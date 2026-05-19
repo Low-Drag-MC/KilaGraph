@@ -1,0 +1,39 @@
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
+
+# idea
+out
+*.ipr
+*.iws
+*.iml
+.idea
+
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+runs
+run-data
+
+repo
+
+*.DS_Store
+*.log
+/.claude
+CLAUDE.md
+/logs
+/mc_src
+/docs
+/.codex
+/.gradle-user-home
+.narrafork/
+/.kotlin
+AGENTS.md
