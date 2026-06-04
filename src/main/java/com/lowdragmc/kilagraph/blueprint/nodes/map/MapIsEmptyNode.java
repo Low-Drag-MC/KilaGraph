@@ -1,0 +1,23 @@
+package com.lowdragmc.kilagraph.blueprint.nodes.map;
+
+import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.graph.core.InputPort;
+import com.lowdragmc.kilagraph.graph.core.OutputPort;
+import com.lowdragmc.kilagraph.graph.exec.EvalContext;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import net.minecraft.network.chat.Component;
+
+import java.util.Map;
+
+@NodeAttribute(name = "map_is_empty", group = "map", graphTypes = BlueprintGraph.class)
+public class MapIsEmptyNode extends AnnotatedNode {
+    @InputPort public Map<?, ?> map = Map.of();
+    @OutputPort public boolean out;
+
+    @Override public Component getDisplayName() { return Component.literal("Map Is Empty"); }
+
+    @Override public void evaluate(EvalContext ctx) {
+        ctx.setOutput("out", ctx.getInput("map", Map.class, Map.of()).isEmpty());
+    }
+}

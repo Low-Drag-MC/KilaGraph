@@ -1,0 +1,27 @@
+package com.lowdragmc.kilagraph.blueprint.nodes.convert;
+
+import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.graph.core.OutputPort;
+import com.lowdragmc.kilagraph.graph.exec.EvalContext;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
+import net.minecraft.network.chat.Component;
+
+@NodeAttribute(name = "convert_to_string", group = "convert", graphTypes = BlueprintGraph.class)
+public class ToStringNode extends AnnotatedNode {
+
+    @OutputPort public String out;
+
+    @Override public Component getDisplayName() { return Component.literal("To String"); }
+
+    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+        ctx.addInputPort("in", TypeHandles.UNKNOWN);
+    }
+
+    @Override public void evaluate(EvalContext ctx) {
+        Object v = ctx.getInput("in").orElse(null);
+        ctx.setOutput("out", v == null ? "" : v.toString());
+    }
+}
