@@ -8,6 +8,7 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.BreakException;
 import com.lowdragmc.kilagraph.graph.exec.ContinueException;
+import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
@@ -35,17 +36,16 @@ public class ForEachNode extends AnnotatedNode {
 
     @Override
     public void execute(ExecContext ctx) {
-        // Pull the list once before iterating — clearing the cache between iterations would lose
-        // it otherwise.
+        // Pull the list once before iterating — clearing the cache between iterations would lose it.
         List<?> values = ctx.getInput("list", List.class, List.of());
-        var indexPort = ctx.getNode().getOutputsById().get("index");
-        var itemPort = ctx.getNode().getOutputsById().get("item");
         for (int i = 0; i < values.size(); i++) {
             ctx.getExecutor().clearCache();
-            if (indexPort != null) ctx.getExecutor().putCache(indexPort, i);
-            if (itemPort != null) ctx.getExecutor().putCache(itemPort, values.get(i));
+            // index/item live in node state so a nested loop's clearCache can't destroy them;
+            // evaluate() re-publishes them on demand.
+            ctx.state().put("index", i);
+            ctx.state().put("item", values.get(i));
             try {
-                ctx.runLoopBody(() -> ctx.flow("body"));
+                ctx.runIsolated(() -> ctx.flow("body"));
             } catch (ContinueException ignored) {
                 // next iteration
             } catch (BreakException ignored) {
@@ -53,5 +53,13 @@ public class ForEachNode extends AnnotatedNode {
             }
         }
         ctx.flow("completed");
+    }
+
+    @Override
+    public void evaluate(EvalContext ctx) {
+        var state = ctx.getExecutor().nodeState(getNodeModel().getUid());
+        Object i = state.get("index");
+        ctx.setOutput("index", i == null ? 0 : i);
+        ctx.setOutput("item", state.get("item"));
     }
 }

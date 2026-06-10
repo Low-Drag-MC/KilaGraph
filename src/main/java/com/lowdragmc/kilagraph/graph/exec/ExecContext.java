@@ -110,6 +110,25 @@ public final class ExecContext {
         executor.enqueueFlow(out);
     }
 
+    // ---- wire topology ---------------------------------------------------------------------
+
+    /**
+     * The source nodes wired into {@code inputId}, read straight from the port topology without
+     * evaluating them. Used by meta-nodes like {@code CacheClear} that act <em>on</em> an upstream
+     * node (here: the {@code Cache} feeding its {@code ref} input) rather than on its value — so
+     * pulling the input (which would force the upstream {@code Cache} to compute) is exactly what we
+     * must avoid.
+     */
+    public java.util.List<NodeModel> connectedSourceNodes(String inputId) {
+        PortModel pm = node.getInputsById().get(inputId);
+        if (pm == null) throw new IllegalArgumentException("No input port '" + inputId + "' on " + node.getUid());
+        var result = new java.util.ArrayList<NodeModel>();
+        for (PortModel connected : pm.getConnectedPorts()) {
+            if (connected.getNodeModel() instanceof NodeModel nm) result.add(nm);
+        }
+        return result;
+    }
+
     // ---- per-node state --------------------------------------------------------------------
 
     /**
@@ -131,16 +150,21 @@ public final class ExecContext {
     }
 
     /**
-     * Execute one isolated iteration of a loop body. Saves the outer pending queue aside, lets
-     * {@code bodyPush} enqueue the body's entry, drains the body's subtree to completion, then
-     * restores the outer queue. {@link BreakException} / {@link ContinueException} thrown inside
-     * the body propagate up to the caller (the loop node) after the queue is restored.
+     * Run {@code flowPush} (typically a single {@code flow(outId)}) with an isolated exec queue:
+     * saves the outer pending queue aside, drains whatever {@code flowPush} enqueues to completion,
+     * then restores the outer queue. {@link BreakException} / {@link ContinueException} thrown
+     * inside propagate up to the caller after the queue is restored.
      *
-     * <p>Without this isolation, a loop sitting after a {@code Sequence} would also drain the
-     * Sequence's siblings during its body — wrong semantics. {@code runLoopBody} pins the body's
-     * world to just what the body itself pushes.</p>
+     * <p>Used by two kinds of node:</p>
+     * <ul>
+     *   <li><b>Loops</b> ({@code For}/{@code While}/{@code ForEach}) — one call per iteration, so the
+     *       body runs fully before the loop decides whether to iterate again, and so the loop catches
+     *       {@code Break}/{@code Continue} at its own level.</li>
+     *   <li><b>{@code Sequence}</b> — one call per output, so each output's chain runs to completion
+     *       before the next starts (run-to-completion semantics, not breadth-first interleaving).</li>
+     * </ul>
      */
-    public void runLoopBody(Runnable bodyPush) {
-        executor.runIsolated(bodyPush);
+    public void runIsolated(Runnable flowPush) {
+        executor.runIsolated(flowPush);
     }
 }

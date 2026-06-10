@@ -20,7 +20,7 @@ import net.minecraft.network.chat.Component;
  * lives in {@link EvalContext}, which makes the same node safely usable by multiple executors
  * (current or future async/parallel).</p>
  */
-public abstract class AnnotatedNode extends Node {
+public abstract class AnnotatedNode extends Node implements IGraphEvaluable {
 
     private NodeMetadata metadata;
 

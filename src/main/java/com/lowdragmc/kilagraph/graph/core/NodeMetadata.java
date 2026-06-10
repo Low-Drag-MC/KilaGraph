@@ -5,6 +5,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IOptionBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.IInputPortBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.IOutputPortBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.PortCapacity;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.PortConnectorUI;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.PortDirection;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
@@ -124,6 +125,7 @@ final class NodeMetadata {
             if (d.kind == Kind.INPUT_PORT) {
                 IInputPortBuilder<?> b = ctx.addInputPort(d.id, d.typeHandle);
                 if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
+                if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
                 if (hasAccessor(d.field.getGenericType())) {
                     Object def = readFieldValue(d.field, node);
                     if (def != null) b.withDefaultValue(def);
@@ -134,6 +136,7 @@ final class NodeMetadata {
             } else {
                 IOutputPortBuilder<?> b = ctx.addOutputPort(d.id, d.typeHandle);
                 if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
+                if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
             }
         }
     }

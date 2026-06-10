@@ -2,10 +2,15 @@ package com.lowdragmc.kilagraph.test.gametest;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.itemlibrary.GraphNodeCreationData;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.SpawnFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.AbstractNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ContextNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.CustomBlockNodeModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
@@ -28,7 +33,7 @@ public final class KGGameTestHelpers {
     }
 
     /** Spawn a node of the given type into the graph and return its underlying NodeModel. */
-    public static NodeModel addNode(BlueprintGraph graph, Class<? extends Node> nodeClass) {
+    public static NodeModel addNode(Graph graph, Class<? extends Node> nodeClass) {
         CustomGraphModelImpl model = graph.graphModel;
         GraphNodeCreationData data = GraphNodeCreationData.ofOrphan(model);
         AbstractNodeModel created = CustomGraphModelImpl.createNodeFromData(data, nodeClass);
@@ -49,6 +54,33 @@ public final class KGGameTestHelpers {
         node.defineNode();
     }
 
+    /**
+     * Instantiate a {@link BlockNode} and insert it into a context node, returning the block's
+     * model. Mirrors {@code BlockCommands.InsertBlockCommand}: set graphModel + non-orphan spawn
+     * flags + parent <em>before</em> {@code onCreateNode()} so the block's ports define & register
+     * against the graph with the parent context known (so parent-dependent port types are correct).
+     */
+    public static NodeModel addBlock(Graph graph, NodeModel contextModel,
+                                     Class<? extends BlockNode> blockClass) {
+        if (!(contextModel instanceof ContextNodeModel cm)) {
+            throw new IllegalArgumentException("Not a context node: " + contextModel);
+        }
+        BlockNode userNode;
+        try {
+            userNode = blockClass.getConstructor().newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Cannot instantiate block " + blockClass.getName(), e);
+        }
+        var block = new CustomBlockNodeModelImpl();
+        block.setGraphModel(graph.graphModel);
+        block.setSpawnFlags(SpawnFlags.DEFAULT);
+        block.initCustomNode(userNode);
+        block.setContextNodeModel(cm);
+        block.onCreateNode();          // defineNode with parent known → correct port types + register
+        cm.insertBlock(block, -1);     // attach (parent already == cm, so no-op re-link)
+        return block;
+    }
+
     /** Set an input port's embedded constant value (for unconnected inputs). */
     public static void setInputConstant(NodeModel node, String portId, Object value) {
         var constant = node.getInputConstantsById().get(portId);
@@ -57,7 +89,7 @@ public final class KGGameTestHelpers {
     }
 
     /** Wire an output port -> input port. */
-    public static void wire(BlueprintGraph graph, PortModel dst, PortModel src) {
+    public static void wire(Graph graph, PortModel dst, PortModel src) {
         graph.graphModel.createWire(dst, src);
     }
 

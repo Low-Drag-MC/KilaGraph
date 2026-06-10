@@ -3,12 +3,14 @@ plugins {
     id 'maven-publish'
     id 'idea'
     id 'net.neoforged.moddev' version '2.0.141'
+    id 'io.freefair.lombok' version '9.2.0'
 }
 
 version = mod_version
 group = mod_group_id
 
 repositories {
+    mavenCentral()
     mavenLocal()
     // LDLib2
     maven { url = "https://maven.firstdark.dev/snapshots" }

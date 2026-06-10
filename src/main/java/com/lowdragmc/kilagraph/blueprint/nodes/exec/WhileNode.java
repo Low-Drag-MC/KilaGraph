@@ -33,7 +33,7 @@ public class WhileNode extends AnnotatedNode {
             ctx.getExecutor().clearCache();
             if (!ctx.getInput("cond", Boolean.class, false)) break;
             try {
-                ctx.runLoopBody(() -> ctx.flow("body"));
+                ctx.runIsolated(() -> ctx.flow("body"));
             } catch (ContinueException ignored) {
                 // skip to next iteration
             } catch (BreakException ignored) {

@@ -2,11 +2,18 @@ package com.lowdragmc.kilagraph;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
+import com.lowdragmc.kilagraph.client.RenderTypeGraphDebug;
 import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
+import com.lowdragmc.lowdraglib2.syncdata.AccessorRegistries;
+import com.lowdragmc.lowdraglib2.syncdata.accessor.direct.CustomDirectAccessor;
 import com.mojang.logging.LogUtils;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.loading.FMLEnvironment;
 import org.slf4j.Logger;
 
 @Mod(Kilagraph.MODID)
@@ -18,10 +25,22 @@ public class Kilagraph {
         // Custom TypeHandles (LIST etc.) must exist before any node class is scanned, because the
         // node registry instantiates each Node to harvest its declared port types.
         KGTypeHandles.init();
+        // Sampler2DValue is a custom-object constant/variable value; register its codec so it round-trips
+        // in graph NBT (customType does not auto-register one — without this the value silently drops).
+        AccessorRegistries.registerAccessor(CustomDirectAccessor.builder(RenderTypeGraphTypes.Sampler2DValue.class)
+                .codec(RenderTypeGraphTypes.SAMPLER2D_CODEC)
+                .streamCodec(RenderTypeGraphTypes.SAMPLER2D_STREAM_CODEC)
+                .copyMark(v -> v) // immutable record — the captured instance compares by value
+                .build(), 1000);
         // Touch the registry to trigger annotation scanning; classes annotated with @NodeAttribute
         // bound to BlueprintGraph self-register.
         LOGGER.info("KilaGraph blueprint nodes loaded: {}", BlueprintGraph.NODE_REGISTRY.getNodeClasses().size());
+        LOGGER.info("KilaGraph rendertype nodes loaded: {}", RenderTypeGraph.NODE_REGISTRY.getNodeClasses().size());
         // Register all KG GameTests (each group adds itself in KGGameTests.init).
         KGGameTests.init(modEventBus);
+        // Client-only debug command + in-world draw for validating the RenderType pipeline end-to-end.
+        if (FMLEnvironment.getDist() == Dist.CLIENT) {
+            RenderTypeGraphDebug.init();
+        }
     }
 }

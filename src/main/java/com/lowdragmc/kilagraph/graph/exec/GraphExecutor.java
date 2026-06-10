@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.graph.exec;
 
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.graph.core.IGraphEvaluable;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IConstantNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IVariableNode;
@@ -178,18 +179,26 @@ public final class GraphExecutor {
         return nodeState.computeIfAbsent(nodeUid, k -> new HashMap<>());
     }
 
-    /**
-     * Stash a value into the port-output cache from outside an evaluate() call. Used by exec nodes
-     * (e.g. {@code For}) that need to expose a data value mid-execute() so the body can pull it
-     * before the normal post-execute flush kicks in.
-     */
-    public void putCache(PortModel outputPort, Object value) {
-        cache.put(outputPort, value);
-    }
-
     /** Reset per-node state — call between independent runs if you want a clean slate. */
     public void clearNodeState() {
         nodeState.clear();
+    }
+
+    /**
+     * Invalidate a single node: drop its per-node {@link #nodeState} entry and evict all its
+     * output ports from the pull {@link #cache}. The next pull of any of its outputs recomputes.
+     *
+     * <p>Used by {@code CacheClear}: unlike {@link #clearCache} (which wipes the whole pull cache
+     * but leaves {@code nodeState} — so a {@code Cache} would keep serving its memo) and
+     * {@link #clearNodeState} (which drops every node's state), this targets exactly one node so a
+     * {@code Cache} recomputes while unrelated memoised values stay put.</p>
+     */
+    public void invalidateNode(NodeModel target) {
+        if (target == null) return;
+        nodeState.remove(target.getUid());
+        for (PortModel out : target.getOutputsByDisplayOrder()) {
+            cache.remove(out);
+        }
     }
 
     private void executeNode(NodeModel n) {
@@ -221,6 +230,16 @@ public final class GraphExecutor {
     }
 
     // ---- internal --------------------------------------------------------------------------
+
+    /**
+     * Public: resolve the value feeding an input port (upstream pull or embedded constant). Used by
+     * meta-nodes that must read a port belonging to a <em>different</em> node — e.g. an InfoNode
+     * field block reading its parent context's {@code target} input.
+     */
+    public Object pullInputValue(PortModel inputPort) {
+        if (inputPort == null) return null;
+        return pullInput(inputPort, Object.class);
+    }
 
     /** Internal: read an input port — either via constant lookup or upstream pull. */
     Object pullInput(PortModel inputPort, Class<?> expected) {
@@ -286,13 +305,14 @@ public final class GraphExecutor {
             return;
         }
 
-        // 4) AnnotatedNode — invoke evaluate(EvalContext).
+        // 4) Any evaluable user node (AnnotatedNode, or a BlockNode-based reader like the InfoNode
+        //    field blocks) — invoke evaluate(EvalContext) and flush its staged outputs.
         if (!(modelNode instanceof NodeModel nm)) return;
         if (!(modelNode instanceof ICustomNodeModel customModel)) return;
         Node userNode = customModel.getNode();
-        if (userNode instanceof AnnotatedNode an) {
+        if (userNode instanceof IGraphEvaluable ev) {
             var ctx = new EvalContext(this, nm);
-            an.evaluate(ctx);
+            ev.evaluate(ctx);
             List<PortModel> outs = nm.getOutputsByDisplayOrder();
             for (PortModel out : outs) {
                 Object v = ctx.outputs.get(out.getPortId());

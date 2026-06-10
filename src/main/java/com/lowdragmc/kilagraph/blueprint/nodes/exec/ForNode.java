@@ -8,13 +8,18 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.BreakException;
 import com.lowdragmc.kilagraph.graph.exec.ContinueException;
+import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionFlow;
 
 /**
  * Counted loop. Runs {@code body} {@code count} times; on each iteration {@code index} (data
- * output) is set to the current index 0..count-1. After the loop, fires {@code completed}.
+ * output) is the current index 0..count-1. After the loop, fires {@code completed}.
+ *
+ * <p>The current index lives in per-node state (keyed by this loop's UID) rather than being pushed
+ * into the pull cache directly — that way a nested loop's {@code clearCache()} can't destroy an
+ * <em>outer</em> loop's live index. {@link #evaluate} re-publishes it on demand.</p>
  */
 @NodeAttribute(name = "exec_for", group = "exec", graphTypes = BlueprintGraph.class)
 public class ForNode extends AnnotatedNode {
@@ -28,14 +33,13 @@ public class ForNode extends AnnotatedNode {
     @Override
     public void execute(ExecContext ctx) {
         int n = Math.max(0, ctx.getInput("count", Integer.class, 0));
-        var indexPort = ctx.getNode().getOutputsById().get("index");
         for (int i = 0; i < n; i++) {
-            // The pull cache holds last iteration's values — invalidate so body recomputes.
+            // The pull cache holds last iteration's values — invalidate so body recomputes against
+            // the new index. The index itself survives in node state (not the cache).
             ctx.getExecutor().clearCache();
-            // Stash this iteration's index eagerly so body nodes can pull it immediately.
-            if (indexPort != null) ctx.getExecutor().putCache(indexPort, i);
+            ctx.state().put("index", i);
             try {
-                ctx.runLoopBody(() -> ctx.flow("body"));
+                ctx.runIsolated(() -> ctx.flow("body"));
             } catch (ContinueException ignored) {
                 // skip to next iteration
             } catch (BreakException ignored) {
@@ -43,5 +47,11 @@ public class ForNode extends AnnotatedNode {
             }
         }
         ctx.flow("completed");
+    }
+
+    @Override
+    public void evaluate(EvalContext ctx) {
+        Object i = ctx.getExecutor().nodeState(getNodeModel().getUid()).get("index");
+        ctx.setOutput("index", i == null ? 0 : i);
     }
 }

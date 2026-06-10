@@ -1,0 +1,38 @@
+package com.lowdragmc.kilagraph.rendertype.compiler;
+
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.Sampler2DValue;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerAddress;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerFilter;
+import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
+import net.minecraft.resources.Identifier;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * A compiled sampler's baked default: the texture to bind plus its GPU sampler parameters (filter /
+ * address / mipmap). Carries KilaGraph's own {@link SamplerFilter}/{@link SamplerAddress} enums (not
+ * blaze3d's) so the compiler/types layer stays headless-safe; the runtime maps these to the
+ * {@code com.mojang.blaze3d.textures} enums when building the {@code GpuSampler}.
+ */
+public record SamplerDefault(Identifier texture, SamplerFilter filter, SamplerAddress address, boolean mipmap) {
+
+    /** The MC missing-texture placeholder with sane defaults — used for unconnected sampler fallbacks. */
+    public static SamplerDefault missing() {
+        return new SamplerDefault(MissingTextureAtlasSprite.getLocation(),
+                SamplerFilter.NEAREST, SamplerAddress.CLAMP, false);
+    }
+
+    /**
+     * Build from a {@link Sampler2DValue} (a constant/variable's value): parse its location to an
+     * {@link Identifier} (else {@code null} — the runtime then binds the missing-texture placeholder).
+     */
+    @Nullable
+    public static SamplerDefault of(Object value) {
+        if (!(value instanceof RenderTypeGraphTypes.Sampler2DValue s)) return null;
+        String loc = s.location();
+        if (loc == null || loc.isBlank()) return null;
+        Identifier texture = Identifier.tryParse(loc);
+        if (texture == null) return null;
+        return new SamplerDefault(texture, s.filter(), s.address(), s.mipmap());
+    }
+}

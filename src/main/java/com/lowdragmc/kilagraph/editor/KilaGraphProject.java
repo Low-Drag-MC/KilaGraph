@@ -31,7 +31,9 @@ public class KilaGraphProject implements IProject {
                 TexturesResource.INSTANCE,
                 IRendererResource.INSTANCE,
                 UIResource.INSTANCE,
-                BlueprintGraphResource.INSTANCE
+                BlueprintGraphResource.INSTANCE,
+                RenderTypeGraphResource.INSTANCE,
+                ShaderFunctionGraphResource.INSTANCE
         );
     }
 
