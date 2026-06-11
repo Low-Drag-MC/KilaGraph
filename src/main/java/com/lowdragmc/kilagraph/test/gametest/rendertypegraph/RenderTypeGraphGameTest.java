@@ -7,7 +7,10 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
+import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
 import com.lowdragmc.kilagraph.rendertype.gui.RenderTypeGraphView;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphLogger;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.ApplyFogNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.LightMapTextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.OverlayTextureNode;
@@ -56,6 +59,7 @@ import java.util.List;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
+import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addRegisteredNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertFalse;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertTrue;
@@ -74,6 +78,11 @@ public final class RenderTypeGraphGameTest {
     private static final String DEFAULT_ENTITY_SHADER_GRAPH = "rendertype_default_entity_shader_graph";
     private static final String SHADER_VALUE_ASSIGNABILITY = "rendertype_shader_value_assignability";
     private static final String COMPILE_DEFAULT_ENTITY = "rendertype_compile_default_entity";
+    private static final String COMPILE_COMPOSED_FORMAT = "rendertype_compile_composed_format";
+    private static final String VERTEX_FORMAT_VALIDATION = "rendertype_vertex_format_validation";
+    private static final String VERTEX_ELEMENT_FALLBACK = "rendertype_vertex_element_fallback";
+    private static final String PREVIEW_GEOMETRY = "rendertype_preview_geometry";
+    private static final String PREVIEW_TESSELLATOR = "rendertype_preview_tessellator";
     private static final String CHANGE_VERSION = "rendertype_change_version";
 
     private RenderTypeGraphGameTest() {}
@@ -96,6 +105,16 @@ public final class RenderTypeGraphGameTest {
                 RenderTypeGraphGameTest::shaderVectorValuesAreWireCompatible);
         KGGameTests.registerFunction(COMPILE_DEFAULT_ENTITY,
                 RenderTypeGraphGameTest::compileDefaultEntityShader);
+        KGGameTests.registerFunction(COMPILE_COMPOSED_FORMAT,
+                RenderTypeGraphGameTest::compileRespectsComposedVertexFormat);
+        KGGameTests.registerFunction(VERTEX_FORMAT_VALIDATION,
+                RenderTypeGraphGameTest::vertexFormatValidationFlagsMissingElement);
+        KGGameTests.registerFunction(VERTEX_ELEMENT_FALLBACK,
+                RenderTypeGraphGameTest::vertexElementDefaultFallsBackAndWarns);
+        KGGameTests.registerFunction(PREVIEW_GEOMETRY,
+                RenderTypeGraphGameTest::previewContentsBuildGeometry);
+        KGGameTests.registerFunction(PREVIEW_TESSELLATOR,
+                RenderTypeGraphGameTest::previewTessellatorMatchesMode);
         KGGameTests.registerFunction(CHANGE_VERSION,
                 RenderTypeGraphGameTest::onGraphChangedBumpsChangeVersion);
     }
@@ -120,6 +139,16 @@ public final class RenderTypeGraphGameTest {
                 KGGameTests.functionKey(SHADER_VALUE_ASSIGNABILITY), d);
         KGGameTests.registerFunctionTest(event, COMPILE_DEFAULT_ENTITY,
                 KGGameTests.functionKey(COMPILE_DEFAULT_ENTITY), d);
+        KGGameTests.registerFunctionTest(event, COMPILE_COMPOSED_FORMAT,
+                KGGameTests.functionKey(COMPILE_COMPOSED_FORMAT), d);
+        KGGameTests.registerFunctionTest(event, VERTEX_FORMAT_VALIDATION,
+                KGGameTests.functionKey(VERTEX_FORMAT_VALIDATION), d);
+        KGGameTests.registerFunctionTest(event, VERTEX_ELEMENT_FALLBACK,
+                KGGameTests.functionKey(VERTEX_ELEMENT_FALLBACK), d);
+        KGGameTests.registerFunctionTest(event, PREVIEW_GEOMETRY,
+                KGGameTests.functionKey(PREVIEW_GEOMETRY), d);
+        KGGameTests.registerFunctionTest(event, PREVIEW_TESSELLATOR,
+                KGGameTests.functionKey(PREVIEW_TESSELLATOR), d);
         KGGameTests.registerFunctionTest(event, CHANGE_VERSION,
                 KGGameTests.functionKey(CHANGE_VERSION), d);
     }
@@ -212,8 +241,8 @@ public final class RenderTypeGraphGameTest {
                 graph.getVertexStageModel() == graph.getVertexStageModel());
         assertTrue(helper, "fixed fragment stage is stable",
                 graph.getFragmentStageModel() == graph.getFragmentStageModel());
-        assertTrue(helper, "default vertex format preset is entity",
-                graph.getSettings().vertexFormatPreset() == RenderTypeGraph.Settings.VertexFormatPreset.ENTITY);
+        assertTrue(helper, "default vertex format is the entity preset",
+                graph.getSettings().vertexFormatElements().equals(VertexFormatPresets.ENTITY));
         assertTrue(helper, "default vertex format mode is quads",
                 graph.getSettings().vertexFormatMode() == RenderTypeGraph.Settings.VertexFormatMode.QUADS);
         assertTrue(helper, "default blend is opaque",
@@ -311,7 +340,7 @@ public final class RenderTypeGraphGameTest {
     public static void resourcePersistsRenderTypeSettings(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         RenderTypeGraph.Settings settings = new RenderTypeGraph.Settings(
-                RenderTypeGraph.Settings.VertexFormatPreset.BLOCK,
+                VertexFormatPresets.BLOCK,
                 RenderTypeGraph.Settings.VertexFormatMode.TRIANGLES,
                 RenderTypeGraph.Settings.BlendMode.ALPHA,
                 RenderTypeGraph.Settings.DepthTest.ALWAYS,
@@ -338,7 +367,7 @@ public final class RenderTypeGraphGameTest {
         RenderTypeGraphView view = new RenderTypeGraphView();
         view.loadGraph(graph);
         RenderTypeGraph.Settings settings = new RenderTypeGraph.Settings(
-                RenderTypeGraph.Settings.VertexFormatPreset.POSITION_COLOR_TEX,
+                VertexFormatPresets.POSITION_COLOR_TEX,
                 RenderTypeGraph.Settings.VertexFormatMode.LINES,
                 RenderTypeGraph.Settings.BlendMode.ADDITIVE,
                 RenderTypeGraph.Settings.DepthTest.NONE,
@@ -483,6 +512,146 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "layout registers the texture-constant sampler",
                 compiled.layout().samplers().stream().anyMatch(s -> s.startsWith("kg_tex")));
         helper.succeed();
+    }
+
+    /** The composed vertex format drives the generated {@code in} attribute declarations: a Block-preset
+     * graph declares exactly Position/Color/UV0/UV2 and omits UV1/Normal. */
+    public static void compileRespectsComposedVertexFormat(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        var s = graph.getSettings();
+        graph.setSettings(new RenderTypeGraph.Settings(
+                VertexFormatPresets.BLOCK, s.vertexFormatMode(), s.blend(), s.depthTest(),
+                s.depthWrite(), s.cull(), s.outputTarget(), s.affectsOutline(), s.sortOnUpload()));
+
+        String vsh = new ShaderGraphCompiler(graph).compile().vertexSource();
+        assertTrue(helper, "block vsh declares Position", vsh.contains("in vec3 Position;"));
+        assertTrue(helper, "block vsh declares Color", vsh.contains("in vec4 Color;"));
+        assertTrue(helper, "block vsh declares UV0", vsh.contains("in vec2 UV0;"));
+        assertTrue(helper, "block vsh declares UV2", vsh.contains("in ivec2 UV2;"));
+        assertFalse(helper, "block vsh omits UV1", vsh.contains("in ivec2 UV1;"));
+        assertFalse(helper, "block vsh omits Normal", vsh.contains("in vec3 Normal;"));
+        helper.succeed();
+    }
+
+    /** A VertexAttributeInputNode whose chosen element is absent from the composed format is flagged via the
+     * GraphLogger (keyed by the node), and not flagged once the element is present. */
+    public static void vertexFormatValidationFlagsMissingElement(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        // Non-orphan so it appears in getNodeModels(), which the validation iterates (orphan nodes don't).
+        NodeModel attr = addRegisteredNode(graph, VertexAttributeInputNode.class); // default element: position
+        RenderTypeGraph.Settings s = graph.getSettings();
+
+        // Format WITHOUT position -> the node's required element is missing.
+        graph.setSettings(new RenderTypeGraph.Settings(
+                List.of("color", "uv0"), s.vertexFormatMode(), s.blend(), s.depthTest(),
+                s.depthWrite(), s.cull(), s.outputTarget(), s.affectsOutline(), s.sortOnUpload()));
+        GraphLogger missing = new GraphLogger();
+        graph.onGraphChanged(missing);
+        assertTrue(helper, "missing element is flagged for the node",
+                missing.getEntries().stream().anyMatch(e -> e.context() == attr));
+
+        // Format WITH position (Entity preset) -> no error for the node.
+        graph.setSettings(new RenderTypeGraph.Settings(
+                VertexFormatPresets.ENTITY, s.vertexFormatMode(), s.blend(), s.depthTest(),
+                s.depthWrite(), s.cull(), s.outputTarget(), s.affectsOutline(), s.sortOnUpload()));
+        GraphLogger present = new GraphLogger();
+        graph.onGraphChanged(present);
+        assertTrue(helper, "present element is not flagged for the node",
+                present.getEntries().stream().noneMatch(e -> e.context() == attr));
+        helper.succeed();
+    }
+
+    /** Removing a vertex element a node DEFAULT references (the vertex Color block defaults to
+     * minecraft_mix_light(Normal, Color)) degrades to a safe constant — the shader stays valid (no Color
+     * attribute / undefined var), the substitution is recorded, and onGraphChanged logs a warning. */
+    public static void vertexElementDefaultFallsBackAndWarns(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        RenderTypeGraph.Settings s = graph.getSettings();
+        var without = new java.util.ArrayList<>(s.vertexFormatElements());
+        without.remove("color");
+        graph.setSettings(new RenderTypeGraph.Settings(without, s.vertexFormatMode(), s.blend(), s.depthTest(),
+                s.depthWrite(), s.cull(), s.outputTarget(), s.affectsOutline(), s.sortOnUpload()));
+
+        CompiledShaderGraph compiled = new ShaderGraphCompiler(graph).compile();
+        assertTrue(helper, "removed Color is reported as a substituted attribute",
+                compiled.missingAttributes().contains("Color"));
+        assertFalse(helper, "vsh no longer declares the Color attribute",
+                compiled.vertexSource().contains("in vec4 Color;"));
+
+        GraphLogger logger = new GraphLogger();
+        graph.onGraphChanged(logger);
+        assertTrue(helper, "a warning is logged for the defaulted attribute",
+                logger.getEntries().stream().anyMatch(e -> e.level() == GraphLogger.Level.WARNING));
+        helper.succeed();
+    }
+
+    /** The built-in preview contents build the expected neutral geometry. */
+    public static void previewContentsBuildGeometry(GameTestHelper helper) {
+        var quad = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
+        com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents.QUAD.build(quad);
+        assertTrue(helper, "quad content is one quad", quad.quads.size() == 1 && quad.tris.isEmpty());
+
+        var cube = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
+        com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents.CUBE.build(cube);
+        assertTrue(helper, "cube content is six quads", cube.quads.size() == 6 && cube.tris.isEmpty());
+
+        var sphere = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
+        com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents.SPHERE.build(sphere);
+        assertTrue(helper, "sphere content has quad bands + triangle caps",
+                !sphere.quads.isEmpty() && !sphere.tris.isEmpty());
+
+        // Custom-element adaptation: a vertex carries per-element values for mod-registered elements,
+        // and copies preserve them (so a content can supply data a custom writer reads).
+        var pv = new com.lowdragmc.kilagraph.rendertype.preview.PreviewVertex();
+        pv.setAttribute("mod_tangent", 1f, 0f, 0f);
+        var cp = pv.copy();
+        assertTrue(helper, "custom attribute round-trips through copy",
+                cp.getAttribute("mod_tangent") != null && cp.getAttribute("mod_tangent")[0] == 1f);
+        assertTrue(helper, "unset custom attribute is null", pv.getAttribute("nope") == null);
+        helper.succeed();
+    }
+
+    /** The tessellator emits the right vertex count per primitive mode, and the triangle-strip stitch
+     * preserves winding (every reconstructed triangle stays CCW). */
+    public static void previewTessellatorMatchesMode(GameTestHelper helper) {
+        var mb = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
+        com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents.CUBE.build(mb); // 6 quads, 24 edges
+
+        var QUADS = RenderTypeGraph.Settings.VertexFormatMode.QUADS;
+        var TRIANGLES = RenderTypeGraph.Settings.VertexFormatMode.TRIANGLES;
+        var LINES = RenderTypeGraph.Settings.VertexFormatMode.LINES;
+        var LINE_STRIP = RenderTypeGraph.Settings.VertexFormatMode.LINE_STRIP;
+        var stream = com.lowdragmc.kilagraph.rendertype.preview.PreviewTessellator.toStream(mb, QUADS);
+        assertEq(helper, "QUADS: 6 quads -> 24 verts", 24, stream.size());
+        assertEq(helper, "TRIANGLES: 12 tris -> 36 verts", 36,
+                com.lowdragmc.kilagraph.rendertype.preview.PreviewTessellator.toStream(mb, TRIANGLES).size());
+        assertEq(helper, "LINES: 24 edges -> 96 verts", 96,
+                com.lowdragmc.kilagraph.rendertype.preview.PreviewTessellator.toStream(mb, LINES).size());
+        assertEq(helper, "LINE_STRIP: 24 edges -> 48 verts", 48,
+                com.lowdragmc.kilagraph.rendertype.preview.PreviewTessellator.toStream(mb, LINE_STRIP).size());
+
+        // Triangle-strip winding: two CCW (+Z) triangles in XY -> stitched strip -> all reconstructed
+        // (non-degenerate) triangles must remain CCW (+Z cross product).
+        var flat = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
+        flat.tri(pv(0, 0), pv(1, 0), pv(0, 1));   // CCW
+        flat.tri(pv(2, 0), pv(3, 0), pv(2, 1));   // CCW, separated
+        var strip = com.lowdragmc.kilagraph.rendertype.preview.PreviewTessellator.toStream(
+                flat, RenderTypeGraph.Settings.VertexFormatMode.TRIANGLE_STRIP);
+        int real = 0;
+        for (int i = 0; i + 2 < strip.size(); i++) {
+            var a = strip.get(i); var b = strip.get(i + 1); var c = strip.get(i + 2);
+            if (i % 2 == 1) { var t = a; a = b; b = t; } // GL strip flips odd triangles
+            double cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+            if (Math.abs(cross) < 1e-6) continue;       // degenerate bridge triangle
+            real++;
+            assertTrue(helper, "stitched strip keeps CCW winding", cross > 0);
+        }
+        assertEq(helper, "strip reconstructs both triangles", 2, real);
+        helper.succeed();
+    }
+
+    private static com.lowdragmc.kilagraph.rendertype.preview.PreviewVertex pv(float x, float y) {
+        return new com.lowdragmc.kilagraph.rendertype.preview.PreviewVertex(x, y, 0, 0, 0, 0, 0, 1);
     }
 
     private static NodeModel findNode(RenderTypeGraph graph, Class<? extends Node> nodeClass) {

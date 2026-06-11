@@ -12,7 +12,6 @@ import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.pipeline.DepthStencilState;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.CompareOp;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -176,7 +175,7 @@ public final class RenderTypeFactory {
                 .withLocation(Identifier.fromNamespaceAndPath(Kilagraph.MODID, "pipeline/" + compiled.contentHash()))
                 .withVertexShader(shaderId)
                 .withFragmentShader(shaderId)
-                .withVertexFormat(vertexFormat(settings.vertexFormatPreset()), vertexMode(settings.vertexFormatMode()))
+                .withVertexFormat(vertexFormat(settings.vertexFormatElements()), vertexMode(settings.vertexFormatMode()))
                 .withColorTargetState(colorTarget(settings.blend()))
                 .withDepthStencilState(depthState(settings.depthTest(), settings.depthWrite()))
                 .withCull(settings.cull());
@@ -226,12 +225,8 @@ public final class RenderTypeFactory {
 
     // ---- Settings -> pipeline state mapping --------------------------------------------------
 
-    public static VertexFormat vertexFormat(RenderTypeGraph.Settings.VertexFormatPreset preset) {
-        return switch (preset) {
-            case BLOCK -> DefaultVertexFormat.BLOCK;
-            case POSITION_COLOR_TEX -> DefaultVertexFormat.POSITION_TEX_COLOR;
-            case ENTITY, CUSTOM -> DefaultVertexFormat.ENTITY;
-        };
+    public static VertexFormat vertexFormat(java.util.List<String> elementKeys) {
+        return com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat.of(elementKeys);
     }
 
     public static VertexFormat.Mode vertexMode(RenderTypeGraph.Settings.VertexFormatMode mode) {

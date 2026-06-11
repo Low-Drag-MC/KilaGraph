@@ -55,6 +55,29 @@ public final class ShaderCompileContext {
         return pm != null && pm.isConnected();
     }
 
+    // ---- vertex attributes -------------------------------------------------------------------
+
+    /**
+     * A raw vertex-attribute reference (e.g. {@code Color}) when its element is in the active vertex
+     * format, else {@code fallback} — so a node default referencing an attribute the user removed degrades
+     * to a safe constant instead of producing undefined-variable GLSL. The substitution is recorded and
+     * surfaced as an editor warning.
+     */
+    public ShaderExpr attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElement element,
+                                GlslType type, ShaderExpr fallback) {
+        return compiler.attribute(element, type, fallback);
+    }
+
+    /** Whether the given vertex element is declared in the active vertex format. */
+    public boolean hasAttribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElement element) {
+        return compiler.hasAttribute(element);
+    }
+
+    /** Record that a referenced attribute is absent from the format (for callers building the ref themselves). */
+    public void markMissingAttribute(String attribName) {
+        compiler.markMissingAttribute(attribName);
+    }
+
     // ---- output writes -----------------------------------------------------------------------
 
     /** Publish an output port's GLSL expression (converted/hoisted by the compiler after compile). */

@@ -46,10 +46,7 @@
   "rt_fragment_emission": "Emission",
   "rt_fragment_alpha_discard": "Alpha Discard",
 
-  "rt_in_position": "Vertex Position",
-  "rt_in_color": "Vertex Color",
-  "rt_in_normal": "Vertex Normal",
-  "rt_in_uv0": "Vertex UV0",
+  "rt_in_vertex_attribute": "Vertex Attribute",
   "rt_frag_tex_coord": "Frag TexCoord",
   "rt_frag_color": "Frag Color",
   "rt_frag_spherical_distance": "Frag Spherical Vertex Distance",
@@ -252,5 +249,8 @@
   "string_trim": "Trim",
   "string_contains": "Contains",
   "string_starts_with": "Starts With",
-  "string_ends_with": "Ends With"
+  "string_ends_with": "Ends With",
+  "rendertypegraph.preview.title": "RenderType Preview",
+  "rendertypegraph.error.missing_vertex_element": "Vertex attribute node needs '%s', not in the vertex format",
+  "rendertypegraph.warn.vertex_element_defaulted": "A default uses vertex attribute '%s' (not in the format) — using a constant"
 }

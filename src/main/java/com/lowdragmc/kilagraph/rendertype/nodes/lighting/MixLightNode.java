@@ -37,8 +37,14 @@ public class MixLightNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         ctx.useMinecraftUniform("Lighting", "minecraft:light.glsl");
-        ShaderExpr normal = ctx.isConnected("normal") ? ctx.input("normal") : new ShaderExpr("Normal", GlslType.VEC3);
-        ShaderExpr color = ctx.isConnected("color") ? ctx.input("color") : new ShaderExpr("Color", GlslType.VEC4);
+        // Unconnected normal/color fall back to the Normal/Color attributes — via ctx.attribute so removing
+        // those elements degrades to safe constants (up / white) instead of undefined-variable GLSL.
+        ShaderExpr normal = ctx.isConnected("normal") ? ctx.input("normal")
+                : ctx.attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.NORMAL,
+                        GlslType.VEC3, new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+        ShaderExpr color = ctx.isConnected("color") ? ctx.input("color")
+                : ctx.attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.COLOR,
+                        GlslType.VEC4, new ShaderExpr("vec4(1.0)", GlslType.VEC4));
         String code = "minecraft_mix_light(Light0_Direction, Light1_Direction, "
                 + normal.code() + ", " + color.code() + ")";
         ctx.output("litColor", new ShaderExpr(code, GlslType.VEC4));

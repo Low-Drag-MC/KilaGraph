@@ -40,6 +40,15 @@ public final class KGGameTestHelpers {
         return (NodeModel) created;
     }
 
+    /** Like {@link #addNode}, but a non-orphan (DEFAULT spawn) node — so it appears in
+     * {@code graphModel.getNodeModels()} (orphan nodes don't), e.g. for graph-wide validation tests. */
+    public static NodeModel addRegisteredNode(Graph graph, Class<? extends Node> nodeClass) {
+        CustomGraphModelImpl model = graph.graphModel;
+        var data = new GraphNodeCreationData(model, new org.joml.Vector2f(), SpawnFlags.DEFAULT, null);
+        AbstractNodeModel created = CustomGraphModelImpl.createNodeFromData(data, nodeClass);
+        return (NodeModel) created;
+    }
+
     /** Set a node option's value (the option's port-backed embedded constant). */
     public static void setOption(NodeModel node, String optionId, Object value) {
         NodeOption opt = null;

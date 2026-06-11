@@ -11,6 +11,8 @@ import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.Style;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Scene;
+import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
+import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.utils.virtuallevel.TrackedDummyWorld;
 import com.mojang.logging.LogUtils;
@@ -42,6 +44,8 @@ public class NodeShaderPreview extends UIElement {
     private boolean lastCompileFailed = false;
     /** The graph change-version last compiled; skip recompiling this thumbnail while it's unchanged. */
     private long lastChangeVersion = Long.MIN_VALUE;
+    /** Ephemeral (not serialized) preview geometry; a flat quad by default, switched via right-click. */
+    private KGPreviewContent content = KGPreviewContents.QUAD;
 
     public NodeShaderPreview(RenderTypeGraph graph, PortModel outputPort) {
         this.graph = graph;
@@ -68,15 +72,26 @@ public class NodeShaderPreview extends UIElement {
         Style.defaultPipeline(scene.getLayout(), l -> l.widthPercent(100).heightPercent(100));
         scene.<WorldSceneRenderer>getRenderer().setAfterBuiltinSubmit(this::submit);
         addChild(scene);
+
+        // Right-click the thumbnail → switch its preview geometry (same picker as the whole-graph preview).
+        addEventListener(UIEvents.MOUSE_DOWN, this::onMouseDown);
+    }
+
+    private void onMouseDown(UIEvent event) {
+        if (event.button != 1 || material == null) return; // right-click only
+        var formatKeys = PreviewContentMenu.formatKeys(material.renderType().format());
+        PreviewContentMenu.open(this, event, formatKeys, c -> content = c);
     }
 
     private void submit(SceneRenderContext ctx) {
         RenderTypeGraphMaterial mat = updateMaterial();
         if (mat == null) return;
         RenderType renderType = mat.renderType();
-        boolean quads = renderType.mode() == com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS;
+        // Node previews compile with PREVIEW_SETTINGS (POSITION_COLOR_TEX, QUADS); render the chosen content
+        // (a flat quad by default) through the shared content/tessellator path.
         ctx.submitStorage().submitCustomGeometry(ctx.poseStack(), renderType,
-                (pose, buffer) -> PreviewGeometry.quad(pose, buffer, renderType.format(), quads));
+                (pose, buffer) -> PreviewRenderer.render(content, pose, buffer,
+                        renderType.format(), RenderTypeGraph.Settings.VertexFormatMode.QUADS));
     }
 
     private RenderTypeGraphMaterial updateMaterial() {

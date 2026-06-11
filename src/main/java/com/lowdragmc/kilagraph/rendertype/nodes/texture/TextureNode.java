@@ -9,6 +9,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
+import net.minecraft.network.chat.Component;
 
 /**
  * A texture source: outputs a {@code SAMPLER2D} configured via its {@code texture} option (a
@@ -23,6 +24,7 @@ public class TextureNode extends ShaderNode {
     public void onDefineOptions(IOptionDefinitionContext context) {
         // SAMPLER2D carries the Sampler2DConfigurator (custom/atlas picker + sampler params + preview).
         context.addOption("texture", RenderTypeGraphTypes.SAMPLER2D)
+                .withDisplayName(Component.empty())
                 .withDefaultValue(Sampler2DValue.defaultValue())
                 .build();
     }

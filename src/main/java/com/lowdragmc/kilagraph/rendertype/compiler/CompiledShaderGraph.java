@@ -41,7 +41,11 @@ public record CompiledShaderGraph(
         Map<String, MaterialUniformLayout.Field> uniformFields,
         Map<String, String> variableSamplers,
         boolean usesOverlay,
-        boolean usesLightmap
+        boolean usesLightmap,
+        // Attribute names a node/block default referenced that aren't in the vertex format (a safe constant
+        // was substituted in the GLSL). Diagnostics only — surfaced as editor warnings; the GLSL already
+        // reflects the substitution, so this is NOT part of contentHash().
+        List<String> missingAttributes
 ) {
 
     /** Whether stage-affinity violations were found (the generated GLSL is then not safe to compile). */

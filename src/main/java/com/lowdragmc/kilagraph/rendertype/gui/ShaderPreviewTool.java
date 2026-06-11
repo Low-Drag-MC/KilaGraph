@@ -3,6 +3,10 @@ package com.lowdragmc.kilagraph.rendertype.gui;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
+import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContent;
+import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents;
+import com.lowdragmc.kilagraph.rendertype.preview.PreviewContentMenu;
+import com.lowdragmc.kilagraph.rendertype.preview.PreviewRenderer;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeFactory;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
 import com.lowdragmc.lowdraglib2.client.scene.SceneRenderContext;
@@ -12,16 +16,14 @@ import com.lowdragmc.lowdraglib2.gui.ui.Style;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Scene;
+import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
+import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.IGraphTool;
 import com.lowdragmc.lowdraglib2.utils.virtuallevel.TrackedDummyWorld;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormatElement;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -42,7 +44,6 @@ import org.slf4j.Logger;
 public class ShaderPreviewTool extends UIElement implements IGraphTool {
 
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final int FULL_BRIGHT = 0x00F000F0;
 
     private final RenderTypeGraphView graphView;
     @Nullable
@@ -54,6 +55,8 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
     private boolean lastCompileFailed = false;
     /** The graph change-version last compiled; skip recompiling while it's unchanged. */
     private long lastChangeVersion = Long.MIN_VALUE;
+    /** Ephemeral (not serialized) choice of what geometry to preview; switched via right-click. */
+    private KGPreviewContent content = KGPreviewContents.CUBE;
 
     public ShaderPreviewTool(RenderTypeGraphView graphView) {
         this.graphView = graphView;
@@ -80,6 +83,9 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
         scene.<WorldSceneRenderer>getRenderer().setAfterBuiltinSubmit(this::submitPreview);
         addChild(scene);
 
+        // Right-click anywhere in the panel → choose the preview geometry (Quad / Cube / Sphere / …).
+        addEventListener(UIEvents.MOUSE_DOWN, this::onMouseDown);
+
         // Overlays the scene; shows stage-affinity errors when the current graph has any.
         errorLabel = new Label();
         Style.defaultPipeline(errorLabel.getLayout(),
@@ -90,7 +96,7 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
 
     @Override
     public Component getTitle() {
-        return Component.literal("Preview");
+        return Component.translatable("rendertypegraph.preview.title");
     }
 
     /** Free the per-instance material (GpuBuffer) when the panel goes away. The Scene releases its
@@ -118,10 +124,30 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
         // between the buffer's format and what we write.)
         RenderType renderType = mat.renderType();
         VertexFormat format = renderType.format();
-        boolean quads = renderType.mode() == VertexFormat.Mode.QUADS;
+        var mode = modeOf(renderType.mode());
 
         ctx.submitStorage().submitCustomGeometry(ctx.poseStack(), renderType,
-                (pose, buffer) -> emitCube(pose, buffer, format, quads));
+                (pose, buffer) -> PreviewRenderer.render(content, pose, buffer, format, mode));
+    }
+
+    /** Map the pipeline's primitive mode back to the graph's {@link RenderTypeGraph.Settings.VertexFormatMode}
+     * (the inverse of {@code RenderTypeFactory.vertexMode}), so the tessellator emits a matching stream. */
+    private static RenderTypeGraph.Settings.VertexFormatMode modeOf(VertexFormat.Mode mode) {
+        return switch (mode) {
+            case TRIANGLES -> RenderTypeGraph.Settings.VertexFormatMode.TRIANGLES;
+            case TRIANGLE_STRIP, TRIANGLE_FAN -> RenderTypeGraph.Settings.VertexFormatMode.TRIANGLE_STRIP;
+            case LINES -> RenderTypeGraph.Settings.VertexFormatMode.LINES;
+            case DEBUG_LINES, DEBUG_LINE_STRIP -> RenderTypeGraph.Settings.VertexFormatMode.LINE_STRIP;
+            case QUADS, POINTS -> RenderTypeGraph.Settings.VertexFormatMode.QUADS;
+        };
+    }
+
+    // ---- right-click content switch ----------------------------------------------------------
+
+    private void onMouseDown(UIEvent event) {
+        if (event.button != 1 || material == null) return; // right-click only
+        var formatKeys = PreviewContentMenu.formatKeys(material.renderType().format());
+        PreviewContentMenu.open(this, event, formatKeys, c -> content = c);
     }
 
     /** Recompile + rebuild the material when the graph changed; null if it can't be rendered. */
@@ -174,48 +200,4 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
         errorLabel.setValue(text.withStyle(s -> s.withColor(0xFF5555)));
     }
 
-    // ---- preview geometry --------------------------------------------------------------------
-
-    /**
-     * A unit cube centered at the origin. Faces wind counter-clockwise when viewed from outside, so
-     * back-face culling keeps the outer surfaces. Vertices carry only the attributes present in
-     * {@code format}. {@code quads} chooses 4-vertex faces (QUADS mode) vs two triangles per face.
-     */
-    private static void emitCube(PoseStack.Pose pose, VertexConsumer vc, VertexFormat format, boolean quads) {
-        // 8 corners
-        float[][] c = {
-                {-0.5f, -0.5f, -0.5f}, {0.5f, -0.5f, -0.5f}, {0.5f, 0.5f, -0.5f}, {-0.5f, 0.5f, -0.5f}, // back  (-Z)
-                {-0.5f, -0.5f, 0.5f}, {0.5f, -0.5f, 0.5f}, {0.5f, 0.5f, 0.5f}, {-0.5f, 0.5f, 0.5f}      // front (+Z)
-        };
-        // 6 faces as CCW-from-outside corner indices + outward normal
-        int[][] faces = {
-                {1, 0, 3, 2}, {4, 5, 6, 7}, {0, 4, 7, 3}, {5, 1, 2, 6}, {4, 0, 1, 5}, {3, 7, 6, 2}
-        };
-        float[][] normals = {
-                {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}
-        };
-        float[][] uvs = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
-
-        for (int f = 0; f < 6; f++) {
-            int[] q = faces[f];
-            float[] n = normals[f];
-            if (quads) {
-                for (int i = 0; i < 4; i++) vertex(vc, pose, format, c[q[i]], uvs[i], n);
-            } else {
-                int[] tri = {0, 1, 2, 0, 2, 3};
-                for (int i : tri) vertex(vc, pose, format, c[q[i]], uvs[i], n);
-            }
-        }
-    }
-
-    /** Emit one vertex, writing only the attributes the format declares. */
-    private static void vertex(VertexConsumer vc, PoseStack.Pose pose, VertexFormat format,
-                               float[] p, float[] uv, float[] n) {
-        vc.addVertex(pose, p[0], p[1], p[2]);
-        if (format.contains(VertexFormatElement.COLOR)) vc.setColor(255, 255, 255, 255);
-        if (format.contains(VertexFormatElement.UV0)) vc.setUv(uv[0], uv[1]);
-        if (format.contains(VertexFormatElement.UV1)) vc.setOverlay(OverlayTexture.NO_OVERLAY);
-        if (format.contains(VertexFormatElement.UV2)) vc.setLight(FULL_BRIGHT);
-        if (format.contains(VertexFormatElement.NORMAL)) vc.setNormal(pose, n[0], n[1], n[2]);
-    }
 }

@@ -2,6 +2,8 @@ package com.lowdragmc.kilagraph.rendertype.compiler;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
+import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
+import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.runtime.KGEngineUniforms;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IVariableNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
@@ -82,6 +84,9 @@ public final class ShaderGraphCompiler {
     private final Map<UUID, String> nodeSamplerNames = new HashMap<>();
     /** All GLSL identifiers already handed out to variables/constants, to keep them unique. */
     private final Set<String> usedVariableNames = new LinkedHashSet<>();
+    /** Attribute names a node/block default referenced that aren't in the active vertex format (a safe
+     *  constant was substituted) — surfaced as editor warnings so the user knows a default degraded. */
+    private final Set<String> missingAttributes = new LinkedHashSet<>();
 
     /** Sampler name for an unconnected Sampler2D fallback — bound to the MC missing-texture. */
     public static final String MISSING_SAMPLER = "kg_MissingSampler";
@@ -107,7 +112,7 @@ public final class ShaderGraphCompiler {
 
     /** Fixed render state for per-node previews: opaque, depth-tested, no cull (so the quad always shows). */
     public static final RenderTypeGraph.Settings PREVIEW_SETTINGS = new RenderTypeGraph.Settings(
-            RenderTypeGraph.Settings.VertexFormatPreset.POSITION_COLOR_TEX,
+            com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets.POSITION_COLOR_TEX,
             RenderTypeGraph.Settings.VertexFormatMode.QUADS,
             RenderTypeGraph.Settings.BlendMode.OPAQUE,
             RenderTypeGraph.Settings.DepthTest.LEQUAL,
@@ -164,7 +169,7 @@ public final class ShaderGraphCompiler {
                 new ArrayList<>(stageErrors.values()), graph.getSettings(),
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap);
+                usesOverlay, usesLightmap, new ArrayList<>(missingAttributes));
     }
 
     /**
@@ -189,7 +194,7 @@ public final class ShaderGraphCompiler {
                 new ArrayList<>(stageErrors.values()), PREVIEW_SETTINGS,
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap);
+                usesOverlay, usesLightmap, new ArrayList<>(missingAttributes));
     }
 
     /**
@@ -237,8 +242,39 @@ public final class ShaderGraphCompiler {
      */
     ShaderExpr meshUv() {
         return varyingInput("texCoord0", GlslType.VEC2,
-                () -> new ShaderExpr("UV0", GlslType.VEC2),
+                () -> attribute(KGVertexElements.UV0, GlslType.VEC2, new ShaderExpr("vec2(0.0)", GlslType.VEC2)),
                 new ShaderExpr("vUv", GlslType.VEC2));
+    }
+
+    /** The element keys actually declared as {@code in} attributes in the current compile: the graph's
+     *  composed vertex format, or — in preview — the fixed preview vsh's {@code Position}+{@code UV0}. */
+    private Set<String> availableAttributes() {
+        if (preview) return Set.of(KGVertexElements.POSITION.key(), KGVertexElements.UV0.key());
+        return new java.util.HashSet<>(graph.getSettings().vertexFormatElements());
+    }
+
+    /** Whether the given vertex element is declared in the active vertex format (so its raw {@code in}
+     *  attribute can be referenced without producing an undefined-variable shader). */
+    boolean hasAttribute(KGVertexElement element) {
+        return availableAttributes().contains(element.key());
+    }
+
+    /**
+     * A raw vertex-attribute reference (e.g. {@code Color}) when its element is in the active vertex
+     * format, else {@code fallback} — so a node/block <em>default</em> that references an attribute the
+     * user removed degrades to a safe constant instead of emitting undefined-variable GLSL (which the GPU
+     * rejects). Records the substituted attribute so the editor can warn about the degraded default.
+     */
+    ShaderExpr attribute(KGVertexElement element, GlslType type, ShaderExpr fallback) {
+        if (hasAttribute(element)) return new ShaderExpr(element.attribName(), type);
+        missingAttributes.add(element.attribName());
+        return fallback;
+    }
+
+    /** Record that a referenced attribute is absent from the format (for callers that build the ref
+     *  themselves, e.g. an explicit attribute node that casts {@code ivec2 → vec2}). */
+    void markMissingAttribute(String attribName) {
+        missingAttributes.add(attribName);
     }
 
     /**
@@ -707,7 +743,7 @@ public final class ShaderGraphCompiler {
         sb.append(GLSL_VERSION).append("\n\n");
         for (String inc : vertex.includes) sb.append("#moj_import <").append(inc).append(">\n");
         if (!vertex.includes.isEmpty()) sb.append('\n');
-        sb.append(vertexAttributes(graph.getSettings().vertexFormatPreset()));
+        sb.append(vertexAttributes(graph.getSettings().vertexFormatElements()));
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append('\n').append(uniforms);
         if (usesEngineGlobals) sb.append('\n').append(KGEngineUniforms.declareGlsl());
@@ -778,30 +814,22 @@ public final class ShaderGraphCompiler {
         return sb.toString();
     }
 
-    /** The {@code in} vertex attribute declarations for a vertex-format preset. */
-    private static String vertexAttributes(RenderTypeGraph.Settings.VertexFormatPreset preset) {
-        return switch (preset) {
-            case BLOCK -> """
-                    in vec3 Position;
-                    in vec4 Color;
-                    in vec2 UV0;
-                    in ivec2 UV2;
-                    in vec3 Normal;
-                    """;
-            case POSITION_COLOR_TEX -> """
-                    in vec3 Position;
-                    in vec4 Color;
-                    in vec2 UV0;
-                    """;
-            default -> """
-                    in vec3 Position;
-                    in vec4 Color;
-                    in vec2 UV0;
-                    in ivec2 UV1;
-                    in ivec2 UV2;
-                    in vec3 Normal;
-                    """;
-        };
+    /**
+     * The {@code in} vertex attribute declarations for the graph's composed vertex format. Each declared
+     * element contributes one {@code in <glslType> <attribName>;} line; the {@code attribName} is exactly
+     * the name {@link com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat} binds the element under, so
+     * the shader's inputs line up with the pipeline layout. Unknown keys are skipped.
+     */
+    private static String vertexAttributes(java.util.List<String> elementKeys) {
+        StringBuilder sb = new StringBuilder();
+        var seen = new java.util.HashSet<String>();
+        for (String key : elementKeys) {
+            var e = com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.get(key);
+            if (e == null) continue;
+            if (!seen.add(e.attribName())) continue; // never declare the same `in` twice
+            sb.append("in ").append(e.glslType()).append(' ').append(e.attribName()).append(";\n");
+        }
+        return sb.toString();
     }
 
     // ---- helpers -----------------------------------------------------------------------------

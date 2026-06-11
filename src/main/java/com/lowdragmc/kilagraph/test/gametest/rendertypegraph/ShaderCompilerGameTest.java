@@ -26,8 +26,7 @@ import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.VertexColorFragmentInputNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.TexCoordFragmentInputNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.NormalVertexFormatInputNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.PositionVertexFormatInputNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.ShaderFloatAddNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.ShaderFloatMultiplyNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.SinNode;
@@ -423,18 +422,18 @@ public final class ShaderCompilerGameTest {
         RenderTypeGraph bad = new RenderTypeGraph();
         NodeModel fragment = bad.getFragmentStageModel();
         NodeModel baseColor = addBlock(bad, fragment, FragmentBaseColorBlock.class);
-        NodeModel normal = addNode(bad, NormalVertexFormatInputNode.class);
+        NodeModel normal = addNode(bad, VertexAttributeInputNode.class);
         wire(bad, baseColor.getInputsById().get("color"), normal.getOutputsById().get("out"));
         CompiledShaderGraph badCompiled = new ShaderGraphCompiler(bad).compile();
-        assertTrue(helper, "Normal in fragment stage is a stage error", badCompiled.hasStageErrors());
-        assertTrue(helper, "error names the Normal node",
-                badCompiled.stageErrors().stream().anyMatch(e -> e.nodeName().contains("Normal")));
+        assertTrue(helper, "vertex attribute in fragment stage is a stage error", badCompiled.hasStageErrors());
+        assertTrue(helper, "error names the vertex attribute node",
+                badCompiled.stageErrors().stream().anyMatch(e -> e.nodeName().contains("Vertex Attribute")));
 
         // Correct: Normal -> vertex Color varying block input (vertex stage) → no error.
         RenderTypeGraph good = new RenderTypeGraph();
         NodeModel vertex = good.getVertexStageModel();
         NodeModel colorVarying = addBlock(good, vertex, VaryingVertexColorBlock.class);
-        NodeModel n2 = addNode(good, NormalVertexFormatInputNode.class);
+        NodeModel n2 = addNode(good, VertexAttributeInputNode.class);
         NodeModel toVec4 = addNode(good, com.lowdragmc.kilagraph.rendertype.nodes.vector.ShaderVec4MultiplyNode.class);
         // feed Normal (vec3 -> vec4 via convert) into the color varying's input (computed in vsh)
         wire(good, toVec4.getInputsById().get("a"), n2.getOutputsById().get("out"));
@@ -698,13 +697,13 @@ public final class ShaderCompilerGameTest {
     public static void vertexFormatInputsAreVertexOnly(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel baseColor = addBlock(graph, graph.getFragmentStageModel(), FragmentBaseColorBlock.class);
-        NodeModel position = addNode(graph, PositionVertexFormatInputNode.class);
+        NodeModel position = addNode(graph, VertexAttributeInputNode.class);
         wire(graph, baseColor.getInputsById().get("color"), position.getOutputsById().get("out"));
 
         CompiledShaderGraph compiled = new ShaderGraphCompiler(graph).compile();
-        assertTrue(helper, "Position in fragment stage is a stage error", compiled.hasStageErrors());
-        assertTrue(helper, "error names the Position node",
-                compiled.stageErrors().stream().anyMatch(e -> e.nodeName().contains("Position")));
+        assertTrue(helper, "vertex attribute in fragment stage is a stage error", compiled.hasStageErrors());
+        assertTrue(helper, "error names the vertex attribute node",
+                compiled.stageErrors().stream().anyMatch(e -> e.nodeName().contains("Vertex Attribute")));
         helper.succeed();
     }
 

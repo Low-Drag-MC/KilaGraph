@@ -98,13 +98,13 @@ public final class RenderTypeGraphTypes {
     /**
      * A SAMPLER2D value: which texture to bind ({@code location} — a texture file id in CUSTOM mode or an
      * atlas id in ATLAS mode; binding is identical, the mode only changes the picker UI) plus the GPU
-     * sampler parameters. Serialized via {@link #CODEC} (registered as an accessor at mod init so it
+     * sampler parameters. Serialized via {@link #SAMPLER2D_CODEC} (registered as an accessor at mod init so it
      * round-trips in graph NBT).
      */
     public record Sampler2DValue(String location, SamplerMode mode, SamplerFilter filter,
                                  SamplerAddress address, boolean mipmap) {
         public static Sampler2DValue defaultValue() {
-            return new Sampler2DValue("", SamplerMode.CUSTOM, SamplerFilter.NEAREST, SamplerAddress.CLAMP, false);
+            return new Sampler2DValue("minecraft:textures/block/dirt.png", SamplerMode.CUSTOM, SamplerFilter.NEAREST, SamplerAddress.CLAMP, false);
         }
 
         public Sampler2DValue withLocation(String location) {

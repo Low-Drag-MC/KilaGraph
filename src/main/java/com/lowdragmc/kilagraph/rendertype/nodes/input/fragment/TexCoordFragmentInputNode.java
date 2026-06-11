@@ -24,7 +24,8 @@ public class TexCoordFragmentInputNode extends FragmentInputNode {
 
     @Override
     protected ShaderExpr vshDefault(ShaderCompileContext ctx) {
-        return new ShaderExpr("UV0", GlslType.VEC2);
+        return ctx.attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.UV0,
+                GlslType.VEC2, new ShaderExpr("vec2(0.0)", GlslType.VEC2));
     }
 
     @Override

@@ -8,7 +8,7 @@ import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentBaseColorBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.NormalVertexFormatInputNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vector.CrossNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vector.Vec3Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
@@ -208,7 +208,7 @@ public final class ShaderSubgraphGameTest {
 
         var outVar = (VariableDeclarationModelBase) inner.createVariable("out", RenderTypeGraphTypes.VEC3, new Vector3f(), VariableKind.OUTPUT);
         var outNode = inner.createVariableNode(outVar, new Vector2f(400, 0), null, null);
-        NodeModel normal = innerNode(inner, NormalVertexFormatInputNode.class); // VERTEX_ONLY
+        NodeModel normal = innerNode(inner, VertexAttributeInputNode.class); // VERTEX_ONLY (default: Position)
         inner.createWire(outNode.getInputPort(), normal.getOutputsById().get("out"));
 
         var subNode = outer.graphModel.createNodeWithType(SubgraphNodeModel.class, "fn",

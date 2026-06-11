@@ -38,8 +38,15 @@ public class VaryingVertexColorBlock extends ShaderBlockNode implements IVarying
         }
         // Unconnected → vanilla per-vertex diffuse lighting (minecraft_mix_light), mirroring how the
         // distance blocks default to fog_*_distance. The MixLight node stays available to wire an
-        // explicit colour/normal; the default shader no longer needs to wire it in.
+        // explicit colour/normal; the default shader no longer needs to wire it in. Normal/Color route
+        // through ctx.attribute so removing those elements from the format degrades to safe constants
+        // (up / white) instead of emitting undefined-variable GLSL.
         ctx.useMinecraftUniform("Lighting", "minecraft:light.glsl");
-        return new ShaderExpr("minecraft_mix_light(Light0_Direction, Light1_Direction, Normal, Color)", GlslType.VEC4);
+        ShaderExpr normal = ctx.attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.NORMAL,
+                GlslType.VEC3, new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+        ShaderExpr color = ctx.attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.COLOR,
+                GlslType.VEC4, new ShaderExpr("vec4(1.0)", GlslType.VEC4));
+        return new ShaderExpr("minecraft_mix_light(Light0_Direction, Light1_Direction, "
+                + normal.code() + ", " + color.code() + ")", GlslType.VEC4);
     }
 }

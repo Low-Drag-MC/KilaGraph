@@ -65,7 +65,8 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
 
     private CompoundTag serializeSettings(RenderTypeGraph.Settings settings) {
         var tag = new CompoundTag();
-        tag.putString("vertexFormatPreset", settings.vertexFormatPreset().name());
+        // Comma-joined element keys (keys are simple identifiers, never contain commas).
+        tag.putString("vertexFormatElements", String.join(",", settings.vertexFormatElements()));
         tag.putString("vertexFormatMode", settings.vertexFormatMode().name());
         tag.putString("blend", settings.blend().name());
         tag.putString("depthTest", settings.depthTest().name());
@@ -80,8 +81,7 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
     private RenderTypeGraph.Settings deserializeSettings(CompoundTag tag) {
         var defaults = RenderTypeGraph.Settings.defaults();
         return new RenderTypeGraph.Settings(
-                readEnum(tag, "vertexFormatPreset", RenderTypeGraph.Settings.VertexFormatPreset.class,
-                        defaults.vertexFormatPreset()),
+                readVertexFormatElements(tag, defaults.vertexFormatElements()),
                 readEnum(tag, "vertexFormatMode", RenderTypeGraph.Settings.VertexFormatMode.class,
                         defaults.vertexFormatMode()),
                 readEnum(tag, "blend", RenderTypeGraph.Settings.BlendMode.class, defaults.blend()),
@@ -92,6 +92,31 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
                 tag.getBoolean("affectsOutline").orElse(defaults.affectsOutline()),
                 tag.getBoolean("sortOnUpload").orElse(defaults.sortOnUpload())
         );
+    }
+
+    /**
+     * Read the composed vertex-format element keys, upgrading saves from the old single
+     * {@code vertexFormatPreset} enum string to the equivalent preset key list when needed.
+     */
+    private static java.util.List<String> readVertexFormatElements(CompoundTag tag, java.util.List<String> fallback) {
+        var joined = tag.getString("vertexFormatElements").orElse("");
+        if (!joined.isBlank()) {
+            var keys = new java.util.ArrayList<String>();
+            for (var part : joined.split(",")) {
+                if (!part.isBlank()) keys.add(part.trim());
+            }
+            if (!keys.isEmpty()) return keys;
+        }
+        // Legacy: map the pre-refactor VertexFormatPreset enum name to its element list.
+        var legacy = tag.getString("vertexFormatPreset").orElse(null);
+        if (legacy != null) {
+            return switch (legacy) {
+                case "BLOCK" -> com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets.BLOCK;
+                case "POSITION_COLOR_TEX" -> com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets.POSITION_COLOR_TEX;
+                default -> com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets.ENTITY; // ENTITY, CUSTOM, unknown
+            };
+        }
+        return fallback;
     }
 
     private static <E extends Enum<E>> E readEnum(CompoundTag tag, String key, Class<E> enumClass, E fallback) {

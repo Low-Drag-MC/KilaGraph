@@ -36,7 +36,9 @@ public class VaryingTexCoordBlock extends ShaderBlockNode implements IVaryingBlo
         if (ctx.isConnected("texCoord")) {
             return ctx.input("texCoord");
         }
-        return new ShaderExpr("UV0", GlslType.VEC2);
+        // Unconnected → the UV0 attribute, degrading to vec2(0) if UV0 isn't in the format.
+        return ctx.attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.UV0,
+                GlslType.VEC2, new ShaderExpr("vec2(0.0)", GlslType.VEC2));
     }
 
     @Override

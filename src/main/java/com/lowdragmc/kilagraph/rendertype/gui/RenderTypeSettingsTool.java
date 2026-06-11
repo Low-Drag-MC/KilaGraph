@@ -1,6 +1,11 @@
 package com.lowdragmc.kilagraph.rendertype.gui;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
+import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
+import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
+import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
+import com.lowdragmc.lowdraglib2.configurator.ui.BooleanConfigurator;
+import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.Style;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
@@ -15,13 +20,21 @@ import dev.vfyjxf.taffy.style.AlignItems;
 import dev.vfyjxf.taffy.style.FlexDirection;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 
 public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
+    /** Position is mandatory: {@code VertexConsumer.addVertex} always writes it, so it can't be removed. */
+    private static final String POSITION = "position";
+
     private final RenderTypeGraphView graphView;
 
-    private final Selector<RenderTypeGraph.Settings.VertexFormatPreset> vertexFormatPreset;
+    /** Live working set of included vertex-format element keys (order is irrelevant — see Settings). */
+    private final List<String> elements = new ArrayList<>();
+    private final Selector<String> presetSelector;
+
     private final Selector<RenderTypeGraph.Settings.VertexFormatMode> vertexFormatMode;
     private final Selector<RenderTypeGraph.Settings.BlendMode> blend;
     private final Selector<RenderTypeGraph.Settings.DepthTest> depthTest;
@@ -37,7 +50,39 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
         Style.defaultPipeline(getLayout(), l -> l.widthPercent(100).heightPercent(100));
         Style.defaultPipeline(getStyle(), s -> s.backgroundTexture(IGuiTexture.EMPTY));
 
-        vertexFormatPreset = enumSelector(RenderTypeGraph.Settings.VertexFormatPreset.class);
+        var graph = graphView.getRenderTypeGraph();
+        elements.addAll((graph == null ? RenderTypeGraph.Settings.defaults() : graph.getSettings()).vertexFormatElements());
+
+        // Vertex format: a preset quick-fill + a collapsible checklist (one toggle per registered element).
+        presetSelector = new Selector<String>()
+                .setCandidates(new ArrayList<>(VertexFormatPresets.ALL.keySet()))
+                .setCandidateUIProvider(UIElementProvider.text(value ->
+                        Component.literal(value == null ? "Preset…" : value)))
+                .selectorStyle(style -> style.closeAfterSelect(true).maxItemCount(12).showOverlay(true));
+        Style.defaultPipeline(presetSelector.getLayout(), l -> l.height(14).flex(1));
+        presetSelector.setOnValueChanged(name -> {
+            if (name == null) return;
+            var preset = VertexFormatPresets.ALL.get(name);
+            if (preset == null) return;
+            presetSelector.setValue(null, false); // let the same preset be re-applied later
+            elements.clear();
+            elements.addAll(preset);
+            applyControlsToGraph(); // the checklist toggles re-read `elements` on their next tick (forceUpdate)
+        });
+
+        // One on/off toggle per registered element; checked = included. Position is shown but locked on.
+        var formatGroup = new ConfiguratorGroup("Vertex Format", false);
+        for (KGVertexElement element : KGVertexElements.all()) {
+            String key = element.key();
+            var configurator = new BooleanConfigurator(
+                    element.attribName(),
+                    () -> elements.contains(key),
+                    on -> setElement(key, on),
+                    elements.contains(key) || key.equals(POSITION),
+                    true); // forceUpdate: reflect preset fills / graph reloads live
+            formatGroup.addConfigurator(configurator);
+        }
+
         vertexFormatMode = enumSelector(RenderTypeGraph.Settings.VertexFormatMode.class);
         blend = enumSelector(RenderTypeGraph.Settings.BlendMode.class);
         depthTest = enumSelector(RenderTypeGraph.Settings.DepthTest.class);
@@ -55,7 +100,8 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
                 .gapAll(3)
                 .flexDirection(FlexDirection.COLUMN));
         content.addChildren(
-                row("Vertex Format", vertexFormatPreset),
+                row("Preset", presetSelector),
+                formatGroup,
                 row("Primitive", vertexFormatMode),
                 row("Blend", blend),
                 row("Depth Test", depthTest),
@@ -86,7 +132,8 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
     public void refreshFromGraph() {
         var graph = graphView.getRenderTypeGraph();
         var settings = graph == null ? RenderTypeGraph.Settings.defaults() : graph.getSettings();
-        vertexFormatPreset.setSelected(settings.vertexFormatPreset(), false);
+        elements.clear();
+        elements.addAll(settings.vertexFormatElements()); // the checklist re-reads it via forceUpdate
         vertexFormatMode.setSelected(settings.vertexFormatMode(), false);
         blend.setSelected(settings.blend(), false);
         depthTest.setSelected(settings.depthTest(), false);
@@ -104,12 +151,19 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
         refreshFromGraph();
     }
 
+    /** Include/exclude an element; Position can't be excluded (addVertex always writes it). */
+    private void setElement(String key, boolean on) {
+        if (!on && key.equals(POSITION)) return;
+        boolean changed = on ? (!elements.contains(key) && elements.add(key)) : elements.remove(key);
+        if (changed) applyControlsToGraph();
+    }
+
     private void applyControlsToGraph() {
         var graph = graphView.getRenderTypeGraph();
         if (graph == null) return;
         var defaults = RenderTypeGraph.Settings.defaults();
         graph.setSettings(new RenderTypeGraph.Settings(
-                valueOr(vertexFormatPreset, defaults.vertexFormatPreset()),
+                elements.isEmpty() ? defaults.vertexFormatElements() : List.copyOf(elements),
                 valueOr(vertexFormatMode, defaults.vertexFormatMode()),
                 valueOr(blend, defaults.blend()),
                 valueOr(depthTest, defaults.depthTest()),
@@ -119,7 +173,12 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
                 affectsOutline.isOn(),
                 sortOnUpload.isOn()
         ));
+        // Settings edits don't route through the model changeset, so re-run the editor's diagnostic hook
+        // (validateVertexFormat) to refresh the footer — e.g. warn when removing an element a default uses.
+        graphView.refreshGraphLogger();
     }
+
+    // ---- shared widgets ----------------------------------------------------------------------
 
     private <E extends Enum<E>> Selector<E> enumSelector(Class<E> enumClass) {
         var selector = new Selector<E>()

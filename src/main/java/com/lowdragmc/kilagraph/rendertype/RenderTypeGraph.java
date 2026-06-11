@@ -1,6 +1,14 @@
 package com.lowdragmc.kilagraph.rendertype;
 
 import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
+import com.lowdragmc.kilagraph.rendertype.format.IVertexFormatDependentNode;
+import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
+import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
+import com.mojang.logging.LogUtils;
+import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.ApplyFogNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.transform.DynamicTransformsUboNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogUboNode;
@@ -53,6 +61,8 @@ public class RenderTypeGraph extends Graph {
     private Settings settings = Settings.defaults();
     private NodeModel vertexStageModel;
     private NodeModel fragmentStageModel;
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     /** Bumped on every model change (see {@link #onGraphChanged}); previews gate recompiles on it. */
     private volatile long changeVersion;
 
@@ -271,6 +281,57 @@ public class RenderTypeGraph extends Graph {
 
     public void setSettings(Settings settings) {
         this.settings = settings == null ? Settings.defaults() : settings;
+        // Settings live outside the node-graph model, so editing them never fires onGraphChanged. Bump the
+        // change version directly so the live previews recompile (vertex format / mode / blend all feed the
+        // content hash + pipeline) instead of waiting for an unrelated node/wire edit.
+        changeVersion++;
+        // Re-validate: removing/reordering an element may leave a vertex-attribute node needing an absent
+        // attribute. No editor GraphLogger here (Settings edits don't route through onGraphChanged), so log
+        // to the console; the GraphLogger surfacing happens on the next node-graph change.
+        validateVertexFormat(null);
+    }
+
+    /**
+     * Flag every {@link IVertexFormatDependentNode} (e.g. a {@code VertexAttributeInputNode}) whose chosen
+     * element isn't present in the composed vertex format — its generated GLSL would reference an undeclared
+     * {@code in}. Surfaced through the editor's {@link GraphLogger} when one is supplied (node-graph edits),
+     * else logged to the console (Settings-only edits).
+     */
+    private void validateVertexFormat(@Nullable GraphLogger logger) {
+        var present = settings.vertexFormatElements();
+        // 1) Explicit attribute-reader nodes (e.g. VertexAttributeInputNode): a node-keyed ERROR for one
+        //    whose chosen element isn't in the format. Track the attribute names so the default-behavior
+        //    pass below doesn't also warn about the same attribute.
+        var flaggedAttribs = new java.util.HashSet<String>();
+        for (var model : graphModel.getNodeModels()) {
+            if (!(model instanceof ICustomNodeModel custom)) continue;
+            if (!(custom.getNode() instanceof IVertexFormatDependentNode dependent)) continue;
+            String key = dependent.requiredElementKey();
+            if (present.contains(key)) continue;
+            var element = KGVertexElements.get(key);
+            String name = element == null ? key : element.attribName();
+            flaggedAttribs.add(name);
+            if (logger != null) {
+                logger.error(Component.translatable("rendertypegraph.error.missing_vertex_element", name), model);
+            } else {
+                LOGGER.warn("[KilaGraph] a vertex-attribute node needs '{}' but the vertex format does not include it", name);
+            }
+        }
+        // 2) Default-behavior references (e.g. the vertex Color block defaulting to minecraft_mix_light with
+        //    Color/Normal): caught by compiling once (CPU-only) and reading the substituted attributes. Only
+        //    when an editor logger is present (a per-edit compile is cheap; skip it on the headless setSettings
+        //    path). Reported as WARNINGs — the shader still compiles (the default degraded to a constant).
+        if (logger == null) return;
+        try {
+            var compiled = new ShaderGraphCompiler(this).compile();
+            for (String attrib : compiled.missingAttributes()) {
+                if (flaggedAttribs.add(attrib)) {
+                    logger.warning(Component.translatable("rendertypegraph.warn.vertex_element_defaulted", attrib));
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // A malformed graph throws during compile; the preview/material path reports that separately.
+        }
     }
 
     @Override
@@ -337,6 +398,7 @@ public class RenderTypeGraph extends Graph {
     public void onGraphChanged(GraphLogger logger) {
         super.onGraphChanged(logger);
         changeVersion++;
+        validateVertexFormat(logger);
     }
 
     /** A monotonically increasing counter bumped on every graph change; see {@link #onGraphChanged}. */
@@ -356,7 +418,10 @@ public class RenderTypeGraph extends Graph {
     }
 
     public record Settings(
-            VertexFormatPreset vertexFormatPreset,
+            // Ordered list of KGVertexElement registry keys composing the vertex format (replaces the old
+            // fixed VertexFormatPreset enum). Resolved to a real VertexFormat on the client via KGVertexFormat;
+            // the shader compiler derives the matching `in …;` declarations from the same keys.
+            List<String> vertexFormatElements,
             VertexFormatMode vertexFormatMode,
             BlendMode blend,
             DepthTest depthTest,
@@ -366,9 +431,27 @@ public class RenderTypeGraph extends Graph {
             boolean affectsOutline,
             boolean sortOnUpload
     ) {
+        public Settings {
+            // A vertex format is semantically a *set* of elements: both the GPU (attributes bind by name)
+            // and the CPU writer (VertexConsumer setters write by element offset) are order-independent.
+            // So canonicalise — dedupe and sort by element id — giving a stable equals/hash/content-hash and
+            // serialization, and reproducing DefaultVertexFormat.ENTITY/BLOCK's layout (id order) for reuse.
+            vertexFormatElements = canonicalizeElements(vertexFormatElements);
+        }
+
+        /** Dedupe + sort the element keys into the canonical id order (unknown keys kept, sorted last). */
+        private static List<String> canonicalizeElements(List<String> keys) {
+            var unique = new java.util.ArrayList<>(new java.util.LinkedHashSet<>(keys));
+            unique.sort(java.util.Comparator.comparingInt(key -> {
+                var element = KGVertexElements.get(key);
+                return element == null ? Integer.MAX_VALUE : element.mcElementId();
+            }));
+            return List.copyOf(unique);
+        }
+
         public static Settings defaults() {
             return new Settings(
-                    VertexFormatPreset.ENTITY,
+                    VertexFormatPresets.defaults(),
                     VertexFormatMode.QUADS,
                     BlendMode.OPAQUE,
                     DepthTest.LEQUAL,
@@ -378,13 +461,6 @@ public class RenderTypeGraph extends Graph {
                     true,
                     false
             );
-        }
-
-        public enum VertexFormatPreset {
-            ENTITY,
-            BLOCK,
-            POSITION_COLOR_TEX,
-            CUSTOM
         }
 
         public enum VertexFormatMode {

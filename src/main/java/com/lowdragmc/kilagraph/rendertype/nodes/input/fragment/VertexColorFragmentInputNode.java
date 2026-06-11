@@ -29,7 +29,9 @@ public class VertexColorFragmentInputNode extends FragmentInputNode {
     protected ShaderExpr vshDefault(ShaderCompileContext ctx) {
         // The varying's vsh-side default is the raw vertex Color attribute. Per-vertex lighting is NOT
         // baked in here (that vsh concern doesn't belong on a fragment node) — use the MixLight node.
-        return new ShaderExpr("Color", GlslType.VEC4);
+        // Degrades to white if Color isn't in the format.
+        return ctx.attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.COLOR,
+                GlslType.VEC4, new ShaderExpr("vec4(1.0)", GlslType.VEC4));
     }
 
     @Override
