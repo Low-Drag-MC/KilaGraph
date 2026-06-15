@@ -28,20 +28,18 @@ import com.lowdragmc.kilagraph.rendertype.nodes.fog.LinearFogValueNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.transform.ProjectionFromPositionNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.transform.ProjectionUboNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.ShaderFloatMultiplyNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.ShaderSplitNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.ShaderVec3MultiplyNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.ShaderVec4MultiplyNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.AddNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4ConstructNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.TotalFogValueNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomFloatBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec4Block;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingVertexColorBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCylindricalVertexDistanceBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingSphericalVertexDistanceBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingStageNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingTexCoordBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.Vec3Node;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphLogger;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.command.GraphCommands;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
@@ -84,6 +82,8 @@ public final class RenderTypeGraphGameTest {
     private static final String PREVIEW_GEOMETRY = "rendertype_preview_geometry";
     private static final String PREVIEW_TESSELLATOR = "rendertype_preview_tessellator";
     private static final String CHANGE_VERSION = "rendertype_change_version";
+    private static final String UNDO_ROUND_TRIP = "rendertype_undo_round_trip";
+    private static final String STAGE_AFFINITY_VALIDATION = "rendertype_stage_affinity_validation";
 
     private RenderTypeGraphGameTest() {}
 
@@ -117,6 +117,10 @@ public final class RenderTypeGraphGameTest {
                 RenderTypeGraphGameTest::previewTessellatorMatchesMode);
         KGGameTests.registerFunction(CHANGE_VERSION,
                 RenderTypeGraphGameTest::onGraphChangedBumpsChangeVersion);
+        KGGameTests.registerFunction(UNDO_ROUND_TRIP,
+                RenderTypeGraphGameTest::undoRoundTripPreservesWholeGraphCompile);
+        KGGameTests.registerFunction(STAGE_AFFINITY_VALIDATION,
+                RenderTypeGraphGameTest::stageAffinityViolationFlaggedOnGraphChanged);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -151,6 +155,10 @@ public final class RenderTypeGraphGameTest {
                 KGGameTests.functionKey(PREVIEW_TESSELLATOR), d);
         KGGameTests.registerFunctionTest(event, CHANGE_VERSION,
                 KGGameTests.functionKey(CHANGE_VERSION), d);
+        KGGameTests.registerFunctionTest(event, UNDO_ROUND_TRIP,
+                KGGameTests.functionKey(UNDO_ROUND_TRIP), d);
+        KGGameTests.registerFunctionTest(event, STAGE_AFFINITY_VALIDATION,
+                KGGameTests.functionKey(STAGE_AFFINITY_VALIDATION), d);
     }
 
     public static void resourceCreatesGraph(GameTestHelper helper) {
@@ -173,6 +181,81 @@ public final class RenderTypeGraphGameTest {
         long v2 = graph.getChangeVersion();
         assertTrue(helper, "change version advances on first onGraphChanged", v1 > v0);
         assertTrue(helper, "change version advances on second onGraphChanged", v2 > v1);
+        helper.succeed();
+    }
+
+    /**
+     * Reproduces the editor's delete-then-undo of a Texture node and verifies the WHOLE-graph compile
+     * (what the graph-tool preview renders) survives it. Undo in {@code UndoableGraphCommand} is a
+     * serialize-of-the-pre-edit-graph followed by {@code graphModel.deserialize(...)} back into the SAME
+     * already-populated model — so this drives exactly that: snapshot, delete the Texture node, then
+     * deserialize the snapshot into the live model. Asserts the node returns, the fixed stages aren't
+     * duplicated, and {@code compile()} reproduces the original shader byte-for-byte (same content hash,
+     * no stage errors) — the condition the persistent preview tool needs to rebuild and draw again.
+     */
+    public static void undoRoundTripPreservesWholeGraphCompile(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        CompiledShaderGraph before = new ShaderGraphCompiler(graph).compile();
+        assertFalse(helper, "baseline graph compiles without stage errors", before.hasStageErrors());
+
+        var provider = com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry();
+        var out = net.minecraft.world.level.storage.TagValueOutput.createWithContext(
+                net.minecraft.util.ProblemReporter.Collector.DISCARDING, provider);
+        graph.graphModel.serialize(out);
+        net.minecraft.nbt.CompoundTag snapshot = out.buildResult();
+
+        NodeModel texture = findNode(graph, TextureNode.class);
+        assertTrue(helper, "default graph has a Texture node", texture != null);
+        graph.graphModel.deleteElements(List.of(texture));
+        assertTrue(helper, "Texture node removed by delete", findNode(graph, TextureNode.class) == null);
+
+        // Undo: deserialize the pre-delete snapshot back into the live (already-populated) model.
+        graph.graphModel.deserialize(net.minecraft.world.level.storage.TagValueInput.create(
+                net.minecraft.util.ProblemReporter.Collector.DISCARDING, provider, snapshot));
+
+        assertTrue(helper, "undo restores the Texture node", findNode(graph, TextureNode.class) != null);
+        assertEq(helper, "exactly one vertex stage after undo (no deserialize duplication)",
+                1, (int) graph.getNodes().stream().filter(VaryingStageNode.class::isInstance).count());
+        assertEq(helper, "exactly one fragment stage after undo (no deserialize duplication)",
+                1, (int) graph.getNodes().stream().filter(FragmentStageNode.class::isInstance).count());
+
+        CompiledShaderGraph after = new ShaderGraphCompiler(graph).compile();
+        assertFalse(helper, "undone graph compiles without stage errors", after.hasStageErrors());
+        // The whole-graph compile (what the persistent graph-tool preview renders) must reproduce the
+        // original shader, not an empty/transparent one from stale fixed-stage refs after the round-trip.
+        assertTrue(helper, "undone fragment shader still samples the texture",
+                after.fragmentSource().contains("texture(kg_tex"));
+        assertEq(helper, "undo preserves the compiled content hash", before.contentHash(), after.contentHash());
+        helper.succeed();
+    }
+
+    /**
+     * Stage-affinity violations surface through the editor {@link GraphLogger} on {@code onGraphChanged},
+     * keyed to the offending node — so the user sees an in-canvas error, not just a silently-skipped draw.
+     * A VERTEX_ONLY vertex-attribute node wired into a fragment block is pulled into the fragment stage,
+     * which its affinity forbids; once the wire is removed it's no longer flagged.
+     */
+    public static void stageAffinityViolationFlaggedOnGraphChanged(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel attr = addRegisteredNode(graph, VertexAttributeInputNode.class); // VERTEX_ONLY, default = position
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), attr.getOutputsById().get("out"));
+
+        GraphLogger flagged = new GraphLogger();
+        graph.onGraphChanged(flagged);
+        assertTrue(helper, "stage-affinity violation is flagged as an ERROR keyed to the node",
+                flagged.getEntries().stream().anyMatch(e ->
+                        e.context() == attr && e.level() == GraphLogger.Level.ERROR));
+
+        // Disconnect: the node is no longer pulled into the fragment stage, so it's not flagged.
+        graph.graphModel.deleteWires(List.copyOf(
+                emission.getInputsById().get("color").getConnectedWires()));
+        GraphLogger clear = new GraphLogger();
+        graph.onGraphChanged(clear);
+        assertTrue(helper, "no stage error once the vertex-only node is unwired",
+                clear.getEntries().stream().noneMatch(e ->
+                        e.context() == attr && e.level() == GraphLogger.Level.ERROR));
         helper.succeed();
     }
 
@@ -200,10 +283,8 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "does not support render type output node",
                 nodes.stream().noneMatch(node -> node.getSimpleName().equals("RenderTypeOutputNode")));
         assertTrue(helper, "supports vertex position output slot block", nodes.contains(VertexPositionBlock.class));
-        assertTrue(helper, "supports vertex color varying block", nodes.contains(VaryingVertexColorBlock.class));
-        assertTrue(helper, "supports vertex spherical fog distance block", nodes.contains(VaryingSphericalVertexDistanceBlock.class));
-        assertTrue(helper, "supports vertex cylindrical fog distance block", nodes.contains(VaryingCylindricalVertexDistanceBlock.class));
-        assertTrue(helper, "supports vertex tex coord varying block", nodes.contains(VaryingTexCoordBlock.class));
+        assertTrue(helper, "supports the UV source node", nodes.contains(UVNode.class));
+        assertTrue(helper, "supports the Vertex Color source node", nodes.contains(VertexColorNode.class));
         assertTrue(helper, "supports custom float interpolator", nodes.contains(VaryingCustomFloatBlock.class));
         assertTrue(helper, "supports custom vec4 interpolator", nodes.contains(VaryingCustomVec4Block.class));
         assertTrue(helper, "does not support old specialized texture sample node",
@@ -212,11 +293,11 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "supports texture node", nodes.contains(TextureNode.class));
         assertTrue(helper, "supports overlay texture node", nodes.contains(OverlayTextureNode.class));
         assertTrue(helper, "supports lightmap texture node", nodes.contains(LightMapTextureNode.class));
-        assertTrue(helper, "supports shader split node", nodes.contains(ShaderSplitNode.class));
+        assertTrue(helper, "supports shader split node", nodes.contains(SplitNode.class));
         assertTrue(helper, "supports vec3 construct node", nodes.contains(Vec3Node.class));
-        assertTrue(helper, "supports float multiply node", nodes.contains(ShaderFloatMultiplyNode.class));
-        assertTrue(helper, "supports vec3 multiply node", nodes.contains(ShaderVec3MultiplyNode.class));
-        assertTrue(helper, "supports vec4 multiply node", nodes.contains(ShaderVec4MultiplyNode.class));
+        assertTrue(helper, "supports dynamic multiply node", nodes.contains(MultiplyNode.class));
+        assertTrue(helper, "supports dynamic add node", nodes.contains(AddNode.class));
+        assertTrue(helper, "supports mat4 construct node", nodes.contains(Mat4ConstructNode.class));
         assertTrue(helper, "supports fog UBO node", nodes.contains(FogUboNode.class));
         assertTrue(helper, "supports linear fog function node", nodes.contains(LinearFogValueNode.class));
         assertTrue(helper, "supports total fog function node", nodes.contains(TotalFogValueNode.class));
@@ -258,16 +339,10 @@ public final class RenderTypeGraphGameTest {
 
         assertTrue(helper, "vertex stage supports position output slot",
                 vertex.getSupportBlocks().contains(VertexPositionBlock.class));
-        assertTrue(helper, "vertex stage supports color output slot",
-                vertex.getSupportBlocks().contains(VaryingVertexColorBlock.class));
-        assertTrue(helper, "vertex stage supports spherical fog distance output slot",
-                vertex.getSupportBlocks().contains(VaryingSphericalVertexDistanceBlock.class));
-        assertTrue(helper, "vertex stage supports cylindrical fog distance output slot",
-                vertex.getSupportBlocks().contains(VaryingCylindricalVertexDistanceBlock.class));
-        assertTrue(helper, "vertex stage supports tex coord output slot",
-                vertex.getSupportBlocks().contains(VaryingTexCoordBlock.class));
         assertTrue(helper, "vertex stage supports custom float interpolator",
                 vertex.getSupportBlocks().contains(VaryingCustomFloatBlock.class));
+        assertFalse(helper, "vertex stage no longer has a specialized color block",
+                vertex.getSupportBlocks().stream().anyMatch(c -> c.getSimpleName().contains("VertexColorBlock")));
         assertTrue(helper, "vertex stage supports custom vec4 interpolator",
                 vertex.getSupportBlocks().contains(VaryingCustomVec4Block.class));
         assertTrue(helper, "fragment stage supports base color output slot",
@@ -284,9 +359,6 @@ public final class RenderTypeGraphGameTest {
         NodeModel vertex = graph.getVertexStageModel();
         NodeModel fragment = graph.getFragmentStageModel();
         NodeModel position = addBlock(graph, vertex, VertexPositionBlock.class);
-        NodeModel color = addBlock(graph, vertex, VaryingVertexColorBlock.class);
-        NodeModel sphericalFog = addBlock(graph, vertex, VaryingSphericalVertexDistanceBlock.class);
-        NodeModel texCoord = addBlock(graph, vertex, VaryingTexCoordBlock.class);
         NodeModel customFloat = addBlock(graph, vertex, VaryingCustomFloatBlock.class);
         NodeModel baseColor = addBlock(graph, fragment, FragmentBaseColorBlock.class);
         NodeModel alpha = addBlock(graph, fragment, FragmentAlphaBlock.class);
@@ -303,12 +375,6 @@ public final class RenderTypeGraphGameTest {
         assertEq(helper, "vertex position writes gl_Position vec4",
                 RenderTypeGraphTypes.VEC4, position.getInputsById().get("position").getDataTypeHandle());
         assertTrue(helper, "vertex position has no varying output", position.getOutputsById().isEmpty());
-        assertTrue(helper, "vertex color input exists", color.getInputsById().containsKey("color"));
-        assertTrue(helper, "vertex color varying output exists", color.getOutputsById().containsKey("color"));
-        assertTrue(helper, "spherical fog distance input exists", sphericalFog.getInputsById().containsKey("distance"));
-        assertTrue(helper, "spherical fog distance varying output exists", sphericalFog.getOutputsById().containsKey("distance"));
-        assertTrue(helper, "tex coord input exists", texCoord.getInputsById().containsKey("texCoord"));
-        assertTrue(helper, "tex coord varying output exists", texCoord.getOutputsById().containsKey("texCoord"));
         assertTrue(helper, "custom float input exists", customFloat.getInputsById().containsKey("value"));
         assertTrue(helper, "custom float varying output exists", customFloat.getOutputsById().containsKey("value"));
         assertTrue(helper, "fragment base color input exists", baseColor.getInputsById().containsKey("color"));
@@ -324,7 +390,7 @@ public final class RenderTypeGraphGameTest {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel vertex = graph.getVertexStageModel();
         NodeModel fragment = graph.getFragmentStageModel();
-        NodeModel color = addBlock(graph, vertex, VaryingVertexColorBlock.class);
+        NodeModel custom = addBlock(graph, vertex, VaryingCustomFloatBlock.class);
 
         assertFalse(helper, "graph rejects deleting fixed vertex stage",
                 graph.canExecuteCommand(new GraphCommands.DeleteElementsCommand(List.of(vertex))));
@@ -333,7 +399,7 @@ public final class RenderTypeGraphGameTest {
         assertFalse(helper, "graph rejects deleting fixed fragment stage",
                 graph.canExecuteCommand(new GraphCommands.DeleteElementsCommand(List.of(fragment))));
         assertTrue(helper, "graph still allows deleting ordinary stage blocks",
-                graph.canExecuteCommand(new GraphCommands.DeleteElementsCommand(List.of(color))));
+                graph.canExecuteCommand(new GraphCommands.DeleteElementsCommand(List.of(custom))));
         helper.succeed();
     }
 
@@ -386,19 +452,14 @@ public final class RenderTypeGraphGameTest {
 
     public static void newGraphContainsDefaultEntityShader(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
-        NodeModel vertex = graph.getVertexStageModel();
         NodeModel fragment = graph.getFragmentStageModel();
-        NodeModel vertexColor = findBlock(vertex, VaryingVertexColorBlock.class);
-        NodeModel vertexTexCoord = findBlock(vertex, VaryingTexCoordBlock.class);
-        NodeModel sphericalDistance = findBlock(vertex, VaryingSphericalVertexDistanceBlock.class);
-        NodeModel cylindricalDistance = findBlock(vertex, VaryingCylindricalVertexDistanceBlock.class);
+        NodeModel vertexColor = findNode(graph, VertexColorNode.class);
         NodeModel textureSample = findNode(graph, SamplerTexture2DNode.class);
-        NodeModel entityColor = findNode(graph, ShaderVec4MultiplyNode.class);
+        NodeModel entityColor = findNode(graph, MultiplyNode.class);
         NodeModel colorModulator = findNode(graph, DynamicTransformsUboNode.class);
-        NodeModel modulatedColor = findSecondNode(graph, ShaderVec4MultiplyNode.class);
+        NodeModel modulatedColor = findSecondNode(graph, MultiplyNode.class);
         NodeModel fogSub = findSubgraphNode(graph);
-        NodeModel split = findNode(graph, ShaderSplitNode.class);
-        NodeModel baseColorVec = findNode(graph, Vec3Node.class);
+        NodeModel split = findNode(graph, SplitNode.class);
         NodeModel baseColor = findBlock(fragment, FragmentBaseColorBlock.class);
         NodeModel alpha = findBlock(fragment, FragmentAlphaBlock.class);
 
@@ -406,11 +467,10 @@ public final class RenderTypeGraphGameTest {
                 graph.getNodes().stream().anyMatch(VaryingStageNode.class::isInstance));
         assertTrue(helper, "new graph contains fragment stage node",
                 graph.getNodes().stream().anyMatch(FragmentStageNode.class::isInstance));
-        assertTrue(helper, "default vertex color varying exists", vertexColor != null);
-        assertTrue(helper, "default vertex tex coord varying exists", vertexTexCoord != null);
-        assertTrue(helper, "default spherical fog varying exists", sphericalDistance != null);
-        assertTrue(helper, "default cylindrical fog varying exists", cylindricalDistance != null);
+        assertTrue(helper, "default vertex color node exists", vertexColor != null);
         assertTrue(helper, "default generic texture2D sample exists", textureSample != null);
+        assertTrue(helper, "default texture sample uv is unconnected (defaults to mesh uv)",
+                textureSample != null && !textureSample.getInputsById().get("uv").isConnected());
         assertTrue(helper, "default texture-sample sampler input is fed by a Sampler2D constant",
                 textureSample != null && textureSample.getInputsById().get("sampler").isConnected());
         assertTrue(helper, "default entity color multiply exists", entityColor != null);
@@ -421,40 +481,28 @@ public final class RenderTypeGraphGameTest {
                 findNode(graph, FogUboNode.class) == null);
         assertTrue(helper, "apply_fog is inside the subgraph, not top-level",
                 findNode(graph, ApplyFogNode.class) == null);
-        assertTrue(helper, "fog subgraph node has 3 inputs (inColor + 2 distances)",
-                fogSub != null && fogSub.getInputsById().size() == 3);
+        assertTrue(helper, "fog subgraph node has 1 input (inColor; distances default inside)",
+                fogSub != null && fogSub.getInputsById().size() == 1);
         assertTrue(helper, "fog subgraph node has 1 output", fogSub != null && fogSub.getOutputsById().size() == 1);
         assertTrue(helper, "default split node exists", split != null);
-        assertTrue(helper, "default vec3 base color node exists", baseColorVec != null);
         assertTrue(helper, "default fragment base color block exists", baseColor != null);
         assertTrue(helper, "default fragment alpha block exists", alpha != null);
 
-        assertTrue(helper, "default wires texCoord into texture sample",
-                isWired(vertexTexCoord, "texCoord", textureSample, "uv"));
         assertTrue(helper, "default wires texture color into entity color multiply",
                 isWired(textureSample, "color", entityColor, "a"));
-        assertTrue(helper, "default wires vertex color into entity color multiply",
-                isWired(vertexColor, "color", entityColor, "b"));
+        assertTrue(helper, "default wires vertex color node into entity color multiply",
+                isWired(vertexColor, "out", entityColor, "b"));
         assertTrue(helper, "default wires entity color into color modulator multiply",
                 isWired(entityColor, "out", modulatedColor, "a"));
         assertTrue(helper, "default wires ColorModulator into color modulator multiply",
                 isWired(colorModulator, "ColorModulator", modulatedColor, "b"));
         assertTrue(helper, "default wires modulated color into fog subgraph",
                 outputConnectsToAnyInput(modulatedColor, "out", fogSub));
-        assertTrue(helper, "default wires spherical distance into fog subgraph",
-                outputConnectsToAnyInput(sphericalDistance, "distance", fogSub));
-        assertTrue(helper, "default wires cylindrical distance into fog subgraph",
-                outputConnectsToAnyInput(cylindricalDistance, "distance", fogSub));
+        // The fogged colour feeds base color (rgb) directly; Split extracts its alpha.
+        assertTrue(helper, "default wires fogged color into fragment base color",
+                anyOutputConnectsTo(fogSub, baseColor, "color"));
         assertTrue(helper, "default wires fogged color into split",
                 anyOutputConnectsTo(fogSub, split, "in"));
-        assertTrue(helper, "default wires split r into base color x",
-                isWired(split, "r", baseColorVec, "x"));
-        assertTrue(helper, "default wires split g into base color y",
-                isWired(split, "g", baseColorVec, "y"));
-        assertTrue(helper, "default wires split b into base color z",
-                isWired(split, "b", baseColorVec, "z"));
-        assertTrue(helper, "default wires vec3 into fragment base color",
-                isWired(baseColorVec, "out", baseColor, "color"));
         assertTrue(helper, "default wires split a into fragment alpha",
                 isWired(split, "a", alpha, "alpha"));
         helper.succeed();
@@ -462,7 +510,7 @@ public final class RenderTypeGraphGameTest {
 
     public static void shaderVectorValuesAreWireCompatible(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
-        NodeModel split = addNode(graph, ShaderSplitNode.class);
+        NodeModel split = addNode(graph, SplitNode.class);
         NodeModel vec3 = addNode(graph, Vec3Node.class);
         NodeModel fragment = graph.getFragmentStageModel();
         NodeModel baseColor = addBlock(graph, fragment, FragmentBaseColorBlock.class);
@@ -487,17 +535,19 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "vsh declares version", vsh.startsWith("#version 330"));
         assertTrue(helper, "vsh declares Position attribute", vsh.contains("in vec3 Position;"));
         assertTrue(helper, "vsh writes gl_Position", vsh.contains("gl_Position ="));
+        // gl_Position + fog distance transform Position + ModelOffset (matching vanilla block.vsh).
+        assertTrue(helper, "vsh adds ModelOffset to Position", vsh.contains("Position + ModelOffset"));
         assertTrue(helper, "vsh outputs vertexColor varying", vsh.contains("out vec4 vertexColor;"));
-        assertTrue(helper, "vsh outputs texCoord0 varying", vsh.contains("out vec2 texCoord0;"));
+        assertTrue(helper, "vsh outputs uv0 varying", vsh.contains("out vec2 uv0;"));
         assertTrue(helper, "vsh outputs spherical distance varying", vsh.contains("out float sphericalVertexDistance;"));
-        assertTrue(helper, "vsh assigns texCoord0 from UV0", vsh.contains("texCoord0 = UV0;"));
+        assertTrue(helper, "vsh assigns uv0 from UV0", vsh.contains("uv0 = UV0;"));
         assertTrue(helper, "vsh imports projection", vsh.contains("#moj_import <minecraft:projection.glsl>"));
 
         // Fragment shader
         assertTrue(helper, "fsh declares version", fsh.startsWith("#version 330"));
         assertTrue(helper, "fsh declares fragColor output", fsh.contains("out vec4 fragColor;"));
         assertTrue(helper, "fsh reads vertexColor varying", fsh.contains("in vec4 vertexColor;"));
-        assertTrue(helper, "fsh reads texCoord0 varying", fsh.contains("in vec2 texCoord0;"));
+        assertTrue(helper, "fsh reads uv0 varying", fsh.contains("in vec2 uv0;"));
         assertTrue(helper, "fsh samples the texture constant", fsh.contains("texture(kg_tex"));
         assertTrue(helper, "fsh declares the texture-constant sampler uniform", fsh.contains("uniform sampler2D kg_tex"));
         assertTrue(helper, "fsh applies fog", fsh.contains("apply_fog("));

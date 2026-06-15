@@ -25,8 +25,8 @@ public class VertexPositionBlock extends ShaderBlockNode implements IVertexPosit
         if (ctx.isConnected("position")) {
             return ctx.input("position");
         }
-        ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl");
         ctx.useMinecraftUniform("Projection", "minecraft:projection.glsl");
-        return new ShaderExpr("ProjMat * ModelViewMat * vec4(Position, 1.0)", GlslType.VEC4);
+        // Match vanilla block.vsh: transform Position + ModelOffset (modelPosition adds the dynamictransforms import).
+        return new ShaderExpr("ProjMat * ModelViewMat * vec4(" + ctx.modelPosition().code() + ", 1.0)", GlslType.VEC4);
     }
 }

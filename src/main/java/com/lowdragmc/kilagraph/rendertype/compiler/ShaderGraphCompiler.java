@@ -5,6 +5,8 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.runtime.KGEngineUniforms;
+import com.lowdragmc.kilagraph.rendertype.runtime.KGTransformUniforms;
+import com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IVariableNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.IVariable;
@@ -54,6 +56,10 @@ public final class ShaderGraphCompiler {
         final String tempPrefix;
         final StringBuilder body = new StringBuilder();
         final Set<String> includes = new LinkedHashSet<>();
+        /** Global-scope helper function definitions for this stage, keyed by function name (first
+         *  registration wins, so a same-named helper can't be redefined) and emitted in insertion order
+         *  (a dependency registered first is declared first) before main(). */
+        final Map<String, String> functions = new LinkedHashMap<>();
         final Map<PortModel, ShaderExpr> cache = new IdentityHashMap<>();
         final Set<AbstractNodeModel> visiting = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
         int tempCounter;
@@ -94,14 +100,24 @@ public final class ShaderGraphCompiler {
     private boolean usesOverlay;
     /** Whether a LightMapTextureNode referenced {@code Sampler2} (so the pipeline must enable lightmap). */
     private boolean usesLightmap;
+    /** Whether a SceneColorNode referenced {@code KG_SceneColor} (the runtime must capture+bind scene colour). */
+    private boolean usesSceneColor;
+    /** Whether a SceneDepthNode referenced {@code KG_SceneDepth} (the runtime must capture+bind scene depth). */
+    private boolean usesSceneDepth;
 
     private StageScope current;
     /** Preview mode: compile a single port onto a flat quad, substituting stage inputs with defaults. */
     private boolean preview;
-    /** Whether any node referenced the engine-globals block ({@code KG_Globals}: Time, ...). */
-    private boolean usesEngineGlobals;
+    /** Editor whole-graph preview ({@code ShaderPreviewTool}): compiles the real graph, but screen-space
+     *  defaults (see {@link #screenUv()}) map the whole capture onto the preview geometry rather than the
+     *  panel's screen sub-rect, so the preview shows the entire scene. In-world rendering is unaffected. */
+    private boolean editorPreview;
+    /** KilaGraph-managed UBOs any node referenced (engine globals, transforms, or a mod's own block).
+     *  Each is declared in the GLSL + bound on the pipeline + uploaded each frame — the single, generic
+     *  extension point that replaced per-block {@code usesX} flags. */
+    private final Set<com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock> uniformBlocks = new LinkedHashSet<>();
     /** Stage-affinity violations found during traversal, keyed by node uid (first conflict per node). */
-    private final Map<java.util.UUID, StageError> stageErrors = new java.util.LinkedHashMap<>();
+    private final Map<UUID, StageError> stageErrors = new LinkedHashMap<>();
     /**
      * Active subgraph-inlining bindings: one frame per nested {@link SubgraphNodeModel} we're inside,
      * mapping an inner READ-variable's declaration uid → the outer input expression bound to it.
@@ -112,7 +128,9 @@ public final class ShaderGraphCompiler {
 
     /** Fixed render state for per-node previews: opaque, depth-tested, no cull (so the quad always shows). */
     public static final RenderTypeGraph.Settings PREVIEW_SETTINGS = new RenderTypeGraph.Settings(
-            com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets.POSITION_COLOR_TEX,
+            // Includes Normal so node previews carry a real surface normal (the preview meshes supply it),
+            // letting Fresnel / normal nodes read real geometry like Unity — see meshNormal()'s preview branch.
+            com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets.POSITION_COLOR_TEX_NORMAL,
             RenderTypeGraph.Settings.VertexFormatMode.QUADS,
             RenderTypeGraph.Settings.BlendMode.OPAQUE,
             RenderTypeGraph.Settings.DepthTest.LEQUAL,
@@ -127,6 +145,18 @@ public final class ShaderGraphCompiler {
     }
 
     // ---- public entry ------------------------------------------------------------------------
+
+    /**
+     * Mark this as an editor whole-graph preview compile (the {@link com.lowdragmc.kilagraph.rendertype.gui.ShaderPreviewTool}
+     * cube/sphere). Screen-space defaults ({@link #screenUv()}, the unconnected UV of Scene Color/Depth) then map the
+     * whole captured frame across the preview geometry's uv instead of the panel's screen sub-rect — otherwise the
+     * preview would sample only the small on-screen rectangle it occupies. No effect on graphs that don't use a
+     * screen-space default. Fluent: call before {@link #compile()}.
+     */
+    public ShaderGraphCompiler editorPreview() {
+        this.editorPreview = true;
+        return this;
+    }
 
     public CompiledShaderGraph compile() {
         ContextNodeModel vertexStage = asContext(graph.getVertexStageModel(), "vertex");
@@ -156,20 +186,20 @@ public final class ShaderGraphCompiler {
             }
         }
         if (position == null) {
-            // No explicit position block — fall back to the standard MVP transform.
-            addInclude("minecraft:dynamictransforms.glsl");
+            // No explicit position block — fall back to the standard MVP transform (matching block.vsh,
+            // which transforms Position + ModelOffset).
             addInclude("minecraft:projection.glsl");
-            position = new ShaderExpr("ProjMat * ModelViewMat * vec4(Position, 1.0)", GlslType.VEC4);
+            position = new ShaderExpr("ProjMat * ModelViewMat * vec4(" + modelPosition().code() + ", 1.0)", GlslType.VEC4);
         }
         line("gl_Position = " + position.code() + ";");
 
         String vsh = assembleVertex();
         String fsh = assembleFragment(out);
-        return new CompiledShaderGraph(vsh, fsh, layout, new ArrayList<>(builtinUbos), usesEngineGlobals,
+        return new CompiledShaderGraph(vsh, fsh, layout, new ArrayList<>(builtinUbos), new ArrayList<>(uniformBlocks),
                 new ArrayList<>(stageErrors.values()), graph.getSettings(),
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap, new ArrayList<>(missingAttributes));
+                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes));
     }
 
     /**
@@ -190,11 +220,11 @@ public final class ShaderGraphCompiler {
 
         String vsh = assemblePreviewVertex();
         String fsh = assemblePreviewFragment(color);
-        return new CompiledShaderGraph(vsh, fsh, layout, new ArrayList<>(builtinUbos), usesEngineGlobals,
+        return new CompiledShaderGraph(vsh, fsh, layout, new ArrayList<>(builtinUbos), new ArrayList<>(uniformBlocks),
                 new ArrayList<>(stageErrors.values()), PREVIEW_SETTINGS,
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap, new ArrayList<>(missingAttributes));
+                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes));
     }
 
     /**
@@ -219,7 +249,7 @@ public final class ShaderGraphCompiler {
 
     /** Default value for a vertex varying when previewing without a vertex stage. */
     private ShaderExpr previewVaryingDefault(String varyingName, GlslType type) {
-        if ("texCoord0".equals(varyingName)) return new ShaderExpr("vUv", GlslType.VEC2);
+        if ("uv0".equals(varyingName)) return new ShaderExpr("vUv", GlslType.VEC2);
         if ("vertexColor".equals(varyingName)) return new ShaderExpr("vec4(1.0)", GlslType.VEC4);
         return zero(type);
     }
@@ -235,15 +265,171 @@ public final class ShaderGraphCompiler {
         };
     }
 
-    /**
-     * The interpolated mesh uv, routed through the {@code texCoord0} varying (vsh default {@code UV0}).
-     * Preview: the quad's uv ({@code vUv}). Shares the single {@code texCoord0} varying with the TexCoord
-     * vertex block / {@code FragmentTexCoordInput} node, so all uv readers see the same interpolant.
-     */
+    /** The interpolated primary mesh uv (UV0). See {@link #meshUv(RenderTypeGraphTypes.UvChannel)}. */
     ShaderExpr meshUv() {
-        return varyingInput("texCoord0", GlslType.VEC2,
-                () -> attribute(KGVertexElements.UV0, GlslType.VEC2, new ShaderExpr("vec2(0.0)", GlslType.VEC2)),
-                new ShaderExpr("vUv", GlslType.VEC2));
+        return meshUv(RenderTypeGraphTypes.UvChannel.UV0);
+    }
+
+    /**
+     * The interpolated mesh uv for a given channel, routed through the {@code uv0}/{@code uv1}/{@code uv2}
+     * varying (vsh default = that channel's vertex attribute). UV0 is a {@code vec2} attribute; UV1/UV2 are
+     * Minecraft's overlay/lightmap {@code ivec2} coords, cast to {@code vec2}. If the chosen channel's
+     * element isn't in the active format it falls back to UV0, then to {@code vec2(0.0)} (the "missing uv"
+     * case). Preview (no vertex stage): UV0 is the quad's gradient uv ({@code vUv}); UV1/UV2 don't exist on
+     * the preview mesh and are constant per draw, so they preview as a flat {@code vec2(0.0)} (a solid colour,
+     * not a misleading gradient). Shared first-writer-wins with the matching varying block / fragment input.
+     */
+    ShaderExpr meshUv(RenderTypeGraphTypes.UvChannel channel) {
+        ShaderExpr quadUv = new ShaderExpr("vUv", GlslType.VEC2);
+        ShaderExpr flatUv = new ShaderExpr("vec2(0.0)", GlslType.VEC2);
+        return switch (channel) {
+            case UV0 -> varyingInput("uv0", GlslType.VEC2, () -> uvAttr(KGVertexElements.UV0, false), quadUv);
+            case UV1 -> varyingInput("uv1", GlslType.VEC2, () -> uvAttr(KGVertexElements.UV1, true), flatUv);
+            case UV2 -> varyingInput("uv2", GlslType.VEC2, () -> uvAttr(KGVertexElements.UV2, true), flatUv);
+        };
+    }
+
+    /**
+     * The interpolated <b>lit</b> vertex colour, routed through the {@code vertexColor} varying — the vsh
+     * default applies vanilla per-vertex diffuse lighting ({@code minecraft_mix_light} of the {@code Normal}
+     * + {@code Color} attributes), so an entity is lit out of the box with no lighting block placed. (Mix
+     * light is vertex-only, hence a varying.) Missing Normal/Color degrade to up / white. Preview: white.
+     */
+    ShaderExpr litVertexColor() {
+        return varyingInput("vertexColor", GlslType.VEC4,
+                () -> {
+                    addInclude("minecraft:light.glsl");
+                    useBuiltinUbo("Lighting");
+                    ShaderExpr normal = attribute(KGVertexElements.NORMAL, GlslType.VEC3,
+                            new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+                    ShaderExpr color = attribute(KGVertexElements.COLOR, GlslType.VEC4,
+                            new ShaderExpr("vec4(1.0)", GlslType.VEC4));
+                    return new ShaderExpr("minecraft_mix_light(Light0_Direction, Light1_Direction, "
+                            + normal.code() + ", " + color.code() + ")", GlslType.VEC4);
+                },
+                new ShaderExpr("vec4(1.0)", GlslType.VEC4));
+    }
+
+    /** The interpolated <b>raw</b> (unlit) vertex colour — the {@code Color} attribute through the
+     *  {@code rawColor} varying. Missing Color degrades to white. Preview: white. */
+    ShaderExpr meshColor() {
+        return varyingInput("rawColor", GlslType.VEC4,
+                () -> attribute(KGVertexElements.COLOR, GlslType.VEC4, new ShaderExpr("vec4(1.0)", GlslType.VEC4)),
+                new ShaderExpr("vec4(1.0)", GlslType.VEC4));
+    }
+
+    /** A uv channel's vsh value: the attribute (cast {@code vec2(...)} for the ivec2 UV1/UV2), else a
+     *  fallback to UV0, else {@code vec2(0.0)} — recording the missing attribute for editor warnings. */
+    private ShaderExpr uvAttr(KGVertexElement element, boolean integer) {
+        if (hasAttribute(element)) {
+            String ref = integer ? "vec2(" + element.attribName() + ")" : element.attribName();
+            return new ShaderExpr(ref, GlslType.VEC2);
+        }
+        markMissingAttribute(element.attribName());
+        if (element != KGVertexElements.UV0 && hasAttribute(KGVertexElements.UV0)) {
+            return new ShaderExpr(KGVertexElements.UV0.attribName(), GlslType.VEC2);
+        }
+        return new ShaderExpr("vec2(0.0)", GlslType.VEC2);
+    }
+
+    /**
+     * The interpolated world-space surface normal, routed through the {@code kg_worldNormal} varying — the
+     * default Unity-like fallback for an unconnected {@code normal} port. The vsh writes the {@code Normal}
+     * attribute transformed object&rarr;world ({@code mat3(IViewMat · ModelViewMat) · Normal}); a missing
+     * {@code Normal} element degrades to object +Y. Interpolation isn't unit-length, so consumers should
+     * renormalize. Preview: the real interpolated {@code vNormal} (the preview mesh carries a Normal
+     * attribute, see {@code PREVIEW_SETTINGS}) — exact on every preview geometry, like Unity's sphere
+     * preview. Registers DynamicTransforms + KG_Transforms.
+     */
+    ShaderExpr meshNormal() {
+        return varyingInput("kg_worldNormal", GlslType.VEC3,
+                () -> {
+                    addInclude("minecraft:dynamictransforms.glsl"); // ModelViewMat
+                    ShaderExpr n = attribute(KGVertexElements.NORMAL, GlslType.VEC3,
+                            new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+                    ShaderExpr iView = transformField("IViewMat", GlslType.MAT4); // view -> world (rotation)
+                    return new ShaderExpr("normalize(mat3(" + iView.code() + ") * mat3(ModelViewMat) * "
+                            + n.code() + ")", GlslType.VEC3);
+                },
+                // The preview mesh's own (object-space) normal, interpolated. The preview camera looks down
+                // an axis so object space ≈ view space here, and meshViewDir's +Z preview default is the
+                // matching view direction — so dot(normal, viewDir) is correct on sphere/cube/custom alike.
+                new ShaderExpr("vNormal", GlslType.VEC3));
+    }
+
+    /**
+     * The interpolated world-space view direction (surface&rarr;camera), routed through the
+     * {@code kg_worldViewDir} varying — the default Unity-like fallback for an unconnected {@code viewDir}
+     * port. In view space the camera sits at the origin, so the direction is {@code -viewPos}; rotating that
+     * into world via {@code IViewMat} suffices because the camera's world translation cancels in
+     * {@code (cameraPos - worldPos)}. Consumers should renormalize after interpolation. Preview: {@code +Z}
+     * (looking straight at the quad). Registers DynamicTransforms + KG_Transforms.
+     */
+    ShaderExpr meshViewDir() {
+        return varyingInput("kg_worldViewDir", GlslType.VEC3,
+                () -> {
+                    ShaderExpr iView = transformField("IViewMat", GlslType.MAT4); // view -> world (rotation)
+                    String viewPos = "(ModelViewMat * vec4(" + modelPosition().code() + ", 1.0)).xyz";
+                    return new ShaderExpr("normalize(mat3(" + iView.code() + ") * (-" + viewPos + "))",
+                            GlslType.VEC3);
+                },
+                new ShaderExpr("vec3(0.0, 0.0, 1.0)", GlslType.VEC3));
+    }
+
+    /**
+     * The interpolated <b>model-space</b> vertex position {@code (Position + ModelOffset)}, routed through
+     * the {@code kg_modelPos} varying — the default fallback for an unconnected {@code position}/{@code coords}
+     * port. Fragment-safe (vsh writes it, fsh reads the interpolated value). Wire a Transform node for world
+     * space. Preview: {@code vec3(0.0)}.
+     */
+    ShaderExpr meshPosition() {
+        return varyingInput("kg_modelPos", GlslType.VEC3, this::modelPosition,
+                new ShaderExpr("vec3(0.0)", GlslType.VEC3));
+    }
+
+    /**
+     * The interpolated {@code sphericalVertexDistance} varying — vanilla's spherical fog distance of the
+     * model position. The vsh default ({@code fog_spherical_distance((Position + ModelOffset))}) is only used
+     * if no varying block already wrote {@code sphericalVertexDistance} (first-writer-wins).
+     */
+    ShaderExpr sphericalVertexDistance() {
+        return varyingInput("sphericalVertexDistance", GlslType.FLOAT,
+                () -> {
+                    addInclude("minecraft:fog.glsl");
+                    return new ShaderExpr("fog_spherical_distance(" + modelPosition().code() + ")", GlslType.FLOAT);
+                },
+                new ShaderExpr("0.0", GlslType.FLOAT));
+    }
+
+    /** The interpolated {@code cylindricalVertexDistance} varying (vanilla's cylindrical fog distance). See
+     *  {@link #sphericalVertexDistance()}. */
+    ShaderExpr cylindricalVertexDistance() {
+        return varyingInput("cylindricalVertexDistance", GlslType.FLOAT,
+                () -> {
+                    addInclude("minecraft:fog.glsl");
+                    return new ShaderExpr("fog_cylindrical_distance(" + modelPosition().code() + ")", GlslType.FLOAT);
+                },
+                new ShaderExpr("0.0", GlslType.FLOAT));
+    }
+
+    /** A raw Minecraft {@code Fog} UBO field accessor (e.g. {@code FogColor}, {@code FogEnvironmentalStart}),
+     *  registering the fog include + builtin UBO so the field resolves. Mirrors {@code FogUboNode}. */
+    ShaderExpr fogField(String name, GlslType type) {
+        addInclude("minecraft:fog.glsl");
+        useBuiltinUbo("Fog");
+        return new ShaderExpr(name, type);
+    }
+
+    /**
+     * The model-space vertex position Minecraft actually transforms: {@code Position + ModelOffset}. The
+     * offset is a per-draw {@code DynamicTransforms} uniform — zero unless set, but block/terrain rendering
+     * sets it to the section offset (see vanilla {@code block.vsh}). Including it matches vanilla and is
+     * harmless when unused, so it's the correct default for {@code gl_Position} and fog distances. Adds the
+     * {@code dynamictransforms.glsl} import to the current (vertex) stage.
+     */
+    ShaderExpr modelPosition() {
+        addInclude("minecraft:dynamictransforms.glsl");
+        return new ShaderExpr("(Position + ModelOffset)", GlslType.VEC3);
     }
 
     /** The element keys actually declared as {@code in} attributes in the current compile: the graph's
@@ -251,6 +437,11 @@ public final class ShaderGraphCompiler {
     private Set<String> availableAttributes() {
         if (preview) return Set.of(KGVertexElements.POSITION.key(), KGVertexElements.UV0.key());
         return new java.util.HashSet<>(graph.getSettings().vertexFormatElements());
+    }
+
+    /** Whether this is a per-node preview compile (single fragment quad; no real vertex stage). */
+    boolean isPreview() {
+        return preview;
     }
 
     /** Whether the given vertex element is declared in the active vertex format (so its raw {@code in}
@@ -304,10 +495,27 @@ public final class ShaderGraphCompiler {
         }
     }
 
+    /** Register a KilaGraph-managed UBO (engine globals / transforms / a mod's own) so the GLSL declares it,
+     *  the pipeline binds it, and the material uploads it each frame. Idempotent (a Set). */
+    void useUniformBlock(ShaderUniformBlock block) {
+        uniformBlocks.add(block);
+    }
+
     /** World time in seconds from the {@code KG_Globals} engine block (updated by us each frame). */
     ShaderExpr engineTime() {
-        usesEngineGlobals = true;
+        useUniformBlock(KGEngineUniforms.BLOCK);
         return new ShaderExpr(KGEngineUniforms.timeAccessor(), GlslType.FLOAT);
+    }
+
+    /**
+     * A {@code KG_Transforms} field accessor (e.g. {@code kg_transforms.ViewMat}), flagging the pipeline to
+     * declare + bind the block. Used by the Transform node for World-space / reverse-direction matrices that
+     * Minecraft's {@code DynamicTransforms}/{@code Projection} blocks don't expose. The {@code type} is the
+     * accessor's GLSL type ({@code MAT4} for the matrices, {@code VEC3} for {@code CameraPos}).
+     */
+    ShaderExpr transformField(String field, GlslType type) {
+        useUniformBlock(KGTransformUniforms.BLOCK);
+        return new ShaderExpr(KGTransformUniforms.accessor(field), type);
     }
 
     /** Minecraft's builtin {@code Globals.GameTime} (day fraction). Bound by {@code bindDefaultUniforms}. */
@@ -335,12 +543,97 @@ public final class ShaderGraphCompiler {
         return new ShaderExpr("Sampler2", GlslType.SAMPLER2D);
     }
 
+    /** Sampler name for the captured opaque scene colour (bound at draw from {@code SceneCaptureManager}). */
+    public static final String SCENE_COLOR_SAMPLER = "KG_SceneColor";
+    /** Sampler name for the captured opaque scene depth (bound at draw from {@code SceneCaptureManager}). */
+    public static final String SCENE_DEPTH_SAMPLER = "KG_SceneDepth";
+
+    /**
+     * Sampler for the captured opaque scene colour (Unity's Scene Color). Declares {@code KG_SceneColor}
+     * in the layout (so it's emitted in the GLSL + declared on the pipeline) and flags the runtime to
+     * capture + bind it. Unlike a Sampler2D it gets no baked missing-texture default — the runtime binds
+     * the live capture (see {@code RenderTypeFactory}/{@code RenderTypeGraphMaterial}).
+     */
+    ShaderExpr sceneColorSampler() {
+        usesSceneColor = true;
+        layout.addSampler(SCENE_COLOR_SAMPLER);
+        return new ShaderExpr(SCENE_COLOR_SAMPLER, GlslType.SAMPLER2D);
+    }
+
+    /** Sampler for the captured opaque scene depth (Unity's Scene Depth). See {@link #sceneColorSampler()}. */
+    ShaderExpr sceneDepthSampler() {
+        usesSceneDepth = true;
+        layout.addSampler(SCENE_DEPTH_SAMPLER);
+        return new ShaderExpr(SCENE_DEPTH_SAMPLER, GlslType.SAMPLER2D);
+    }
+
+    /** Screen-space UV {@code gl_FragCoord.xy / ScreenSize} (vec2) — the default UV for Scene Color/Depth
+     *  (Unity defaults their UV to screen position). Fragment-only; reads {@code Globals.ScreenSize}.
+     *  <p>In an editor preview the geometry only covers a small screen sub-rect, so true screen coordinates
+     *  would sample just that corner of the full-screen capture; there we map the whole captured frame across
+     *  the preview geometry's uv (mesh/quad uv) so the preview shows the entire scene.</p> */
+    ShaderExpr screenUv() {
+        if (preview || editorPreview) return meshUv();
+        addInclude("minecraft:globals.glsl");
+        useBuiltinUbo("Globals");
+        return new ShaderExpr("(gl_FragCoord.xy / ScreenSize)", GlslType.VEC2);
+    }
+
+    /** Sample the captured opaque scene colour (vec3) at {@code uv} — Unity's Scene Color. */
+    ShaderExpr sampleSceneColor(ShaderExpr uv) {
+        ShaderExpr s = sceneColorSampler();
+        return new ShaderExpr("texture(" + s.code() + ", " + convert(uv, GlslType.VEC2).code() + ").rgb", GlslType.VEC3);
+    }
+
+    /** Raw hardware depth in {@code [0,1]} (Unity's Scene Depth "Raw"). */
+    ShaderExpr sampleSceneDepthRaw(ShaderExpr uv) {
+        ShaderExpr s = sceneDepthSampler();
+        return new ShaderExpr("texture(" + s.code() + ", " + convert(uv, GlslType.VEC2).code() + ").r", GlslType.FLOAT);
+    }
+
+    /** Eye-space distance from the camera in world units (Unity's Scene Depth "Eye"), reconstructed via {@code IProjMat}. */
+    ShaderExpr sampleSceneDepthEye(ShaderExpr uv) {
+        addInclude("kilagraph:kg_scene.glsl");
+        ShaderExpr raw = sampleSceneDepthRaw(uv);
+        ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
+        return new ShaderExpr("kg_eye_depth(" + raw.code() + ", " + iproj.code() + ")", GlslType.FLOAT);
+    }
+
+    /** Linearised depth {@code 0}(near)..{@code 1}(far) (Unity's Scene Depth "Linear 01"), reconstructed via {@code IProjMat}. */
+    ShaderExpr sampleSceneDepthLinear01(ShaderExpr uv) {
+        addInclude("kilagraph:kg_scene.glsl");
+        ShaderExpr raw = sampleSceneDepthRaw(uv);
+        ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
+        return new ShaderExpr("kg_linear01_depth(" + raw.code() + ", " + iproj.code() + ")", GlslType.FLOAT);
+    }
+
+    /** Camera near-plane distance (world units), reconstructed from {@code IProjMat}. */
+    ShaderExpr cameraNear() {
+        addInclude("kilagraph:kg_scene.glsl");
+        ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
+        return new ShaderExpr("kg_camera_near(" + iproj.code() + ")", GlslType.FLOAT);
+    }
+
+    /** Camera far-plane distance (world units), reconstructed from {@code IProjMat}. */
+    ShaderExpr cameraFar() {
+        addInclude("kilagraph:kg_scene.glsl");
+        ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
+        return new ShaderExpr("kg_camera_far(" + iproj.code() + ")", GlslType.FLOAT);
+    }
+
     // ---- traversal ---------------------------------------------------------------------------
 
     /** Pull an input port's value as a GLSL expression converted to {@code expected}. */
     ShaderExpr pullInput(PortModel inputPort, @Nullable GlslType expected) {
         GlslType target = expected != null ? expected : GlslType.of(inputPort.getDataTypeHandle());
         if (!inputPort.isConnected()) {
+            // An unconnected UV port reads the mesh uv of the channel its configurator picked (not a literal).
+            if (inputPort.getDataTypeHandle().equals(RenderTypeGraphTypes.UV)) {
+                Object c = readConstant(inputPort);
+                RenderTypeGraphTypes.UvChannel ch = c instanceof RenderTypeGraphTypes.UvChannel u
+                        ? u : RenderTypeGraphTypes.UvChannel.UV0;
+                return convert(meshUv(ch), target);
+            }
             GlslType declared = GlslType.of(inputPort.getDataTypeHandle());
             // An unconnected sampler can't be a literal — fall back to the missing-texture sampler.
             if (declared == GlslType.SAMPLER2D) return missingSampler();
@@ -363,8 +656,10 @@ public final class ShaderGraphCompiler {
         // Varying boundary: a vertex varying block consumed from the fragment stage.
         if (current == fragment && ownerNode instanceof IVaryingBlock vb) {
             if (preview) {
-                // No vertex stage in preview — substitute a sensible default for the interpolant.
-                return convert(previewVaryingDefault(vb.varyingName(), vb.varyingType()), target);
+                // No vertex stage in preview — compute what the varying would carry. If the block's input is
+                // driven (e.g. a fixed value), that value is uniform across the quad, so use it; otherwise a
+                // sensible default. Same logic as the block's own preview (previewValueOf).
+                return convert(previewValueOf(outputPort), target);
             }
             ensureVaryingBuilt(outputPort, vb);
             ShaderExpr ref = new ShaderExpr(vb.varyingName(), vb.varyingType());
@@ -374,6 +669,38 @@ public final class ShaderGraphCompiler {
         ShaderExpr value = evaluateOutput(outputPort);
         if (value == null) value = new ShaderExpr("0.0", GlslType.FLOAT);
         return convert(value, target);
+    }
+
+    /**
+     * Pull an input port's value at its <em>natural</em> GLSL type, with no resize to the port's declared
+     * type — used by Dynamic math/vector nodes that infer their result width from the operands. Int/bool
+     * are normalised to float (so arithmetic builtins apply); float-vectors pass through untouched. An
+     * unconnected port yields its embedded {@code float} default (the DYNAMIC port editor) as a literal.
+     */
+    ShaderExpr pullInputNatural(PortModel inputPort) {
+        if (!inputPort.isConnected()) {
+            Object constant = readConstant(inputPort);
+            float f = constant instanceof Number n ? n.floatValue() : 0f;
+            return new ShaderExpr(GlslFormat.f(f), GlslType.FLOAT);
+        }
+        PortModel outputPort = inputPort.getFirstConnectedPort() instanceof PortModel pm ? pm : null;
+        if (outputPort == null) return new ShaderExpr("0.0", GlslType.FLOAT);
+        Node ownerNode = nodeOf(outputPort);
+
+        // Varying boundary (same handling as pullInput): a vertex varying consumed from the fragment stage.
+        if (current == fragment && ownerNode instanceof IVaryingBlock vb) {
+            if (preview) return normaliseToFloat(previewValueOf(outputPort));
+            ensureVaryingBuilt(outputPort, vb);
+            return new ShaderExpr(vb.varyingName(), vb.varyingType());
+        }
+        ShaderExpr value = evaluateOutput(outputPort);
+        if (value == null) return new ShaderExpr("0.0", GlslType.FLOAT);
+        return normaliseToFloat(value);
+    }
+
+    /** Normalise an int/bool expression to float (leaving float-vectors / opaque types unchanged). */
+    private static ShaderExpr normaliseToFloat(ShaderExpr e) {
+        return (e.type() == GlslType.INT || e.type() == GlslType.BOOL) ? convert(e, GlslType.FLOAT) : e;
     }
 
     @Nullable
@@ -430,7 +757,11 @@ public final class ShaderGraphCompiler {
         // Stage inference: this node is being used in the current stage. Flag if its affinity forbids it.
         ShaderStage stage = current == vertex ? ShaderStage.VERTEX : ShaderStage.FRAGMENT;
         StageAffinity affinity = sn.stageAffinity();
-        if (!affinity.allows(stage)) {
+        // A per-node preview compiles the whole upstream chain into the fragment scope (single quad), so
+        // stage affinity is meaningless there — a VERTEX_ONLY attribute reader is substituted with a
+        // fragment-safe default (see VertexAttributeInputNode#compile). Only flag stage errors for a real
+        // two-stage compile.
+        if (!preview && !affinity.allows(stage)) {
             stageErrors.putIfAbsent(nm.getUid(),
                     new StageError(nm.getUid(), sn.getDisplayName().getString(), stage, affinity));
         }
@@ -441,7 +772,11 @@ public final class ShaderGraphCompiler {
             if (raw == null) continue;
             GlslType decl = GlslType.of(outp.getDataTypeHandle());
             if (decl == null) {
-                current.cache.put(outp, raw);
+                // A DYNAMIC (or otherwise unmapped) output: keep the node's own inferred type, but still
+                // hoist a concrete float-vector result into a temp so a value consumed N times is emitted
+                // once. Opaque/no-type exprs are cached inline (can't be copied into a temp).
+                current.cache.put(outp, raw.type() != null && raw.type().isFloatVector()
+                        ? hoist(raw.type(), raw.code()) : raw);
                 continue;
             }
             ShaderExpr conv = convert(raw, decl);
@@ -665,6 +1000,37 @@ public final class ShaderGraphCompiler {
     }
 
     /**
+     * Register a global-scope GLSL helper function (the full definition {@code glsl}) under {@code name}
+     * in the current stage, declared once before {@code main()}. Keyed by name — the same helper used by
+     * many node instances appears once, and a re-registration with the same name is ignored (so a helper
+     * can't be redefined). A node that needs helper B to call helper A must register A first (insertion
+     * order is preserved). Used by procedural nodes (noise / Voronoi) whose math is clearest as a reusable
+     * function rather than an inlined expression.
+     */
+    void addFunction(String name, String glsl) {
+        current.functions.putIfAbsent(name, glsl);
+    }
+
+    /** Emit a stage's helper function definitions (if any), each on its own line, after a blank line. */
+    private static void appendFunctions(StringBuilder sb, StageScope scope) {
+        if (scope.functions.isEmpty()) return;
+        sb.append('\n');
+        for (String fn : scope.functions.values()) sb.append(fn).append('\n');
+    }
+
+    /** Append each used KG-managed UBO's std140 declaration, sorted by name so the generated source (and
+     *  therefore the content hash) is stable regardless of node-traversal order. */
+    private void appendUniformBlocks(StringBuilder sb, boolean leadingNewline) {
+        uniformBlocks.stream()
+                .sorted(java.util.Comparator.comparing(
+                        com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock::uboName))
+                .forEach(b -> {
+                    if (leadingNewline) sb.append('\n');
+                    sb.append(b.declareGlsl());
+                });
+    }
+
+    /**
      * Minecraft include files that unconditionally declare a {@code layout(std140) uniform} block.
      * Importing one means the generated GLSL contains that block, so the pipeline must declare the
      * matching uniform — registered automatically here to keep shader and pipeline in lockstep.
@@ -746,13 +1112,14 @@ public final class ShaderGraphCompiler {
         sb.append(vertexAttributes(graph.getSettings().vertexFormatElements()));
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append('\n').append(uniforms);
-        if (usesEngineGlobals) sb.append('\n').append(KGEngineUniforms.declareGlsl());
+        appendUniformBlocks(sb, true);
         if (!varyings.isEmpty()) {
             sb.append('\n');
             for (var e : varyings.entrySet()) {
                 sb.append("out ").append(e.getValue().glsl()).append(' ').append(e.getKey()).append(";\n");
             }
         }
+        appendFunctions(sb, vertex);
         sb.append("\nvoid main() {\n");
         sb.append(vertex.body).append("}\n");
         return sb.toString();
@@ -762,9 +1129,11 @@ public final class ShaderGraphCompiler {
         return GLSL_VERSION + "\n\n"
                 + "#moj_import <minecraft:dynamictransforms.glsl>\n"
                 + "#moj_import <minecraft:projection.glsl>\n\n"
-                + "in vec3 Position;\nin vec2 UV0;\n\nout vec2 vUv;\n\n"
+                + "in vec3 Position;\nin vec2 UV0;\nin vec3 Normal;\n\nout vec2 vUv;\nout vec3 vPos;\nout vec3 vNormal;\n\n"
                 + "void main() {\n"
                 + "    vUv = UV0;\n"
+                + "    vPos = Position;\n"
+                + "    vNormal = Normal;\n"
                 + "    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);\n"
                 + "}\n";
     }
@@ -776,8 +1145,9 @@ public final class ShaderGraphCompiler {
         if (!fragment.includes.isEmpty()) sb.append('\n');
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
-        if (usesEngineGlobals) sb.append(KGEngineUniforms.declareGlsl());
-        sb.append("\nin vec2 vUv;\n\nout vec4 fragColor;\n");
+        appendUniformBlocks(sb, false);
+        sb.append("\nin vec2 vUv;\nin vec3 vPos;\nin vec3 vNormal;\n\nout vec4 fragColor;\n");
+        appendFunctions(sb, fragment);
         sb.append("\nvoid main() {\n").append(fragment.body);
         sb.append("    fragColor = ").append(color.code()).append(";\n");
         sb.append("}\n");
@@ -791,13 +1161,14 @@ public final class ShaderGraphCompiler {
         if (!fragment.includes.isEmpty()) sb.append('\n');
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
-        if (usesEngineGlobals) sb.append(KGEngineUniforms.declareGlsl());
+        appendUniformBlocks(sb, false);
         if (!varyings.isEmpty()) {
             for (var e : varyings.entrySet()) {
                 sb.append("in ").append(e.getValue().glsl()).append(' ').append(e.getKey()).append(";\n");
             }
         }
         sb.append("\nout vec4 fragColor;\n");
+        appendFunctions(sb, fragment);
         sb.append("\nvoid main() {\n").append(fragment.body);
         String baseColor = out.baseColor != null ? out.baseColor.code() : "vec3(1.0)";
         String alpha = out.alpha != null ? out.alpha.code() : "1.0";

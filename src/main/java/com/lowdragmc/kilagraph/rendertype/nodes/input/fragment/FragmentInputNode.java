@@ -19,7 +19,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  */
 public abstract class FragmentInputNode extends ShaderNode {
 
-    /** The varying name shared with the matching vertex block, e.g. {@code "texCoord0"}. */
+    /** The varying name shared with the matching vertex block, e.g. {@code "uv0"}. */
     protected abstract String varyingName();
 
     /** The output port's graph type (must be a GLSL-representable handle). */

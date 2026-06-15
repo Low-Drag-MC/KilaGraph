@@ -1,0 +1,42 @@
+package com.lowdragmc.kilagraph.rendertype.nodes.artistic.normal;
+
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
+import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
+import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
+import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
+import com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity;
+import com.lowdragmc.kilagraph.rendertype.nodes.artistic.ArtisticNode;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
+
+/**
+ * Unity's Normal From Height: builds a tangent-space normal from a scalar height field via its
+ * screen-space derivatives — {@code normalize(vec3(-strength * dFdx(in), -strength * dFdy(in), 1))}. Uses
+ * derivatives, so {@link StageAffinity#FRAGMENT_ONLY}. (A screen-space approximation — Minecraft has no
+ * per-vertex tangent basis for Unity's full world/tangent reconstruction.)
+ */
+@NodeAttribute(name = "rt_normal_from_height", group = "rendertype_artistic/normal", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
+public class NormalFromHeightNode extends ArtisticNode {
+    @Override
+    public StageAffinity stageAffinity() {
+        return StageAffinity.FRAGMENT_ONLY; // uses dFdx/dFdy
+    }
+
+    @Override
+    public void onDefinePorts(IPortDefinitionContext context) {
+        context.addInputPort("in", TypeHandles.FLOAT);
+        context.addInputPort("strength", TypeHandles.FLOAT).withDefaultValue(1f);
+        context.addOutputPort("out", RenderTypeGraphTypes.VEC3);
+    }
+
+    @Override
+    public void compile(ShaderCompileContext ctx) {
+        ShaderExpr in = ctx.temp(GlslType.FLOAT, ctx.input("in").code());
+        String s = ctx.input("strength").code();
+        ctx.output("out", new ShaderExpr("normalize(vec3(-" + s + " * dFdx(" + in.code() + "), -"
+                + s + " * dFdy(" + in.code() + "), 1.0))", GlslType.VEC3));
+    }
+}

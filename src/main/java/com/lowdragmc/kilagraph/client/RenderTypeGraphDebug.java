@@ -1,11 +1,22 @@
 package com.lowdragmc.kilagraph.client;
 
-import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
+import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentBaseColorBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.range.FractNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec3Block;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeFactory;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
+import com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ContextNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
+
+import java.util.List;
 import com.mojang.blaze3d.pipeline.CompiledRenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -43,6 +54,8 @@ public final class RenderTypeGraphDebug {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static volatile boolean drawing = false;
+    /** When true, the draw uses the world-position-grid Transform test graph instead of the default. */
+    private static volatile boolean transformMode = false;
     private static RenderTypeGraphMaterial material;
     private static boolean materialInvalid = false;
 
@@ -61,10 +74,20 @@ public final class RenderTypeGraphDebug {
                             return 1;
                         }))
                         .then(Commands.literal("draw").executes(ctx -> {
-                            drawing = !drawing;
+                            setMode(false);
                             ctx.getSource().sendSuccess(
                                     () -> Component.literal("KilaGraph shader test draw: " + (drawing ? "ON" : "OFF")),
                                     false);
+                            return 1;
+                        }))
+                        .then(Commands.literal("transform").executes(ctx -> {
+                            setMode(true);
+                            ctx.getSource().sendSuccess(() -> Component.literal(
+                                    "KilaGraph Transform(object->world) test: " + (drawing ? "ON" : "OFF")
+                                            + " — a 4x4 quad above you, coloured by fract(worldPos). "
+                                            + "The grid is WORLD-LOCKED: walk around and the colours should slide with "
+                                            + "your world XZ (red=fract(worldX), blue=fract(worldZ)); they must NOT stay "
+                                            + "fixed to the quad."), false);
                             return 1;
                         }))
         );
@@ -113,10 +136,12 @@ public final class RenderTypeGraphDebug {
         VertexConsumer vc = buffers.getBuffer(mat.renderType());
         int light = 0x00F000F0; // full-bright (sky=240, block=240)
         int overlay = OverlayTexture.NO_OVERLAY;
-        quadVertex(vc, m, -0.5f, 0f, -0.5f, 0f, 0f, light, overlay);
-        quadVertex(vc, m, -0.5f, 0f, 0.5f, 0f, 1f, light, overlay);
-        quadVertex(vc, m, 0.5f, 0f, 0.5f, 1f, 1f, light, overlay);
-        quadVertex(vc, m, 0.5f, 0f, -0.5f, 1f, 0f, light, overlay);
+        // The Transform test wants several world-grid cells visible, so use a bigger horizontal quad.
+        float h = transformMode ? 2.0f : 0.5f;
+        quadVertex(vc, m, -h, 0f, -h, 0f, 0f, light, overlay);
+        quadVertex(vc, m, -h, 0f, h, 0f, 1f, light, overlay);
+        quadVertex(vc, m, h, 0f, h, 1f, 1f, light, overlay);
+        quadVertex(vc, m, h, 0f, -h, 1f, 0f, light, overlay);
         buffers.endBatch(mat.renderType());
 
         ps.popPose();
@@ -138,7 +163,7 @@ public final class RenderTypeGraphDebug {
             RenderSystem.assertOnRenderThread();
             // createMaterial validates the pipeline on the GPU and returns null if it can't compile,
             // so we never draw with a broken pipeline (which would crash the render loop).
-            material = RenderTypeFactory.createMaterial(new RenderTypeGraph());
+            material = RenderTypeFactory.createMaterial(transformMode ? buildTransformGraph() : new RenderTypeGraph());
             if (material == null) {
                 LOGGER.error("[KilaGraph] test material pipeline is invalid; refusing to draw. Run /kilagraph_shadertest precompile for the GLSL + driver log.");
                 materialInvalid = true;
@@ -146,5 +171,60 @@ public final class RenderTypeGraphDebug {
             }
         }
         return material;
+    }
+
+    /** Switch draw mode (default vs Transform test). Toggles off if the same mode is requested again. */
+    private static void setMode(boolean transform) {
+        if (drawing && transformMode == transform) {
+            drawing = false;
+        } else {
+            transformMode = transform;
+            drawing = true;
+        }
+        if (material != null) {
+            material.close();
+            material = null;
+        }
+        materialInvalid = false;
+    }
+
+    /**
+     * Build a graph that colours each fragment by {@code fract(worldPosition)} — a 1-block world-locked
+     * grid — to verify the {@code Transform(object → world)} node + the KG_Transforms matrices. Vertex
+     * stage: {@code Position attribute → Transform(object,world) → custom vec3 varying}; fragment stage:
+     * the interpolated world position → {@code Fraction} → Base Color (replacing the default colour wire).
+     */
+    private static RenderTypeGraph buildTransformGraph() {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel vertexStage = graph.getVertexStageModel();
+
+        NodeModel posAttr = KGGameTestHelpers.addNode(graph, VertexAttributeInputNode.class); // default element = position
+        NodeModel transform = KGGameTestHelpers.addNode(graph, TransformNode.class);
+        KGGameTestHelpers.setOption(transform, "from", "object");
+        KGGameTestHelpers.setOption(transform, "to", "world");
+        NodeModel varying = KGGameTestHelpers.addBlock(graph, vertexStage, VaryingCustomVec3Block.class);
+        KGGameTestHelpers.wire(graph, transform.getInputsById().get("in"), posAttr.getOutputsById().get("out"));
+        KGGameTestHelpers.wire(graph, varying.getInputsById().get("value"), transform.getOutputsById().get("out"));
+
+        NodeModel fract = KGGameTestHelpers.addNode(graph, FractNode.class);
+        KGGameTestHelpers.wire(graph, fract.getInputsById().get("a"), varying.getOutputsById().get("value"));
+
+        NodeModel baseColor = findBaseColor(graph);
+        PortModel colorIn = baseColor.getInputsById().get("color");
+        graph.graphModel.deleteWires(List.copyOf(colorIn.getConnectedWires())); // drop the default colour wire
+        KGGameTestHelpers.wire(graph, colorIn, fract.getOutputsById().get("out"));
+        return graph;
+    }
+
+    /** Find the default graph's Base Color fragment block. */
+    private static NodeModel findBaseColor(RenderTypeGraph graph) {
+        if (graph.getFragmentStageModel() instanceof ContextNodeModel frag) {
+            for (var block : frag.getBlocks()) {
+                if (block instanceof ICustomNodeModel cnm && cnm.getNode() instanceof FragmentBaseColorBlock) {
+                    return (NodeModel) block;
+                }
+            }
+        }
+        throw new IllegalStateException("default entity graph has no Base Color block");
     }
 }

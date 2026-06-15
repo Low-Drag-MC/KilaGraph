@@ -50,6 +50,17 @@ public abstract class ShaderNode extends Node {
         return null;
     }
 
+    /**
+     * The {@link com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents} key of the geometry this
+     * node's preview should default to (e.g. {@code "sphere"} for a Fresnel/normal-based effect that's
+     * invisible on a flat quad), or {@code null} for the default flat quad. The user can still switch it
+     * via right-click — this only sets the initial geometry.
+     */
+    @Nullable
+    protected String defaultPreviewContentKey() {
+        return null;
+    }
+
     @Override
     public boolean hasNodePreview() {
         // The per-node preview renders the port's value on a flat fragment quad. A VERTEX_ONLY node
@@ -60,6 +71,8 @@ public abstract class ShaderNode extends Node {
 
     @Override
     public void onBuildNodePreview(NodePreviewContext context) {
-        ShaderPreviewSupport.build(context, previewOutputPortId());
+        // Pass the id as a supplier so the preview re-resolves the (recreatable) port each frame — a node
+        // that redefines its outputs (Expression) would otherwise freeze on a stale PortModel.
+        ShaderPreviewSupport.build(context, this::previewOutputPortId, defaultPreviewContentKey());
     }
 }

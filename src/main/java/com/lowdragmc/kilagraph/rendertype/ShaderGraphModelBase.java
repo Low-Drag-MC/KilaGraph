@@ -32,6 +32,8 @@ public class ShaderGraphModelBase extends KGGraphModel {
                 || type.equals(RenderTypeGraphTypes.VEC2)
                 || type.equals(RenderTypeGraphTypes.VEC3)
                 || type.equals(RenderTypeGraphTypes.VEC4)
+                || type.equals(RenderTypeGraphTypes.DYNAMIC) // Dynamic math type: any float/vec
+                || type.equals(RenderTypeGraphTypes.UV) // uv coordinate, compiles to vec2
                 || type.equals(TypeHandles.COLOR); // ARGB color, compiles to vec4
     }
 }

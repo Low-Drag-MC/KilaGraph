@@ -18,12 +18,12 @@ public class VaryingStageNode extends ContextNode {
 
     @Override
     public List<Class<? extends BlockNode>> getSupportBlocks() {
+        // Only Position + the generic Custom varying blocks. The old specialized blocks (uv0 / vertex
+        // colour / fog distances) are gone — their values come from compiler defaults (meshUv /
+        // litVertexColor / sphericalVertexDistance / cylindricalVertexDistance), and a user who wants to
+        // override a varying adds a Custom block.
         return List.of(
                 VertexPositionBlock.class,
-                VaryingVertexColorBlock.class,
-                VaryingSphericalVertexDistanceBlock.class,
-                VaryingCylindricalVertexDistanceBlock.class,
-                VaryingTexCoordBlock.class,
                 VaryingCustomFloatBlock.class,
                 VaryingCustomVec2Block.class,
                 VaryingCustomVec3Block.class,

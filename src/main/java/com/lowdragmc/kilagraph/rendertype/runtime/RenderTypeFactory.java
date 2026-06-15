@@ -94,7 +94,8 @@ public final class RenderTypeFactory {
 
         if (!RenderSystem.getDevice().precompilePipeline(pipeline).isValid()) {
             if (FAILED.add(hash)) {
-                LOGGER.warn("[KilaGraph] generated pipeline invalid for hash {}.\n--- VERTEX ---\n{}\n--- FRAGMENT ---\n{}",
+                LOGGER.warn("[KilaGraph] " +
+                                "generated pipeline invalid for hash {}.\n--- VERTEX ---\n{}\n--- FRAGMENT ---\n{}",
                         hash, compiled.vertexSource(), compiled.fragmentSource());
             }
             if (!REFCOUNTS.containsKey(hash)) evictGenerated(hash); // nobody references it; drop our entry
@@ -119,6 +120,8 @@ public final class RenderTypeFactory {
             if (samplerDefaults.containsKey(sampler)) continue;
             if (sampler.equals("Sampler1") && useOverlay) continue;
             if (sampler.equals("Sampler2") && useLightmap) continue;
+            // Scene colour/depth are bound dynamically from SceneCaptureManager each draw, not via RenderSetup.
+            if (isSceneSampler(sampler)) continue;
             setup.withTexture(sampler, MissingTextureAtlasSprite.getLocation());
         }
         if (useLightmap) setup.useLightmap();
@@ -127,11 +130,14 @@ public final class RenderTypeFactory {
         setup.setOutputTarget(outputTarget(compiled.settings().outputTarget()));
 
         REFCOUNTS.merge(hash, 1, Integer::sum);
+        // The graph samples the captured opaque scene — start (and refcount) the capture while this material lives.
+        if (compiled.usesSceneColor() || compiled.usesSceneDepth()) SceneCaptureManager.INSTANCE.acquire();
         String name = Kilagraph.MODID + ":graph/" + hash;
         RenderType renderType = RenderType.create(name, setup.createRenderSetup());
         RenderTypeGraphMaterial material = new RenderTypeGraphMaterial(
-                renderType, compiled.layout(), compiled.usesEngineGlobals(), hash,
-                compiled.uniformFields(), compiled.variableSamplers(), buildMaterialTextures(compiled));
+                renderType, compiled.layout(), compiled.uniformBlocks(), hash,
+                compiled.uniformFields(), compiled.variableSamplers(), buildMaterialTextures(compiled),
+                compiled.usesSceneColor(), compiled.usesSceneDepth());
         // Bake EXPOSED-variable defaults into the material UBO; callers may override later via setUniform.
         for (Map.Entry<String, float[]> e : compiled.uniformDefaults().entrySet()) {
             material.setUniformField(e.getKey(), e.getValue());
@@ -189,9 +195,10 @@ public final class RenderTypeFactory {
             b.withUniform(com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout.UBO_NAME,
                     UniformType.UNIFORM_BUFFER);
         }
-        // Engine globals (Time, ...) updated by us each frame.
-        if (compiled.usesEngineGlobals()) {
-            b.withUniform(KGEngineUniforms.UBO_NAME, UniformType.UNIFORM_BUFFER);
+        // KilaGraph-managed UBOs the graph uses (engine globals / transforms / a mod's own), uploaded by us
+        // each frame. Generic — adding a new engine UBO needs no change here.
+        for (ShaderUniformBlock block : compiled.uniformBlocks()) {
+            b.withUniform(block.uboName(), UniformType.UNIFORM_BUFFER);
         }
         for (String sampler : compiled.layout().samplers()) {
             b.withSampler(sampler);
@@ -211,9 +218,16 @@ public final class RenderTypeFactory {
         for (String sampler : compiled.layout().samplers()) {
             if (sampler.equals("Sampler1") && compiled.usesOverlay()) continue;
             if (sampler.equals("Sampler2") && compiled.usesLightmap()) continue;
+            if (isSceneSampler(sampler)) continue; // bound from SceneCaptureManager, not TextureManager
             textures.put(sampler, compiled.samplerDefaults().getOrDefault(sampler, SamplerDefault.missing()));
         }
         return textures;
+    }
+
+    /** Whether {@code sampler} is one of the captured scene samplers (bound dynamically, not via RenderSetup). */
+    private static boolean isSceneSampler(String sampler) {
+        return sampler.equals(ShaderGraphCompiler.SCENE_COLOR_SAMPLER)
+                || sampler.equals(ShaderGraphCompiler.SCENE_DEPTH_SAMPLER);
     }
 
     /** Build the GPU sampler for a {@link SamplerDefault}, mapping KilaGraph's enums to blaze3d's. */

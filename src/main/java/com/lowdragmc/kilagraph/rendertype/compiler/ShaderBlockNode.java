@@ -35,6 +35,13 @@ public abstract class ShaderBlockNode extends BlockNode {
         return null;
     }
 
+    /** The {@link com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents} key of the preview's default
+     *  geometry (e.g. {@code "sphere"}), or {@code null} for the flat quad. See {@code ShaderNode}. */
+    @Nullable
+    protected String defaultPreviewContentKey() {
+        return null;
+    }
+
     @Override
     public boolean hasNodePreview() {
         return previewOutputPortId() != null;
@@ -42,6 +49,6 @@ public abstract class ShaderBlockNode extends BlockNode {
 
     @Override
     public void onBuildNodePreview(NodePreviewContext context) {
-        ShaderPreviewSupport.build(context, previewOutputPortId());
+        ShaderPreviewSupport.build(context, this::previewOutputPortId, defaultPreviewContentKey());
     }
 }

@@ -15,7 +15,7 @@ public class SamplerTexture2DNode extends ShaderNode {
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         context.addInputPort("sampler", RenderTypeGraphTypes.SAMPLER2D).withoutConfigurator();
-        context.addInputPort("uv", RenderTypeGraphTypes.VEC2);
+        context.addInputPort("uv", RenderTypeGraphTypes.UV);
         context.addOutputPort("color", RenderTypeGraphTypes.VEC4);
     }
 
@@ -24,7 +24,7 @@ public class SamplerTexture2DNode extends ShaderNode {
         // Unconnected sampler/uv fall back to the missing-texture sampler and the mesh uv, so the node
         // always samples something (the texture is meant to come from a Sampler2D constant/variable).
         ShaderExpr sampler = ctx.isConnected("sampler") ? ctx.input("sampler") : ctx.missingSampler();
-        ShaderExpr uv = ctx.isConnected("uv") ? ctx.input("uv") : ctx.meshUv();
+        ShaderExpr uv = ctx.input("uv");
         ctx.output("color", new ShaderExpr("texture(" + sampler.code() + ", " + uv.code() + ")", GlslType.VEC4));
     }
 

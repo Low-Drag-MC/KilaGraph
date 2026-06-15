@@ -69,6 +69,8 @@ public enum GlslType {
         if (type.equals(TypeHandles.INT)) return INT;
         if (type.equals(TypeHandles.BOOL)) return BOOL;
         if (type.equals(RenderTypeGraphTypes.VEC2)) return VEC2;
+        // UV is a vec2 in the shader; an unconnected UV port resolves to a channel's mesh uv (pullInput).
+        if (type.equals(RenderTypeGraphTypes.UV)) return VEC2;
         if (type.equals(RenderTypeGraphTypes.VEC3)) return VEC3;
         if (type.equals(RenderTypeGraphTypes.VEC4)) return VEC4;
         // COLOR is an ARGB int at the editor surface (color-picker), but a vec4 in the shader.

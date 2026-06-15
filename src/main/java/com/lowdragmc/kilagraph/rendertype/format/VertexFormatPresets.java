@@ -20,6 +20,9 @@ public final class VertexFormatPresets {
     public static final List<String> BLOCK = List.of("position", "color", "uv0", "uv2");
     /** {@code DefaultVertexFormat.POSITION_TEX_COLOR}: Position, UV0, Color. */
     public static final List<String> POSITION_COLOR_TEX = List.of("position", "uv0", "color");
+    /** {@code DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL}: Position, UV0, Color, Normal. Used by the
+     *  node-preview (so previews carry a real surface normal for Fresnel/normal nodes). */
+    public static final List<String> POSITION_COLOR_TEX_NORMAL = List.of("position", "uv0", "color", "normal");
 
     /** Ordered name -> key list, for the UI's preset menu. */
     public static final Map<String, List<String>> ALL = new LinkedHashMap<>();

@@ -160,7 +160,10 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
 
         CompiledShaderGraph compiled;
         try {
-            compiled = new ShaderGraphCompiler(graph).compile();
+            // editorPreview(): screen-space defaults (Scene Color/Depth's unconnected UV) map the whole capture
+            // onto the cube instead of the panel's screen sub-rect — otherwise the preview would only show the
+            // small on-screen rectangle it occupies. In-world materials still use true screen-space.
+            compiled = new ShaderGraphCompiler(graph).editorPreview().compile();
         } catch (RuntimeException e) {
             if (!lastCompileFailed) {
                 LOGGER.warn("[KilaGraph] preview graph failed to compile: {}", e.getMessage());
@@ -181,10 +184,23 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
         // Graph changed — createMaterial validates the pipeline on the GPU and returns null if the
         // edit produced an invalid shader; keep the last good material rather than crashing the draw.
         RenderTypeGraphMaterial rebuilt = RenderTypeFactory.createMaterial(compiled);
-        if (rebuilt == null) return material;
+        if (rebuilt == null) {
+            // GLSL/pipeline compile failures happen at the GPU layer (GlDevice/RenderTypeFactory), not the
+            // graph-validation layer, so they never reach the GraphLogger — surface them here (the detailed
+            // driver error is in the log). Don't clobber a stage-error message already shown above.
+            if (!compiled.hasStageErrors()) showCompileError();
+            return material;
+        }
         if (material != null) material.close();
         material = rebuilt;
         return material;
+    }
+
+    /** Show a generic "shader failed to compile" message (the driver's detailed GLSL error is logged). */
+    private void showCompileError() {
+        if (errorLabel == null) return;
+        errorLabel.setValue(Component.translatable("rendertypegraph.preview.compile_failed")
+                .withStyle(s -> s.withColor(0xFF5555)));
     }
 
     /** Show stage-affinity violations (one per line, red) over the scene, or clear when none. */

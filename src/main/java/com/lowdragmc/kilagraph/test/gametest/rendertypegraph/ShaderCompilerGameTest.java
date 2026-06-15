@@ -7,35 +7,76 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.AbsNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.ClampNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.CrossNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.DotNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.AbsNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.range.ClampNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.CrossNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.DotNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.FresnelNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.SphereMaskNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.ApplyFogNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.TotalFogValueNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogSphericalDistanceNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomFloatBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.channel.CombineNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.channel.FlipNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.channel.SwizzleNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.TilingAndOffsetNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.RotateNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.TwirlNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.SpherizeNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.RadialShearNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.PolarCoordinatesNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.FlipbookNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.TriplanarNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.scene.ScreenPositionNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.scene.SceneColorNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.scene.SceneDepthNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.transform.CameraNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.BranchNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.CompareNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.AndNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.OrNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.NotNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.ExpressionNode;
+import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
+import com.lowdragmc.kilagraph.editor.ExportShaderFunction;
+import com.lowdragmc.lowdraglib2.Platform;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.GraphElementModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec2Block;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec2Node;
+import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaDiscardBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentBaseColorBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentEmissionBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.LengthNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.LerpNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.MinNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.NormalizeNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.PowNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.LengthNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.interpolation.LerpNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.range.MinNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.NormalizeNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.PowNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.LightMapTextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.OverlayTextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.VertexColorFragmentInputNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.TexCoordFragmentInputNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.ShaderFloatAddNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.ShaderFloatMultiplyNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.SinNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.AddNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4ConstructNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4SplitNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4TransformNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.derivative.DDXNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.trigonometry.SinNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.uv.TilingAndOffsetNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.constant.TimeNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.Vec2Node;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.Vec3Node;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.Vec4Node;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingVertexColorBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec2Node;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec4Node;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec4Block;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec3Block;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
@@ -52,6 +93,7 @@ import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
+import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addRegisteredNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertFalse;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertTrue;
@@ -92,6 +134,37 @@ public final class ShaderCompilerGameTest {
     private static final String VECTOR_NODES = "rendertype_compile_vector_nodes";
     private static final String VERTEX_FORMAT_INPUTS = "rendertype_compile_vertex_format_inputs";
     private static final String FRAGMENT_INPUTS = "rendertype_compile_fragment_inputs";
+    private static final String DYNAMIC_WIDTH = "rendertype_compile_dynamic_width";
+    private static final String MATRIX_NODES = "rendertype_compile_matrix_nodes";
+    private static final String DERIVATIVE_NODES = "rendertype_compile_derivative_nodes";
+    private static final String PREVIEW_VERTEX_ATTR = "rendertype_compile_preview_vertex_attr";
+    private static final String EXTRA_MATH_NODES = "rendertype_compile_extra_math_nodes";
+    private static final String TRANSFORM_NODE = "rendertype_compile_transform_node";
+    private static final String CAMERA_NODE = "rendertype_compile_camera_node";
+    private static final String EXP_LOG_BASE = "rendertype_compile_exp_log_base";
+    private static final String KG_TRANSFORMS_UBO = "rendertype_compile_kg_transforms_ubo";
+    private static final String WORLD_GRID = "rendertype_compile_world_grid";
+    private static final String PROCEDURAL_NODES = "rendertype_compile_procedural_nodes";
+    private static final String ARTISTIC_NODES = "rendertype_compile_artistic_nodes";
+    private static final String FRESNEL_DEFAULTS = "rendertype_compile_fresnel_defaults";
+    private static final String FOG_DISTANCE_VERTEX_ONLY = "rendertype_compile_fog_distance_vertex_only";
+    private static final String FOG_PARAM_DEFAULTS = "rendertype_compile_fog_param_defaults";
+    private static final String SPHERE_MASK_COORDS = "rendertype_compile_sphere_mask_coords";
+    private static final String CHANNEL_NODES = "rendertype_compile_channel_nodes";
+    private static final String UV_NODES = "rendertype_compile_uv_nodes";
+    private static final String UV_CHANNEL = "rendertype_compile_uv_channel";
+    private static final String UV_CHANNEL_CODEC = "rendertype_compile_uv_channel_codec";
+    private static final String UV_PREVIEW = "rendertype_compile_uv_preview";
+    private static final String SCENE_NODES = "rendertype_compile_scene_nodes";
+    private static final String SCENE_SAMPLER_DEFAULT = "rendertype_compile_scene_sampler_default";
+    private static final String SCREEN_POSITION_MODES = "rendertype_compile_screen_position_modes";
+    private static final String CAMERA_NEW_OUTPUTS = "rendertype_compile_camera_new_outputs";
+    private static final String SCENE_PREVIEW_UV = "rendertype_compile_scene_preview_uv";
+    private static final String BRANCH_SELECT = "rendertype_compile_branch_select";
+    private static final String COMPARE_LOGIC = "rendertype_compile_compare_logic";
+    private static final String EXPRESSION_NODE = "rendertype_compile_expression_node";
+    private static final String EXPRESSION_VALIDATION = "rendertype_compile_expression_validation";
+    private static final String EXPORT_FUNCTION = "rendertype_compile_export_function";
 
     private ShaderCompilerGameTest() {}
 
@@ -120,6 +193,37 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunction(VECTOR_NODES, ShaderCompilerGameTest::vectorNodesEmitGlslCalls);
         KGGameTests.registerFunction(VERTEX_FORMAT_INPUTS, ShaderCompilerGameTest::vertexFormatInputsAreVertexOnly);
         KGGameTests.registerFunction(FRAGMENT_INPUTS, ShaderCompilerGameTest::fragmentInputsEmitVaryings);
+        KGGameTests.registerFunction(DYNAMIC_WIDTH, ShaderCompilerGameTest::dynamicMathInfersWidth);
+        KGGameTests.registerFunction(MATRIX_NODES, ShaderCompilerGameTest::matrixNodesEmitGlsl);
+        KGGameTests.registerFunction(DERIVATIVE_NODES, ShaderCompilerGameTest::derivativeNodesEmitGlsl);
+        KGGameTests.registerFunction(PREVIEW_VERTEX_ATTR, ShaderCompilerGameTest::previewOfVertexAttributeHasNoStageError);
+        KGGameTests.registerFunction(EXTRA_MATH_NODES, ShaderCompilerGameTest::extraMathNodesEmitGlsl);
+        KGGameTests.registerFunction(TRANSFORM_NODE, ShaderCompilerGameTest::transformNodeUsesSpaceMatrices);
+        KGGameTests.registerFunction(CAMERA_NODE, ShaderCompilerGameTest::cameraNodeReadsGlobals);
+        KGGameTests.registerFunction(EXP_LOG_BASE, ShaderCompilerGameTest::expLogBaseOptionDrivesGlsl);
+        KGGameTests.registerFunction(KG_TRANSFORMS_UBO, ShaderCompilerGameTest::kgTransformsUboNodeExposesMatrices);
+        KGGameTests.registerFunction(WORLD_GRID, ShaderCompilerGameTest::worldGridTransformGraphCompiles);
+        KGGameTests.registerFunction(PROCEDURAL_NODES, ShaderCompilerGameTest::proceduralNodesEmitGlsl);
+        KGGameTests.registerFunction(ARTISTIC_NODES, ShaderCompilerGameTest::artisticNodesEmitGlsl);
+        KGGameTests.registerFunction(FRESNEL_DEFAULTS, ShaderCompilerGameTest::fresnelDefaultsToMeshNormalAndViewDir);
+        KGGameTests.registerFunction(FOG_DISTANCE_VERTEX_ONLY, ShaderCompilerGameTest::fogDistanceNodesAreVertexOnly);
+        KGGameTests.registerFunction(FOG_PARAM_DEFAULTS, ShaderCompilerGameTest::fogParamsDefaultToUboAndVaryings);
+        KGGameTests.registerFunction(SPHERE_MASK_COORDS, ShaderCompilerGameTest::sphereMaskCoordsDefaultToMeshPosition);
+        KGGameTests.registerFunction(CHANNEL_NODES, ShaderCompilerGameTest::channelNodesEmitGlsl);
+        KGGameTests.registerFunction(UV_NODES, ShaderCompilerGameTest::uvNodesEmitGlsl);
+        KGGameTests.registerFunction(UV_CHANNEL, ShaderCompilerGameTest::uvTypeResolvesChannel);
+        KGGameTests.registerFunction(UV_CHANNEL_CODEC, ShaderCompilerGameTest::uvChannelValueCodecRoundTrips);
+        KGGameTests.registerFunction(UV_PREVIEW, ShaderCompilerGameTest::uvPreviewSemantics);
+        KGGameTests.registerFunction(SCENE_NODES, ShaderCompilerGameTest::sceneNodesEmitGlsl);
+        KGGameTests.registerFunction(SCENE_SAMPLER_DEFAULT, ShaderCompilerGameTest::sceneSamplersHaveNoBakedDefault);
+        KGGameTests.registerFunction(SCREEN_POSITION_MODES, ShaderCompilerGameTest::screenPositionModesEmitGlsl);
+        KGGameTests.registerFunction(CAMERA_NEW_OUTPUTS, ShaderCompilerGameTest::cameraNodeExposesNewOutputs);
+        KGGameTests.registerFunction(SCENE_PREVIEW_UV, ShaderCompilerGameTest::scenePreviewMapsWholeCapture);
+        KGGameTests.registerFunction(BRANCH_SELECT, ShaderCompilerGameTest::branchEmitsSelect);
+        KGGameTests.registerFunction(COMPARE_LOGIC, ShaderCompilerGameTest::compareLogicEmitGlsl);
+        KGGameTests.registerFunction(EXPRESSION_NODE, ShaderCompilerGameTest::expressionNodeEmitsFunctionAndCall);
+        KGGameTests.registerFunction(EXPRESSION_VALIDATION, ShaderCompilerGameTest::expressionNodeValidationFlagsBadNames);
+        KGGameTests.registerFunction(EXPORT_FUNCTION, ShaderCompilerGameTest::exportBuildsFunctionGraph);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -148,10 +252,186 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunctionTest(event, VECTOR_NODES, KGGameTests.functionKey(VECTOR_NODES), d);
         KGGameTests.registerFunctionTest(event, VERTEX_FORMAT_INPUTS, KGGameTests.functionKey(VERTEX_FORMAT_INPUTS), d);
         KGGameTests.registerFunctionTest(event, FRAGMENT_INPUTS, KGGameTests.functionKey(FRAGMENT_INPUTS), d);
+        KGGameTests.registerFunctionTest(event, DYNAMIC_WIDTH, KGGameTests.functionKey(DYNAMIC_WIDTH), d);
+        KGGameTests.registerFunctionTest(event, MATRIX_NODES, KGGameTests.functionKey(MATRIX_NODES), d);
+        KGGameTests.registerFunctionTest(event, DERIVATIVE_NODES, KGGameTests.functionKey(DERIVATIVE_NODES), d);
+        KGGameTests.registerFunctionTest(event, PREVIEW_VERTEX_ATTR, KGGameTests.functionKey(PREVIEW_VERTEX_ATTR), d);
+        KGGameTests.registerFunctionTest(event, EXTRA_MATH_NODES, KGGameTests.functionKey(EXTRA_MATH_NODES), d);
+        KGGameTests.registerFunctionTest(event, TRANSFORM_NODE, KGGameTests.functionKey(TRANSFORM_NODE), d);
+        KGGameTests.registerFunctionTest(event, CAMERA_NODE, KGGameTests.functionKey(CAMERA_NODE), d);
+        KGGameTests.registerFunctionTest(event, EXP_LOG_BASE, KGGameTests.functionKey(EXP_LOG_BASE), d);
+        KGGameTests.registerFunctionTest(event, KG_TRANSFORMS_UBO, KGGameTests.functionKey(KG_TRANSFORMS_UBO), d);
+        KGGameTests.registerFunctionTest(event, WORLD_GRID, KGGameTests.functionKey(WORLD_GRID), d);
+        KGGameTests.registerFunctionTest(event, PROCEDURAL_NODES, KGGameTests.functionKey(PROCEDURAL_NODES), d);
+        KGGameTests.registerFunctionTest(event, ARTISTIC_NODES, KGGameTests.functionKey(ARTISTIC_NODES), d);
+        KGGameTests.registerFunctionTest(event, FRESNEL_DEFAULTS, KGGameTests.functionKey(FRESNEL_DEFAULTS), d);
+        KGGameTests.registerFunctionTest(event, FOG_DISTANCE_VERTEX_ONLY, KGGameTests.functionKey(FOG_DISTANCE_VERTEX_ONLY), d);
+        KGGameTests.registerFunctionTest(event, FOG_PARAM_DEFAULTS, KGGameTests.functionKey(FOG_PARAM_DEFAULTS), d);
+        KGGameTests.registerFunctionTest(event, SPHERE_MASK_COORDS, KGGameTests.functionKey(SPHERE_MASK_COORDS), d);
+        KGGameTests.registerFunctionTest(event, CHANNEL_NODES, KGGameTests.functionKey(CHANNEL_NODES), d);
+        KGGameTests.registerFunctionTest(event, UV_NODES, KGGameTests.functionKey(UV_NODES), d);
+        KGGameTests.registerFunctionTest(event, UV_CHANNEL, KGGameTests.functionKey(UV_CHANNEL), d);
+        KGGameTests.registerFunctionTest(event, UV_CHANNEL_CODEC, KGGameTests.functionKey(UV_CHANNEL_CODEC), d);
+        KGGameTests.registerFunctionTest(event, UV_PREVIEW, KGGameTests.functionKey(UV_PREVIEW), d);
+        KGGameTests.registerFunctionTest(event, SCENE_NODES, KGGameTests.functionKey(SCENE_NODES), d);
+        KGGameTests.registerFunctionTest(event, SCENE_SAMPLER_DEFAULT, KGGameTests.functionKey(SCENE_SAMPLER_DEFAULT), d);
+        KGGameTests.registerFunctionTest(event, SCREEN_POSITION_MODES, KGGameTests.functionKey(SCREEN_POSITION_MODES), d);
+        KGGameTests.registerFunctionTest(event, CAMERA_NEW_OUTPUTS, KGGameTests.functionKey(CAMERA_NEW_OUTPUTS), d);
+        KGGameTests.registerFunctionTest(event, SCENE_PREVIEW_UV, KGGameTests.functionKey(SCENE_PREVIEW_UV), d);
+        KGGameTests.registerFunctionTest(event, BRANCH_SELECT, KGGameTests.functionKey(BRANCH_SELECT), d);
+        KGGameTests.registerFunctionTest(event, COMPARE_LOGIC, KGGameTests.functionKey(COMPARE_LOGIC), d);
+        KGGameTests.registerFunctionTest(event, EXPRESSION_NODE, KGGameTests.functionKey(EXPRESSION_NODE), d);
+        KGGameTests.registerFunctionTest(event, EXPRESSION_VALIDATION, KGGameTests.functionKey(EXPRESSION_VALIDATION), d);
+        KGGameTests.registerFunctionTest(event, EXPORT_FUNCTION, KGGameTests.functionKey(EXPORT_FUNCTION), d);
     }
 
     private static CompiledShaderGraph compile(RenderTypeGraph graph) {
         return new ShaderGraphCompiler(graph).compile();
+    }
+
+    /** Whether the compiled graph registered the KG-managed UBO with the given block name. */
+    private static boolean usesUniformBlock(CompiledShaderGraph compiled, String uboName) {
+        return compiled.uniformBlocks().stream().anyMatch(b -> b.uboName().equals(uboName));
+    }
+
+    // ---- logic / branch / expression / export ------------------------------------------------
+
+    /** A Branch node emits a ternary {@code (pred ? t : f)} select; the result width follows the wider
+     *  operand (a vec3 {@code t} broadcasts the scalar {@code f} to vec3). The wired Compare emits its op. */
+    public static void branchEmitsSelect(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel branch = addNode(graph, BranchNode.class);
+        NodeModel compare = addNode(graph, CompareNode.class);
+        setOption(compare, "op", "less");
+        NodeModel vec3 = addNode(graph, Vec3Node.class);
+        wire(graph, branch.getInputsById().get("predicate"), compare.getOutputsById().get("out"));
+        wire(graph, branch.getInputsById().get("t"), vec3.getOutputsById().get("out"));
+        wire(graph, emission.getInputsById().get("color"), branch.getOutputsById().get("out"));
+
+        String fsh = compile(graph).fragmentSource();
+        assertTrue(helper, "branch emits ternary select", fsh.contains("?") && fsh.contains(" : "));
+        assertTrue(helper, "compare operator < emitted", fsh.contains("<"));
+        assertTrue(helper, "scalar f operand broadcast to vec3", fsh.contains("vec3("));
+        helper.succeed();
+    }
+
+    /** Compare emits the chosen relational operator (→ bool); And/Or/Not emit {@code &&}/{@code ||}/{@code !}. */
+    public static void compareLogicEmitGlsl(GameTestHelper helper) {
+        String[][] ops = {{"equal", "=="}, {"notEqual", "!="}, {"less", "<"},
+                {"lessEqual", "<="}, {"greater", ">"}, {"greaterEqual", ">="}};
+        for (String[] op : ops) {
+            RenderTypeGraph graph = new RenderTypeGraph();
+            NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+            NodeModel compare = addNode(graph, CompareNode.class);
+            setOption(compare, "op", op[0]);
+            wire(graph, emission.getInputsById().get("color"), compare.getOutputsById().get("out"));
+            assertTrue(helper, "compare " + op[0] + " emits " + op[1],
+                    compile(graph).fragmentSource().contains(op[1]));
+        }
+        assertTrue(helper, "And emits &&", logicOpFsh(AndNode.class).contains("&&"));
+        assertTrue(helper, "Or emits ||", logicOpFsh(OrNode.class).contains("||"));
+        assertTrue(helper, "Not emits !", logicOpFsh(NotNode.class).contains("(!"));
+        helper.succeed();
+    }
+
+    /** Compile a graph with a single boolean-logic node wired into emission, returning the fragment GLSL. */
+    private static String logicOpFsh(Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node> nodeClass) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel node = addNode(graph, nodeClass);
+        wire(graph, emission.getInputsById().get("color"), node.getOutputsById().get("out"));
+        return compile(graph).fragmentSource();
+    }
+
+    /** The Expression node defines its ports from the spec and compiles to a per-instance helper function
+     *  ({@code void kg_expr_…(in …, out …)}) called with the input expressions + declared out temps. */
+    public static void expressionNodeEmitsFunctionAndCall(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel expr = addNode(graph, ExpressionNode.class);
+        String json = ExpressionNode.toJson(new ExpressionNode.ExpressionSpec(
+                java.util.List.of(new ExpressionNode.PortSpec("a", "FLOAT"), new ExpressionNode.PortSpec("b", "VEC3")),
+                java.util.List.of(new ExpressionNode.PortSpec("result", "VEC3"), new ExpressionNode.PortSpec("scalar", "FLOAT")),
+                "result = b * a;\nscalar = a;"));
+        setOption(expr, "spec", json); // setOption calls defineNode() → ports re-derived from the spec
+        assertEq(helper, "expression inputs (a,b)", 2, expr.getInputsById().size());
+        assertEq(helper, "expression outputs (result,scalar)", 2, expr.getOutputsById().size());
+        wire(graph, emission.getInputsById().get("color"), expr.getOutputsById().get("result"));
+
+        String fsh = compile(graph).fragmentSource();
+        assertTrue(helper, "helper function declared", fsh.contains("void kg_expr_"));
+        assertTrue(helper, "helper has typed in/out params",
+                fsh.contains("in float a") && fsh.contains("in vec3 b")
+                        && fsh.contains("out vec3 result") && fsh.contains("out float scalar"));
+        assertTrue(helper, "helper body inlined", fsh.contains("result = b * a;"));
+        assertTrue(helper, "function declared + called", count(fsh, "kg_expr_") >= 2);
+        helper.succeed();
+    }
+
+    /** {@link ExportShaderFunction#build} turns a selection into a standalone ShaderFunctionGraph with one
+     *  READ (incoming) + one WRITE (outgoing) boundary variable and the copied nodes — without modifying the
+     *  source graph. (The editor menu + resource persistence is client-verified.) */
+    public static void exportBuildsFunctionGraph(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel vecA = addRegisteredNode(graph, Vec3Node.class);
+        NodeModel vecB = addRegisteredNode(graph, Vec3Node.class);
+        NodeModel add = addRegisteredNode(graph, AddNode.class);
+        wire(graph, add.getInputsById().get("a"), vecA.getOutputsById().get("out"));
+        wire(graph, add.getInputsById().get("b"), vecB.getOutputsById().get("out"));
+        NodeModel baseColor = addBlock(graph, graph.getFragmentStageModel(), FragmentBaseColorBlock.class);
+        wire(graph, baseColor.getInputsById().get("color"), add.getOutputsById().get("out"));
+
+        int sourceNodesBefore = graph.graphModel.getNodeModels().size();
+        long sourceVarsBefore = graph.graphModel.getGraphVariableModels().stream().filter(java.util.Objects::nonNull).count();
+
+        // Select {vecA, add}: vecB→add.b crosses in (READ), add→baseColor crosses out (WRITE), vecA→add internal.
+        java.util.List<GraphElementModel> selection = java.util.List.of(
+                (GraphElementModel) vecA, (GraphElementModel) add);
+        ShaderFunctionGraph fn = ExportShaderFunction.build(graph.graphModel, selection, Platform.getFrozenRegistry());
+        assertTrue(helper, "export produced a function graph", fn != null);
+
+        var vars = fn.graphModel.getGraphVariableModels().stream().filter(java.util.Objects::nonNull).toList();
+        long reads = vars.stream().filter(v -> v.getModifiers() != null && v.getModifiers().hasFlag(ModifierFlags.READ)).count();
+        long writes = vars.stream().filter(v -> v.getModifiers() != null && v.getModifiers().hasFlag(ModifierFlags.WRITE)).count();
+        assertEq(helper, "one READ (input) boundary var", 1L, reads);
+        assertEq(helper, "one WRITE (output) boundary var", 1L, writes);
+
+        assertTrue(helper, "copied Vec3 node present",
+                fn.graphModel.getNodeModels().stream().anyMatch(n -> isNodeOfType(n, Vec3Node.class)));
+        assertTrue(helper, "copied Add node present",
+                fn.graphModel.getNodeModels().stream().anyMatch(n -> isNodeOfType(n, AddNode.class)));
+
+        assertEq(helper, "source nodes unchanged", sourceNodesBefore, graph.graphModel.getNodeModels().size());
+        assertEq(helper, "source has no new variables", (int) sourceVarsBefore,
+                (int) graph.graphModel.getGraphVariableModels().stream().filter(java.util.Objects::nonNull).count());
+        helper.succeed();
+    }
+
+    /** Whether a node model wraps a user node of the given class. */
+    private static boolean isNodeOfType(Object model, Class<?> nodeClass) {
+        return model instanceof ICustomNodeModel c && nodeClass.isInstance(c.getNode());
+    }
+
+    /** The Expression node reports a validation error for a reserved/illegal port name (so the editor's
+     *  GraphLogger surfaces it next to the node), and none for a valid spec. */
+    public static void expressionNodeValidationFlagsBadNames(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel exprModel = addNode(graph, ExpressionNode.class);
+        ExpressionNode expr = (ExpressionNode) ((ICustomNodeModel) exprModel).getNode();
+
+        // Output named "out" is a GLSL reserved word → flagged.
+        setOption(exprModel, "spec", ExpressionNode.toJson(new ExpressionNode.ExpressionSpec(
+                java.util.List.of(new ExpressionNode.PortSpec("a", "FLOAT")),
+                java.util.List.of(new ExpressionNode.PortSpec("out", "FLOAT")), "out = a;")));
+        assertTrue(helper, "reserved output name flagged", !expr.validationErrors().isEmpty());
+
+        // Valid identifiers → no validation errors.
+        setOption(exprModel, "spec", ExpressionNode.toJson(new ExpressionNode.ExpressionSpec(
+                java.util.List.of(new ExpressionNode.PortSpec("a", "FLOAT")),
+                java.util.List.of(new ExpressionNode.PortSpec("result", "FLOAT")), "result = a;")));
+        assertTrue(helper, "valid spec has no errors", expr.validationErrors().isEmpty());
+        helper.succeed();
     }
 
     /** A shared upstream node (the texture sample, apply_fog) must be emitted exactly once. */
@@ -214,7 +494,7 @@ public final class ShaderCompilerGameTest {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
         NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
-        NodeModel fmul = addNode(graph, ShaderFloatMultiplyNode.class); // float output
+        NodeModel fmul = addNode(graph, MultiplyNode.class); // dynamic; float×float → float output
         wire(graph, emission.getInputsById().get("color"), fmul.getOutputsById().get("out"));
 
         String fsh = compile(graph).fragmentSource();
@@ -369,7 +649,7 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph compiled = compile(graph);
         String fsh = compiled.fragmentSource();
 
-        assertTrue(helper, "graph uses engine globals", compiled.usesEngineGlobals());
+        assertTrue(helper, "graph uses engine globals", usesUniformBlock(compiled, "KG_Globals"));
         assertTrue(helper, "fsh declares KG_Globals block",
                 fsh.contains("layout(std140) uniform "
                         + com.lowdragmc.kilagraph.rendertype.runtime.KGEngineUniforms.UBO_NAME));
@@ -384,7 +664,7 @@ public final class ShaderCompilerGameTest {
      */
     public static void previewCompilesPortSubgraph(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
-        NodeModel uv = addNode(graph, TexCoordFragmentInputNode.class);
+        NodeModel uv = addNode(graph, UVNode.class);
         NodeModel tiling = addNode(graph, TilingAndOffsetNode.class);
         NodeModel tex = addNode(graph, SamplerTexture2DNode.class); // unconnected sampler → missing
         wire(graph, tiling.getInputsById().get("uv"), uv.getOutputsById().get("out"));
@@ -429,18 +709,18 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "error names the vertex attribute node",
                 badCompiled.stageErrors().stream().anyMatch(e -> e.nodeName().contains("Vertex Attribute")));
 
-        // Correct: Normal -> vertex Color varying block input (vertex stage) → no error.
+        // Correct: Normal -> a custom vec4 varying block input (vertex stage) → no error.
         RenderTypeGraph good = new RenderTypeGraph();
         NodeModel vertex = good.getVertexStageModel();
-        NodeModel colorVarying = addBlock(good, vertex, VaryingVertexColorBlock.class);
+        NodeModel colorVarying = addBlock(good, vertex, VaryingCustomVec4Block.class);
         NodeModel n2 = addNode(good, VertexAttributeInputNode.class);
-        NodeModel toVec4 = addNode(good, com.lowdragmc.kilagraph.rendertype.nodes.vector.ShaderVec4MultiplyNode.class);
-        // feed Normal (vec3 -> vec4 via convert) into the color varying's input (computed in vsh)
+        NodeModel toVec4 = addNode(good, MultiplyNode.class);
+        // feed Normal (vec3 -> vec4 via convert) into the varying's input (computed in vsh)
         wire(good, toVec4.getInputsById().get("a"), n2.getOutputsById().get("out"));
-        wire(good, colorVarying.getInputsById().get("color"), toVec4.getOutputsById().get("out"));
+        wire(good, colorVarying.getInputsById().get("value"), toVec4.getOutputsById().get("out"));
         // also consume the varying in fragment so the vertex subgraph is actually compiled
         NodeModel baseColor2 = addBlock(good, good.getFragmentStageModel(), FragmentBaseColorBlock.class);
-        wire(good, baseColor2.getInputsById().get("color"), colorVarying.getOutputsById().get("color"));
+        wire(good, baseColor2.getInputsById().get("color"), colorVarying.getOutputsById().get("value"));
         CompiledShaderGraph goodCompiled = new ShaderGraphCompiler(good).compile();
         assertFalse(helper, "Normal feeding a vertex varying is not a stage error", goodCompiled.hasStageErrors());
         helper.succeed();
@@ -613,9 +893,9 @@ public final class ShaderCompilerGameTest {
     }
 
     /**
-     * An unconnected vertex Color block defaults to vanilla per-vertex diffuse lighting
-     * ({@code minecraft_mix_light}), importing {@code minecraft:light.glsl} — mirroring how the distance
-     * blocks default to {@code fog_*_distance}. The default entity shader exercises exactly this.
+     * The default entity shader is lit out of the box: its (lit) {@code VertexColorNode} resolves through
+     * {@code ctx.litVertexColor()} to vanilla per-vertex diffuse lighting ({@code minecraft_mix_light}),
+     * importing {@code minecraft:light.glsl} — the same default the old vertex Color block carried.
      */
     public static void unconnectedVertexColorDefaultsToMixLight(GameTestHelper helper) {
         CompiledShaderGraph compiled = compile(new RenderTypeGraph());
@@ -637,7 +917,7 @@ public final class ShaderCompilerGameTest {
         NodeModel sin = addNode(graph, SinNode.class);
         wire(graph, sin.getInputsById().get("a"), abs.getOutputsById().get("out"));
         NodeModel length = addNode(graph, LengthNode.class);          // vec3 -> float
-        NodeModel add = addNode(graph, ShaderFloatAddNode.class);
+        NodeModel add = addNode(graph, AddNode.class);
         wire(graph, add.getInputsById().get("a"), sin.getOutputsById().get("out"));
         wire(graph, add.getInputsById().get("b"), length.getOutputsById().get("out"));
         NodeModel min = addNode(graph, MinNode.class);
@@ -656,6 +936,423 @@ public final class ShaderCompilerGameTest {
             assertTrue(helper, "fsh emits " + fn, fsh.contains(fn));
         }
         assertTrue(helper, "add emits + operator", fsh.contains(" + "));
+        helper.succeed();
+    }
+
+    /**
+     * A Dynamic-type math node infers its output width from the operands: a Multiply fed a float and a
+     * vec3 produces a {@code vec3} result (the float is broadcast), while two floats keep a {@code float}
+     * result. Confirms the compile-time width inference + single-evaluation hoist.
+     */
+    public static void dynamicMathInfersWidth(GameTestHelper helper) {
+        // float (Sin output) × vec3 (Vec3 node) -> the Multiply result is hoisted as a vec3 temp.
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel mul = addNode(graph, MultiplyNode.class);
+        NodeModel sinF = addNode(graph, SinNode.class);                 // float
+        NodeModel vec3 = addNode(graph, Vec3Node.class);                // vec3
+        wire(graph, mul.getInputsById().get("a"), sinF.getOutputsById().get("out"));
+        wire(graph, mul.getInputsById().get("b"), vec3.getOutputsById().get("out"));
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), mul.getOutputsById().get("out"));
+        String fsh = compile(graph).fragmentSource();
+        assertTrue(helper, "float×vec3 multiply hoisted as a vec3 temp", fsh.contains("    vec3 f_"));
+
+        // float × float -> a float result (no vec temp introduced for the product).
+        RenderTypeGraph scalar = new RenderTypeGraph();
+        NodeModel sFrag = scalar.getFragmentStageModel();
+        NodeModel addS = addNode(scalar, AddNode.class);                // both inputs unconnected floats
+        NodeModel alpha = addBlock(scalar, sFrag, FragmentAlphaBlock.class);
+        wire(scalar, alpha.getInputsById().get("alpha"), addS.getOutputsById().get("out"));
+        String sfsh = compile(scalar).fragmentSource();
+        assertTrue(helper, "float+float add hoisted as a float temp", sfsh.contains("    float f_"));
+        helper.succeed();
+    }
+
+    /** Construct→Transform→Split of a mat4 emits {@code mat4(}, a {@code m * v} transform, and column reads. */
+    public static void matrixNodesEmitGlsl(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel construct = addNode(graph, Mat4ConstructNode.class);  // 4 unconnected vec4 columns
+        NodeModel transform = addNode(graph, Mat4TransformNode.class);  // mat4 × vec4 -> vec4
+        wire(graph, transform.getInputsById().get("m"), construct.getOutputsById().get("out"));
+        NodeModel split = addNode(graph, Mat4SplitNode.class);          // mat4 -> 4 vec4
+        wire(graph, split.getInputsById().get("in"), construct.getOutputsById().get("out"));
+        NodeModel baseColor = addBlock(graph, fragment, FragmentBaseColorBlock.class);
+        wire(graph, baseColor.getInputsById().get("color"), transform.getOutputsById().get("out"));
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), split.getOutputsById().get("c0"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "matrix graph has no stage errors", compiled.hasStageErrors());
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "constructs a mat4", fsh.contains("mat4("));
+        assertTrue(helper, "transforms a vec4 by the matrix", fsh.contains(" * "));
+        assertTrue(helper, "reads a matrix column", fsh.contains(")[0]"));
+        helper.succeed();
+    }
+
+    /** A derivative node compiles to its GLSL builtin and, in the fragment stage, raises no stage error. */
+    public static void derivativeNodesEmitGlsl(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel uv = addNode(graph, UVNode.class); // vec2, fragment-available
+        NodeModel ddx = addNode(graph, DDXNode.class);
+        wire(graph, ddx.getInputsById().get("a"), uv.getOutputsById().get("out"));
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), ddx.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "fragment-stage derivative is not a stage error", compiled.hasStageErrors());
+        assertTrue(helper, "emits dFdx", compiled.fragmentSource().contains("dFdx("));
+        helper.succeed();
+    }
+
+    /**
+     * Previewing a node fed by a VERTEX_ONLY {@code VertexAttributeInputNode} must not record a stage
+     * error (a preview is a single fragment quad), and the attribute resolves to a fragment-safe default
+     * — so the thumbnail compiles instead of going blank. Regression for the preview-recompile bug.
+     */
+    public static void previewOfVertexAttributeHasNoStageError(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel attr = addNode(graph, VertexAttributeInputNode.class); // default element: position (VERTEX_ONLY)
+        NodeModel add = addNode(graph, AddNode.class);
+        wire(graph, add.getInputsById().get("a"), attr.getOutputsById().get("out"));
+
+        CompiledShaderGraph preview = new ShaderGraphCompiler(graph).compilePreview(add.getOutputsById().get("out"));
+        assertFalse(helper, "preview of a vertex attribute has no stage error", preview.hasStageErrors());
+        String fsh = preview.fragmentSource();
+        assertTrue(helper, "preview writes fragColor", fsh.contains("fragColor = "));
+        assertFalse(helper, "preview fsh does not reference raw Position attribute", fsh.contains("vec4(Position"));
+        helper.succeed();
+    }
+
+    /** The newly added Unity math nodes (Posterize/Sphere Mask/wave/Rejection) emit their GLSL formulas. */
+    public static void extraMathNodesEmitGlsl(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel poster = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.PosterizeNode.class);
+        NodeModel saw = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.wave.SawtoothWaveNode.class);
+        wire(graph, poster.getInputsById().get("in"), saw.getOutputsById().get("out"));
+        NodeModel mask = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.vector.SphereMaskNode.class);
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), poster.getOutputsById().get("out"));
+        NodeModel alpha = addBlock(graph, fragment, FragmentAlphaBlock.class);
+        wire(graph, alpha.getInputsById().get("alpha"), mask.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "extra math graph has no stage errors", compiled.hasStageErrors());
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "posterize emits floor(.../steps", fsh.contains("floor("));
+        assertTrue(helper, "sawtooth emits its ramp", fsh.contains(" - floor(0.5 + "));
+        assertTrue(helper, "sphere mask emits distance()", fsh.contains("distance("));
+        helper.succeed();
+    }
+
+    /**
+     * A Transform(object→world) of a vec3 sets {@code usesTransforms}, declares the KG_Transforms block,
+     * and references the world-space matrices (ModelViewMat in the vsh path, ViewMat/CameraPos from our
+     * block) — confirming the precomputed-matrix UBO is wired end to end.
+     */
+    public static void transformNodeUsesSpaceMatrices(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel transform = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode.class);
+        // defaults: from=object, to=world, type=position
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), transform.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "transform graph has no stage errors", compiled.hasStageErrors());
+        assertTrue(helper, "graph flags usesTransforms", usesUniformBlock(compiled, "KG_Transforms"));
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "fsh declares KG_Transforms", fsh.contains("uniform KG_Transforms"));
+        assertTrue(helper, "fsh references ModelViewMat (object->view)", fsh.contains("ModelViewMat"));
+        // object->world = ModelViewMat (to view) then IViewMat + camera position (view to absolute world);
+        // the camera position comes from MC's globals.glsl (precision-split), not our KG block.
+        assertTrue(helper, "fsh references the inverse camera view matrix", fsh.contains("kg_transforms.IViewMat"));
+        assertTrue(helper, "fsh reads the camera position from globals", fsh.contains("CameraBlockPos"));
+
+        // clip→view uses the precomputed inverse projection (kg_transforms.IProjMat), not a per-pixel inverse.
+        RenderTypeGraph clipGraph = new RenderTypeGraph();
+        NodeModel clipFrag = clipGraph.getFragmentStageModel();
+        NodeModel clipT = addNode(clipGraph, com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode.class);
+        setOption(clipT, "from", "clip");
+        setOption(clipT, "to", "view");
+        NodeModel clipEmit = addBlock(clipGraph, clipFrag, FragmentEmissionBlock.class);
+        wire(clipGraph, clipEmit.getInputsById().get("color"), clipT.getOutputsById().get("out"));
+        String clipFsh = compile(clipGraph).fragmentSource();
+        assertTrue(helper, "clip source uses precomputed IProjMat", clipFsh.contains("kg_transforms.IProjMat"));
+        assertFalse(helper, "no per-pixel inverse(ProjMat)", clipFsh.contains("inverse(ProjMat)"));
+        helper.succeed();
+    }
+
+    /** The merged Exponential/Log nodes pick their GLSL variant from a {@code base} option dropdown. */
+    public static void expLogBaseOptionDrivesGlsl(GameTestHelper helper) {
+        // Default Exponential = exp; switching base to 2 = exp2.
+        assertTrue(helper, "default exp emits exp(", expFsh(null).contains("exp("));
+        assertTrue(helper, "base-2 exp emits exp2(", expFsh("2").contains("exp2("));
+        // Default Log = log; base 2 = log2; base 10 = log(x)/log(10.0).
+        assertTrue(helper, "default log emits log(", logFsh(null).contains("log("));
+        assertTrue(helper, "base-2 log emits log2(", logFsh("2").contains("log2("));
+        assertTrue(helper, "base-10 log divides by log(10.0)", logFsh("10").contains("/ log(10.0)"));
+        helper.succeed();
+    }
+
+    private static String expFsh(String base) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel exp = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.ExpNode.class);
+        if (base != null) setOption(exp, "base", base);
+        NodeModel alpha = addBlock(graph, graph.getFragmentStageModel(), FragmentAlphaBlock.class);
+        wire(graph, alpha.getInputsById().get("alpha"), exp.getOutputsById().get("out"));
+        return compile(graph).fragmentSource();
+    }
+
+    private static String logFsh(String base) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel log = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.LogNode.class);
+        if (base != null) setOption(log, "base", base);
+        NodeModel alpha = addBlock(graph, graph.getFragmentStageModel(), FragmentAlphaBlock.class);
+        wire(graph, alpha.getInputsById().get("alpha"), log.getOutputsById().get("out"));
+        return compile(graph).fragmentSource();
+    }
+
+    /**
+     * The world-position-grid Transform graph the {@code /kilagraph_shadertest transform} debug command
+     * builds: {@code Position attr → Transform(object,world) → custom vec3 varying}, then fragment
+     * {@code fract(world) → base color}. Guards that it compiles with no stage errors (Position is
+     * VERTEX_ONLY but crosses to fragment via the varying) and reflects the world matrices, so a client
+     * launch isn't wasted on a broken graph.
+     */
+    public static void worldGridTransformGraphCompiles(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel vertexStage = graph.getVertexStageModel();
+        NodeModel posAttr = addNode(graph, VertexAttributeInputNode.class); // default element = position
+        NodeModel transform = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode.class);
+        setOption(transform, "from", "object");
+        setOption(transform, "to", "world");
+        NodeModel varying = addBlock(graph, vertexStage, com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec3Block.class);
+        wire(graph, transform.getInputsById().get("in"), posAttr.getOutputsById().get("out"));
+        wire(graph, varying.getInputsById().get("value"), transform.getOutputsById().get("out"));
+        NodeModel fract = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.range.FractNode.class);
+        wire(graph, fract.getInputsById().get("a"), varying.getOutputsById().get("value"));
+        NodeModel baseColor = addBlock(graph, graph.getFragmentStageModel(), FragmentBaseColorBlock.class);
+        wire(graph, baseColor.getInputsById().get("color"), fract.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "world-grid graph has no stage errors", compiled.hasStageErrors());
+        assertTrue(helper, "world-grid graph flags usesTransforms", usesUniformBlock(compiled, "KG_Transforms"));
+        assertTrue(helper, "vsh transforms to world via IViewMat", compiled.vertexSource().contains("kg_transforms.IViewMat"));
+        assertTrue(helper, "fsh fracts the interpolated world position", compiled.fragmentSource().contains("fract("));
+        helper.succeed();
+    }
+
+    /**
+     * The Procedural nodes (noise / shapes / checkerboard) emit their GLSL: the noise/Voronoi/rounded-
+     * polygon helpers are declared as global functions (and deduped — two Simple Noise nodes declare
+     * {@code kg_valueNoise} once), the shapes antialias with {@code fwidth}, and Checkerboard reads
+     * screen-space derivatives ({@code dFdx}). A per-node preview of a fragment-only shape also compiles
+     * (its helper-less {@code fwidth} field) and a noise preview carries its helper function.
+     */
+    public static void proceduralNodesEmitGlsl(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+
+        NodeModel simple = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.SimpleNoiseNode.class);
+        NodeModel simple2 = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.SimpleNoiseNode.class);
+        NodeModel gradient = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.GradientNoiseNode.class);
+        NodeModel voronoi = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.VoronoiNode.class);
+        NodeModel ellipse = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.EllipseNode.class);
+        NodeModel polygon = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.PolygonNode.class);
+        NodeModel rect = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.RectangleNode.class);
+        NodeModel rrect = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.RoundedRectangleNode.class);
+        NodeModel rpoly = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.RoundedPolygonNode.class);
+        NodeModel checker = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.CheckerboardNode.class);
+
+        // Sum every float output (incl. both Voronoi outputs) through an Add chain into the alpha channel.
+        java.util.List<com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel> outs = java.util.List.of(
+                simple.getOutputsById().get("out"), simple2.getOutputsById().get("out"),
+                gradient.getOutputsById().get("out"),
+                voronoi.getOutputsById().get("out"), voronoi.getOutputsById().get("cells"),
+                ellipse.getOutputsById().get("out"), polygon.getOutputsById().get("out"),
+                rect.getOutputsById().get("out"), rrect.getOutputsById().get("out"),
+                rpoly.getOutputsById().get("out"));
+        var acc = outs.get(0);
+        for (int i = 1; i < outs.size(); i++) {
+            NodeModel add = addNode(graph, AddNode.class);
+            wire(graph, add.getInputsById().get("a"), acc);
+            wire(graph, add.getInputsById().get("b"), outs.get(i));
+            acc = add.getOutputsById().get("out");
+        }
+        NodeModel alpha = addBlock(graph, fragment, FragmentAlphaBlock.class);
+        wire(graph, alpha.getInputsById().get("alpha"), acc);
+        // Checkerboard is vec3 → additive emission.
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), checker.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "procedural graph has no stage errors", compiled.hasStageErrors());
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "emits value-noise helper", fsh.contains("float kg_valueNoise(vec2 uv) {"));
+        assertTrue(helper, "emits gradient-noise dir helper", fsh.contains("vec2 kg_gradientDir(vec2 p) {"));
+        assertTrue(helper, "emits voronoi random helper", fsh.contains("vec2 kg_voronoiRandom("));
+        assertTrue(helper, "emits voronoi search helper", fsh.contains("void kg_voronoi("));
+        assertTrue(helper, "emits rounded-polygon sdf helper", fsh.contains("float kg_sdRoundedPolygon("));
+        assertTrue(helper, "shapes antialias with fwidth", fsh.contains("fwidth("));
+        assertTrue(helper, "checkerboard reads screen-space derivatives", fsh.contains("dFdx("));
+        // Dedup: two Simple Noise nodes share ONE kg_valueNoise definition.
+        assertEq(helper, "value-noise helper declared exactly once",
+                1, countOccurrences(fsh, "float kg_valueNoise(vec2 uv) {"));
+
+        // A fragment-only shape previews fine (single quad), antialiased with fwidth.
+        CompiledShaderGraph shapePreview = new ShaderGraphCompiler(new RenderTypeGraph())
+                .compilePreview(ellipsePreviewPort());
+        assertFalse(helper, "ellipse preview has no stage errors", shapePreview.hasStageErrors());
+        assertTrue(helper, "ellipse preview antialiases with fwidth", shapePreview.fragmentSource().contains("fwidth("));
+        // A noise preview carries its helper function into the preview fragment shader.
+        assertTrue(helper, "noise preview emits its helper function",
+                noisePreviewFsh().contains("float kg_valueNoise(vec2 uv) {"));
+        helper.succeed();
+    }
+
+    /** A standalone Ellipse node's preview output port (separate graph; preview is a flat quad). */
+    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel ellipsePreviewPort() {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel ellipse = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.EllipseNode.class);
+        return ellipse.getOutputsById().get("out");
+    }
+
+    private static String noisePreviewFsh() {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel simple = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.SimpleNoiseNode.class);
+        return new ShaderGraphCompiler(graph).compilePreview(simple.getOutputsById().get("out")).fragmentSource();
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        for (int i = haystack.indexOf(needle); i >= 0; i = haystack.indexOf(needle, i + needle.length())) count++;
+        return count;
+    }
+
+    /**
+     * The Artistic nodes (adjustment / blend / mask / normal / filter / utility) emit their GLSL and the
+     * whole graph compiles with no stage errors — all 18 wired reachable from the fragment outputs (the
+     * fragment-only Dither/Normal-From-Height/Normal-From-Texture are pulled into the fragment stage).
+     * Also checks the shared HSV helper is name-deduped (Hue + Colorspace both register {@code kg_rgb2hsv}
+     * → one definition) and that the Blend mode dropdown drives the emitted formula.
+     */
+    public static void artisticNodesEmitGlsl(GameTestHelper helper) {
+        String pkg = "com.lowdragmc.kilagraph.rendertype.nodes.artistic.";
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+
+        NodeModel sat = addArtistic(graph, pkg + "adjustment.SaturationNode");
+        NodeModel contrast = addArtistic(graph, pkg + "adjustment.ContrastNode");
+        NodeModel hue = addArtistic(graph, pkg + "adjustment.HueNode");
+        NodeModel mixer = addArtistic(graph, pkg + "adjustment.ChannelMixerNode");
+        NodeModel invert = addArtistic(graph, pkg + "adjustment.InvertColorsNode");
+        NodeModel replace = addArtistic(graph, pkg + "adjustment.ReplaceColorNode");
+        NodeModel white = addArtistic(graph, pkg + "adjustment.WhiteBalanceNode");
+        NodeModel chanMask = addArtistic(graph, pkg + "mask.ChannelMaskNode");
+        NodeModel nUnpack = addArtistic(graph, pkg + "normal.NormalUnpackNode");
+        NodeModel nStrength = addArtistic(graph, pkg + "normal.NormalStrengthNode");
+        NodeModel blend = addArtistic(graph, pkg + "blend.BlendNode");
+        NodeModel colorspace = addArtistic(graph, pkg + "utility.ColorspaceConversionNode");
+        NodeModel nBlend = addArtistic(graph, pkg + "normal.NormalBlendNode");
+        NodeModel nReconstruct = addArtistic(graph, pkg + "normal.NormalReconstructZNode");
+        NodeModel nFromTex = addArtistic(graph, pkg + "normal.NormalFromTextureNode");
+        NodeModel nFromHeight = addArtistic(graph, pkg + "normal.NormalFromHeightNode");
+        NodeModel colorMask = addArtistic(graph, pkg + "mask.ColorMaskNode");
+        NodeModel dither = addArtistic(graph, pkg + "filter.DitherNode");
+        setOption(blend, "mode", "overlay");
+        setOption(colorspace, "from", "rgb");
+        setOption(colorspace, "to", "hsv");
+
+        // vec3 adjustment chain → blend.base → colorspace → emission color.
+        wire(graph, contrast.getInputsById().get("in"), sat.getOutputsById().get("out"));
+        wire(graph, hue.getInputsById().get("in"), contrast.getOutputsById().get("out"));
+        wire(graph, mixer.getInputsById().get("in"), hue.getOutputsById().get("out"));
+        wire(graph, invert.getInputsById().get("in"), mixer.getOutputsById().get("out"));
+        wire(graph, replace.getInputsById().get("in"), invert.getOutputsById().get("out"));
+        wire(graph, white.getInputsById().get("in"), replace.getOutputsById().get("out"));
+        wire(graph, chanMask.getInputsById().get("in"), white.getOutputsById().get("out"));
+        wire(graph, nUnpack.getInputsById().get("in"), chanMask.getOutputsById().get("out"));
+        wire(graph, nStrength.getInputsById().get("in"), nUnpack.getOutputsById().get("out"));
+        wire(graph, blend.getInputsById().get("base"), nStrength.getOutputsById().get("out"));
+        // normal sub-tree → blend.blend.
+        wire(graph, nBlend.getInputsById().get("a"), nReconstruct.getOutputsById().get("out"));
+        wire(graph, nBlend.getInputsById().get("b"), nFromTex.getOutputsById().get("out"));
+        wire(graph, nReconstruct.getInputsById().get("in"), sat.getOutputsById().get("out")); // vec3 -> vec2
+        wire(graph, blend.getInputsById().get("blend"), nBlend.getOutputsById().get("out"));
+        wire(graph, replace.getInputsById().get("from"), nFromHeight.getOutputsById().get("out"));
+        wire(graph, colorspace.getInputsById().get("in"), blend.getOutputsById().get("out"));
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), colorspace.getOutputsById().get("out"));
+        // float chain: colorMask → (dither + normalFromHeight.in) → alpha.
+        wire(graph, nFromHeight.getInputsById().get("in"), colorMask.getOutputsById().get("out"));
+        wire(graph, dither.getInputsById().get("in"), colorMask.getOutputsById().get("out"));
+        NodeModel alpha = addBlock(graph, fragment, FragmentAlphaBlock.class);
+        wire(graph, alpha.getInputsById().get("alpha"), dither.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "artistic graph has no stage errors", compiled.hasStageErrors());
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "saturation emits the Rec.709 luma", fsh.contains("0.2126729"));
+        assertTrue(helper, "hue/colorspace emit the rgb->hsv helper", fsh.contains("kg_rgb2hsv("));
+        assertTrue(helper, "hue emits the hsv->rgb helper", fsh.contains("kg_hsv2rgb("));
+        assertTrue(helper, "blend overlay mode emits the per-channel step", fsh.contains("step(0.5,"));
+        assertTrue(helper, "dither reads gl_FragCoord", fsh.contains("gl_FragCoord"));
+        assertTrue(helper, "normal-from-height uses a screen-space derivative", fsh.contains("dFdx("));
+        assertTrue(helper, "normal-from-texture samples the texture", fsh.contains("texture("));
+        // The HSV helper is shared by Hue + Colorspace but declared exactly once (name-keyed dedup).
+        assertEq(helper, "rgb->hsv helper declared exactly once",
+                1, countOccurrences(fsh, "vec3 kg_rgb2hsv(vec3 c) {"));
+        helper.succeed();
+    }
+
+    private static NodeModel addArtistic(RenderTypeGraph graph, String className) {
+        try {
+            @SuppressWarnings("unchecked")
+            var cls = (Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node>)
+                    Class.forName(className);
+            return addNode(graph, cls);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("missing artistic node " + className, e);
+        }
+    }
+
+    /** The Camera node reads the Globals block (camera world position + screen size). */
+    public static void cameraNodeReadsGlobals(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel camera = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.transform.CameraNode.class);
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), camera.getOutputsById().get("Position"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "camera graph has no stage errors", compiled.hasStageErrors());
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "camera node reads CameraBlockPos", fsh.contains("CameraBlockPos"));
+        assertTrue(helper, "camera node reads CameraOffset", fsh.contains("CameraOffset"));
+        helper.succeed();
+    }
+
+    /** The KG_Transforms UBO node exposes our precomputed space matrices (flags + declares the block). */
+    public static void kgTransformsUboNodeExposesMatrices(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel ubo = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.transform.KGTransformsUboNode.class);
+        // The node's outputs are mat4s; transform a vec4 by ViewMat so the result reaches a color block.
+        NodeModel xform = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4TransformNode.class);
+        wire(graph, xform.getInputsById().get("m"), ubo.getOutputsById().get("ViewMat"));
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), xform.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "KG transforms UBO graph has no stage errors", compiled.hasStageErrors());
+        assertTrue(helper, "graph flags usesTransforms", usesUniformBlock(compiled, "KG_Transforms"));
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "fsh declares KG_Transforms", fsh.contains("uniform KG_Transforms"));
+        assertTrue(helper, "fsh references kg_transforms.ViewMat", fsh.contains("kg_transforms.ViewMat"));
         helper.succeed();
     }
 
@@ -693,6 +1390,427 @@ public final class ShaderCompilerGameTest {
         helper.succeed();
     }
 
+    /**
+     * Fresnel's {@code normal}/{@code viewDir} ports have no configurator: left unconnected they fall back
+     * to the interpolated world-space mesh normal / view direction. The vsh declares + writes both varyings
+     * (object→world via ModelViewMat + kg_transforms.IViewMat), the fsh reads them, and the graph registers
+     * the KG_Transforms block.
+     */
+    public static void fresnelDefaultsToMeshNormalAndViewDir(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fresnel = addNode(graph, FresnelNode.class); // normal/viewDir intentionally unconnected
+        NodeModel alpha = addBlock(graph, graph.getFragmentStageModel(), FragmentAlphaBlock.class);
+        wire(graph, alpha.getInputsById().get("alpha"), fresnel.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        String vsh = compiled.vertexSource();
+        String fsh = compiled.fragmentSource();
+        assertFalse(helper, "fresnel defaults are not a stage error", compiled.hasStageErrors());
+        assertTrue(helper, "vsh declares kg_worldNormal out", vsh.contains("out vec3 kg_worldNormal;"));
+        assertTrue(helper, "vsh declares kg_worldViewDir out", vsh.contains("out vec3 kg_worldViewDir;"));
+        assertTrue(helper, "world normal uses ModelViewMat", vsh.contains("mat3(ModelViewMat)"));
+        assertTrue(helper, "defaults rotate to world via IViewMat", vsh.contains("kg_transforms.IViewMat"));
+        assertTrue(helper, "fsh reads kg_worldNormal in", fsh.contains("in vec3 kg_worldNormal;"));
+        assertTrue(helper, "fsh reads kg_worldViewDir in", fsh.contains("in vec3 kg_worldViewDir;"));
+        assertTrue(helper, "fsh emits the fresnel pow", fsh.contains("pow(1.0 - clamp(dot("));
+        assertTrue(helper, "graph registers KG_Transforms", usesUniformBlock(compiled, "KG_Transforms"));
+
+        // Per-node preview: the normal default is the preview mesh's real interpolated normal (vNormal), so
+        // the rim gradient is correct on sphere/cube/custom geometry (Unity-like). A flat +Z default would
+        // give dot(+Z,+Z)=1 → pow(0,power)=0 → all black.
+        CompiledShaderGraph preview = new ShaderGraphCompiler(graph)
+                .compilePreview(fresnel.getOutputsById().get("out"));
+        assertTrue(helper, "preview vsh passes the mesh Normal as vNormal",
+                preview.vertexSource().contains("in vec3 Normal;") && preview.vertexSource().contains("vNormal = Normal;"));
+        assertTrue(helper, "preview fresnel reads the real interpolated normal vNormal",
+                preview.fragmentSource().contains("in vec3 vNormal;") && preview.fragmentSource().contains("vNormal"));
+        helper.succeed();
+    }
+
+    /**
+     * Fog distance nodes are VERTEX_ONLY: pulling one into a fragment block is a stage error, but feeding a
+     * vsh varying block works and an unconnected {@code pos} defaults to the model-space vertex position.
+     */
+    public static void fogDistanceNodesAreVertexOnly(GameTestHelper helper) {
+        // (a) into a fragment block → stage error keyed to the fog node.
+        RenderTypeGraph badGraph = new RenderTypeGraph();
+        NodeModel alpha = addBlock(badGraph, badGraph.getFragmentStageModel(), FragmentAlphaBlock.class);
+        NodeModel fogBad = addNode(badGraph, FogSphericalDistanceNode.class);
+        wire(badGraph, alpha.getInputsById().get("alpha"), fogBad.getOutputsById().get("out"));
+        CompiledShaderGraph badCompiled = new ShaderGraphCompiler(badGraph).compile();
+        assertTrue(helper, "fog distance in fragment stage is a stage error", badCompiled.hasStageErrors());
+        assertTrue(helper, "error names the fog distance node",
+                badCompiled.stageErrors().stream().anyMatch(e -> e.nodeName().contains("Fog Spherical Distance")));
+
+        // (b) into a vsh varying block, pos unconnected → default model-space position.
+        RenderTypeGraph okGraph = new RenderTypeGraph();
+        NodeModel varying = addBlock(okGraph, okGraph.getVertexStageModel(), VaryingCustomFloatBlock.class);
+        NodeModel fogOk = addNode(okGraph, FogSphericalDistanceNode.class); // pos intentionally unconnected
+        wire(okGraph, varying.getInputsById().get("value"), fogOk.getOutputsById().get("out"));
+        CompiledShaderGraph okCompiled = compile(okGraph);
+        assertFalse(helper, "fog distance feeding a vsh block is legal", okCompiled.hasStageErrors());
+        assertTrue(helper, "pos defaults to fog_spherical_distance of the model position",
+                okCompiled.vertexSource().contains("fog_spherical_distance((Position + ModelOffset))"));
+        helper.succeed();
+    }
+
+    /**
+     * ApplyFog / TotalFogValue parameters left unconnected fall back to the Fog UBO fields + the fog-distance
+     * varyings, so the node fogs with the current scene settings out of the box.
+     */
+    public static void fogParamsDefaultToUboAndVaryings(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel apply = addNode(graph, ApplyFogNode.class); // every param unconnected
+        // apply.out is vec4 → emission color is vec3 (swizzle).
+        wire(graph, emission.getInputsById().get("color"), apply.getOutputsById().get("out"));
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "fog defaults are not a stage error", compiled.hasStageErrors());
+        String fsh = compiled.fragmentSource();
+        for (String field : new String[]{"FogColor", "FogEnvironmentalStart", "FogEnvironmentalEnd",
+                "FogRenderDistanceStart", "FogRenderDistanceEnd"}) {
+            assertTrue(helper, "fsh references " + field, fsh.contains(field));
+        }
+        assertTrue(helper, "fsh reads the spherical distance varying", fsh.contains("in float sphericalVertexDistance;"));
+        assertTrue(helper, "vsh writes the spherical distance default",
+                compiled.vertexSource().contains("fog_spherical_distance((Position + ModelOffset))"));
+
+        // TotalFogValue: same field/varying defaults (float output → alpha).
+        RenderTypeGraph tot = new RenderTypeGraph();
+        NodeModel alpha = addBlock(tot, tot.getFragmentStageModel(), FragmentAlphaBlock.class);
+        NodeModel total = addNode(tot, TotalFogValueNode.class);
+        wire(tot, alpha.getInputsById().get("alpha"), total.getOutputsById().get("out"));
+        String totFsh = compile(tot).fragmentSource();
+        assertTrue(helper, "total_fog_value references the Fog UBO", totFsh.contains("FogEnvironmentalStart"));
+        assertTrue(helper, "total_fog_value reads the cylindrical varying",
+                totFsh.contains("in float cylindricalVertexDistance;"));
+        helper.succeed();
+    }
+
+    /** SphereMask's coords port has no configurator: unconnected it defaults to the interpolated mesh
+     *  model-space position (kg_modelPos varying). */
+    public static void sphereMaskCoordsDefaultToMeshPosition(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel alpha = addBlock(graph, graph.getFragmentStageModel(), FragmentAlphaBlock.class);
+        NodeModel mask = addNode(graph, SphereMaskNode.class); // coords unconnected
+        wire(graph, alpha.getInputsById().get("alpha"), mask.getOutputsById().get("out"));
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "sphere mask default is not a stage error", compiled.hasStageErrors());
+        assertTrue(helper, "vsh writes kg_modelPos = (Position + ModelOffset)",
+                compiled.vertexSource().contains("kg_modelPos = (Position + ModelOffset);"));
+        assertTrue(helper, "fsh reads kg_modelPos in", compiled.fragmentSource().contains("in vec3 kg_modelPos;"));
+        helper.succeed();
+    }
+
+    /**
+     * Channel nodes: Combine assembles R/G/B/A into vectors, Swizzle remaps channels (GLSL swizzle), Flip
+     * mirrors selected channels (Unity's {@code (flip*-2+1)*in+flip}), Split breaks a vector into floats.
+     */
+    public static void channelNodesEmitGlsl(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+
+        // Combine R,G,B,A → rgba/rgb.
+        NodeModel combine = addNode(graph, CombineNode.class);
+        setInputConstant(combine, "r", 1f);
+        setInputConstant(combine, "a", 1f);
+
+        // Swizzle rgba → zyx (vec3) → base color.
+        NodeModel swizzle = addNode(graph, SwizzleNode.class);
+        setOption(swizzle, "c0", "z");
+        setOption(swizzle, "c1", "y");
+        setOption(swizzle, "c2", "x");
+        setOption(swizzle, "c3", "-");
+        wire(graph, swizzle.getInputsById().get("in"), combine.getOutputsById().get("rgba"));
+        NodeModel baseColor = addBlock(graph, fragment, FragmentBaseColorBlock.class);
+        wire(graph, baseColor.getInputsById().get("color"), swizzle.getOutputsById().get("out"));
+
+        // Flip rgb (red + blue) → emission.
+        NodeModel flip = addNode(graph, FlipNode.class);
+        setOption(flip, "red", true);
+        setOption(flip, "blue", true);
+        wire(graph, flip.getInputsById().get("in"), combine.getOutputsById().get("rgb"));
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), flip.getOutputsById().get("out"));
+
+        // Split rgba → r → alpha.
+        NodeModel split = addNode(graph, SplitNode.class);
+        wire(graph, split.getInputsById().get("in"), combine.getOutputsById().get("rgba"));
+        NodeModel alpha = addBlock(graph, fragment, FragmentAlphaBlock.class);
+        wire(graph, alpha.getInputsById().get("alpha"), split.getOutputsById().get("r"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        String fsh = compiled.fragmentSource();
+        assertFalse(helper, "channel nodes are not a stage error", compiled.hasStageErrors());
+        assertTrue(helper, "combine emits a vec4", fsh.contains("vec4("));
+        assertTrue(helper, "swizzle emits the .zyx remap", fsh.contains(".zyx"));
+        assertTrue(helper, "flip emits the Unity flip mask (vec3(1.0, 0.0, 1.0))",
+                fsh.contains("vec3(1.0, 0.0, 1.0)") && fsh.contains("* -2.0 + 1.0"));
+        helper.succeed();
+    }
+
+    /**
+     * UV nodes: the 6 pure-uv transforms (chained, each unconnected uv auto-resolving to the mesh uv) +
+     * Triplanar. Asserts their distinctive GLSL appears and there are no stage errors.
+     */
+    public static void uvNodesEmitGlsl(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+
+        // Chain: Rotate -> Twirl -> Spherize -> RadialShear -> Polar -> Flipbook -> base color.
+        NodeModel rotate = addNode(graph, RotateNode.class);       // uv unconnected → mesh uv (UV0)
+        NodeModel twirl = addNode(graph, TwirlNode.class);
+        NodeModel spherize = addNode(graph, SpherizeNode.class);
+        NodeModel shear = addNode(graph, RadialShearNode.class);
+        NodeModel polar = addNode(graph, PolarCoordinatesNode.class);
+        NodeModel flipbook = addNode(graph, FlipbookNode.class);
+        wire(graph, twirl.getInputsById().get("uv"), rotate.getOutputsById().get("out"));
+        wire(graph, spherize.getInputsById().get("uv"), twirl.getOutputsById().get("out"));
+        wire(graph, shear.getInputsById().get("uv"), spherize.getOutputsById().get("out"));
+        wire(graph, polar.getInputsById().get("uv"), shear.getOutputsById().get("out"));
+        wire(graph, flipbook.getInputsById().get("uv"), polar.getOutputsById().get("out"));
+        NodeModel baseColor = addBlock(graph, fragment, FragmentBaseColorBlock.class);
+        wire(graph, baseColor.getInputsById().get("color"), flipbook.getOutputsById().get("out"));
+
+        // Triplanar (texture unconnected → missing sampler) → emission.
+        NodeModel triplanar = addNode(graph, TriplanarNode.class);
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), triplanar.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        String fsh = compiled.fragmentSource();
+        assertFalse(helper, "uv nodes are not a stage error", compiled.hasStageErrors());
+        for (String marker : new String[]{"cos(", "length(", "atan(", "floor(", "pow(abs(", "texture("}) {
+            assertTrue(helper, "uv fsh emits " + marker, fsh.contains(marker));
+        }
+        // The chained uv default resolved to the UV0 mesh varying.
+        assertTrue(helper, "uv chain uses the uv0 varying", fsh.contains("in vec2 uv0;"));
+        helper.succeed();
+    }
+
+    /**
+     * The UV port type: an unconnected uv port reads the channel its configurator picked. UV0 writes the
+     * {@code uv0} varying from the {@code UV0} attribute; UV1 writes {@code uv1} from {@code vec2(UV1)}; and
+     * when the chosen channel's attribute is absent from the format it falls back to UV0.
+     */
+    public static void uvTypeResolvesChannel(GameTestHelper helper) {
+        // Default (UV0): the ENTITY format has UV0 → uv0 = UV0.
+        RenderTypeGraph g0 = new RenderTypeGraph();
+        NodeModel tile0 = addNode(g0, TilingAndOffsetNode.class); // uv unconnected, default channel UV0
+        wire(g0, addBlock(g0, g0.getFragmentStageModel(), FragmentBaseColorBlock.class).getInputsById().get("color"),
+                tile0.getOutputsById().get("out"));
+        String vsh0 = compile(g0).vertexSource();
+        assertTrue(helper, "UV0 default writes uv0 = UV0", vsh0.contains("uv0 = UV0;"));
+
+        // UV1 picked, ENTITY has UV1 (ivec2) → uv1 = vec2(UV1), read in fsh.
+        RenderTypeGraph g1 = new RenderTypeGraph();
+        NodeModel tile1 = addNode(g1, TilingAndOffsetNode.class);
+        setInputConstant(tile1, "uv", RenderTypeGraphTypes.UvChannel.UV1);
+        wire(g1, addBlock(g1, g1.getFragmentStageModel(), FragmentBaseColorBlock.class).getInputsById().get("color"),
+                tile1.getOutputsById().get("out"));
+        CompiledShaderGraph c1 = compile(g1);
+        assertTrue(helper, "UV1 vsh declares uv1 varying", c1.vertexSource().contains("out vec2 uv1;"));
+        assertTrue(helper, "UV1 casts the ivec2 attribute (vec2(UV1))", c1.vertexSource().contains("uv1 = vec2(UV1);"));
+        assertTrue(helper, "UV1 fsh reads uv1", c1.fragmentSource().contains("in vec2 uv1;"));
+
+        // UV1 picked but the BLOCK format omits UV1 (has UV0) → fall back to UV0.
+        RenderTypeGraph g2 = new RenderTypeGraph();
+        var s = g2.getSettings();
+        g2.setSettings(new RenderTypeGraph.Settings(VertexFormatPresets.BLOCK, s.vertexFormatMode(), s.blend(),
+                s.depthTest(), s.depthWrite(), s.cull(), s.outputTarget(), s.affectsOutline(), s.sortOnUpload()));
+        NodeModel tile2 = addNode(g2, TilingAndOffsetNode.class);
+        setInputConstant(tile2, "uv", RenderTypeGraphTypes.UvChannel.UV1);
+        wire(g2, addBlock(g2, g2.getFragmentStageModel(), FragmentBaseColorBlock.class).getInputsById().get("color"),
+                tile2.getOutputsById().get("out"));
+        assertTrue(helper, "missing UV1 falls back to UV0", compile(g2).vertexSource().contains("uv1 = UV0;"));
+        helper.succeed();
+    }
+
+    /** The UV channel value round-trips through its codec (registered so it survives graph save). */
+    public static void uvChannelValueCodecRoundTrips(GameTestHelper helper) {
+        var value = RenderTypeGraphTypes.UvChannel.UV2;
+        var encoded = RenderTypeGraphTypes.UV_CODEC.encodeStart(NbtOps.INSTANCE, value).result().orElse(null);
+        assertTrue(helper, "uv channel encodes", encoded != null);
+        var decoded = RenderTypeGraphTypes.UV_CODEC.parse(NbtOps.INSTANCE, encoded).result().orElse(null);
+        assertEq(helper, "uv channel round-trips", value, decoded);
+        helper.succeed();
+    }
+
+    /**
+     * Scene Color / Scene Depth: a Screen Position drives a Scene Color sample and a Scene Depth sample.
+     * Asserts the captured-scene samplers + their flags, the gl_FragCoord-derived UV, and that Linear01/Eye
+     * reconstruct linear depth via the inverse-projection helper.
+     */
+    public static void sceneNodesEmitGlsl(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel screenPos = addNode(graph, ScreenPositionNode.class);       // default mode
+        NodeModel sceneColor = addNode(graph, SceneColorNode.class);
+        wire(graph, sceneColor.getInputsById().get("uv"), screenPos.getOutputsById().get("out"));
+        wire(graph, addBlock(graph, fragment, FragmentBaseColorBlock.class).getInputsById().get("color"),
+                sceneColor.getOutputsById().get("out"));
+        NodeModel sceneDepth = addNode(graph, SceneDepthNode.class);          // linear01 default
+        wire(graph, addBlock(graph, fragment, FragmentAlphaBlock.class).getInputsById().get("alpha"),
+                sceneDepth.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        String fsh = compiled.fragmentSource();
+        assertFalse(helper, "scene nodes are not a stage error", compiled.hasStageErrors());
+        assertTrue(helper, "samples the captured scene colour", fsh.contains("texture(KG_SceneColor"));
+        assertTrue(helper, "samples the captured scene depth", fsh.contains("texture(KG_SceneDepth"));
+        assertTrue(helper, "screen position derives uv from gl_FragCoord", fsh.contains("gl_FragCoord"));
+        assertTrue(helper, "linear01 imports the scene depth helper",
+                fsh.contains("#moj_import <kilagraph:kg_scene.glsl>"));
+        assertTrue(helper, "linear01 reconstructs via IProjMat",
+                fsh.contains("kg_linear01_depth(") && fsh.contains("IProjMat"));
+        assertTrue(helper, "flags scene colour use", compiled.usesSceneColor());
+        assertTrue(helper, "flags scene depth use", compiled.usesSceneDepth());
+        assertTrue(helper, "declares the scene samplers",
+                compiled.layout().samplers().contains("KG_SceneColor")
+                        && compiled.layout().samplers().contains("KG_SceneDepth"));
+
+        // Eye reconstructs distance; Raw samples directly with no linearise include.
+        assertTrue(helper, "eye mode emits kg_eye_depth", compileSceneDepthFsh("eye").contains("kg_eye_depth("));
+        String raw = compileSceneDepthFsh("raw");
+        assertTrue(helper, "raw mode samples the depth texture", raw.contains("texture(KG_SceneDepth"));
+        assertFalse(helper, "raw mode needs no linearise helper", raw.contains("kg_scene.glsl"));
+        helper.succeed();
+    }
+
+    private static String compileSceneDepthFsh(String mode) {
+        RenderTypeGraph g = new RenderTypeGraph();
+        NodeModel depth = addNode(g, SceneDepthNode.class);
+        setOption(depth, "sampling", mode);
+        wire(g, addBlock(g, g.getFragmentStageModel(), FragmentAlphaBlock.class).getInputsById().get("alpha"),
+                depth.getOutputsById().get("out"));
+        return compile(g).fragmentSource();
+    }
+
+    /**
+     * The captured scene samplers are declared in the layout but carry <b>no</b> baked default texture (unlike
+     * a Sampler2D / the missing-texture fallback) — the runtime binds them live from the capture manager.
+     */
+    public static void sceneSamplersHaveNoBakedDefault(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel sceneColor = addNode(graph, SceneColorNode.class);
+        wire(graph, addBlock(graph, graph.getFragmentStageModel(), FragmentBaseColorBlock.class).getInputsById().get("color"),
+                sceneColor.getOutputsById().get("out"));
+        CompiledShaderGraph compiled = compile(graph);
+        assertTrue(helper, "scene colour sampler is declared", compiled.layout().samplers().contains("KG_SceneColor"));
+        assertFalse(helper, "scene colour sampler has no baked default texture",
+                compiled.samplerDefaults().containsKey("KG_SceneColor"));
+        helper.succeed();
+    }
+
+    /** Each Screen Position mode emits its distinctive GLSL formula. */
+    public static void screenPositionModesEmitGlsl(GameTestHelper helper) {
+        assertTrue(helper, "pixel mode is raw fragcoord", screenPosFsh("pixel").contains("vec4(gl_FragCoord.xy, 0.0, 0.0)"));
+        assertTrue(helper, "center mode remaps to -1..1", screenPosFsh("center").contains("* 2.0 - 1.0"));
+        assertTrue(helper, "tiled mode tiles with fract", screenPosFsh("tiled").contains("fract("));
+        assertTrue(helper, "default mode normalises by ScreenSize",
+                screenPosFsh("default").contains("gl_FragCoord.xy / ScreenSize"));
+        helper.succeed();
+    }
+
+    private static String screenPosFsh(String mode) {
+        RenderTypeGraph g = new RenderTypeGraph();
+        NodeModel sp = addNode(g, ScreenPositionNode.class);
+        setOption(sp, "mode", mode);
+        wire(g, addBlock(g, g.getFragmentStageModel(), FragmentBaseColorBlock.class).getInputsById().get("color"),
+                sp.getOutputsById().get("out"));
+        return compile(g).fragmentSource();
+    }
+
+    /**
+     * Scene Color's unconnected (screen-space) UV maps the whole capture onto the preview geometry in both
+     * editor previews (node thumbnail = compilePreview; whole-graph = editorPreview), but keeps true
+     * gl_FragCoord screen-space for in-world rendering — so a preview shows the entire scene, not the panel's
+     * screen sub-rect.
+     */
+    public static void scenePreviewMapsWholeCapture(GameTestHelper helper) {
+        // Node thumbnail (compilePreview): screen default becomes the quad uv, not gl_FragCoord.
+        RenderTypeGraph g = new RenderTypeGraph();
+        NodeModel sceneColor = addNode(g, SceneColorNode.class);
+        String pfsh = new ShaderGraphCompiler(g)
+                .compilePreview(sceneColor.getOutputsById().get("out")).fragmentSource();
+        assertTrue(helper, "node preview still samples the capture", pfsh.contains("texture(KG_SceneColor"));
+        assertFalse(helper, "node preview does not use gl_FragCoord", pfsh.contains("gl_FragCoord"));
+
+        // Whole-graph editor preview: same — the screen default maps to the mesh uv.
+        RenderTypeGraph g2 = new RenderTypeGraph();
+        NodeModel sc2 = addNode(g2, SceneColorNode.class);
+        wire(g2, addBlock(g2, g2.getFragmentStageModel(), FragmentBaseColorBlock.class).getInputsById().get("color"),
+                sc2.getOutputsById().get("out"));
+        assertFalse(helper, "editor preview does not use gl_FragCoord",
+                new ShaderGraphCompiler(g2).editorPreview().compile().fragmentSource().contains("gl_FragCoord"));
+
+        // In-world: the real compile keeps true screen-space.
+        assertTrue(helper, "in-world keeps gl_FragCoord screen-space",
+                new ShaderGraphCompiler(g2).compile().fragmentSource().contains("gl_FragCoord"));
+        helper.succeed();
+    }
+
+    /** The extended Camera node exposes Direction (IViewMat), Near/Far (inverse-projection) and Orthographic. */
+    public static void cameraNodeExposesNewOutputs(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel camera = addNode(graph, CameraNode.class);
+        wire(graph, addBlock(graph, graph.getFragmentStageModel(), FragmentBaseColorBlock.class).getInputsById().get("color"),
+                camera.getOutputsById().get("Direction"));
+        // Route the three float outputs through a Combine so the demand-driven compiler actually emits them.
+        NodeModel combine = addNode(graph, CombineNode.class);
+        wire(graph, combine.getInputsById().get("r"), camera.getOutputsById().get("NearPlane"));
+        wire(graph, combine.getInputsById().get("g"), camera.getOutputsById().get("FarPlane"));
+        wire(graph, combine.getInputsById().get("b"), camera.getOutputsById().get("Orthographic"));
+        wire(graph, addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class).getInputsById().get("color"),
+                combine.getOutputsById().get("rgb"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "camera new outputs are not a stage error", compiled.hasStageErrors());
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "Direction uses the inverse view matrix", fsh.contains("IViewMat"));
+        assertTrue(helper, "Near/Far reconstruct via the kg_scene helpers",
+                fsh.contains("kg_camera_near(") && fsh.contains("kg_camera_far("));
+        assertTrue(helper, "Orthographic reads ProjMat[3][3]", fsh.contains("ProjMat[3][3]"));
+        helper.succeed();
+    }
+
+    /**
+     * Node-preview honesty for uv: (A) a UV node on UV0 previews the quad gradient ({@code vUv}) but on
+     * UV1/UV2 previews a flat colour (those channels are constant per draw, not a gradient); (B) a uv driven
+     * through a varying block by a fixed value previews that fixed value downstream (not the quad uv) — the
+     * varying boundary reuses the block's own preview logic.
+     */
+    public static void uvPreviewSemantics(GameTestHelper helper) {
+        // (A) UV node channel previews.
+        RenderTypeGraph g0 = new RenderTypeGraph();
+        NodeModel uv0 = addNode(g0, UVNode.class); // default channel uv0
+        addBlock(g0, g0.getFragmentStageModel(), FragmentBaseColorBlock.class);
+        String uv0Fsh = new ShaderGraphCompiler(g0).compilePreview(uv0.getOutputsById().get("out")).fragmentSource();
+        assertTrue(helper, "UV0 preview is the quad gradient (vUv)", uv0Fsh.contains("= vUv;"));
+
+        RenderTypeGraph g1 = new RenderTypeGraph();
+        NodeModel uv1 = addNode(g1, UVNode.class);
+        setOption(uv1, "channel", "uv1");
+        addBlock(g1, g1.getFragmentStageModel(), FragmentBaseColorBlock.class);
+        String uv1Fsh = new ShaderGraphCompiler(g1).compilePreview(uv1.getOutputsById().get("out")).fragmentSource();
+        assertTrue(helper, "UV1 preview is a flat colour", uv1Fsh.contains("= vec2(0.0);"));
+        assertFalse(helper, "UV1 preview is not the quad gradient", uv1Fsh.contains("= vUv;"));
+
+        // (B) A custom vec2 varying block driven by a fixed Vec2 → SamplerTexture2D preview samples that uv.
+        RenderTypeGraph g2 = new RenderTypeGraph();
+        NodeModel vec2 = addNode(g2, Vec2Node.class);
+        setInputConstant(vec2, "x", 0.25f);
+        setInputConstant(vec2, "y", 0.75f);
+        NodeModel uvBlock = addBlock(g2, g2.getVertexStageModel(), VaryingCustomVec2Block.class);
+        wire(g2, uvBlock.getInputsById().get("value"), vec2.getOutputsById().get("out"));
+        NodeModel tex = addNode(g2, SamplerTexture2DNode.class); // sampler unconnected → missing
+        wire(g2, tex.getInputsById().get("uv"), uvBlock.getOutputsById().get("value"));
+        String texFsh = new ShaderGraphCompiler(g2).compilePreview(tex.getOutputsById().get("color")).fragmentSource();
+        assertTrue(helper, "driven-varying preview samples the fixed uv (0.25)", texFsh.contains("0.25"));
+        assertTrue(helper, "driven-varying preview still samples a texture", texFsh.contains("texture("));
+        helper.succeed();
+    }
+
     /** A VertexFormat input (raw vsh attribute) is VERTEX_ONLY: pulling it into fragment is a stage error. */
     public static void vertexFormatInputsAreVertexOnly(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
@@ -709,27 +1827,26 @@ public final class ShaderCompilerGameTest {
 
     /**
      * A standalone FragmentInput node reads a fixed interpolated varying, ensuring the vsh declares and
-     * writes it with the block's default (no vertex block placed). texCoord0 → UV0; vertexColor → light mix.
+     * writes it with the block's default (no vertex block placed). uv0 → UV0; vertexColor → light mix.
      */
     public static void fragmentInputsEmitVaryings(GameTestHelper helper) {
-        // TexCoord input → base color: texCoord0 varying with UV0 default, no kg_uv anywhere.
+        // TexCoord input → base color: uv0 varying with UV0 default, no kg_uv anywhere.
         RenderTypeGraph uvGraph = new RenderTypeGraph();
         NodeModel baseColor = addBlock(uvGraph, uvGraph.getFragmentStageModel(), FragmentBaseColorBlock.class);
-        NodeModel texcoord = addNode(uvGraph, TexCoordFragmentInputNode.class);
+        NodeModel texcoord = addNode(uvGraph, UVNode.class);
         wire(uvGraph, baseColor.getInputsById().get("color"), texcoord.getOutputsById().get("out"));
         CompiledShaderGraph uvCompiled = new ShaderGraphCompiler(uvGraph).compile();
-        assertTrue(helper, "vsh declares texCoord0 out", uvCompiled.vertexSource().contains("out vec2 texCoord0;"));
-        assertTrue(helper, "vsh writes texCoord0 = UV0", uvCompiled.vertexSource().contains("texCoord0 = UV0;"));
-        assertTrue(helper, "fsh reads texCoord0 in", uvCompiled.fragmentSource().contains("in vec2 texCoord0;"));
-        assertFalse(helper, "no kg_uv anywhere (unified to texCoord0)",
+        assertTrue(helper, "vsh declares uv0 out", uvCompiled.vertexSource().contains("out vec2 uv0;"));
+        assertTrue(helper, "vsh writes uv0 = UV0", uvCompiled.vertexSource().contains("uv0 = UV0;"));
+        assertTrue(helper, "fsh reads uv0 in", uvCompiled.fragmentSource().contains("in vec2 uv0;"));
+        assertFalse(helper, "no kg_uv anywhere (unified to uv0)",
                 uvCompiled.vertexSource().contains("kg_uv") || uvCompiled.fragmentSource().contains("kg_uv"));
 
-        // FragmentColorInput reads the vertexColor varying across the stage boundary (declared as a vsh
-        // out + read as an fsh in). The varying's value is whatever drives it (the default graph's Color
-        // block here); the node itself bakes no vsh lighting.
+        // A (lit) VertexColorNode reads the vertexColor varying across the stage boundary (declared as a vsh
+        // out + read as an fsh in); its vsh default is per-vertex mix_light lighting.
         RenderTypeGraph colGraph = new RenderTypeGraph();
         NodeModel emission = addBlock(colGraph, colGraph.getFragmentStageModel(), FragmentEmissionBlock.class);
-        NodeModel vcolor = addNode(colGraph, VertexColorFragmentInputNode.class);
+        NodeModel vcolor = addNode(colGraph, VertexColorNode.class);
         wire(colGraph, emission.getInputsById().get("color"), vcolor.getOutputsById().get("out"));
         CompiledShaderGraph colCompiled = new ShaderGraphCompiler(colGraph).compile();
         assertTrue(helper, "vsh declares vertexColor out", colCompiled.vertexSource().contains("out vec4 vertexColor;"));

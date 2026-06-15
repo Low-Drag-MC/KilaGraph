@@ -55,6 +55,23 @@ public final class ShaderCompileContext {
         return pm != null && pm.isConnected();
     }
 
+    /**
+     * Pull an input port at its <em>natural</em> GLSL type — no resize to the port's declared type
+     * (only int/bool→float normalisation). Used by Dynamic math/vector nodes, which infer their
+     * output width from the actual operand types instead of a fixed port type. An unconnected port
+     * yields its embedded {@code float} default as a literal.
+     */
+    public ShaderExpr inputDynamic(String portId) {
+        PortModel pm = node.getInputsById().get(portId);
+        if (pm == null) throw new IllegalArgumentException("No input port '" + portId + "' on " + node.getUid());
+        return compiler.pullInputNatural(pm);
+    }
+
+    /** Whether this is a per-node preview compile (single fragment quad; no real vertex stage). */
+    public boolean isPreview() {
+        return compiler.isPreview();
+    }
+
     // ---- vertex attributes -------------------------------------------------------------------
 
     /**
@@ -158,6 +175,41 @@ public final class ShaderCompileContext {
         return compiler.lightmapSampler();
     }
 
+    /** Screen-space UV {@code gl_FragCoord.xy / ScreenSize} (vec2) — the default UV for Scene Color/Depth. */
+    public ShaderExpr screenUv() {
+        return compiler.screenUv();
+    }
+
+    /** Sample the captured opaque scene colour (vec3) at {@code uv} — Unity's Scene Color node. */
+    public ShaderExpr sampleSceneColor(ShaderExpr uv) {
+        return compiler.sampleSceneColor(uv);
+    }
+
+    /** Raw hardware scene depth {@code [0,1]} at {@code uv} (Unity Scene Depth "Raw"). */
+    public ShaderExpr sampleSceneDepthRaw(ShaderExpr uv) {
+        return compiler.sampleSceneDepthRaw(uv);
+    }
+
+    /** Eye-space scene depth in world units at {@code uv} (Unity Scene Depth "Eye"). */
+    public ShaderExpr sampleSceneDepthEye(ShaderExpr uv) {
+        return compiler.sampleSceneDepthEye(uv);
+    }
+
+    /** Linearised scene depth {@code 0}(near)..{@code 1}(far) at {@code uv} (Unity Scene Depth "Linear 01"). */
+    public ShaderExpr sampleSceneDepthLinear01(ShaderExpr uv) {
+        return compiler.sampleSceneDepthLinear01(uv);
+    }
+
+    /** Camera near-plane distance (world units), reconstructed from {@code IProjMat}. */
+    public ShaderExpr cameraNear() {
+        return compiler.cameraNear();
+    }
+
+    /** Camera far-plane distance (world units), reconstructed from {@code IProjMat}. */
+    public ShaderExpr cameraFar() {
+        return compiler.cameraFar();
+    }
+
     /** Allocate a temp variable in the current stage holding {@code expr}, returning a reference. */
     public ShaderExpr temp(GlslType type, String code) {
         return compiler.hoist(type, code);
@@ -166,6 +218,76 @@ public final class ShaderCompileContext {
     /** The interpolated mesh uv (vec2). In a per-node preview this is the preview quad's uv. */
     public ShaderExpr meshUv() {
         return compiler.meshUv();
+    }
+
+    /** The interpolated mesh uv for a specific channel (UV0/UV1/UV2). UV0 is the texture uv; UV1/UV2 are
+     *  the overlay/lightmap coords (cast to vec2). See {@link #meshUv()}. */
+    public ShaderExpr meshUv(com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.UvChannel channel) {
+        return compiler.meshUv(channel);
+    }
+
+    /** The interpolated lit vertex colour (vanilla per-vertex {@code minecraft_mix_light} by default). */
+    public ShaderExpr litVertexColor() {
+        return compiler.litVertexColor();
+    }
+
+    /** The interpolated raw (unlit) vertex {@code Color} attribute. */
+    public ShaderExpr meshColor() {
+        return compiler.meshColor();
+    }
+
+    /**
+     * The interpolated world-space surface normal (vec3) — the default fallback for an unconnected
+     * {@code normal} port (Unity's Normal Vector node defaults to world space). Not unit-length after
+     * interpolation, so renormalize before use. In a per-node preview the quad faces the camera ({@code +Z}).
+     */
+    public ShaderExpr meshNormal() {
+        return compiler.meshNormal();
+    }
+
+    /**
+     * The interpolated world-space view direction, surface&rarr;camera (vec3) — the default fallback for an
+     * unconnected {@code viewDir} port (Unity's View Direction node defaults to world space). Renormalize
+     * before use. In a per-node preview this is {@code +Z} (looking straight at the quad).
+     */
+    public ShaderExpr meshViewDir() {
+        return compiler.meshViewDir();
+    }
+
+    /**
+     * The interpolated <b>model-space</b> vertex position {@code (Position + ModelOffset)} (vec3) — the
+     * default fallback for an unconnected {@code position}/{@code coords} port. Fragment-safe. Wire a
+     * Transform node for world space.
+     */
+    public ShaderExpr meshPosition() {
+        return compiler.meshPosition();
+    }
+
+    /** The interpolated {@code sphericalVertexDistance} varying (float) — vanilla's spherical fog distance,
+     *  the default for an unconnected fog distance port. */
+    public ShaderExpr sphericalVertexDistance() {
+        return compiler.sphericalVertexDistance();
+    }
+
+    /** The interpolated {@code cylindricalVertexDistance} varying (float) — vanilla's cylindrical fog
+     *  distance, the default for an unconnected fog distance port. */
+    public ShaderExpr cylindricalVertexDistance() {
+        return compiler.cylindricalVertexDistance();
+    }
+
+    /** A raw Minecraft {@code Fog} UBO field accessor (e.g. {@code FogColor}, {@code FogEnvironmentalStart}) —
+     *  the default for an unconnected fog parameter port. Registers the fog include + UBO binding. */
+    public ShaderExpr fogField(String name, GlslType type) {
+        return compiler.fogField(name, type);
+    }
+
+    /**
+     * The model-space vertex position MC transforms: {@code (Position + ModelOffset)} (vec3). ModelOffset is
+     * a per-draw DynamicTransforms uniform — zero unless set (block/terrain rendering sets it), so this is
+     * the correct, harmless default for position / fog distance. Registers the dynamictransforms import.
+     */
+    public ShaderExpr modelPosition() {
+        return compiler.modelPosition();
     }
 
     /**
@@ -178,9 +300,34 @@ public final class ShaderCompileContext {
         return compiler.varyingInput(name, type, vshDefault, previewDefault);
     }
 
+    /**
+     * Register a KilaGraph-managed UBO (a {@link com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock})
+     * this node needs — the generic extension point for engine/mod uniform blocks. Once registered, the
+     * compiler emits the block's {@code declareGlsl()} into the source, the pipeline declares its
+     * {@code uboName()}, and the material drives its per-frame {@code prepareUpload()} + binds its
+     * {@code slice()}. The node then references the block's fields itself, e.g.
+     * {@code ctx.useUniformBlock(MyBlock.INSTANCE); return new ShaderExpr("my_block.Field", GlslType.VEC3);}
+     * (the GLSL block/instance name is whatever the block's {@code declareGlsl()} uses). Idempotent.
+     *
+     * <p>{@link #engineTime()} / {@link #transformField(String, GlslType)} are the built-in conveniences
+     * layered on this for KilaGraph's own {@code KG_Globals} / {@code KG_Transforms} blocks.</p>
+     */
+    public void useUniformBlock(com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock block) {
+        compiler.useUniformBlock(block);
+    }
+
     /** World time in seconds, from KilaGraph's engine-globals block (we update it each frame). */
     public ShaderExpr engineTime() {
         return compiler.engineTime();
+    }
+
+    /**
+     * A {@code KG_Transforms} field accessor (precomputed space matrices + camera, e.g.
+     * {@code "ViewMat"}/{@code "IModelViewMat"}/{@code "CameraPos"}), flagging the pipeline to declare +
+     * bind the block. {@code type} is the field's GLSL type. Used by the Transform node.
+     */
+    public ShaderExpr transformField(String field, GlslType type) {
+        return compiler.transformField(field, type);
     }
 
     /** Minecraft's builtin {@code Globals.GameTime} (normalised day fraction, wraps every MC day). */
@@ -191,6 +338,16 @@ public final class ShaderCompileContext {
     /** Append a raw statement to the current stage's main() body. */
     public void line(String statement) {
         compiler.line(statement);
+    }
+
+    /**
+     * Declare a global-scope GLSL helper function {@code glsl} (its full definition) under {@code name}
+     * in the current stage, emitted once before {@code main()}. Keyed by name (a re-registration with the
+     * same name is ignored — no redefinition); register a callee before its caller. For procedural nodes
+     * whose math reads best as a reusable function (noise hashes, the Voronoi cell loop).
+     */
+    public void function(String name, String glsl) {
+        compiler.addFunction(name, glsl);
     }
 
     /** Convert an expression to a target GLSL type using the standard float/vector rules. */

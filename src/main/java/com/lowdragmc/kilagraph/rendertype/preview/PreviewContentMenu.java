@@ -23,15 +23,23 @@ public final class PreviewContentMenu {
 
     private PreviewContentMenu() {}
 
+    /** Append a leaf per registered content compatible with {@code formatKeys} (each invoking
+     *  {@code onSelect}), into an existing menu builder. Shared by the standalone {@link #open} popup and
+     *  the graph-view context menu so both list the same geometry choices. */
+    public static void appendContentItems(TreeBuilder.Menu menu, Set<String> formatKeys,
+                                          Consumer<KGPreviewContent> onSelect) {
+        for (KGPreviewContent content : KGPreviewContents.all()) {
+            if (!content.isCompatible(formatKeys)) continue;
+            menu.leaf(content.title(), () -> onSelect.accept(content));
+        }
+    }
+
     /** Open the content picker at the event's position, invoking {@code onSelect} with the chosen content. */
     public static void open(UIElement host, UIEvent event, Set<String> formatKeys, Consumer<KGPreviewContent> onSelect) {
         var mui = host.getModularUI();
         if (mui == null) return;
         var menu = TreeBuilder.Menu.start();
-        for (KGPreviewContent content : KGPreviewContents.all()) {
-            if (!content.isCompatible(formatKeys)) continue;
-            menu.leaf(content.title(), () -> onSelect.accept(content));
-        }
+        appendContentItems(menu, formatKeys, onSelect);
         var root = mui.ui.rootElement;
         var offset = root.worldToLocalLayoutOffset(new Vector2f(event.x, event.y));
         root.addChild(new Menu<>(menu.build(), TreeBuilder.Menu::uiProvider)

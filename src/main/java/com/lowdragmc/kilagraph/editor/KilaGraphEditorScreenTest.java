@@ -21,7 +21,7 @@ public class KilaGraphEditorScreenTest implements IScreenTest {
 
     @Override
     public ModularUI createUI(Player entityPlayer) {
-        var root = new EditorWindow(KilaGraphEditor::new);
+        var root = EditorWindow.open(KilaGraphEditor.WINDOW_ID, KilaGraphEditor::new);
         return new ModularUI(UI.of(root))
                 .shouldCloseOnEsc(false)
                 .shouldCloseOnKeyInventory(false);

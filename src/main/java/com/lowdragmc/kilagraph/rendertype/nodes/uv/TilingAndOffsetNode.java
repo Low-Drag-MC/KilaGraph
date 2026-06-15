@@ -9,6 +9,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
+import org.joml.Vector2f;
 
 /**
  * Unity-style Tiling And Offset: {@code uv * tiling + offset}. An unconnected {@code uv} defaults to
@@ -19,16 +20,16 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 public class TilingAndOffsetNode extends ShaderNode {
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
-        context.addInputPort("uv", RenderTypeGraphTypes.VEC2);
-        context.addInputPort("tiling", RenderTypeGraphTypes.VEC2);
+        context.addInputPort("uv", RenderTypeGraphTypes.UV);
+        context.addInputPort("tiling", RenderTypeGraphTypes.VEC2).withDefaultValue(new Vector2f(1, 1));
         context.addInputPort("offset", RenderTypeGraphTypes.VEC2);
         context.addOutputPort("out", RenderTypeGraphTypes.VEC2);
     }
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ShaderExpr uv = ctx.isConnected("uv") ? ctx.input("uv") : ctx.meshUv();
-        ShaderExpr tiling = ctx.isConnected("tiling") ? ctx.input("tiling") : new ShaderExpr("vec2(1.0)", GlslType.VEC2);
+        ShaderExpr uv = ctx.input("uv");
+        ShaderExpr tiling = ctx.input("tiling");
         ShaderExpr offset = ctx.input("offset");
         ctx.output("out", new ShaderExpr("(" + uv.code() + " * " + tiling.code() + " + " + offset.code() + ")", GlslType.VEC2));
     }

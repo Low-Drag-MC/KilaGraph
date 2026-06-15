@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype;
 
 import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.INodeValidator;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.IVertexFormatDependentNode;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
@@ -17,22 +18,17 @@ import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentBaseColorBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentStageNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.ShaderSplitNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.ShaderVec4MultiplyNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vector.Vec3Node;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingVertexColorBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCylindricalVertexDistanceBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingSphericalVertexDistanceBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingStageNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingTexCoordBlock;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphLogger;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphNodeRegistry;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.command.GraphCommands;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.command.IGraphCommand;
@@ -142,55 +138,50 @@ public class RenderTypeGraph extends Graph {
             return;
         }
 
-        var position = createBlock(vertexStage, VertexPositionBlock.class);
-        var vertexColor = createBlock(vertexStage, VaryingVertexColorBlock.class);
-        var sphericalDistance = createBlock(vertexStage, VaryingSphericalVertexDistanceBlock.class);
-        var cylindricalDistance = createBlock(vertexStage, VaryingCylindricalVertexDistanceBlock.class);
-        var texCoord = createBlock(vertexStage, VaryingTexCoordBlock.class);
-        var sampler = createTextureNode(-120, 96, "minecraft:textures/block/dirt.png");
-        var textureSample = createNode(SamplerTexture2DNode.class, 80, 96);
-        var entityColor = createNode(ShaderVec4MultiplyNode.class, 280, 64);
-        var dynamicTransforms = createNode(DynamicTransformsUboNode.class, 280, 190);
-        var modulatedColor = createNode(ShaderVec4MultiplyNode.class, 500, 96);
-        var fogSub = createFogSubgraphNode(740, 96);
-        var split = createNode(ShaderSplitNode.class, 960, 96);
-        var baseColorVec = createNode(Vec3Node.class, 1160, 64);
+        // Only Position is an explicit vertex block now. The mesh uv (texture sample's uv), the lit vertex
+        // colour (VertexColorNode), and the fog distances (inside the fog subgraph) all come from compiler
+        // defaults — no specialized varying blocks needed.
+        createBlock(vertexStage, VertexPositionBlock.class);
+        var vertexColor = createNode(VertexColorNode.class, 208, 112); // lit vertex colour (fsh)
+        vertexColor.setPreviewExpanded(false);
+        var sampler = createTextureNode(48, -128, "minecraft:textures/block/dirt.png");
+        var textureSample = createNode(SamplerTexture2DNode.class, 208, -128);
+        var entityColor = createNode(MultiplyNode.class, 384, -128);
+        entityColor.setPreviewExpanded(false);
+        var dynamicTransforms = createNode(DynamicTransformsUboNode.class, 352, 0);
+        var modulatedColor = createNode(MultiplyNode.class, 512, -128);
+        modulatedColor.setPreviewExpanded(false);
+        var fogSub = createFogSubgraphNode(608, -96);
+        var split = createNode(SplitNode.class, 752, 0);
         var baseColor = createBlock(fragmentStage, FragmentBaseColorBlock.class);
         var alpha = createBlock(fragmentStage, FragmentAlphaBlock.class);
 
-        position.setPosition(new Vector2f(-430, -8));
-        vertexColor.setPosition(new Vector2f(-430, 24));
-        sphericalDistance.setPosition(new Vector2f(-430, 56));
-        cylindricalDistance.setPosition(new Vector2f(-430, 88));
-        texCoord.setPosition(new Vector2f(-430, 120));
-        baseColor.setPosition(new Vector2f(410, -8));
-        alpha.setPosition(new Vector2f(410, 24));
+        // The two fixed stages sit on the right; their blocks auto-stack at the stage origin.
+        vertexStage.setPosition(new Vector2f(832, -320));
+        fragmentStage.setPosition(new Vector2f(832, -128));
 
         graphModel.createWire(textureSample.getInputsById().get("sampler"), sampler.getOutputsById().get("sampler"));
-        graphModel.createWire(textureSample.getInputsById().get("uv"), texCoord.getOutputsById().get("texCoord"));
+        // textureSample.uv is left unconnected — the UV-typed port defaults to the mesh uv (UV0).
         graphModel.createWire(entityColor.getInputsById().get("a"), textureSample.getOutputsById().get("color"));
-        graphModel.createWire(entityColor.getInputsById().get("b"), vertexColor.getOutputsById().get("color"));
+        graphModel.createWire(entityColor.getInputsById().get("b"), vertexColor.getOutputsById().get("out"));
         graphModel.createWire(modulatedColor.getInputsById().get("a"), entityColor.getOutputsById().get("out"));
         graphModel.createWire(modulatedColor.getInputsById().get("b"), dynamicTransforms.getOutputsById().get("ColorModulator"));
         graphModel.createWire(fogSub.inColor(), modulatedColor.getOutputsById().get("out"));
-        graphModel.createWire(fogSub.spherical(), sphericalDistance.getOutputsById().get("distance"));
-        graphModel.createWire(fogSub.cylindrical(), cylindricalDistance.getOutputsById().get("distance"));
+        // fog distances default inside the subgraph (ApplyFog's distance ports → the fog-distance varyings).
+        // The fogged colour (vec4) feeds base color directly (rgb swizzle); Split extracts its alpha.
+        graphModel.createWire(baseColor.getInputsById().get("color"), fogSub.out());
         graphModel.createWire(split.getInputsById().get("in"), fogSub.out());
-        graphModel.createWire(baseColorVec.getInputsById().get("x"), split.getOutputsById().get("r"));
-        graphModel.createWire(baseColorVec.getInputsById().get("y"), split.getOutputsById().get("g"));
-        graphModel.createWire(baseColorVec.getInputsById().get("z"), split.getOutputsById().get("b"));
-        graphModel.createWire(baseColor.getInputsById().get("color"), baseColorVec.getOutputsById().get("out"));
         graphModel.createWire(alpha.getInputsById().get("alpha"), split.getOutputsById().get("a"));
     }
 
     /** The fog subgraph node's outer ports, resolved by inner-variable uid. */
-    private record FogSubgraph(NodeModel node, PortModel inColor, PortModel spherical,
-                               PortModel cylindrical, PortModel out) {}
+    private record FogSubgraph(NodeModel node, PortModel inColor, PortModel out) {}
 
     /**
      * Build the default fog as a collapsed {@link ShaderFunctionGraph} subgraph node — the Fog UBO and
-     * {@code apply_fog} live inside, so the node exposes just {@code inColor} + the two vertex distances
-     * as inputs and the fogged colour as output. The user can dive in to tweak or delete + rebuild it.
+     * {@code apply_fog} live inside, so the node exposes just {@code inColor} as input and the fogged colour
+     * as output. The vertex distances default inside (ApplyFog's distance ports → the fog-distance
+     * varyings), so they aren't exposed. The user can dive in to tweak or delete + rebuild it.
      */
     private FogSubgraph createFogSubgraphNode(float x, float y) {
         CustomGraphModelImpl inner = graphModel.createLocalSubgraphInstance(ShaderFunctionGraph.class);
@@ -198,24 +189,18 @@ public class RenderTypeGraph extends Graph {
 
         var inColorVar = (VariableDeclarationModelBase) inner.createVariable(
                 "inColor", RenderTypeGraphTypes.VEC4, new Vector4f(), VariableKind.INPUT);
-        var sphericalVar = (VariableDeclarationModelBase) inner.createVariable(
-                "sphericalVertexDistance", TypeHandles.FLOAT, 0f, VariableKind.INPUT);
-        var cylindricalVar = (VariableDeclarationModelBase) inner.createVariable(
-                "cylindricalVertexDistance", TypeHandles.FLOAT, 0f, VariableKind.INPUT);
         var outVar = (VariableDeclarationModelBase) inner.createVariable(
                 "out", RenderTypeGraphTypes.VEC4, new Vector4f(), VariableKind.OUTPUT);
 
         var inColorNode = inner.createVariableNode(inColorVar, new Vector2f(-400, 0), null, null);
-        var sphericalNode = inner.createVariableNode(sphericalVar, new Vector2f(-400, 48), null, null);
-        var cylindricalNode = inner.createVariableNode(cylindricalVar, new Vector2f(-400, 96), null, null);
         var outNode = inner.createVariableNode(outVar, new Vector2f(400, 0), null, null);
 
         NodeModel fogUbo = innerNode(inner, FogUboNode.class, -180, 140);
         NodeModel applyFog = innerNode(inner, ApplyFogNode.class, 40, 16);
 
         inner.createWire(applyFog.getInputsById().get("inColor"), inColorNode.getOutputPort());
-        inner.createWire(applyFog.getInputsById().get("sphericalVertexDistance"), sphericalNode.getOutputPort());
-        inner.createWire(applyFog.getInputsById().get("cylindricalVertexDistance"), cylindricalNode.getOutputPort());
+        // sphericalVertexDistance / cylindricalVertexDistance left unconnected → ApplyFog defaults them to
+        // the fog-distance varyings (ctx.sphericalVertexDistance() / cylindricalVertexDistance()).
         inner.createWire(applyFog.getInputsById().get("environmentalStart"), fogUbo.getOutputsById().get("FogEnvironmentalStart"));
         inner.createWire(applyFog.getInputsById().get("environmentalEnd"), fogUbo.getOutputsById().get("FogEnvironmentalEnd"));
         inner.createWire(applyFog.getInputsById().get("renderDistanceStart"), fogUbo.getOutputsById().get("FogRenderDistanceStart"));
@@ -228,8 +213,6 @@ public class RenderTypeGraph extends Graph {
         subNode.defineNode();
         return new FogSubgraph(subNode,
                 subNode.getInputsById().get(inColorVar.getUid().toString()),
-                subNode.getInputsById().get(sphericalVar.getUid().toString()),
-                subNode.getInputsById().get(cylindricalVar.getUid().toString()),
                 subNode.getOutputsById().get(outVar.getUid().toString()));
     }
 
@@ -288,16 +271,18 @@ public class RenderTypeGraph extends Graph {
         // Re-validate: removing/reordering an element may leave a vertex-attribute node needing an absent
         // attribute. No editor GraphLogger here (Settings edits don't route through onGraphChanged), so log
         // to the console; the GraphLogger surfacing happens on the next node-graph change.
-        validateVertexFormat(null);
+        validateGraph(null);
     }
 
     /**
-     * Flag every {@link IVertexFormatDependentNode} (e.g. a {@code VertexAttributeInputNode}) whose chosen
-     * element isn't present in the composed vertex format — its generated GLSL would reference an undeclared
-     * {@code in}. Surfaced through the editor's {@link GraphLogger} when one is supplied (node-graph edits),
-     * else logged to the console (Settings-only edits).
+     * Editor-surfaced validation of the current graph: (1) every {@link IVertexFormatDependentNode} (e.g. a
+     * {@code VertexAttributeInputNode}) whose chosen element isn't in the composed vertex format — its GLSL
+     * would reference an undeclared {@code in}; (2) stage-affinity violations (a VERTEX_ONLY/FRAGMENT_ONLY
+     * node pulled into the wrong stage), read from a single CPU {@code compile()}. Surfaced through the
+     * editor's {@link GraphLogger} when one is supplied (node-graph edits), else logged to the console
+     * (Settings-only edits, which can't fix per-node markers anyway).
      */
-    private void validateVertexFormat(@Nullable GraphLogger logger) {
+    private void validateGraph(@Nullable GraphLogger logger) {
         var present = settings.vertexFormatElements();
         // 1) Explicit attribute-reader nodes (e.g. VertexAttributeInputNode): a node-keyed ERROR for one
         //    whose chosen element isn't in the format. Track the attribute names so the default-behavior
@@ -317,6 +302,20 @@ public class RenderTypeGraph extends Graph {
                 LOGGER.warn("[KilaGraph] a vertex-attribute node needs '{}' but the vertex format does not include it", name);
             }
         }
+        // 1b) Nodes that validate themselves (e.g. the Expression node's reserved-word / duplicate port
+        //     names, which would otherwise only surface as a GPU compile error). Node-keyed ERRORs.
+        for (var model : graphModel.getNodeModels()) {
+            if (!(model instanceof ICustomNodeModel custom)) continue;
+            if (!(custom.getNode() instanceof INodeValidator validator)) continue;
+            for (var error : validator.validationErrors()) {
+                if (logger != null) {
+                    logger.error(error, model);
+                } else {
+                    LOGGER.warn("[KilaGraph] {}", error.getString());
+                }
+            }
+        }
+
         // 2) Default-behavior references (e.g. the vertex Color block defaulting to minecraft_mix_light with
         //    Color/Normal): caught by compiling once (CPU-only) and reading the substituted attributes. Only
         //    when an editor logger is present (a per-edit compile is cheap; skip it on the headless setSettings
@@ -328,6 +327,13 @@ public class RenderTypeGraph extends Graph {
                 if (flaggedAttribs.add(attrib)) {
                     logger.warning(Component.translatable("rendertypegraph.warn.vertex_element_defaulted", attrib));
                 }
+            }
+            // Stage-affinity violations from the same compile: a node pulled into a stage its affinity
+            // forbids (e.g. a vertex attribute read in the fragment stage). Keyed to the offending node.
+            for (var err : compiled.stageErrors()) {
+                logger.error(Component.translatable("rendertypegraph.error.stage_affinity",
+                                err.nodeName(), err.affinity().name(), err.usedIn().name()),
+                        graphModel.getModel(err.nodeUid()));
             }
         } catch (RuntimeException ignored) {
             // A malformed graph throws during compile; the preview/material path reports that separately.
@@ -398,7 +404,7 @@ public class RenderTypeGraph extends Graph {
     public void onGraphChanged(GraphLogger logger) {
         super.onGraphChanged(logger);
         changeVersion++;
-        validateVertexFormat(logger);
+        validateGraph(logger);
     }
 
     /** A monotonically increasing counter bumped on every graph change; see {@link #onGraphChanged}. */

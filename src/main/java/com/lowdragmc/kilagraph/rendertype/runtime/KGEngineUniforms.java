@@ -30,6 +30,14 @@ public final class KGEngineUniforms {
     public static final String UBO_NAME = "KG_Globals";
     public static final String UBO_INSTANCE = "kg_globals";
 
+    /** The {@link ShaderUniformBlock} view a node registers via {@code ctx.useUniformBlock(...)}. */
+    public static final ShaderUniformBlock BLOCK = new ShaderUniformBlock() {
+        @Override public String uboName() { return UBO_NAME; }
+        @Override public String declareGlsl() { return KGEngineUniforms.declareGlsl(); }
+        @Override public void prepareUpload() { KGEngineUniforms.prepareUpload(); }
+        @Override public GpuBufferSlice slice() { return KGEngineUniforms.slice(); }
+    };
+
     /** std140 size: one float (Time). Grows as engine fields are added (camera, screen size, ...). */
     private static final int UBO_SIZE = new Std140SizeCalculator().putFloat().get();
 

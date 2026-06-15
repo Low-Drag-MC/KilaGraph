@@ -49,7 +49,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
 
     private final RenderType renderType;
     private final MaterialUniformBuffer uniforms;
-    private final boolean usesEngineGlobals;
+    /** KilaGraph-managed UBOs this material's graph uses — uploaded each draw (HEAD) + bound in the pass. */
+    private final java.util.List<ShaderUniformBlock> uniformBlocks;
     private final String contentHash;
     /** Variable display name -> KG_Material field (name + type), for set-by-name uniform updates. */
     private final Map<String, MaterialUniformLayout.Field> uniformFields;
@@ -59,21 +60,27 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     private final Map<String, SamplerDefault> textures;
     /** Sampler uniform name -> resolved view+sampler, refreshed in {@link #prepareUniforms} (pre-pass). */
     private final Map<String, ResolvedSampler> resolvedTextures = new HashMap<>();
+    /** Whether the graph samples the captured scene colour/depth — bound from {@link SceneCaptureManager}. */
+    private final boolean usesSceneColor;
+    private final boolean usesSceneDepth;
 
     private record ResolvedSampler(GpuTextureView view, GpuSampler sampler) {}
 
     public RenderTypeGraphMaterial(RenderType renderType, MaterialUniformLayout layout,
-                                   boolean usesEngineGlobals, String contentHash,
+                                   java.util.List<ShaderUniformBlock> uniformBlocks, String contentHash,
                                    Map<String, MaterialUniformLayout.Field> uniformFields,
                                    Map<String, String> variableSamplers,
-                                   Map<String, SamplerDefault> textures) {
+                                   Map<String, SamplerDefault> textures,
+                                   boolean usesSceneColor, boolean usesSceneDepth) {
         this.renderType = renderType;
         this.uniforms = new MaterialUniformBuffer(layout);
-        this.usesEngineGlobals = usesEngineGlobals;
+        this.uniformBlocks = java.util.List.copyOf(uniformBlocks);
         this.contentHash = contentHash;
         this.uniformFields = new HashMap<>(uniformFields);
         this.variableSamplers = new HashMap<>(variableSamplers);
         this.textures = new HashMap<>(textures);
+        this.usesSceneColor = usesSceneColor;
+        this.usesSceneDepth = usesSceneDepth;
         BY_RENDER_TYPE.put(renderType, this);
     }
 
@@ -178,7 +185,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
      */
     public void prepareUniforms() {
         uniforms.prepareUpload();
-        if (usesEngineGlobals) KGEngineUniforms.prepareUpload();
+        for (ShaderUniformBlock block : uniformBlocks) block.prepareUpload();
         // Resolve (loading if needed) each bound texture now, and build its GpuSampler from the params —
         // the actual bindTexture in the pass then only reads the already-uploaded view/sampler.
         if (!textures.isEmpty()) {
@@ -198,9 +205,9 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
             GpuBufferSlice slice = uniforms.slice();
             if (slice != null) renderPass.setUniform(MaterialUniformLayout.UBO_NAME, slice);
         }
-        if (usesEngineGlobals) {
-            GpuBufferSlice globals = KGEngineUniforms.slice();
-            if (globals != null) renderPass.setUniform(KGEngineUniforms.UBO_NAME, globals);
+        for (ShaderUniformBlock block : uniformBlocks) {
+            GpuBufferSlice s = block.slice();
+            if (s != null) renderPass.setUniform(block.uboName(), s);
         }
         // Dynamic samplers: (re)bind the textures resolved in prepareUniforms, so setTexture takes effect
         // without rebuilding the RenderType. bindTexture is a pure pass command (no GPU upload), and the
@@ -209,12 +216,33 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
             ResolvedSampler r = e.getValue();
             renderPass.bindTexture(e.getKey(), r.view(), r.sampler());
         }
+        // Captured scene colour/depth: bound from the live SceneCaptureManager (not TextureManager). Before
+        // the first capture the view is null — bind the missing-texture as a placeholder so the encoder's
+        // "every declared sampler must be bound" check passes.
+        if (usesSceneColor) {
+            GpuTextureView view = SceneCaptureManager.INSTANCE.colorView();
+            renderPass.bindTexture(com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler.SCENE_COLOR_SAMPLER,
+                    view != null ? view : missingView(), SceneCaptureManager.INSTANCE.sampler());
+        }
+        if (usesSceneDepth) {
+            GpuTextureView view = SceneCaptureManager.INSTANCE.depthView();
+            renderPass.bindTexture(com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler.SCENE_DEPTH_SAMPLER,
+                    view != null ? view : missingView(), SceneCaptureManager.INSTANCE.sampler());
+        }
+    }
+
+    /** The MC missing-texture view, a safe placeholder for a scene sampler before the first capture. */
+    private static GpuTextureView missingView() {
+        return Minecraft.getInstance().getTextureManager()
+                .getTexture(net.minecraft.client.renderer.texture.MissingTextureAtlasSprite.getLocation())
+                .getTextureView();
     }
 
     @Override
     public void close() {
         BY_RENDER_TYPE.remove(renderType);
         uniforms.close();
+        if (usesSceneColor || usesSceneDepth) SceneCaptureManager.INSTANCE.release();
         RenderTypeFactory.release(contentHash);
     }
 }

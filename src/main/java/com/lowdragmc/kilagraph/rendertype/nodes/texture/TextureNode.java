@@ -39,4 +39,9 @@ public class TextureNode extends ShaderNode {
         Sampler2DValue value = ctx.option("texture", Sampler2DValue.class, Sampler2DValue.defaultValue());
         ctx.output("sampler", ctx.textureSampler(value));
     }
+
+    @Override
+    public float getNodeWidth() {
+        return 120;
+    }
 }

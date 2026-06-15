@@ -76,6 +76,13 @@ public class VertexAttributeInputNode extends ShaderNode implements IVertexForma
             ctx.output("out", new ShaderExpr("vec4(0.0)", GlslType.VEC4));
             return;
         }
+        // Per-node preview: there is no real vertex stage (just a flat quad drawn through the preview vsh,
+        // which forwards Position→vPos and UV0→vUv). Substitute a fragment-safe default for the attribute
+        // so the thumbnail compiles and shows something meaningful instead of undefined-variable GLSL.
+        if (ctx.isPreview()) {
+            ctx.output("out", previewExpr(element));
+            return;
+        }
         // An explicit read of an attribute the format doesn't declare would emit undefined-variable GLSL;
         // fall back to a zero of the output type (and record it — the graph also flags this node via
         // IVertexFormatDependentNode validation, so the user gets a node-level error too).
@@ -101,6 +108,21 @@ public class VertexAttributeInputNode extends ShaderNode implements IVertexForma
             case "vec2", "ivec2" -> RenderTypeGraphTypes.VEC2;
             case "vec3" -> RenderTypeGraphTypes.VEC3;
             default -> RenderTypeGraphTypes.VEC4; // vec4 and anything unrecognised
+        };
+    }
+
+    /**
+     * A fragment-safe preview value for an attribute (the per-node preview has no vertex stage). The
+     * preview vsh forwards {@code Position→vPos} and {@code UV0→vUv}, so position/uv read those
+     * interpolants; the rest fall back to neutral constants (a flat quad has no real color/normal).
+     */
+    private static ShaderExpr previewExpr(KGVertexElement element) {
+        return switch (element.key()) {
+            case "position" -> new ShaderExpr("vPos", GlslType.VEC3);
+            case "uv0" -> new ShaderExpr("vUv", GlslType.VEC2);
+            case "color" -> new ShaderExpr("vec4(1.0)", GlslType.VEC4);
+            case "normal" -> new ShaderExpr("vec3(0.0, 0.0, 1.0)", GlslType.VEC3);
+            default -> zeroExpr(element.glslType()); // uv1/uv2/lineWidth/custom → zero of its type
         };
     }
 

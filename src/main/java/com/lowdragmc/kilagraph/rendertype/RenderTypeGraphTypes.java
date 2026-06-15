@@ -27,6 +27,21 @@ public final class RenderTypeGraphTypes {
     public static final TypeHandle VEC4 = TypeHandleHelpers.customType(Vector4f.class, "KG_VEC4", "Vec4");
     public static final TypeHandle MAT4 = TypeHandleHelpers.customType(Mat4Value.class, "KG_MAT4", "Mat4");
     public static final TypeHandle SAMPLER2D = TypeHandleHelpers.customType(Sampler2DValue.class, "KG_SAMPLER2D", "Sampler2D");
+    /**
+     * A "dynamic" float-vector type for math/vector nodes: a single node accepts any float/vec input and
+     * infers its output width at compile time (Unity's Dynamic Vector). Backed by {@code Float.class} so an
+     * unconnected port gets the built-in inline float editor (a scalar default with no wire), yet its custom
+     * identification keeps {@link com.lowdragmc.kilagraph.rendertype.compiler.GlslType#of} returning {@code
+     * null} for it — so a DYNAMIC output is passed through uncast and the node tags its own inferred type.
+     */
+    public static final TypeHandle DYNAMIC = TypeHandleHelpers.customType(Float.class, "KG_DYNAMIC", "Dynamic");
+    /**
+     * A uv-coordinate type: wire-compatible with {@code VEC2} (compiles to {@code vec2}), but its
+     * unconnected port carries a {@link UvChannel} picker (UV0/UV1/UV2). When unconnected the compiler
+     * emits the chosen channel's interpolated mesh uv (see {@code ShaderGraphCompiler.pullInput} +
+     * {@code meshUv(UvChannel)}), so a uv port "just works" with the mesh's texcoords by default.
+     */
+    public static final TypeHandle UV = TypeHandleHelpers.customType(UvChannel.class, "KG_UV", "UV");
 
     static {
         // A custom object type's constant starts at its registered default-value supplier (else null).
@@ -37,11 +52,20 @@ public final class RenderTypeGraphTypes {
         TypeHandleHelpers.setCustomDefaultValue(VEC2, Vector2f::new);
         TypeHandleHelpers.setCustomDefaultValue(VEC3, Vector3f::new);
         TypeHandleHelpers.setCustomDefaultValue(VEC4, Vector4f::new);
+        // DYNAMIC resolves to Float, so it reuses the built-in float inline editor; give it the float default
+        // (a scalar a user can type when the port is unwired) and the float port colour so it reads sensibly.
+        TypeHandleHelpers.setCustomDefaultValue(DYNAMIC, () -> 0.0f);
+        TypeHandleHelpers.setCustomColor(DYNAMIC, 0xFF10B4C5);
         TypeHandleHelpers.setCustomDefaultValue(SAMPLER2D, Sampler2DValue::defaultValue);
         // The SAMPLER2D configurator (custom/atlas picker + sampler params + preview) is client-only;
         // the lambda references it lazily so the compiler/headless path never loads the UI class.
         TypeHandleHelpers.setCustomConfigurable(SAMPLER2D, (valueConfigurable, typeHandle) ->
                 com.lowdragmc.kilagraph.rendertype.gui.Sampler2DConfigurator.build(valueConfigurable));
+        // UV: default to channel UV0, a teal-ish port colour, and a client-only UV0/UV1/UV2 dropdown.
+        TypeHandleHelpers.setCustomDefaultValue(UV, () -> UvChannel.UV0);
+        TypeHandleHelpers.setCustomColor(UV, 0xFF2EB8A6);
+        TypeHandleHelpers.setCustomConfigurable(UV, (valueConfigurable, typeHandle) ->
+                com.lowdragmc.kilagraph.rendertype.gui.UvChannelConfigurator.build(valueConfigurable));
     }
 
     /** Node-palette type-picker handles shared by RenderTypeGraph and ShaderFunctionGraph. */
@@ -70,6 +94,24 @@ public final class RenderTypeGraphTypes {
     private RenderTypeGraphTypes() {}
 
     public record Mat4Value() {}
+
+    /**
+     * Which mesh uv channel a {@link #UV} port reads when unconnected. UV0 is the texture uv (a float
+     * {@code vec2} attribute); UV1/UV2 are Minecraft's overlay/lightmap coords (ivec2, cast to vec2).
+     */
+    public enum UvChannel implements StringRepresentable {
+        UV0("uv0"), UV1("uv1"), UV2("uv2");
+        private final String name;
+        UvChannel(String name) { this.name = name; }
+        @Override public String getSerializedName() { return name; }
+    }
+
+    public static final Codec<UvChannel> UV_CODEC =
+            LDLibExtraCodecs.enumCodec(UvChannel.class, UvChannel.UV0);
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, UvChannel> UV_STREAM_CODEC =
+            StreamCodec.of((buf, v) -> buf.writeVarInt(v.ordinal()),
+                    buf -> UvChannel.values()[buf.readVarInt()]);
 
     /** How a {@link Sampler2DValue}'s {@code location} is picked in the configurator (binding is identical). */
     public enum SamplerMode implements StringRepresentable {
