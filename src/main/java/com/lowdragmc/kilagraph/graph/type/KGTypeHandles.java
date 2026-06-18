@@ -3,6 +3,7 @@ package com.lowdragmc.kilagraph.graph.type;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandleHelpers;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -43,6 +44,8 @@ public final class KGTypeHandles {
     public static final TypeHandle ENTITY;
     public static final TypeHandle PLAYER;
     public static final TypeHandle BLOCK_ENTITY;
+    /** NBT compound tag — wire-only (no accessor/picker), like LEVEL/ENTITY. */
+    public static final TypeHandle NBT_COMPOUND;
 
     /** Optional overrides: a Java type that should resolve to a specific custom TypeHandle. */
     private static final Map<Type, TypeHandle> OVERRIDES = new ConcurrentHashMap<>();
@@ -77,6 +80,7 @@ public final class KGTypeHandles {
         ENTITY = TypeHandleHelpers.fromType(Entity.class, "Entity");
         PLAYER = TypeHandleHelpers.fromType(Player.class, "Player");
         BLOCK_ENTITY = TypeHandleHelpers.fromType(BlockEntity.class, "BlockEntity");
+        NBT_COMPOUND = TypeHandleHelpers.fromType(CompoundTag.class, "CompoundTag");
     }
 
     private KGTypeHandles() {}

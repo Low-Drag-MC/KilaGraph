@@ -7,6 +7,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IConstantNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IVariableNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.PortDirection;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.IVariable;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -68,6 +70,13 @@ public final class GraphExecutor {
     private final Deque<NodeModel> pending = new ArrayDeque<>();
     /** Per-node persistent state, keyed by node UID. Lazy-created via {@link #nodeState(UUID)}. */
     private final Map<UUID, Map<String, Object>> nodeState = new HashMap<>();
+    /**
+     * Names of {@code EXECUTION_FLOW} WRITE (OUTPUT) graph variables whose set-node this executor's
+     * exec flow reached — i.e. the exec "exit" pins a subgraph run fired. A parent executor reads a
+     * child's set after entering the child (see {@link #executeSubgraph}) to fire only the matching
+     * outer exec-out pins. Populated in {@link #executeNode}; one child executor per subgraph entry.
+     */
+    private final Set<String> reachedExecOutputs = new LinkedHashSet<>();
 
     public GraphExecutor(Graph graph) {
         this(graph, EvaluationEnvironment.defaults());
@@ -110,6 +119,7 @@ public final class GraphExecutor {
         if (!(graph.graphModel instanceof CustomGraphModelImpl gm)) return result;
         for (var v : gm.getGraphVariableModels()) {
             if (v == null) continue;
+            if (isExecVar(v)) continue;  // exec-flow vars are not data outputs
             if (v.getVariableKind() != VariableKind.OUTPUT) continue;
             result.put(v.getName(), resolveOutputVariable(v, gm));
         }
@@ -133,7 +143,7 @@ public final class GraphExecutor {
 
     /**
      * Drain the pending exec queue until empty. Public surface: {@link #executeFrom}. Internal
-     * surface (loop nodes via {@link ExecContext#runLoopBody}): drain the body's sub-tree before
+     * surface (loop nodes via {@link ExecContext#runIsolated}): drain the body's sub-tree before
      * deciding to re-iterate.
      */
     void drainExecQueue() {
@@ -202,7 +212,25 @@ public final class GraphExecutor {
     }
 
     private void executeNode(NodeModel n) {
-        if (!(n instanceof com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel cnm)) return;
+        // Subgraph node on the exec path: enter the inner graph's exec flow.
+        if (n instanceof SubgraphNodeModel sub) {
+            executeSubgraph(sub);
+            return;
+        }
+        // A variable node reached by exec flow: only an EXECUTION_FLOW WRITE ("set"/exit form) is
+        // meaningful — it marks a subgraph exit. Record it for the entering parent; never propagate
+        // (variable nodes have no execute() of their own).
+        IVariableNode vn = asVariableNode(n);
+        if (vn != null) {
+            IVariable var = vn.getVariable();
+            // An exec "exit": a variable set-node with an EXECUTION_FLOW input port that flow reached.
+            // (IVariable#getDataType is a java Type, not a TypeHandle — test the port handle instead.)
+            if (var != null && hasExecPort(n.getInputsById().values())) {
+                reachedExecOutputs.add(var.getName());
+            }
+            return;
+        }
+        if (!(n instanceof ICustomNodeModel cnm)) return;
         if (!(cnm.getNode() instanceof AnnotatedNode an)) return;
         var ctx = new ExecContext(this, n);
         an.execute(ctx);
@@ -210,6 +238,117 @@ public final class GraphExecutor {
         for (PortModel out : n.getOutputsByDisplayOrder()) {
             Object v = ctx.outputs.get(out.getPortId());
             if (v != null) cache.put(out, v);
+        }
+    }
+
+    private static IVariableNode asVariableNode(NodeModel n) {
+        if (n instanceof IVariableNode direct) return direct;
+        if (n instanceof ICustomNodeModel cnm && cnm.getNode() instanceof IVariableNode wrapped) return wrapped;
+        return null;
+    }
+
+    /** Names of exec exits this executor's flow reached (for the entering parent to read). */
+    public Set<String> reachedExecOutputs() {
+        return reachedExecOutputs;
+    }
+
+    private static boolean isExecVar(VariableDeclarationModelBase v) {
+        return v != null && TypeHandles.EXECUTION_FLOW.equals(v.getDataTypeHandle());
+    }
+
+    /**
+     * Exec-flow entry into a {@link SubgraphNodeModel}. Mirrors {@link #evaluateSubgraph} (the pull
+     * path) but drives the inner graph's <em>execution</em>:
+     * <ol>
+     *   <li>Seed a child {@link VariableStore} from the inner READ <em>data</em> variables (pull the
+     *       outer input pins). Exec-typed variables are skipped here.</li>
+     *   <li>Enter the inner exec: find the inner {@code EXECUTION_FLOW} READ variable's get-node and
+     *       run a child executor from whatever its exec output wires into, draining to completion.</li>
+     *   <li>Harvest the inner WRITE <em>data</em> variables into this node's outer output cache so
+     *       downstream data pulls see them.</li>
+     *   <li>Fire the outer exec-out pins for the exits the inner run actually reached (tracked via
+     *       {@link #reachedExecOutputs}). If the inner graph is unresolvable, fire all exec-out pins
+     *       so a broken subgraph doesn't silently dead-end the outer flow.</li>
+     * </ol>
+     */
+    private void executeSubgraph(SubgraphNodeModel sub) {
+        if (!(sub.getSubgraphModel() instanceof CustomGraphModelImpl inner)
+                || inner == graph.graphModel || inner.getGraph() == null) {
+            fireAllExecOutPins(sub);
+            return;
+        }
+
+        // 1) seed READ data vars from outer inputs
+        VariableStore childStore = new VariableStore();
+        for (var v : inner.getGraphVariableModels()) {
+            if (v == null || isExecVar(v)) continue;
+            var mods = v.getModifiers();
+            if (mods == null || !mods.hasFlag(ModifierFlags.READ)) continue;
+            PortModel outerInput = lookupSubgraphPort(sub, v, true, mods);
+            if (outerInput == null) continue;
+            childStore.put(v.getName(), pullInput(outerInput, Object.class));
+        }
+
+        var childEnv = new EvaluationEnvironment(childStore, env.seed());
+        var childExec = new GraphExecutor(inner.getGraph(), childEnv);
+
+        // 2) enter inner exec via the EXECUTION_FLOW READ variable's get-node downstream
+        NodeModel entryGetNode = findExecEntryNode(inner);
+        if (entryGetNode != null) {
+            for (PortModel out : entryGetNode.getOutputsByDisplayOrder()) {
+                for (PortModel connected : out.getConnectedPorts()) {
+                    if (connected.getNodeModel() instanceof NodeModel target) {
+                        childExec.executeFrom(target);
+                    }
+                }
+            }
+        }
+
+        // 3) harvest WRITE data vars into the outer output cache (skips exec vars)
+        Map<String, Object> innerResults = childExec.runOutputs();
+        for (var v : inner.getGraphVariableModels()) {
+            if (v == null || isExecVar(v)) continue;
+            var mods = v.getModifiers();
+            if (mods == null || !mods.hasFlag(ModifierFlags.WRITE)) continue;
+            PortModel outerOutput = lookupSubgraphPort(sub, v, false, mods);
+            if (outerOutput == null) continue;
+            cache.put(outerOutput, innerResults.get(v.getName()));
+        }
+
+        // 4) fire only the exec-out pins whose exit the inner run reached
+        Set<String> reached = childExec.reachedExecOutputs();
+        for (var v : inner.getGraphVariableModels()) {
+            if (v == null || !isExecVar(v)) continue;
+            var mods = v.getModifiers();
+            if (mods == null || !mods.hasFlag(ModifierFlags.WRITE)) continue;
+            if (!reached.contains(v.getName())) continue;
+            PortModel outerOut = lookupSubgraphPort(sub, v, false, mods);
+            if (outerOut != null) enqueueFlow(outerOut);
+        }
+    }
+
+    /** Find the inner {@code EXECUTION_FLOW} READ variable's get-node (its exec output is the entry). */
+    private NodeModel findExecEntryNode(CustomGraphModelImpl gm) {
+        for (var nm : gm.getNodeModels()) {
+            if (!(nm instanceof NodeModel n)) continue;
+            if (asVariableNode(n) == null) continue;
+            // READ ("get") form of an exec var exposes an EXECUTION_FLOW output port — the entry.
+            if (hasExecPort(n.getOutputsById().values())) return n;
+        }
+        return null;
+    }
+
+    private static boolean hasExecPort(java.util.Collection<PortModel> ports) {
+        for (PortModel p : ports) {
+            if (TypeHandles.EXECUTION_FLOW.equals(p.getDataTypeHandle())) return true;
+        }
+        return false;
+    }
+
+    /** Enqueue every exec output pin of {@code sub} (leniency for unresolved/self-ref subgraphs). */
+    private void fireAllExecOutPins(SubgraphNodeModel sub) {
+        for (PortModel out : sub.getOutputsByDisplayOrder()) {
+            if (TypeHandles.EXECUTION_FLOW.equals(out.getDataTypeHandle())) enqueueFlow(out);
         }
     }
 
@@ -350,7 +489,7 @@ public final class GraphExecutor {
 
         VariableStore childStore = new VariableStore();
         for (var v : inner.getGraphVariableModels()) {
-            if (v == null) continue;
+            if (v == null || isExecVar(v)) continue;
             var mods = v.getModifiers();
             if (mods == null || !mods.hasFlag(ModifierFlags.READ)) continue;
             PortModel outerInput = lookupSubgraphPort(sub, v, true, mods);
@@ -369,7 +508,7 @@ public final class GraphExecutor {
         Map<String, Object> innerResults = childExec.runOutputs();
 
         for (var v : inner.getGraphVariableModels()) {
-            if (v == null) continue;
+            if (v == null || isExecVar(v)) continue;
             var mods = v.getModifiers();
             if (mods == null || !mods.hasFlag(ModifierFlags.WRITE)) continue;
             PortModel outerOutput = lookupSubgraphPort(sub, v, false, mods);

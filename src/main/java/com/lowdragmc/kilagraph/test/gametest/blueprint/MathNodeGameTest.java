@@ -3,7 +3,11 @@ package com.lowdragmc.kilagraph.test.gametest.blueprint;
 import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AbsNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.AngleConvertNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.Atan2Node;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.ClampNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.FractNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.LogBaseNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.DivideNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.ExpNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.LerpNode;
@@ -59,6 +63,10 @@ public final class MathNodeGameTest {
     private static final String REMAP = "math_remap";
     private static final String RANDOM_DETERMINISTIC = "math_random_seeded";
     private static final String RANDOM_INT = "math_random_int_seeded";
+    private static final String FRACT = "math_fract";
+    private static final String ATAN2 = "math_atan2";
+    private static final String LOG_BASE = "math_log_base";
+    private static final String ANGLE_CONVERT = "math_angle_convert";
 
     private MathNodeGameTest() {}
 
@@ -83,6 +91,10 @@ public final class MathNodeGameTest {
         KGGameTests.registerFunction(REMAP, MathNodeGameTest::remap);
         KGGameTests.registerFunction(RANDOM_DETERMINISTIC, MathNodeGameTest::randomDeterministic);
         KGGameTests.registerFunction(RANDOM_INT, MathNodeGameTest::randomIntSeeded);
+        KGGameTests.registerFunction(FRACT, MathNodeGameTest::fract);
+        KGGameTests.registerFunction(ATAN2, MathNodeGameTest::atan2);
+        KGGameTests.registerFunction(LOG_BASE, MathNodeGameTest::logBase);
+        KGGameTests.registerFunction(ANGLE_CONVERT, MathNodeGameTest::angleConvert);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -107,6 +119,10 @@ public final class MathNodeGameTest {
         KGGameTests.registerFunctionTest(event, REMAP, KGGameTests.functionKey(REMAP), d);
         KGGameTests.registerFunctionTest(event, RANDOM_DETERMINISTIC, KGGameTests.functionKey(RANDOM_DETERMINISTIC), d);
         KGGameTests.registerFunctionTest(event, RANDOM_INT, KGGameTests.functionKey(RANDOM_INT), d);
+        KGGameTests.registerFunctionTest(event, FRACT, KGGameTests.functionKey(FRACT), d);
+        KGGameTests.registerFunctionTest(event, ATAN2, KGGameTests.functionKey(ATAN2), d);
+        KGGameTests.registerFunctionTest(event, LOG_BASE, KGGameTests.functionKey(LOG_BASE), d);
+        KGGameTests.registerFunctionTest(event, ANGLE_CONVERT, KGGameTests.functionKey(ANGLE_CONVERT), d);
     }
 
     /** Run a simple float-out node with provided input constants; assert the output. */
@@ -323,6 +339,47 @@ public final class MathNodeGameTest {
         Float v2 = new GraphExecutor(g2, env2).evaluate(n2.getOutputsById().get("out"), Float.class);
 
         assertEq(helper, "seeded random is deterministic", v1, v2);
+        helper.succeed();
+    }
+
+    public static void fract(GameTestHelper helper) {
+        assertEq(helper, "fract(3.25)", 0.25f, runFloat(FractNode.class, java.util.Map.entry("in", 3.25f)), 1e-5f);
+        assertEq(helper, "fract(-0.25)", 0.75f, runFloat(FractNode.class, java.util.Map.entry("in", -0.25f)), 1e-5f);
+        helper.succeed();
+    }
+
+    public static void atan2(GameTestHelper helper) {
+        assertEq(helper, "atan2(1,1)", (float) (Math.PI / 4),
+                runFloat(Atan2Node.class, java.util.Map.entry("y", 1f), java.util.Map.entry("x", 1f)), 1e-5f);
+        assertEq(helper, "atan2(0,1)", 0f,
+                runFloat(Atan2Node.class, java.util.Map.entry("y", 0f), java.util.Map.entry("x", 1f)), 1e-5f);
+        helper.succeed();
+    }
+
+    public static void logBase(GameTestHelper helper) {
+        assertEq(helper, "log_2(8)", 3f,
+                runFloat(LogBaseNode.class, java.util.Map.entry("value", 8f), java.util.Map.entry("base", 2f)), 1e-4f);
+        assertEq(helper, "log_10(1000)", 3f,
+                runFloat(LogBaseNode.class, java.util.Map.entry("value", 1000f), java.util.Map.entry("base", 10f)), 1e-4f);
+        assertEq(helper, "log_base(value<=0) = 0", 0f,
+                runFloat(LogBaseNode.class, java.util.Map.entry("value", 0f), java.util.Map.entry("base", 2f)), 0f);
+        helper.succeed();
+    }
+
+    public static void angleConvert(GameTestHelper helper) {
+        var g = newGraph();
+        var n = addNode(g, AngleConvertNode.class);
+        setOption(n, "op", AngleConvertNode.Op.DEG_TO_RAD);
+        setInputConstant(n, "in", 180f);
+        assertEq(helper, "deg2rad(180)", (float) Math.PI,
+                new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Float.class), 1e-5f);
+
+        var g2 = newGraph();
+        var n2 = addNode(g2, AngleConvertNode.class);
+        setOption(n2, "op", AngleConvertNode.Op.RAD_TO_DEG);
+        setInputConstant(n2, "in", (float) Math.PI);
+        assertEq(helper, "rad2deg(PI)", 180f,
+                new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), Float.class), 1e-3f);
         helper.succeed();
     }
 

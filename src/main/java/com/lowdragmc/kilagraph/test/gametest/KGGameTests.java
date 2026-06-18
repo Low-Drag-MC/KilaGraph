@@ -1,15 +1,18 @@
 package com.lowdragmc.kilagraph.test.gametest;
 
 import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.BitwiseNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.CacheGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ComparisonNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ConvertNodeGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.EntityNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecCombinationsGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecIntegrationGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecLoopsGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecPrimitivesGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecRuntimeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecSemanticsGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecVarInteractionGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.InfoNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ListNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.LogicNodeGameTest;
@@ -17,9 +20,11 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.MapNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.MathNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McDataGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McWorldQueryGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.NbtNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.OptionalNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.SetVarGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.StringNodeGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.SubgraphExecGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.SubgraphGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.VariableGameTest;
 import com.lowdragmc.kilagraph.test.gametest.rendertypegraph.RenderTypeGraphGameTest;
@@ -94,6 +99,11 @@ public final class KGGameTests {
         McDataGameTest.registerFunctions();
         InfoNodeGameTest.registerFunctions();
         McWorldQueryGameTest.registerFunctions();
+        BitwiseNodeGameTest.registerFunctions();
+        NbtNodeGameTest.registerFunctions();
+        EntityNodeGameTest.registerFunctions();
+        ExecVarInteractionGameTest.registerFunctions();
+        SubgraphExecGameTest.registerFunctions();
     }
 
     private static void registerRenderTypeGraphFunctions() {
@@ -172,6 +182,11 @@ public final class KGGameTests {
         McDataGameTest.register(event, environment);
         InfoNodeGameTest.register(event, environment);
         McWorldQueryGameTest.register(event, environment);
+        BitwiseNodeGameTest.register(event, environment);
+        NbtNodeGameTest.register(event, environment);
+        EntityNodeGameTest.register(event, environment);
+        ExecVarInteractionGameTest.register(event, environment);
+        SubgraphExecGameTest.register(event, environment);
     }
 
     private static void registerRenderTypeGraphTests(

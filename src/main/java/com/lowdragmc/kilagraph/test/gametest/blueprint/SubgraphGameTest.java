@@ -34,6 +34,7 @@ public final class SubgraphGameTest {
     private static final String DATA_PASSES_THROUGH_LOCAL_SUBGRAPH = "subgraph_data_passes_through_local";
     private static final String UNRESOLVED_EXTERNAL_RETURNS_NULL = "subgraph_unresolved_external_returns_null";
     private static final String CONSTANT_INPUT_FEEDS_SUBGRAPH = "subgraph_constant_input_feeds_subgraph";
+    private static final String NESTED_SUBGRAPH = "subgraph_nested";
 
     private SubgraphGameTest() {}
 
@@ -41,6 +42,7 @@ public final class SubgraphGameTest {
         KGGameTests.registerFunction(DATA_PASSES_THROUGH_LOCAL_SUBGRAPH, SubgraphGameTest::dataPassesThroughLocalSubgraph);
         KGGameTests.registerFunction(UNRESOLVED_EXTERNAL_RETURNS_NULL, SubgraphGameTest::unresolvedExternalReturnsNull);
         KGGameTests.registerFunction(CONSTANT_INPUT_FEEDS_SUBGRAPH, SubgraphGameTest::constantInputFeedsSubgraph);
+        KGGameTests.registerFunction(NESTED_SUBGRAPH, SubgraphGameTest::nestedSubgraph);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -48,6 +50,7 @@ public final class SubgraphGameTest {
         KGGameTests.registerFunctionTest(event, DATA_PASSES_THROUGH_LOCAL_SUBGRAPH, KGGameTests.functionKey(DATA_PASSES_THROUGH_LOCAL_SUBGRAPH), data);
         KGGameTests.registerFunctionTest(event, UNRESOLVED_EXTERNAL_RETURNS_NULL, KGGameTests.functionKey(UNRESOLVED_EXTERNAL_RETURNS_NULL), data);
         KGGameTests.registerFunctionTest(event, CONSTANT_INPUT_FEEDS_SUBGRAPH, KGGameTests.functionKey(CONSTANT_INPUT_FEEDS_SUBGRAPH), data);
+        KGGameTests.registerFunctionTest(event, NESTED_SUBGRAPH, KGGameTests.functionKey(NESTED_SUBGRAPH), data);
     }
 
     // --- 1. Outer feeds vIn → inner Add(+10) → vOut → outer reads ----------------------------------
@@ -179,6 +182,64 @@ public final class SubgraphGameTest {
         Object result = executor.evaluate(vOutPort, Object.class);
         if (!(result instanceof Number n) || Math.abs(n.floatValue() - 99.0f) > 1e-5f) {
             helper.fail("expected 99, got " + result);
+            return;
+        }
+        helper.succeed();
+    }
+
+    // --- 4. Subgraph inside a subgraph: outer(5) → inner1 → inner2(+10) → 15 -----------------------
+    public static void nestedSubgraph(GameTestHelper helper) {
+        var outer = newGraph();
+
+        // inner2: vIn2 + 10 → vOut2
+        var inner1 = outer.graphModel.createLocalSubgraphInstance();
+        if (inner1 == null) { helper.fail("createLocalSubgraphInstance(inner1) returned null"); return; }
+        outer.graphModel.addLocalSubgraph(inner1);
+        var inner2 = inner1.createLocalSubgraphInstance();
+        if (inner2 == null) { helper.fail("createLocalSubgraphInstance(inner2) returned null"); return; }
+        inner1.addLocalSubgraph(inner2);
+
+        var vIn2 = (VariableDeclarationModelBase) inner2.createVariable("vIn2", int.class, 0, VariableKind.INPUT);
+        var vOut2 = (VariableDeclarationModelBase) inner2.createVariable("vOut2", int.class, 0, VariableKind.OUTPUT);
+        var vIn2Node = inner2.createVariableNode(vIn2, new Vector2f(0, 0), null, null);
+        var vOut2Node = inner2.createVariableNode(vOut2, new Vector2f(400, 0), null, null);
+        if (!(inner2.getGraph() instanceof com.lowdragmc.kilagraph.blueprint.BlueprintGraph bg2)) {
+            helper.fail("inner2 graph is not a BlueprintGraph"); return;
+        }
+        var add2 = addNode(bg2, AddNode.class);
+        inner2.createWire(add2.getInputsById().get("in1"), vIn2Node.getOutputPort());
+        var add2In2 = add2.getInputConstantsById().get("in2");
+        if (add2In2 == null) { helper.fail("inner2 add in2 constant missing"); return; }
+        add2In2.setValue(10.0f);
+        inner2.createWire(vOut2Node.getInputPort(), add2.getOutputsById().get("out"));
+
+        // inner1: vIn1 → sub2(inner2).vIn2 ; sub2.vOut2 → vOut1
+        var vIn1 = (VariableDeclarationModelBase) inner1.createVariable("vIn1", int.class, 0, VariableKind.INPUT);
+        var vOut1 = (VariableDeclarationModelBase) inner1.createVariable("vOut1", int.class, 0, VariableKind.OUTPUT);
+        var vIn1Node = inner1.createVariableNode(vIn1, new Vector2f(0, 0), null, null);
+        var vOut1Node = inner1.createVariableNode(vOut1, new Vector2f(400, 0), null, null);
+        var sub2 = inner1.createNodeWithType(SubgraphNodeModel.class, "sub2",
+                new Vector2f(200, 0), null, n -> n.setLocalSubgraph(inner2), SpawnFlags.DEFAULT);
+        sub2.defineNode();
+        var sub2In = sub2.getInputsById().get(vIn2.getUid().toString());
+        var sub2Out = sub2.getOutputsById().get(vOut2.getUid().toString());
+        if (sub2In == null || sub2Out == null) { helper.fail("sub2 mirrored ports missing"); return; }
+        inner1.createWire(sub2In, vIn1Node.getOutputPort());
+        inner1.createWire(vOut1Node.getInputPort(), sub2Out);
+
+        // outer: sub1(inner1) fed 5, read vOut1
+        var sub1 = outer.graphModel.createNodeWithType(SubgraphNodeModel.class, "sub1",
+                new Vector2f(0, 0), null, n -> n.setLocalSubgraph(inner1), SpawnFlags.DEFAULT);
+        sub1.defineNode();
+        var sub1InConst = sub1.getInputConstantsById().get(vIn1.getUid().toString());
+        if (sub1InConst == null) { helper.fail("sub1 vIn1 input constant missing"); return; }
+        sub1InConst.setValue(5);
+        var sub1Out = sub1.getOutputsById().get(vOut1.getUid().toString());
+        if (sub1Out == null) { helper.fail("sub1 vOut1 mirrored port missing"); return; }
+
+        Object result = new GraphExecutor(outer).evaluate(sub1Out, Object.class);
+        if (!(result instanceof Number n) || Math.abs(n.floatValue() - 15.0f) > 1e-5f) {
+            helper.fail("expected 15 through nested subgraph, got " + result);
             return;
         }
         helper.succeed();

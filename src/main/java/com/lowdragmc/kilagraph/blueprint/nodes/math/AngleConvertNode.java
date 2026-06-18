@@ -1,0 +1,35 @@
+package com.lowdragmc.kilagraph.blueprint.nodes.math;
+
+import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.graph.core.InputPort;
+import com.lowdragmc.kilagraph.graph.core.Option;
+import com.lowdragmc.kilagraph.graph.core.OutputPort;
+import com.lowdragmc.kilagraph.graph.exec.EvalContext;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import net.minecraft.network.chat.Component;
+
+/**
+ * Convert between degrees and radians. Enum {@link Op} → {@code EnumAccessor} dropdown.
+ */
+@NodeAttribute(name = "math_angle_convert", group = "math", graphTypes = BlueprintGraph.class)
+public class AngleConvertNode extends AnnotatedNode {
+
+    public enum Op { DEG_TO_RAD, RAD_TO_DEG }
+
+    @Option public Op op = Op.DEG_TO_RAD;
+    @InputPort public float in = 0f;
+    @OutputPort public float out;
+
+    @Override public Component getDisplayName() { return Component.literal("Angle Convert"); }
+
+    @Override public void evaluate(EvalContext ctx) {
+        float v = ctx.getInput("in", Float.class, 0f);
+        Op o = ctx.getOption("op", Op.class, Op.DEG_TO_RAD);
+        float r = switch (o) {
+            case RAD_TO_DEG -> (float) Math.toDegrees(v);
+            default -> (float) Math.toRadians(v);
+        };
+        ctx.setOutput("out", r);
+    }
+}

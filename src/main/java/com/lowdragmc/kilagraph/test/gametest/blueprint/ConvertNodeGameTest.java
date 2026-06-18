@@ -5,9 +5,12 @@ import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.NumberFormatNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ParseBoolNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ParseNumberNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.convert.ToFloatNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.convert.ToIntNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ToStringNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListGetNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import net.minecraft.core.Holder;
@@ -28,6 +31,8 @@ public final class ConvertNodeGameTest {
     private static final String PARSE_NUMBER = "convert_parse_number";
     private static final String PARSE_BOOL = "convert_parse_bool";
     private static final String NUMBER_FORMAT = "convert_number_format";
+    private static final String TO_INT = "convert_to_int";
+    private static final String TO_FLOAT = "convert_to_float";
 
     private ConvertNodeGameTest() {}
 
@@ -36,6 +41,8 @@ public final class ConvertNodeGameTest {
         KGGameTests.registerFunction(PARSE_NUMBER, ConvertNodeGameTest::parseNumber);
         KGGameTests.registerFunction(PARSE_BOOL, ConvertNodeGameTest::parseBool);
         KGGameTests.registerFunction(NUMBER_FORMAT, ConvertNodeGameTest::numberFormat);
+        KGGameTests.registerFunction(TO_INT, ConvertNodeGameTest::toInt);
+        KGGameTests.registerFunction(TO_FLOAT, ConvertNodeGameTest::toFloat);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -44,6 +51,31 @@ public final class ConvertNodeGameTest {
         KGGameTests.registerFunctionTest(event, PARSE_NUMBER, KGGameTests.functionKey(PARSE_NUMBER), data);
         KGGameTests.registerFunctionTest(event, PARSE_BOOL, KGGameTests.functionKey(PARSE_BOOL), data);
         KGGameTests.registerFunctionTest(event, NUMBER_FORMAT, KGGameTests.functionKey(NUMBER_FORMAT), data);
+        KGGameTests.registerFunctionTest(event, TO_INT, KGGameTests.functionKey(TO_INT), data);
+        KGGameTests.registerFunctionTest(event, TO_FLOAT, KGGameTests.functionKey(TO_FLOAT), data);
+    }
+
+    /** A wired Float source (AddNode out) to feed UNKNOWN inputs that have no embedded constant. */
+    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel floatSource(
+            com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, float value) {
+        var add = addNode(g, AddNode.class);
+        setInputConstant(add, "in1", value);
+        setInputConstant(add, "in2", 0f);
+        return add.getOutputsById().get("out");
+    }
+
+    /** A wired Integer source (ListCombine(INT)+ListGet(INT)) to feed UNKNOWN inputs. */
+    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel intSource(
+            com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, int value) {
+        var combine = addNode(g, ListCombineNode.class);
+        setOption(combine, "type", TypeHandles.INT.getIdentification());
+        setOption(combine, "inputs", 1);
+        setInputConstant(combine, "in1", value);
+        var get = addNode(g, ListGetNode.class);
+        setOption(get, "type", TypeHandles.INT.getIdentification());
+        setInputConstant(get, "index", 0);
+        wire(g, get.getInputsById().get("list"), combine.getOutputsById().get("out"));
+        return get.getOutputsById().get("value");
     }
 
     /** Helper: feed a String value into an UNKNOWN port via a ListCombine(STRING)+ListGet(STRING). */
@@ -107,6 +139,29 @@ public final class ConvertNodeGameTest {
             assertEq(helper, "'" + s + "' → false", Boolean.FALSE,
                     new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Boolean.class));
         }
+        helper.succeed();
+    }
+
+    public static void toInt(GameTestHelper helper) {
+        for (var c : new Object[][]{{ToIntNode.Op.TRUNC, 3.9f, 3}, {ToIntNode.Op.TRUNC, -3.9f, -3},
+                                     {ToIntNode.Op.FLOOR, 3.9f, 3}, {ToIntNode.Op.CEIL, 3.1f, 4},
+                                     {ToIntNode.Op.ROUND, 3.6f, 4}}) {
+            var g = newGraph();
+            var n = addNode(g, ToIntNode.class);
+            setOption(n, "op", c[0]);
+            wire(g, n.getInputsById().get("in"), floatSource(g, (float) c[1]));
+            Integer v = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Integer.class);
+            assertEq(helper, c[0] + "(" + c[1] + ")", (int) (Integer) c[2], (int) v);
+        }
+        helper.succeed();
+    }
+
+    public static void toFloat(GameTestHelper helper) {
+        var g = newGraph();
+        var n = addNode(g, ToFloatNode.class);
+        wire(g, n.getInputsById().get("in"), intSource(g, 7));
+        Float v = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Float.class);
+        assertEq(helper, "int 7 → float 7.0", 7.0f, v, 1e-5f);
         helper.succeed();
     }
 

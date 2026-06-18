@@ -7,6 +7,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImp
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * KilaGraph's {@link CustomGraphModelImpl} subclass. Relaxes {@code canAssignTo} so that:
@@ -27,6 +29,19 @@ public class KGGraphModel extends CustomGraphModelImpl {
 
     public KGGraphModel(Graph graph) {
         super(graph);
+    }
+
+    /**
+     * Offer {@code EXECUTION_FLOW} in the blackboard variable-type picker (on top of the data types
+     * from {@link Graph#getSupportTypes()}), so a subgraph can declare exec in/out variables — an
+     * INPUT exec var becomes the subgraph node's exec-in pin, an OUTPUT one an exec-out pin. It is
+     * deliberately <em>not</em> added to the data-type pickers (you don't cast to/collect exec-flow).
+     */
+    @Override
+    public List<TypeHandle> getVariableSupportTypes() {
+        List<TypeHandle> types = new ArrayList<>(super.getVariableSupportTypes());
+        if (!types.contains(TypeHandles.EXECUTION_FLOW)) types.add(TypeHandles.EXECUTION_FLOW);
+        return types;
     }
 
     @Override

@@ -14,7 +14,7 @@ import net.minecraft.network.chat.Component;
  *
  * <p>The framework reflects each field, registers the matching LDLib2 port/option, forwards
  * field + owner via {@code withFieldContext(...)} so LDLib2's {@code @Configurable} ecosystem
- * picks up UI metadata, and forwards any {@link CustomConfigurable} via {@code withConfigurable}.</p>
+ * picks up UI metadata, and forwards any Custom Configurable via {@code withConfigurable}.</p>
  *
  * <p>Node instances are pure definitions: they carry no per-evaluation state. All runtime state
  * lives in {@link EvalContext}, which makes the same node safely usable by multiple executors
