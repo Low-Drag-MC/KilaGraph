@@ -6,7 +6,6 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,10 +15,7 @@ public class ListRemoveAtNode extends AnnotatedNode {
     @InputPort public List<?> list = List.of();
     @InputPort public int index = 0;
     @OutputPort public List<?> out;
-
-    @Override public Component getDisplayName() { return Component.literal("List Remove At"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         List<?> src = ctx.getInput("list", List.class, List.of());
         int i = ctx.getInput("index", Integer.class, 0);
         List<Object> result = new ArrayList<>(src);

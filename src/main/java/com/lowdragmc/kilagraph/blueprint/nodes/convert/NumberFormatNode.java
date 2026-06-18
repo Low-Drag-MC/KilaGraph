@@ -7,7 +7,6 @@ import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 import java.text.DecimalFormat;
 
@@ -21,10 +20,7 @@ public class NumberFormatNode extends AnnotatedNode {
     @Option public String pattern = "#.##";
     @InputPort public float in = 0f;
     @OutputPort public String out;
-
-    @Override public Component getDisplayName() { return Component.literal("Number Format"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         float v = ctx.getInput("in", Float.class, 0f);
         String p = ctx.getOption("pattern", String.class, "#.##");
         try {

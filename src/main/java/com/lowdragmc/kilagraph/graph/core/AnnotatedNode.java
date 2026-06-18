@@ -3,6 +3,7 @@ package com.lowdragmc.kilagraph.graph.core;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 import net.minecraft.network.chat.Component;
@@ -52,7 +53,8 @@ public abstract class AnnotatedNode extends Node implements IGraphEvaluable {
 
     @Override
     public Component getDisplayName() {
-        return Component.literal(getClass().getSimpleName());
+        var attribute = getClass().getAnnotation(NodeAttribute.class);
+        return attribute == null ? Component.literal(getClass().getSimpleName()) : Component.translatable(attribute.name());
     }
 
     /**

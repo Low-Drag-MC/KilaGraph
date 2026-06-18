@@ -11,7 +11,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.GraphModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,10 +19,7 @@ import java.util.Map;
 @NodeAttribute(name = "map_keys", group = "map", graphTypes = BlueprintGraph.class)
 public class MapKeysNode extends AnnotatedNode {
     @InputPort public Map<?, ?> map = Map.of();
-
-    @Override public Component getDisplayName() { return Component.literal("Map Keys"); }
-
-    @Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("keyType", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))

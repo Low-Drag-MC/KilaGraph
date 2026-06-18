@@ -12,7 +12,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.GraphModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,10 +21,7 @@ public class ListInsertNode extends AnnotatedNode {
     @InputPort public List<?> list = List.of();
     @InputPort public int index = 0;
     @OutputPort public List<?> out;
-
-    @Override public Component getDisplayName() { return Component.literal("List Insert"); }
-
-    @Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))

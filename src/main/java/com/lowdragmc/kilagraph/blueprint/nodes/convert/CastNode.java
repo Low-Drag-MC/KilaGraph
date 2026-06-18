@@ -11,7 +11,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.GraphModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
@@ -26,13 +25,7 @@ import java.util.List;
  */
 @NodeAttribute(name = "convert_cast", group = "convert", graphTypes = BlueprintGraph.class)
 public class CastNode extends AnnotatedNode {
-
-    @Override
-    public Component getDisplayName() {
-        return Component.literal("Cast");
-    }
-
-    @Override
+@Override
     protected void onDefineExtraOptions(IOptionDefinitionContext context) {
         context.addOption("targetType", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())

@@ -10,7 +10,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.GraphModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
@@ -20,10 +19,7 @@ import java.util.List;
  */
 @NodeAttribute(name = "optional_default", group = "optional", graphTypes = BlueprintGraph.class)
 public class DefaultNode extends AnnotatedNode {
-
-    @Override public Component getDisplayName() { return Component.literal("Default"); }
-
-    @Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))

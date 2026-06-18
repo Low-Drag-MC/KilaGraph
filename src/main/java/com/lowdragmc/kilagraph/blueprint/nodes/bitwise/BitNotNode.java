@@ -6,16 +6,12 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 @NodeAttribute(name = "bitwise_not", group = "bitwise", graphTypes = BlueprintGraph.class)
 public class BitNotNode extends AnnotatedNode {
     @InputPort public int in = 0;
     @OutputPort public int out;
-
-    @Override public Component getDisplayName() { return Component.literal("Bitwise Not"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         ctx.setOutput("out", ~ctx.getInput("in", Integer.class, 0));
     }
 }

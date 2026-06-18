@@ -17,10 +17,7 @@ import org.joml.Vector2fc;
 import org.joml.Vector3fc;
 import org.joml.Vector4fc;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A compiled, ready-to-render material: a Minecraft {@link RenderType} (sharing a cached pipeline)
@@ -60,6 +57,10 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     private final Map<String, SamplerDefault> textures;
     /** Sampler uniform name -> resolved view+sampler, refreshed in {@link #prepareUniforms} (pre-pass). */
     private final Map<String, ResolvedSampler> resolvedTextures = new HashMap<>();
+    /** Sampler uniform name -> externally-supplied raw view+sampler (e.g. another mod's live {@code GpuTexture}),
+     *  bound in preference to the Identifier/TextureManager binding. Lets a host feed a texture that has no
+     *  registered {@link Identifier} (like SlideShow's decoded slide) straight into a graph sampler. */
+    private final Map<String, ResolvedSampler> externalViews = new HashMap<>();
     /** Whether the graph samples the captured scene colour/depth — bound from {@link SceneCaptureManager}. */
     private final boolean usesSceneColor;
     private final boolean usesSceneDepth;
@@ -175,6 +176,31 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         return true;
     }
 
+    /**
+     * Bind a raw {@link GpuTextureView} (not a registered {@link Identifier}) to a sampler dynamically,
+     * taking precedence over {@link #setTexture}'s TextureManager binding. {@code name} may be a Sampler2D
+     * variable's display name or the raw sampler uniform name. Pass a {@code null} view/sampler to clear the
+     * override (falling back to the Identifier binding). Returns false if this material doesn't manage that
+     * sampler (e.g. overlay/lightmap/scene, not in the dynamic texture map). Takes effect on the next draw.
+     */
+    public boolean setTextureView(String name, @Nullable GpuTextureView view, @Nullable GpuSampler sampler) {
+        String s = variableSamplers.getOrDefault(name, name);
+        if (!textures.containsKey(s)) return false;
+        if (view == null || sampler == null) {
+            externalViews.remove(s);
+        } else {
+            externalViews.put(s, new ResolvedSampler(view, sampler));
+        }
+        return true;
+    }
+
+    /** The custom sampler uniform names this material manages (excludes overlay/lightmap/scene, which are
+     *  bound elsewhere). Lets a host rebind every custom sampler — e.g. feed one external texture into all
+     *  of a graph's samplers — without knowing their generated names. */
+    public Set<String> managedSamplerNames() {
+        return Collections.unmodifiableSet(textures.keySet());
+    }
+
     // ---- draw-time binding -------------------------------------------------------------------
 
     /**
@@ -213,7 +239,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         // without rebuilding the RenderType. bindTexture is a pure pass command (no GPU upload), and the
         // GL backend dedups the actual glBindTexture, so a no-op rebind is cheap.
         for (Map.Entry<String, ResolvedSampler> e : resolvedTextures.entrySet()) {
-            ResolvedSampler r = e.getValue();
+            // An external raw view (e.g. SlideShow's live slide texture) wins over the Identifier binding.
+            ResolvedSampler r = externalViews.getOrDefault(e.getKey(), e.getValue());
             renderPass.bindTexture(e.getKey(), r.view(), r.sampler());
         }
         // Captured scene colour/depth: bound from the live SceneCaptureManager (not TextureManager). Before

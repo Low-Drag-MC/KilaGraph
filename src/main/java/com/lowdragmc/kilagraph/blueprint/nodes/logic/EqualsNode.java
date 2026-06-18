@@ -7,7 +7,6 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 import java.util.Objects;
 
@@ -20,13 +19,7 @@ public class EqualsNode extends AnnotatedNode {
     @Option public int inputs = 2;
 
     @OutputPort public boolean out;
-
-    @Override
-    public Component getDisplayName() {
-        return Component.literal("Equals");
-    }
-
-    @Override
+@Override
     protected void onDefineDynamicPorts(IPortDefinitionContext context) {
         int n = Math.max(2, optionValue("inputs", Integer.class, inputs));
         for (int i = 1; i <= n; i++) {

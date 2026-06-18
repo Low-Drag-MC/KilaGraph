@@ -7,7 +7,6 @@ import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,10 +22,7 @@ public class ListSortNode extends AnnotatedNode {
     @Option public boolean ascending = true;
     @InputPort public List<?> list = List.of();
     @OutputPort public List<?> out;
-
-    @Override public Component getDisplayName() { return Component.literal("List Sort"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         List<Object> result = new ArrayList<>(ctx.getInput("list", List.class, List.of()));
         boolean asc = ctx.getOption("ascending", Boolean.class, true);
         @SuppressWarnings({"unchecked", "rawtypes"})

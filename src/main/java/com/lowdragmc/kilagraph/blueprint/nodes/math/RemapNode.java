@@ -6,7 +6,6 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 /**
  * Linear remap of {@code in} from [fromMin, fromMax] → [toMin, toMax]. Degenerate range → toMin.
@@ -19,10 +18,7 @@ public class RemapNode extends AnnotatedNode {
     @InputPort public float toMin = 0f;
     @InputPort public float toMax = 1f;
     @OutputPort public float out;
-
-    @Override public Component getDisplayName() { return Component.literal("Remap"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         float v = ctx.getInput("in", Float.class, 0f);
         float fMin = ctx.getInput("fromMin", Float.class, 0f);
         float fMax = ctx.getInput("fromMax", Float.class, 1f);

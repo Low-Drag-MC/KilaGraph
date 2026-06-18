@@ -12,7 +12,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.GraphModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,10 +20,7 @@ import java.util.List;
 public class ListPrependNode extends AnnotatedNode {
     @InputPort public List<?> list = List.of();
     @OutputPort public List<?> out;
-
-    @Override public Component getDisplayName() { return Component.literal("List Prepend"); }
-
-    @Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))

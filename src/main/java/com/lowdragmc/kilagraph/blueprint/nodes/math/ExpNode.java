@@ -6,16 +6,12 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 @NodeAttribute(name = "math_exp", group = "math", graphTypes = BlueprintGraph.class)
 public class ExpNode extends AnnotatedNode {
     @InputPort public float in = 0f;
     @OutputPort public float out;
-
-    @Override public Component getDisplayName() { return Component.literal("Exp"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         ctx.setOutput("out", (float) Math.exp(ctx.getInput("in", Float.class, 0f)));
     }
 }

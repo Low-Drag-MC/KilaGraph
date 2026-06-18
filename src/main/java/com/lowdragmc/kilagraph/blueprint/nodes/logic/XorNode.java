@@ -7,7 +7,6 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 /**
  * Folded XOR: true iff an odd number of inputs are true.
@@ -17,10 +16,7 @@ public class XorNode extends AnnotatedNode {
 
     @Option public int inputs = 2;
     @OutputPort public boolean out;
-
-    @Override public Component getDisplayName() { return Component.literal("Xor"); }
-
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         int n = Math.max(1, optionValue("inputs", Integer.class, inputs));
         for (int i = 1; i <= n; i++) ctx.addInputPort("in" + i, Boolean.class);
     }

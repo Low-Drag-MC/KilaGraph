@@ -6,7 +6,6 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 import java.util.Arrays;
 import java.util.List;
@@ -20,10 +19,7 @@ public class SplitNode extends AnnotatedNode {
     @InputPort public String in = "";
     @InputPort public String delimiter = ",";
     @OutputPort public List<?> out;
-
-    @Override public Component getDisplayName() { return Component.literal("Split"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         String s = ctx.getInput("in", String.class, "");
         String d = ctx.getInput("delimiter", String.class, ",");
         if (d.isEmpty()) { ctx.setOutput("out", List.of(s)); return; }

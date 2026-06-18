@@ -7,7 +7,6 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 /**
  * Convert a numeric value to {@code float}. Input is {@code UNKNOWN} so any {@link Number} wire
@@ -17,10 +16,7 @@ import net.minecraft.network.chat.Component;
 public class ToFloatNode extends AnnotatedNode {
 
     @OutputPort public float out;
-
-    @Override public Component getDisplayName() { return Component.literal("To Float"); }
-
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("in", TypeHandles.UNKNOWN);
     }
 

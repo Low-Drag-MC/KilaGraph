@@ -6,7 +6,6 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 /** Logarithm of {@code value} in an arbitrary {@code base}: {@code log(value) / log(base)}. */
 @NodeAttribute(name = "math_log_base", group = "math", graphTypes = BlueprintGraph.class)
@@ -14,10 +13,7 @@ public class LogBaseNode extends AnnotatedNode {
     @InputPort public float value = 1f;
     @InputPort public float base = 10f;
     @OutputPort public float out;
-
-    @Override public Component getDisplayName() { return Component.literal("Log Base"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         float v = ctx.getInput("value", Float.class, 1f);
         float b = ctx.getInput("base", Float.class, 10f);
         if (v <= 0f || b <= 0f || b == 1f) { ctx.setOutput("out", 0f); return; }

@@ -8,7 +8,6 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,10 +20,7 @@ import java.util.Objects;
 public class ListRemoveNode extends AnnotatedNode {
     @InputPort public List<?> list = List.of();
     @OutputPort public List<?> out;
-
-    @Override public Component getDisplayName() { return Component.literal("List Remove"); }
-
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("value", TypeHandles.UNKNOWN);
     }
 

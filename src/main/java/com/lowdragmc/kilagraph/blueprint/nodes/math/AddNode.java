@@ -7,7 +7,6 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 /**
  * Sum of {@code inputs} float values: {@code in1 + in2 + ... + inN}. Default is 2 inputs.
@@ -18,13 +17,7 @@ public class AddNode extends AnnotatedNode {
     @Option public int inputs = 2;
 
     @OutputPort public float out;
-
-    @Override
-    public Component getDisplayName() {
-        return Component.literal("Add");
-    }
-
-    @Override
+@Override
     protected void onDefineDynamicPorts(IPortDefinitionContext context) {
         int n = Math.max(1, optionValue("inputs", Integer.class, inputs));
         for (int i = 1; i <= n; i++) {

@@ -57,10 +57,19 @@ public class RenderTypeGraphView extends GraphView {
         // The settings + preview tools are RenderType-specific. When diving into a ShaderFunctionGraph
         // (or any non-RenderType sub-graph) they have no meaning, so hide their panels.
         boolean isRenderType = graph instanceof RenderTypeGraph;
-        setPanelVisible(settingsPanel, isRenderType);
+        setPanelVisible(settingsPanel, isRenderType && shouldShowSettingsPanel(graph));
         setPanelVisible(previewPanel, isRenderType);
         if (isRenderType) settingsTool.refreshFromGraph();
         return this;
+    }
+
+    /**
+     * Whether the render-settings panel should be shown for {@code graph}. Subclasses whose render
+     * settings are forced/locked (e.g. a SlideShow-compat view that must match the slide pipeline) can
+     * override this to hide the panel entirely. Default: shown for any {@link RenderTypeGraph}.
+     */
+    protected boolean shouldShowSettingsPanel(@Nullable Graph graph) {
+        return true;
     }
 
     private static void setPanelVisible(GraphPanel panel, boolean visible) {

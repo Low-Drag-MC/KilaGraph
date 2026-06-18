@@ -12,7 +12,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.GraphModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
@@ -26,13 +25,7 @@ public class ListGetNode extends AnnotatedNode {
 
     @InputPort public List<?> list = List.of();
     @InputPort public int     index = 0;
-
-    @Override
-    public Component getDisplayName() {
-        return Component.literal("List Get");
-    }
-
-    @Override
+@Override
     protected void onDefineExtraOptions(IOptionDefinitionContext context) {
         context.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())

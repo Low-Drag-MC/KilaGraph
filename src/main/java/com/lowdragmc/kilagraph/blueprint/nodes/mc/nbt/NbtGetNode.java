@@ -8,7 +8,6 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 
 /**
  * Read a value out of a {@link CompoundTag} by key. The {@link NbtValueType} option both selects
@@ -20,10 +19,7 @@ public class NbtGetNode extends AnnotatedNode {
     @Option public NbtValueType valueType = NbtValueType.STRING;
     @InputPort public CompoundTag tag;
     @InputPort public String key = "";
-
-    @Override public Component getDisplayName() { return Component.literal("Nbt Get"); }
-
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addOutputPort("out", optionValue("valueType", NbtValueType.class, valueType).portType());
     }
 

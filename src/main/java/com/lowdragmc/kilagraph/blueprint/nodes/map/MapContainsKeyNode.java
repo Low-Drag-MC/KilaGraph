@@ -12,7 +12,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.GraphModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 import java.util.List;
 import java.util.Map;
@@ -21,10 +20,7 @@ import java.util.Map;
 public class MapContainsKeyNode extends AnnotatedNode {
     @InputPort public Map<?, ?> map = Map.of();
     @OutputPort public boolean out;
-
-    @Override public Component getDisplayName() { return Component.literal("Map Contains Key"); }
-
-    @Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("keyType", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))

@@ -32,7 +32,7 @@ public class InfoFieldBlock extends BlockNode implements IGraphEvaluable {
 
     @Override
     public Component getDisplayName() {
-        return Component.literal("Info Field");
+        return Component.translatable("info_field");
     }
 
     @Override

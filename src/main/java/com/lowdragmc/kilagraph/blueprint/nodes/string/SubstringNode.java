@@ -6,7 +6,6 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 /**
  * Clamping substring: bounds outside [0, len] are clipped. start > end → empty.
@@ -17,10 +16,7 @@ public class SubstringNode extends AnnotatedNode {
     @InputPort public int start = 0;
     @InputPort public int end = 0;
     @OutputPort public String out;
-
-    @Override public Component getDisplayName() { return Component.literal("Substring"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         String s = ctx.getInput("in", String.class, "");
         int st = Math.max(0, Math.min(s.length(), ctx.getInput("start", Integer.class, 0)));
         int en = Math.max(0, Math.min(s.length(), ctx.getInput("end", Integer.class, s.length())));

@@ -57,7 +57,7 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
         presetSelector = new Selector<String>()
                 .setCandidates(new ArrayList<>(VertexFormatPresets.ALL.keySet()))
                 .setCandidateUIProvider(UIElementProvider.text(value ->
-                        Component.literal(value == null ? "Preset…" : value)))
+                        value == null ? Component.translatable("rendertypegraph.settings.preset.placeholder") : Component.literal(value)))
                 .selectorStyle(style -> style.closeAfterSelect(true).maxItemCount(12).showOverlay(true));
         Style.defaultPipeline(presetSelector.getLayout(), l -> l.height(14).flex(1));
         presetSelector.setOnValueChanged(name -> {
@@ -71,7 +71,7 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
         });
 
         // One on/off toggle per registered element; checked = included. Position is shown but locked on.
-        var formatGroup = new ConfiguratorGroup("Vertex Format", false);
+        var formatGroup = new ConfiguratorGroup("rendertypegraph.settings.vertex_format", false);
         for (KGVertexElement element : KGVertexElements.all()) {
             String key = element.key();
             var configurator = new BooleanConfigurator(
@@ -100,16 +100,16 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
                 .gapAll(3)
                 .flexDirection(FlexDirection.COLUMN));
         content.addChildren(
-                row("Preset", presetSelector),
+                row("rendertypegraph.settings.preset", presetSelector),
                 formatGroup,
-                row("Primitive", vertexFormatMode),
-                row("Blend", blend),
-                row("Depth Test", depthTest),
-                row("Target", outputTarget),
-                row("Depth Write", depthWrite),
-                row("Cull", cull),
-                row("Outline", affectsOutline),
-                row("Sort Upload", sortOnUpload)
+                row("rendertypegraph.settings.primitive", vertexFormatMode),
+                row("rendertypegraph.settings.blend", blend),
+                row("rendertypegraph.settings.depth_test", depthTest),
+                row("rendertypegraph.settings.target", outputTarget),
+                row("rendertypegraph.settings.depth_write", depthWrite),
+                row("rendertypegraph.settings.cull", cull),
+                row("rendertypegraph.settings.outline", affectsOutline),
+                row("rendertypegraph.settings.sort_upload", sortOnUpload)
         );
 
         // Scroller styled like Blackboard's: fill the panel, no viewport padding, empty background.
@@ -126,7 +126,7 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
 
     @Override
     public Component getTitle() {
-        return Component.literal("RenderType");
+        return Component.translatable("rendertypegraph.settings.title");
     }
 
     public void refreshFromGraph() {
@@ -184,7 +184,9 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
         var selector = new Selector<E>()
                 .setCandidates(Arrays.asList(enumClass.getEnumConstants()))
                 .setCandidateUIProvider(UIElementProvider.text(value ->
-                        Component.literal(value == null ? "---" : enumTitle(value))))
+                        value == null
+                                ? Component.translatable("rendertypegraph.settings.none")
+                                : Component.translatable(enumTranslationKey(value))))
                 .selectorStyle(style -> style
                         .closeAfterSelect(true)
                         .maxItemCount(12)
@@ -203,7 +205,7 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
         return toggle;
     }
 
-    private UIElement row(String label, UIElement control) {
+    private UIElement row(String labelKey, UIElement control) {
         var row = new UIElement();
         row.addClass("__rendertype-settings-row__");
         Style.defaultPipeline(row.getLayout(), l -> l
@@ -214,7 +216,7 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
                 .flexDirection(FlexDirection.ROW));
 
         var title = new Label();
-        title.setText(label);
+        title.setValue(Component.translatable(labelKey));
         Style.defaultPipeline(title.getLayout(), l -> l.width(62).heightPercent(100));
         row.addChildren(title, control);
         return row;
@@ -225,14 +227,20 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
         return value == null ? fallback : value;
     }
 
-    private static String enumTitle(Enum<?> value) {
-        var words = value.name().toLowerCase(Locale.ROOT).split("_");
-        var builder = new StringBuilder();
-        for (var word : words) {
-            if (word.isEmpty()) continue;
-            if (!builder.isEmpty()) builder.append(' ');
-            builder.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+    private static String enumTranslationKey(Enum<?> value) {
+        Class<?> enumClass = value.getDeclaringClass();
+        String group;
+        if (enumClass == RenderTypeGraph.Settings.VertexFormatMode.class) {
+            group = "vertex_format_mode";
+        } else if (enumClass == RenderTypeGraph.Settings.BlendMode.class) {
+            group = "blend_mode";
+        } else if (enumClass == RenderTypeGraph.Settings.DepthTest.class) {
+            group = "depth_test";
+        } else if (enumClass == RenderTypeGraph.Settings.OutputTarget.class) {
+            group = "output_target";
+        } else {
+            group = enumClass.getSimpleName().toLowerCase(Locale.ROOT);
         }
-        return builder.toString();
+        return "rendertypegraph.settings." + group + "." + value.name().toLowerCase(Locale.ROOT);
     }
 }

@@ -7,7 +7,6 @@ import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 /**
  * Convert between degrees and radians. Enum {@link Op} → {@code EnumAccessor} dropdown.
@@ -20,10 +19,7 @@ public class AngleConvertNode extends AnnotatedNode {
     @Option public Op op = Op.DEG_TO_RAD;
     @InputPort public float in = 0f;
     @OutputPort public float out;
-
-    @Override public Component getDisplayName() { return Component.literal("Angle Convert"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         float v = ctx.getInput("in", Float.class, 0f);
         Op o = ctx.getOption("op", Op.class, Op.DEG_TO_RAD);
         float r = switch (o) {

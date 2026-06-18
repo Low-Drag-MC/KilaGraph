@@ -17,9 +17,9 @@ public final class KGPreviewContents {
 
     private static final Map<String, KGPreviewContent> BY_KEY = new LinkedHashMap<>();
 
-    public static final KGPreviewContent QUAD = register(new SimpleContent("quad", "Quad", KGPreviewContents::buildQuad));
-    public static final KGPreviewContent CUBE = register(new SimpleContent("cube", "Cube", KGPreviewContents::buildCube));
-    public static final KGPreviewContent SPHERE = register(new SimpleContent("sphere", "Sphere", KGPreviewContents::buildSphere));
+    public static final KGPreviewContent QUAD = register(new SimpleContent("quad", "rendertypegraph.preview.quad", KGPreviewContents::buildQuad));
+    public static final KGPreviewContent CUBE = register(new SimpleContent("cube", "rendertypegraph.preview.cube", KGPreviewContents::buildCube));
+    public static final KGPreviewContent SPHERE = register(new SimpleContent("sphere", "rendertypegraph.preview.sphere", KGPreviewContents::buildSphere));
 
     private KGPreviewContents() {}
 
@@ -95,11 +95,11 @@ public final class KGPreviewContents {
     }
 
     /** A built-in content whose geometry is a plain builder consumer (quad/cube/sphere). */
-    private record SimpleContent(String key, String label,
+    private record SimpleContent(String key, String translationKey,
                                  java.util.function.Consumer<PreviewMeshBuilder> builder) implements KGPreviewContent {
         @Override
         public Component title() {
-            return Component.literal(label);
+            return Component.translatable(translationKey);
         }
 
         @Override

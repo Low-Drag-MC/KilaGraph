@@ -318,6 +318,31 @@ public final class ShaderGraphCompiler {
                 new ShaderExpr("vec4(1.0)", GlslType.VEC4));
     }
 
+    /**
+     * Block-style vertex colour: {@code Color * sample_lightmap(Sampler2, UV2)} computed in the vertex stage
+     * (the {@code blockColor} varying), exactly like vanilla {@code block.vsh}. Needs no Normal — the lighting
+     * comes from the baked lightmap (UV2) rather than per-vertex diffuse. Declares {@code Sampler2} + flags
+     * {@code usesLightmap} so the runtime binds the vanilla lightmap. Missing UV2 degrades to the raw Color
+     * (unlit); missing Color degrades to white. Preview: white.
+     */
+    ShaderExpr blockVertexColor() {
+        return varyingInput("blockColor", GlslType.VEC4,
+                () -> {
+                    ShaderExpr color = attribute(KGVertexElements.COLOR, GlslType.VEC4,
+                            new ShaderExpr("vec4(1.0)", GlslType.VEC4));
+                    if (!hasAttribute(KGVertexElements.UV2)) {
+                        markMissingAttribute(KGVertexElements.UV2.attribName());
+                        return color; // no lightmap coords -> unlit colour
+                    }
+                    addInclude("minecraft:sample_lightmap.glsl");
+                    layout.addSampler("Sampler2"); // declare `uniform sampler2D Sampler2`
+                    usesLightmap = true;           // bind the vanilla lightmap, skip the placeholder
+                    return new ShaderExpr(color.code() + " * sample_lightmap(Sampler2, "
+                            + KGVertexElements.UV2.attribName() + ")", GlslType.VEC4);
+                },
+                new ShaderExpr("vec4(1.0)", GlslType.VEC4));
+    }
+
     /** A uv channel's vsh value: the attribute (cast {@code vec2(...)} for the ivec2 UV1/UV2), else a
      *  fallback to UV0, else {@code vec2(0.0)} — recording the missing attribute for editor warnings. */
     private ShaderExpr uvAttr(KGVertexElement element, boolean integer) {

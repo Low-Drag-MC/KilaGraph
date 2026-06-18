@@ -8,7 +8,6 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 /**
  * {@link String#format} with N argument inputs. Malformed pattern → returns the pattern unchanged.
@@ -18,10 +17,7 @@ public class FormatNode extends AnnotatedNode {
     @Option public String pattern = "%s";
     @Option public int inputs = 1;
     @OutputPort public String out;
-
-    @Override public Component getDisplayName() { return Component.literal("Format"); }
-
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         int n = Math.max(0, optionValue("inputs", Integer.class, inputs));
         for (int i = 1; i <= n; i++) ctx.addInputPort("arg" + i, TypeHandles.UNKNOWN);
     }

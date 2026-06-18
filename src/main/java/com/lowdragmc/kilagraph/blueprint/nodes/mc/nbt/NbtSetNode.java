@@ -9,7 +9,6 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 
 /**
  * Put a value into a {@link CompoundTag} under {@code key}, returning the (mutated) tag. A null
@@ -22,10 +21,7 @@ public class NbtSetNode extends AnnotatedNode {
     @InputPort public CompoundTag tag;
     @InputPort public String key = "";
     @OutputPort public CompoundTag out;
-
-    @Override public Component getDisplayName() { return Component.literal("Nbt Set"); }
-
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("value", optionValue("valueType", NbtValueType.class, valueType).portType());
     }
 

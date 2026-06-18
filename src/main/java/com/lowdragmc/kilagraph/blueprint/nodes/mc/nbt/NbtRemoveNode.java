@@ -7,7 +7,6 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 
 /** Remove {@code key} from {@code tag}, returning the (mutated) tag. */
 @NodeAttribute(name = "mc_nbt_remove", group = "mc_nbt", graphTypes = BlueprintGraph.class)
@@ -15,10 +14,7 @@ public class NbtRemoveNode extends AnnotatedNode {
     @InputPort public CompoundTag tag;
     @InputPort public String key = "";
     @OutputPort public CompoundTag out;
-
-    @Override public Component getDisplayName() { return Component.literal("Nbt Remove"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         CompoundTag t = ctx.getInput("tag", CompoundTag.class, null);
         if (t == null) { ctx.setOutput("out", new CompoundTag()); return; }
         String k = ctx.getInput("key", String.class, "");

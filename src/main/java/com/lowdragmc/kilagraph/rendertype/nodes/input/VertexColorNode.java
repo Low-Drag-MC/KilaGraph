@@ -6,21 +6,34 @@ import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity;
+import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
+import java.util.List;
+
 /**
  * Outputs the mesh's interpolated vertex colour (vec4). {@link StageAffinity#FRAGMENT_ONLY} (reads an
- * interpolated varying). The {@code lit} toggle picks between vanilla per-vertex diffuse lighting
- * ({@code minecraft_mix_light} — the entity default) and the raw, unlit {@code Color} attribute. Like the
- * {@code UV} node, it's a clean dedicated source; the per-vertex lighting it carries used to live in the
- * (now removed) vertex Color varying block.
+ * interpolated varying). The {@code mode} dropdown picks how the colour is lit:
+ * <ul>
+ *   <li>{@code mix_light} — vanilla per-vertex diffuse ({@code minecraft_mix_light}); needs
+ *       {@code Light0/1_Direction}, {@code Normal}, {@code Color} (the entity default).</li>
+ *   <li>{@code color} — the raw, unlit {@code Color} attribute.</li>
+ *   <li>{@code block} — {@code Color * sample_lightmap(Sampler2, UV2)} like vanilla {@code block.vsh};
+ *       baked lightmap lighting, no {@code Normal} needed.</li>
+ * </ul>
  */
 @NodeAttribute(name = "rt_vertex_color", group = "rendertype_input", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class VertexColorNode extends ShaderNode {
+
+    public static final String MODE_MIX_LIGHT = "mix_light";
+    public static final String MODE_COLOR = "color";
+    public static final String MODE_BLOCK = "block";
+    private static final List<String> MODES = List.of(MODE_MIX_LIGHT, MODE_COLOR, MODE_BLOCK);
+
     @Override
     public StageAffinity stageAffinity() {
         return StageAffinity.FRAGMENT_ONLY;
@@ -28,7 +41,8 @@ public class VertexColorNode extends ShaderNode {
 
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
-        context.addOption("lit", TypeHandles.BOOL).withDefaultValue(true).build();
+        context.addOption("mode", TypeHandles.STRING).withDefaultValue(MODE_MIX_LIGHT)
+                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, MODES, VertexColorNode::label)).build();
     }
 
     @Override
@@ -38,7 +52,11 @@ public class VertexColorNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.output("out", lit() ? ctx.litVertexColor() : ctx.meshColor());
+        ctx.output("out", switch (mode()) {
+            case MODE_COLOR -> ctx.meshColor();
+            case MODE_BLOCK -> ctx.blockVertexColor();
+            default -> ctx.litVertexColor();
+        });
     }
 
     @Override
@@ -46,9 +64,17 @@ public class VertexColorNode extends ShaderNode {
         return "out";
     }
 
-    private boolean lit() {
-        INodeOption opt = getNodeOptionById("lit");
+    private static String label(String mode) {
+        return switch (mode) {
+            case MODE_COLOR -> "Color";
+            case MODE_BLOCK -> "Block";
+            default -> "Mix Light";
+        };
+    }
+
+    private String mode() {
+        INodeOption opt = getNodeOptionById("mode");
         Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
-        return !(raw instanceof Boolean b) || b; // default lit
+        return raw instanceof String s && MODES.contains(s) ? s : MODE_MIX_LIGHT;
     }
 }

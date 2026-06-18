@@ -7,7 +7,6 @@ import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 /**
  * Single trig function picker. Enum {@link Op} drives LDLib2's {@code EnumAccessor} which renders
@@ -21,10 +20,7 @@ public class TrigNode extends AnnotatedNode {
     @Option public Op op = Op.SIN;
     @InputPort public float in = 0f;
     @OutputPort public float out;
-
-    @Override public Component getDisplayName() { return Component.literal("Trig"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         float v = ctx.getInput("in", Float.class, 0f);
         Op o = ctx.getOption("op", Op.class, Op.SIN);
         double r = switch (o) {

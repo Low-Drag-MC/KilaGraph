@@ -6,7 +6,6 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,10 +19,7 @@ public class ListRangeNode extends AnnotatedNode {
     @InputPort public int to = 10;
     @InputPort public int step = 1;
     @OutputPort public List<?> out;
-
-    @Override public Component getDisplayName() { return Component.literal("Range"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         int f = ctx.getInput("from", Integer.class, 0);
         int t = ctx.getInput("to", Integer.class, 10);
         int s = ctx.getInput("step", Integer.class, 1);

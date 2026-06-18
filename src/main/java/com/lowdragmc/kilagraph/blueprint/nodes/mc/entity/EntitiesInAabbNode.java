@@ -7,7 +7,6 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
@@ -21,10 +20,7 @@ public class EntitiesInAabbNode extends AnnotatedNode {
     @InputPort public BlockPos min = BlockPos.ZERO;
     @InputPort public BlockPos max = BlockPos.ZERO;
     @OutputPort public List<Entity> out;
-
-    @Override public Component getDisplayName() { return Component.literal("Entities In AABB"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         Level l = ctx.getInput("level", Level.class, null);
         if (l == null) { ctx.setOutput("out", List.of()); return; }
         BlockPos a = ctx.getInput("min", BlockPos.class, BlockPos.ZERO);

@@ -6,7 +6,6 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -17,10 +16,7 @@ public class MapMergeNode extends AnnotatedNode {
     @InputPort public Map<?, ?> a = Map.of();
     @InputPort public Map<?, ?> b = Map.of();
     @OutputPort public Map<?, ?> out;
-
-    @Override public Component getDisplayName() { return Component.literal("Map Merge"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         Map<?, ?> aMap = ctx.getInput("a", Map.class, Map.of());
         Map<?, ?> bMap = ctx.getInput("b", Map.class, Map.of());
         Map<Object, Object> result = new LinkedHashMap<>(aMap);

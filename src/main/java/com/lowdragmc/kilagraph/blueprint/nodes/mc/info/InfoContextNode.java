@@ -3,6 +3,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.mc.info;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.ContextNode;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 import com.lowdragmc.lowdraglib2.syncdata.AccessorRegistries;
 import net.minecraft.network.chat.Component;
@@ -33,7 +34,8 @@ public abstract class InfoContextNode<T> extends ContextNode {
 
     @Override
     public Component getDisplayName() {
-        return Component.literal(targetClass().getSimpleName() + " Info");
+        var attribute = getClass().getAnnotation(NodeAttribute.class);
+        return attribute == null ? Component.literal(targetClass().getSimpleName() + " Info") : Component.translatable(attribute.name());
     }
 
     @Override

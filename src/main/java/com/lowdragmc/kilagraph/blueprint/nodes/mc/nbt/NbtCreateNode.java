@@ -6,16 +6,12 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 
 /** Produces a fresh empty {@link CompoundTag}. */
 @NodeAttribute(name = "mc_nbt_create", group = "mc_nbt", graphTypes = BlueprintGraph.class)
 public class NbtCreateNode extends AnnotatedNode {
     @OutputPort public CompoundTag out;
-
-    @Override public Component getDisplayName() { return Component.literal("Nbt Create"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         ctx.setOutput("out", new CompoundTag());
     }
 }

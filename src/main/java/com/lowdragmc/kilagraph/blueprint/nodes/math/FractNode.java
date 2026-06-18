@@ -6,17 +6,13 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 /** Fractional part: {@code in - floor(in)}. Always in {@code [0, 1)}. */
 @NodeAttribute(name = "math_fract", group = "math", graphTypes = BlueprintGraph.class)
 public class FractNode extends AnnotatedNode {
     @InputPort public float in = 0f;
     @OutputPort public float out;
-
-    @Override public Component getDisplayName() { return Component.literal("Fract"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         float v = ctx.getInput("in", Float.class, 0f);
         ctx.setOutput("out", v - (float) Math.floor(v));
     }

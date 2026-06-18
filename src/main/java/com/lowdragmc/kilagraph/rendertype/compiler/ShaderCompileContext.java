@@ -236,6 +236,12 @@ public final class ShaderCompileContext {
         return compiler.meshColor();
     }
 
+    /** Block-style vertex colour: {@code Color * sample_lightmap(Sampler2, UV2)} (vanilla {@code block.vsh}),
+     *  no Normal needed. */
+    public ShaderExpr blockVertexColor() {
+        return compiler.blockVertexColor();
+    }
+
     /**
      * The interpolated world-space surface normal (vec3) — the default fallback for an unconnected
      * {@code normal} port (Unity's Normal Vector node defaults to world space). Not unit-length after

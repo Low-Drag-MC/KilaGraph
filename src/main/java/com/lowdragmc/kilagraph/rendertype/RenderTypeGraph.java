@@ -6,9 +6,6 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.IVertexFormatDependentNode;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
-import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.platform.DestFactor;
-import com.mojang.blaze3d.platform.SourceFactor;
 import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
@@ -88,7 +85,7 @@ public class RenderTypeGraph extends Graph {
         return new RenderTypeGraphModel(this);
     }
 
-    private NodeModel createNode(Class<? extends Node> nodeClass, float x, float y) {
+    protected NodeModel createNode(Class<? extends Node> nodeClass, float x, float y) {
         var data = new GraphNodeCreationData(graphModel, new Vector2f(x, y), SpawnFlags.DEFAULT, null);
         return (NodeModel) CustomGraphModelImpl.createNodeFromData(data, nodeClass);
     }
@@ -99,6 +96,26 @@ public class RenderTypeGraph extends Graph {
         setNodeOption(node, "texture",
                 RenderTypeGraphTypes.Sampler2DValue.defaultValue().withLocation(texture));
         return node;
+    }
+
+    /**
+     * The default shader's texture-source node: a node exposing a {@code SAMPLER2D} output port named
+     * {@code "sampler"}, wired into the default {@code SamplerTexture2DNode}. Defaults to a
+     * {@link TextureNode} bound to dirt; subclasses whose texture comes from outside the graph (e.g. a
+     * SlideShow slide fed via an external sampler) override this to supply their own source node.
+     */
+    protected NodeModel createDefaultTextureSource() {
+        return createTextureNode(48, -128, "minecraft:textures/block/dirt.png");
+    }
+
+    /**
+     * The {@code mode} option for the default shader's {@link VertexColorNode} (see its dropdown:
+     * {@code mix_light} / {@code color} / {@code block}). Defaults to {@code mix_light} (the entity look,
+     * per-vertex diffuse). Subclasses whose geometry has no usable {@code Normal} (e.g. a SlideShow slide
+     * quad) override this to {@code block} so the default lighting uses the baked lightmap instead.
+     */
+    protected String defaultVertexColorMode() {
+        return VertexColorNode.MODE_MIX_LIGHT;
     }
 
     /** Set a node option's value (mirrors the editor's option-constant write). */
@@ -145,7 +162,7 @@ public class RenderTypeGraph extends Graph {
                 .orElse(null);
     }
 
-    private void initializeDefaultEntityShader() {
+    protected void initializeDefaultEntityShader() {
         if (!(vertexStageModel instanceof ContextNodeModel vertexStage)
                 || !(fragmentStageModel instanceof ContextNodeModel fragmentStage)) {
             return;
@@ -160,8 +177,9 @@ public class RenderTypeGraph extends Graph {
         // defaults — no specialized varying blocks needed.
         createBlock(vertexStage, VertexPositionBlock.class);
         var vertexColor = createNode(VertexColorNode.class, 208, 112); // lit vertex colour (fsh)
+        setNodeOption(vertexColor, "mode", defaultVertexColorMode());
         vertexColor.setPreviewExpanded(false);
-        var sampler = createTextureNode(48, -128, "minecraft:textures/block/dirt.png");
+        var sampler = createDefaultTextureSource();
         var textureSample = createNode(SamplerTexture2DNode.class, 208, -128);
         var entityColor = createNode(MultiplyNode.class, 384, -128);
         entityColor.setPreviewExpanded(false);

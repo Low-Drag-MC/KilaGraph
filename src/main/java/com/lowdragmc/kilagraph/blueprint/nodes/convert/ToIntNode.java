@@ -8,7 +8,6 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
 
 /**
  * Convert a numeric value to {@code int}, choosing how to drop the fractional part. Input is
@@ -21,10 +20,7 @@ public class ToIntNode extends AnnotatedNode {
 
     @Option public Op op = Op.TRUNC;
     @OutputPort public int out;
-
-    @Override public Component getDisplayName() { return Component.literal("To Int"); }
-
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("in", TypeHandles.UNKNOWN);
     }
 

@@ -7,7 +7,6 @@ import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 /**
  * Case conversion via enum {@link Op}. Title casing capitalises the first letter after each
@@ -21,10 +20,7 @@ public class CaseNode extends AnnotatedNode {
     @Option public Op op = Op.LOWER;
     @InputPort public String in = "";
     @OutputPort public String out;
-
-    @Override public Component getDisplayName() { return Component.literal("Case"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         String s = ctx.getInput("in", String.class, "");
         Op o = ctx.getOption("op", Op.class, Op.LOWER);
         String r = switch (o) {

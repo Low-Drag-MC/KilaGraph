@@ -6,7 +6,6 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
-import net.minecraft.network.chat.Component;
 
 /**
  * Uniform float in {@code [min, max)} using the executor's shared RNG. Within a single executor's
@@ -18,10 +17,7 @@ public class RandomNode extends AnnotatedNode {
     @InputPort public float min = 0f;
     @InputPort public float max = 1f;
     @OutputPort public float out;
-
-    @Override public Component getDisplayName() { return Component.literal("Random"); }
-
-    @Override public void evaluate(EvalContext ctx) {
+@Override public void evaluate(EvalContext ctx) {
         float lo = ctx.getInput("min", Float.class, 0f);
         float hi = ctx.getInput("max", Float.class, 1f);
         if (hi <= lo) { ctx.setOutput("out", lo); return; }
