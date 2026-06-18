@@ -68,6 +68,11 @@
   "rt_vertex_color": "Vertex Color",
   "rt_frag_spherical_distance": "Frag Spherical Vertex Distance",
   "rt_frag_cylindrical_distance": "Frag Cylindrical Vertex Distance",
+  "rt_vertex_id": "Vertex ID",
+  "rt_instance_id": "Instance ID",
+  "rt_front_facing": "Front Facing",
+  "rt_fragment_coord": "Fragment Coordinate",
+  "rt_primitive_id": "Primitive ID",
 
   "rt_color": "Color",
   "rt_time": "Time",

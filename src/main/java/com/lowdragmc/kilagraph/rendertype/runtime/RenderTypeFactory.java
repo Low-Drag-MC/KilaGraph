@@ -5,8 +5,11 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerAddress;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerFilter;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
+import com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat;
+import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.pipeline.DepthStencilState;
@@ -27,6 +30,8 @@ import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,7 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p><b>Resource management.</b> Generated pipelines/sources are reference-counted by content hash:
  * {@link #createMaterial} acquires a reference, {@link RenderTypeGraphMaterial#close()} releases it,
  * and when the last reference drops we evict the pipeline + GLSL source from our maps (and the
- * material frees its UBO {@link com.mojang.blaze3d.buffers.GpuBuffer}). This bounds our heap to live
+ * material frees its UBO {@link GpuBuffer}). This bounds our heap to live
  * materials — important for the live preview, which churns a new hash on every edit.</p>
  *
  * <p><b>Known limitation:</b> the GL device's pipeline cache has no per-pipeline release API (only a
@@ -192,7 +197,7 @@ public final class RenderTypeFactory {
         }
         // Per-material UBO + samplers exposed by the graph.
         if (!compiled.layout().isEmpty()) {
-            b.withUniform(com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout.UBO_NAME,
+            b.withUniform(MaterialUniformLayout.UBO_NAME,
                     UniformType.UNIFORM_BUFFER);
         }
         // KilaGraph-managed UBOs the graph uses (engine globals / transforms / a mod's own), uploaded by us
@@ -214,7 +219,7 @@ public final class RenderTypeFactory {
      * without a pipeline rebuild).
      */
     public static Map<String, SamplerDefault> buildMaterialTextures(CompiledShaderGraph compiled) {
-        Map<String, SamplerDefault> textures = new java.util.HashMap<>();
+        Map<String, SamplerDefault> textures = new HashMap<>();
         for (String sampler : compiled.layout().samplers()) {
             if (sampler.equals("Sampler1") && compiled.usesOverlay()) continue;
             if (sampler.equals("Sampler2") && compiled.usesLightmap()) continue;
@@ -239,8 +244,8 @@ public final class RenderTypeFactory {
 
     // ---- Settings -> pipeline state mapping --------------------------------------------------
 
-    public static VertexFormat vertexFormat(java.util.List<String> elementKeys) {
-        return com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat.of(elementKeys);
+    public static VertexFormat vertexFormat(List<String> elementKeys) {
+        return KGVertexFormat.of(elementKeys);
     }
 
     public static VertexFormat.Mode vertexMode(RenderTypeGraph.Settings.VertexFormatMode mode) {
@@ -256,8 +261,14 @@ public final class RenderTypeFactory {
     private static ColorTargetState colorTarget(RenderTypeGraph.Settings.BlendMode blend) {
         return switch (blend) {
             case OPAQUE -> ColorTargetState.DEFAULT;
-            case ALPHA, TRANSLUCENT -> new ColorTargetState(BlendFunction.TRANSLUCENT);
+            case TRANSLUCENT -> new ColorTargetState(BlendFunction.TRANSLUCENT);
             case ADDITIVE -> new ColorTargetState(BlendFunction.ADDITIVE);
+            case LIGHTNING -> new ColorTargetState(BlendFunction.LIGHTNING);
+            case GLINT -> new ColorTargetState(BlendFunction.GLINT);
+            case OVERLAY -> new ColorTargetState(BlendFunction.OVERLAY);
+            case TRANSLUCENT_PREMULTIPLIED_ALPHA -> new ColorTargetState(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA);
+            case ENTITY_OUTLINE_BLIT -> new ColorTargetState(BlendFunction.ENTITY_OUTLINE_BLIT);
+            case INVERT -> new ColorTargetState(BlendFunction.INVERT);
         };
     }
 

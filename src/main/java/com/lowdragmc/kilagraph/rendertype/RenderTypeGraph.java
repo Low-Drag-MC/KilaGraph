@@ -6,6 +6,9 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.IVertexFormatDependentNode;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
+import com.mojang.blaze3d.pipeline.BlendFunction;
+import com.mojang.blaze3d.platform.DestFactor;
+import com.mojang.blaze3d.platform.SourceFactor;
 import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
@@ -63,7 +66,21 @@ public class RenderTypeGraph extends Graph {
     private volatile long changeVersion;
 
     public RenderTypeGraph() {
-        ensureFixedStages();
+        this(true);
+    }
+
+    /**
+     * @param initialize whether to build the default entity shader (the fixed vertex/fragment stages and
+     *  the default node network). Pass {@code false} when the graph is about to be deserialized into — this
+     *  skips constructing a throwaway default graph, and (more importantly) avoids priming the model's
+     *  {@code getNodes()} cache with default nodes that would then go stale once {@code deserialize} clears
+     *  and reloads {@code nodeModels}. {@link #restoreFixedStagesAfterDeserialize()} re-ensures the fixed
+     *  stages after the load (recreating them only if a loaded graph somehow lacks them).
+     */
+    public RenderTypeGraph(boolean initialize) {
+        if (initialize) {
+            ensureFixedStages();
+        }
     }
 
     @Override
@@ -479,9 +496,14 @@ public class RenderTypeGraph extends Graph {
 
         public enum BlendMode {
             OPAQUE,
-            ALPHA,
+            TRANSLUCENT,
             ADDITIVE,
-            TRANSLUCENT
+            LIGHTNING,
+            GLINT,
+            OVERLAY,
+            TRANSLUCENT_PREMULTIPLIED_ALPHA,
+            ENTITY_OUTLINE_BLIT,
+            INVERT
         }
 
         public enum DepthTest {

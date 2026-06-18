@@ -408,7 +408,7 @@ public final class RenderTypeGraphGameTest {
         RenderTypeGraph.Settings settings = new RenderTypeGraph.Settings(
                 VertexFormatPresets.BLOCK,
                 RenderTypeGraph.Settings.VertexFormatMode.TRIANGLES,
-                RenderTypeGraph.Settings.BlendMode.ALPHA,
+                RenderTypeGraph.Settings.BlendMode.TRANSLUCENT,
                 RenderTypeGraph.Settings.DepthTest.ALWAYS,
                 false,
                 false,

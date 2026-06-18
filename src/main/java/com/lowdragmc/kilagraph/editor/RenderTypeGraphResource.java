@@ -50,7 +50,11 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
     }
 
     public RenderTypeGraph deserializeGraph(CompoundTag tag, @Nullable IGraphReferenceResolver resolver) {
-        var graph = createGraph();
+        // Start from an empty graph (no default node network): deserialize below clears and reloads
+        // nodeModels, so building the default graph here would be wasted work and would leave the model's
+        // getNodes() cache primed with stale default nodes. restoreFixedStagesAfterDeserialize() re-ensures
+        // the fixed stages after the load.
+        var graph = new RenderTypeGraph(false);
         graph.graphModel.setReferenceResolver(resolver);
         var graphTag = tag.get(GRAPH_TAG) instanceof CompoundTag compound ? compound : tag;
         graph.graphModel.deserialize(TagValueInput.create(ProblemReporter.Collector.DISCARDING,

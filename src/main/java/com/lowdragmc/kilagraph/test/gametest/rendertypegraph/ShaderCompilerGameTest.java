@@ -64,6 +64,11 @@ import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexIdNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceIdNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.FrontFacingNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.FragmentCoordinateNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.PrimitiveIdNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.AddNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4ConstructNode;
@@ -165,6 +170,8 @@ public final class ShaderCompilerGameTest {
     private static final String EXPRESSION_NODE = "rendertype_compile_expression_node";
     private static final String EXPRESSION_VALIDATION = "rendertype_compile_expression_validation";
     private static final String EXPORT_FUNCTION = "rendertype_compile_export_function";
+    private static final String BUILTIN_FRAG_KEYWORDS = "rendertype_compile_builtin_frag_keywords";
+    private static final String BUILTIN_VERTEX_IDS = "rendertype_compile_builtin_vertex_ids";
 
     private ShaderCompilerGameTest() {}
 
@@ -224,6 +231,8 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunction(EXPRESSION_NODE, ShaderCompilerGameTest::expressionNodeEmitsFunctionAndCall);
         KGGameTests.registerFunction(EXPRESSION_VALIDATION, ShaderCompilerGameTest::expressionNodeValidationFlagsBadNames);
         KGGameTests.registerFunction(EXPORT_FUNCTION, ShaderCompilerGameTest::exportBuildsFunctionGraph);
+        KGGameTests.registerFunction(BUILTIN_FRAG_KEYWORDS, ShaderCompilerGameTest::builtinFragmentKeywordsEmitGlsl);
+        KGGameTests.registerFunction(BUILTIN_VERTEX_IDS, ShaderCompilerGameTest::vertexIdNodesAreVertexOnly);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -283,6 +292,8 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunctionTest(event, EXPRESSION_NODE, KGGameTests.functionKey(EXPRESSION_NODE), d);
         KGGameTests.registerFunctionTest(event, EXPRESSION_VALIDATION, KGGameTests.functionKey(EXPRESSION_VALIDATION), d);
         KGGameTests.registerFunctionTest(event, EXPORT_FUNCTION, KGGameTests.functionKey(EXPORT_FUNCTION), d);
+        KGGameTests.registerFunctionTest(event, BUILTIN_FRAG_KEYWORDS, KGGameTests.functionKey(BUILTIN_FRAG_KEYWORDS), d);
+        KGGameTests.registerFunctionTest(event, BUILTIN_VERTEX_IDS, KGGameTests.functionKey(BUILTIN_VERTEX_IDS), d);
     }
 
     private static CompiledShaderGraph compile(RenderTypeGraph graph) {
@@ -431,6 +442,67 @@ public final class ShaderCompilerGameTest {
                 java.util.List.of(new ExpressionNode.PortSpec("a", "FLOAT")),
                 java.util.List.of(new ExpressionNode.PortSpec("result", "FLOAT")), "result = a;")));
         assertTrue(helper, "valid spec has no errors", expr.validationErrors().isEmpty());
+        helper.succeed();
+    }
+
+    /** The fragment-stage built-in keyword nodes emit their GLSL special variables into the fsh with no
+     *  stage errors: Front Facing → {@code gl_FrontFacing}, Fragment Coordinate → {@code gl_FragCoord},
+     *  Primitive ID → {@code gl_PrimitiveID}. */
+    public static void builtinFragmentKeywordsEmitGlsl(GameTestHelper helper) {
+        // Fragment Coordinate (vec4) → emission color.
+        RenderTypeGraph coordGraph = new RenderTypeGraph();
+        NodeModel coordEmission = addBlock(coordGraph, coordGraph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel coord = addNode(coordGraph, FragmentCoordinateNode.class);
+        wire(coordGraph, coordEmission.getInputsById().get("color"), coord.getOutputsById().get("out"));
+        CompiledShaderGraph coordCompiled = compile(coordGraph);
+        assertTrue(helper, "fragment coordinate emits gl_FragCoord", coordCompiled.fragmentSource().contains("gl_FragCoord"));
+        assertFalse(helper, "fragment coordinate is not a stage error", coordCompiled.hasStageErrors());
+
+        // Front Facing (bool) → Branch predicate (bool input).
+        RenderTypeGraph faceGraph = new RenderTypeGraph();
+        NodeModel faceEmission = addBlock(faceGraph, faceGraph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel branch = addNode(faceGraph, BranchNode.class);
+        NodeModel face = addNode(faceGraph, FrontFacingNode.class);
+        NodeModel vec3 = addNode(faceGraph, Vec3Node.class);
+        wire(faceGraph, branch.getInputsById().get("predicate"), face.getOutputsById().get("out"));
+        wire(faceGraph, branch.getInputsById().get("t"), vec3.getOutputsById().get("out"));
+        wire(faceGraph, faceEmission.getInputsById().get("color"), branch.getOutputsById().get("out"));
+        CompiledShaderGraph faceCompiled = compile(faceGraph);
+        assertTrue(helper, "front facing emits gl_FrontFacing", faceCompiled.fragmentSource().contains("gl_FrontFacing"));
+        assertFalse(helper, "front facing is not a stage error", faceCompiled.hasStageErrors());
+
+        // Primitive ID (int) → emission color (int→vec4 convert).
+        RenderTypeGraph primGraph = new RenderTypeGraph();
+        NodeModel primEmission = addBlock(primGraph, primGraph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel prim = addNode(primGraph, PrimitiveIdNode.class);
+        wire(primGraph, primEmission.getInputsById().get("color"), prim.getOutputsById().get("out"));
+        CompiledShaderGraph primCompiled = compile(primGraph);
+        assertTrue(helper, "primitive id emits gl_PrimitiveID", primCompiled.fragmentSource().contains("gl_PrimitiveID"));
+        assertFalse(helper, "primitive id is not a stage error", primCompiled.hasStageErrors());
+        helper.succeed();
+    }
+
+    /** The vertex-stage ID nodes are VERTEX_ONLY: pulled straight into a fragment block they're a stage
+     *  error, but routed through a vertex varying block (consumed in fragment) they compile and the vsh
+     *  references {@code gl_VertexID} / {@code gl_InstanceID}. */
+    public static void vertexIdNodesAreVertexOnly(GameTestHelper helper) {
+        // Misuse: Vertex ID → fragment emission (fragment stage) → stage error.
+        RenderTypeGraph bad = new RenderTypeGraph();
+        NodeModel badEmission = addBlock(bad, bad.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel badId = addNode(bad, VertexIdNode.class);
+        wire(bad, badEmission.getInputsById().get("color"), badId.getOutputsById().get("out"));
+        assertTrue(helper, "vertex id in fragment stage is a stage error", compile(bad).hasStageErrors());
+
+        // Correct: Instance ID → vertex varying block (vsh) → consumed in fragment → no error.
+        RenderTypeGraph good = new RenderTypeGraph();
+        NodeModel varying = addBlock(good, good.getVertexStageModel(), VaryingCustomFloatBlock.class);
+        NodeModel instanceId = addNode(good, InstanceIdNode.class);
+        wire(good, varying.getInputsById().get("value"), instanceId.getOutputsById().get("out"));
+        NodeModel goodEmission = addBlock(good, good.getFragmentStageModel(), FragmentEmissionBlock.class);
+        wire(good, goodEmission.getInputsById().get("color"), varying.getOutputsById().get("value"));
+        CompiledShaderGraph goodCompiled = new ShaderGraphCompiler(good).compile();
+        assertFalse(helper, "instance id feeding a vertex varying is not a stage error", goodCompiled.hasStageErrors());
+        assertTrue(helper, "vsh references gl_InstanceID", goodCompiled.vertexSource().contains("gl_InstanceID"));
         helper.succeed();
     }
 
