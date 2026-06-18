@@ -3,14 +3,13 @@ package com.lowdragmc.kilagraph.blueprint.nodes.exec;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
-import com.lowdragmc.kilagraph.graph.exec.BreakException;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionFlow;
 
 /**
- * Throws {@link BreakException}, caught by the nearest enclosing loop. Outside any loop, it
- * propagates out of {@code executeFrom} — diagnostic for "Break placed outside a loop".
+ * Signals the engine to break the nearest enclosing loop. Outside any loop, the session surfaces an
+ * {@code IllegalStateException} — diagnostic for "Break placed outside a loop".
  */
 @NodeAttribute(name = "exec_break", group = "exec", graphTypes = BlueprintGraph.class)
 public class BreakNode extends AnnotatedNode {
@@ -19,6 +18,6 @@ public class BreakNode extends AnnotatedNode {
 
     @Override
     public void execute(ExecContext ctx) {
-        throw BreakException.INSTANCE;
+        ctx.signalBreak();
     }
 }

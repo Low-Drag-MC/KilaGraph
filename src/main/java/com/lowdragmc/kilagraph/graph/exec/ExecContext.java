@@ -6,24 +6,25 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * Per-call context for an {@code AnnotatedNode#execute} invocation. Mirrors {@link EvalContext}
- * for the data-pull surface ({@link #getInput} / {@link #getOption} / {@link #setOutput}) and
- * adds:
+ * Per-call context for an {@code AnnotatedNode#execute} invocation, bound to the
+ * {@link ExecSession} that's driving the run and the {@link ExecFrame} the node is executing in.
+ * Mirrors {@link EvalContext} for the data surface ({@link #getInput}/{@link #getOption}/
+ * {@link #setOutput}) and adds the exec-flow control surface:
  * <ul>
- *   <li>{@link #flow(String)} — push the node connected to {@code outputId} (an
- *       {@code EXECUTION_FLOW} output) onto the executor's pending queue. Call zero or more times
- *       per execute() invocation. {@code Sequence} calls it N times; {@code Branch} calls it once
- *       on the picked branch; an exec node that does nothing downstream calls it zero times.</li>
- *   <li>{@link #state()} — a node-scoped {@code Map<String, Object>} lazily allocated in the
- *       executor's {@code nodeState}, surviving across {@link GraphExecutor#executeFrom} calls
- *       on the same executor instance. Future {@code Cache} reads/writes here; for loops use it
- *       to stash counters; debug nodes can stash captured values.</li>
- *   <li>{@link #runUntilDrained()} — internal hook for loop nodes that need to drain the body's
- *       sub-execution to completion before deciding to iterate again.</li>
+ *   <li>{@link #flow(String)} — continue the flow into the node connected to {@code outputId}
+ *       (within the current frame). Call zero or more times. {@code Branch} calls it once on the
+ *       picked branch; an exec node with nothing downstream calls it zero times.</li>
+ *   <li>{@link #pushSequence(List)} — run-to-completion fan-out (the {@code Sequence} node).</li>
+ *   <li>{@link #pushLoop(LoopController, String, String)} — start a step-able loop (For/While/
+ *       ForEach); the engine drives the iterations.</li>
+ *   <li>{@link #signalBreak()}/{@link #signalContinue()} — loop control (the {@code Break}/
+ *       {@code Continue} nodes), routed to the nearest enclosing loop frame.</li>
+ *   <li>{@link #state()} — node-scoped persistent map (survives across the run on this executor).</li>
  * </ul>
  *
  * <p>Coercion rules and lookup semantics match {@link EvalContext} — see its javadoc.</p>
@@ -31,11 +32,15 @@ import java.util.Optional;
 public final class ExecContext {
     private final GraphExecutor executor;
     private final NodeModel node;
+    private final ExecSession session;
+    private final ExecFrame frame;
     final Map<String, Object> outputs = new HashMap<>();  // flushed into the executor's cache by the run loop
 
-    ExecContext(GraphExecutor executor, NodeModel node) {
+    ExecContext(GraphExecutor executor, NodeModel node, ExecSession session, ExecFrame frame) {
         this.executor = executor;
         this.node = node;
+        this.session = session;
+        this.frame = frame;
     }
 
     // ---- input port reads (same shape as EvalContext) --------------------------------------
@@ -99,15 +104,42 @@ public final class ExecContext {
     // ---- flow ------------------------------------------------------------------------------
 
     /**
-     * Enqueue the node connected to {@code outputId} (an {@code EXECUTION_FLOW} output) onto the
-     * executor's pending exec queue. No-op if the port is unwired.
+     * Continue the flow into the node connected to {@code outputId} (an {@code EXECUTION_FLOW}
+     * output), within the current frame. No-op if the port is unwired.
      */
     public void flow(String outputId) {
         PortModel out = node.getOutputsById().get(outputId);
         if (out == null) {
             throw new IllegalArgumentException("No output port '" + outputId + "' on " + node.getUid());
         }
-        executor.enqueueFlow(out);
+        frame.enqueueFlow(out);
+    }
+
+    /**
+     * Start a run-to-completion sequence: each {@code outId} in order has its whole chain run before
+     * the next begins. Replaces the {@code Sequence} node's per-output {@code runIsolated}.
+     */
+    public void pushSequence(List<String> outIds) {
+        session.push(new SequenceFrame(executor, node, outIds));
+    }
+
+    /**
+     * Start a step-able loop. The engine drives {@code controller} for iterations, flowing
+     * {@code bodyOut} into the loop frame each iteration and {@code completedOut} into the parent
+     * frame when the loop ends. Replaces the loop nodes' synchronous {@code runIsolated} drive.
+     */
+    public void pushLoop(LoopController controller, String bodyOut, String completedOut) {
+        session.push(new LoopFrame(executor, node, controller, bodyOut, completedOut, frame));
+    }
+
+    /** Raise a {@code Break}: the nearest enclosing loop frame ends after this node. */
+    public void signalBreak() {
+        session.signalBreak();
+    }
+
+    /** Raise a {@code Continue}: the nearest enclosing loop frame skips to its next iteration. */
+    public void signalContinue() {
+        session.signalContinue();
     }
 
     // ---- wire topology ---------------------------------------------------------------------
@@ -115,11 +147,9 @@ public final class ExecContext {
     /**
      * The source nodes wired into {@code inputId}, read straight from the port topology without
      * evaluating them. Used by meta-nodes like {@code CacheClear} that act <em>on</em> an upstream
-     * node (here: the {@code Cache} feeding its {@code ref} input) rather than on its value — so
-     * pulling the input (which would force the upstream {@code Cache} to compute) is exactly what we
-     * must avoid.
+     * node (here: the {@code Cache} feeding its {@code ref} input) rather than on its value.
      */
-    public java.util.List<NodeModel> connectedSourceNodes(String inputId) {
+    public List<NodeModel> connectedSourceNodes(String inputId) {
         PortModel pm = node.getInputsById().get(inputId);
         if (pm == null) throw new IllegalArgumentException("No input port '" + inputId + "' on " + node.getUid());
         var result = new java.util.ArrayList<NodeModel>();
@@ -147,24 +177,5 @@ public final class ExecContext {
 
     public GraphExecutor getExecutor() {
         return executor;
-    }
-
-    /**
-     * Run {@code flowPush} (typically a single {@code flow(outId)}) with an isolated exec queue:
-     * saves the outer pending queue aside, drains whatever {@code flowPush} enqueues to completion,
-     * then restores the outer queue. {@link BreakException} / {@link ContinueException} thrown
-     * inside propagate up to the caller after the queue is restored.
-     *
-     * <p>Used by two kinds of node:</p>
-     * <ul>
-     *   <li><b>Loops</b> ({@code For}/{@code While}/{@code ForEach}) — one call per iteration, so the
-     *       body runs fully before the loop decides whether to iterate again, and so the loop catches
-     *       {@code Break}/{@code Continue} at its own level.</li>
-     *   <li><b>{@code Sequence}</b> — one call per output, so each output's chain runs to completion
-     *       before the next starts (run-to-completion semantics, not breadth-first interleaving).</li>
-     * </ul>
-     */
-    public void runIsolated(Runnable flowPush) {
-        executor.runIsolated(flowPush);
     }
 }

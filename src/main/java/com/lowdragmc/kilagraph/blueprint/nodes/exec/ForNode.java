@@ -6,12 +6,12 @@ import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
-import com.lowdragmc.kilagraph.graph.exec.BreakException;
-import com.lowdragmc.kilagraph.graph.exec.ContinueException;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
+import com.lowdragmc.kilagraph.graph.exec.LoopController;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionFlow;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 
 /**
  * Counted loop. Runs {@code body} {@code count} times; on each iteration {@code index} (data
@@ -33,20 +33,10 @@ public class ForNode extends AnnotatedNode {
     @Override
     public void execute(ExecContext ctx) {
         int n = Math.max(0, ctx.getInput("count", Integer.class, 0));
-        for (int i = 0; i < n; i++) {
-            // The pull cache holds last iteration's values — invalidate so body recomputes against
-            // the new index. The index itself survives in node state (not the cache).
-            ctx.getExecutor().clearCache();
-            ctx.state().put("index", i);
-            try {
-                ctx.runIsolated(() -> ctx.flow("body"));
-            } catch (ContinueException ignored) {
-                // skip to next iteration
-            } catch (BreakException ignored) {
-                break;
-            }
-        }
-        ctx.flow("completed");
+        // The controller drives iterations on the step-able engine: each iteration clears the cache
+        // and publishes "index" into node state (read back by evaluate()); the engine runs the body
+        // a node at a time and fires "completed" when the count is exhausted.
+        ctx.pushLoop(new LoopController.ForController((NodeModel) getNodeModel(), n), "body", "completed");
     }
 
     @Override

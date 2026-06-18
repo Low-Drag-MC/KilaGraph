@@ -6,13 +6,13 @@ import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
-import com.lowdragmc.kilagraph.graph.exec.BreakException;
-import com.lowdragmc.kilagraph.graph.exec.ContinueException;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
+import com.lowdragmc.kilagraph.graph.exec.LoopController;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionFlow;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
 import java.util.List;
@@ -38,21 +38,9 @@ public class ForEachNode extends AnnotatedNode {
     public void execute(ExecContext ctx) {
         // Pull the list once before iterating — clearing the cache between iterations would lose it.
         List<?> values = ctx.getInput("list", List.class, List.of());
-        for (int i = 0; i < values.size(); i++) {
-            ctx.getExecutor().clearCache();
-            // index/item live in node state so a nested loop's clearCache can't destroy them;
-            // evaluate() re-publishes them on demand.
-            ctx.state().put("index", i);
-            ctx.state().put("item", values.get(i));
-            try {
-                ctx.runIsolated(() -> ctx.flow("body"));
-            } catch (ContinueException ignored) {
-                // next iteration
-            } catch (BreakException ignored) {
-                break;
-            }
-        }
-        ctx.flow("completed");
+        // The controller publishes "index"/"item" into node state per iteration (read by evaluate());
+        // the engine steps the body and fires "completed" when the list is exhausted.
+        ctx.pushLoop(new LoopController.ForEachController((NodeModel) getNodeModel(), values), "body", "completed");
     }
 
     @Override

@@ -6,11 +6,11 @@ import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.Option;
-import com.lowdragmc.kilagraph.graph.exec.BreakException;
-import com.lowdragmc.kilagraph.graph.exec.ContinueException;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
+import com.lowdragmc.kilagraph.graph.exec.LoopController;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionFlow;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 
 /**
  * Re-pulls {@code cond} between iterations. Hard cap of {@code maxIterations} guards against
@@ -28,18 +28,8 @@ public class WhileNode extends AnnotatedNode {
     @Override
     public void execute(ExecContext ctx) {
         int cap = Math.max(1, ctx.getOption("maxIterations", Integer.class, maxIterations));
-        for (int i = 0; i < cap; i++) {
-            // Invalidate cache so cond re-pulls — and so the body sees fresh values.
-            ctx.getExecutor().clearCache();
-            if (!ctx.getInput("cond", Boolean.class, false)) break;
-            try {
-                ctx.runIsolated(() -> ctx.flow("body"));
-            } catch (ContinueException ignored) {
-                // skip to next iteration
-            } catch (BreakException ignored) {
-                break;
-            }
-        }
-        ctx.flow("completed");
+        // The controller re-pulls "cond" (after clearing the cache) before each iteration and caps
+        // at maxIterations; the engine steps the body and fires "completed" when cond goes false.
+        ctx.pushLoop(new LoopController.WhileController((NodeModel) getNodeModel(), cap), "body", "completed");
     }
 }

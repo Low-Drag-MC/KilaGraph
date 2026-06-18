@@ -34,11 +34,10 @@ public class SequenceNode extends AnnotatedNode {
     @Override
     public void execute(ExecContext ctx) {
         int n = Math.max(1, ctx.getOption("outputs", Integer.class, outputs));
-        for (int i = 1; i <= n; i++) {
-            final int idx = i;
-            // Drain out_idx's whole chain before starting out_{idx+1}. A Break/Continue raised
-            // inside a branch propagates out (abandoning the remaining outputs) to an enclosing loop.
-            ctx.runIsolated(() -> ctx.flow("out" + idx));
-        }
+        // Run-to-completion fan-out: out1's whole chain drains before out2 begins, etc. A
+        // Break/Continue raised inside a branch unwinds this sequence frame to the enclosing loop.
+        java.util.List<String> outIds = new java.util.ArrayList<>(n);
+        for (int i = 1; i <= n; i++) outIds.add("out" + i);
+        ctx.pushSequence(outIds);
     }
 }
