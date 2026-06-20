@@ -10,12 +10,16 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.PortDirection;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.IVariable;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.DeclarationModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.AbstractNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ISingleInputPortNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ISingleOutputPortNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.WirePortalModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 
@@ -153,6 +157,14 @@ public final class GraphExecutor {
     void executeStep(NodeModel n, ExecSession session, ExecFrame frame) {
         if (n instanceof SubgraphNodeModel sub) {
             subgraphEnter(sub, session, frame);
+            return;
+        }
+        // Wire-portal ENTRY reached by exec flow: fan out to every matching exit portal's downstream
+        // (the entry↔exit gap has no wire — bridge it via the shared DeclarationModel).
+        if (n instanceof WirePortalModel entry && n instanceof ISingleInputPortNodeModel) {
+            for (WirePortalModel exit : exitPortals(entry.getDeclarationModel())) {
+                if (exit instanceof ISingleOutputPortNodeModel out) frame.enqueueFlow(out.getOutputPort());
+            }
             return;
         }
         IVariableNode vn = asVariableNode(n);
@@ -401,6 +413,13 @@ public final class GraphExecutor {
             return;
         }
 
+        // 3b) Wire-portal EXIT — a "teleport wire" has no edge linking it to its entry; resolve the
+        //     value through the matching entry portal (shared DeclarationModel) and pull its input.
+        if (modelNode instanceof WirePortalModel exit && modelNode instanceof ISingleOutputPortNodeModel out) {
+            cache.put(out.getOutputPort(), resolvePortalValue(exit));
+            return;
+        }
+
         // 4) Any evaluable user node (AnnotatedNode, or a BlockNode-based reader like the InfoNode
         //    field blocks) — invoke evaluate(EvalContext) and flush its staged outputs.
         if (!(modelNode instanceof NodeModel nm)) return;
@@ -472,6 +491,28 @@ public final class GraphExecutor {
             if (outerOutput == null) continue;
             cache.put(outerOutput, innerResults.get(v.getName()));
         }
+    }
+
+    /**
+     * Resolve the value an exit wire-portal delivers: find the single entry portal sharing its
+     * {@link DeclarationModel} and pull the entry's input wire. Null if there's no entry (dangling
+     * exit) or the entry is unwired.
+     */
+    private Object resolvePortalValue(WirePortalModel exit) {
+        DeclarationModel decl = exit.getDeclarationModel();
+        if (decl == null || !(graph.graphModel instanceof CustomGraphModelImpl gm)) return null;
+        for (var entry : gm.getEntryPortals(decl)) {
+            if (entry instanceof ISingleInputPortNodeModel in) {
+                return pullInput(in.getInputPort(), Object.class);
+            }
+        }
+        return null;
+    }
+
+    /** Exit portals sharing {@code decl} (empty if the graph model isn't resolvable). */
+    private List<WirePortalModel> exitPortals(DeclarationModel decl) {
+        if (decl == null || !(graph.graphModel instanceof CustomGraphModelImpl gm)) return List.of();
+        return gm.getExitPortals(decl);
     }
 
     /**

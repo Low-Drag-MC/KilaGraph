@@ -27,6 +27,7 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.StringNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.StepDebuggerGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.SubgraphExecGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.SubgraphGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.WirePortalGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.VariableGameTest;
 import com.lowdragmc.kilagraph.test.gametest.rendertypegraph.RenderTypeGraphGameTest;
 import com.lowdragmc.kilagraph.test.gametest.rendertypegraph.ShaderCompilerGameTest;
@@ -106,6 +107,7 @@ public final class KGGameTests {
         ExecVarInteractionGameTest.registerFunctions();
         SubgraphExecGameTest.registerFunctions();
         StepDebuggerGameTest.registerFunctions();
+        WirePortalGameTest.registerFunctions();
     }
 
     private static void registerRenderTypeGraphFunctions() {
@@ -190,6 +192,7 @@ public final class KGGameTests {
         ExecVarInteractionGameTest.register(event, environment);
         SubgraphExecGameTest.register(event, environment);
         StepDebuggerGameTest.register(event, environment);
+        WirePortalGameTest.register(event, environment);
     }
 
     private static void registerRenderTypeGraphTests(
