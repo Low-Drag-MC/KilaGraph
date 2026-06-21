@@ -120,24 +120,33 @@ final class NodeMetadata {
     }
 
     void applyPorts(IPortDefinitionContext ctx, AnnotatedNode node) {
+        // Emit exec-flow ports before data ports so {@code trigger}/{@code next} sit at the top of the
+        // node — even when declared in a superclass (the field scan visits subclass fields first, so an
+        // inherited exec port would otherwise land at the bottom).
         for (FieldDef d : defs) {
-            if (d.kind == Kind.OPTION) continue;
-            if (d.kind == Kind.INPUT_PORT) {
-                IInputPortBuilder<?> b = ctx.addInputPort(d.id, d.typeHandle);
-                if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
-                if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
-                if (hasAccessor(d.field.getGenericType())) {
-                    Object def = readFieldValue(d.field, node);
-                    if (def != null) b.withDefaultValue(def);
-                    b.withFieldContext(d.field, node);
-                } else {
-                    b.withoutConfigurator();
-                }
+            if (d.kind != Kind.OPTION && d.execFlow) applyPort(ctx, node, d);
+        }
+        for (FieldDef d : defs) {
+            if (d.kind != Kind.OPTION && !d.execFlow) applyPort(ctx, node, d);
+        }
+    }
+
+    private void applyPort(IPortDefinitionContext ctx, AnnotatedNode node, FieldDef d) {
+        if (d.kind == Kind.INPUT_PORT) {
+            IInputPortBuilder<?> b = ctx.addInputPort(d.id, d.typeHandle);
+            if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
+            if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
+            if (hasAccessor(d.field.getGenericType())) {
+                Object def = readFieldValue(d.field, node);
+                if (def != null) b.withDefaultValue(def);
+                b.withFieldContext(d.field, node);
             } else {
-                IOutputPortBuilder<?> b = ctx.addOutputPort(d.id, d.typeHandle);
-                if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
-                if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
+                b.withoutConfigurator();
             }
+        } else {
+            IOutputPortBuilder<?> b = ctx.addOutputPort(d.id, d.typeHandle);
+            if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
+            if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
         }
     }
 
