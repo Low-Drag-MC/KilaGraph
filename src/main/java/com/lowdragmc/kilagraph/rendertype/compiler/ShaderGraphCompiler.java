@@ -216,7 +216,11 @@ public final class ShaderGraphCompiler {
         builtinUbos.add("Projection"); // vsh uses ProjMat * ModelViewMat
         ShaderExpr value = previewValueOf(outputPort);
         if (value == null) value = new ShaderExpr("vec4(0.0)", GlslType.VEC4);
-        ShaderExpr color = convert(value, GlslType.VEC4);
+        // The preview quad is composited over the editor GUI by its alpha, so a value's alpha would control
+        // visibility — a scalar broadcast (vec4(f)) makes alpha == the value, so a 0 vanishes instead of
+        // showing black. Force opaque: take the value's rgb (scalars broadcast to grey) and append alpha 1,
+        // matching Unity (a 0 previews as black). See NodeShaderPreview / ShaderPreviewTool.
+        ShaderExpr color = new ShaderExpr("vec4(" + convert(value, GlslType.VEC3).code() + ", 1.0)", GlslType.VEC4);
 
         String vsh = assemblePreviewVertex();
         String fsh = assemblePreviewFragment(color);
@@ -630,6 +634,16 @@ public final class ShaderGraphCompiler {
         ShaderExpr raw = sampleSceneDepthRaw(uv);
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
         return new ShaderExpr("kg_linear01_depth(" + raw.code() + ", " + iproj.code() + ")", GlslType.FLOAT);
+    }
+
+    /** Eye-space distance of THIS fragment from the camera (world units), reconstructed from
+     *  {@code gl_FragCoord.z} via {@code IProjMat} — the same basis as {@link #sampleSceneDepthEye}, so
+     *  {@code sampleSceneDepthEye(uv) - fragmentEyeDepth()} cancels the camera (Unity's ScreenPosition raw
+     *  {@code .w} / soft-particle depth fade). Fragment-only. */
+    ShaderExpr fragmentEyeDepth() {
+        addInclude("kilagraph:kg_scene.glsl");
+        ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
+        return new ShaderExpr("kg_eye_depth(gl_FragCoord.z, " + iproj.code() + ")", GlslType.FLOAT);
     }
 
     /** Camera near-plane distance (world units), reconstructed from {@code IProjMat}. */

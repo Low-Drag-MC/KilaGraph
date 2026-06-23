@@ -24,8 +24,11 @@ import java.util.List;
  *   <li><b>center</b> — {@code [-1,1]}, origin at screen center.</li>
  *   <li><b>tiled</b> — centered + aspect-corrected, fractional (a repeating tile).</li>
  *   <li><b>pixel</b> — raw pixel coordinates {@code [0,ScreenSize]}.</li>
- *   <li><b>raw</b> — homogeneous screen position. We lack the pre-divide clip position as a varying, so
- *       this is emitted as the normalized position with {@code w=1} (so {@code .xy/.w} still yields the UV).</li>
+ *   <li><b>raw</b> — homogeneous screen position (Unity's pre-divide {@code ComputeScreenPos}): {@code .xy/.w}
+ *       yields the UV, {@code .z/.w} the window depth, and <b>{@code .w} is the fragment's eye-space distance
+ *       from the camera</b> (= clip-space w), reconstructed from {@code gl_FragCoord.z} via the same
+ *       {@code IProjMat} basis as Scene Depth "eye". This makes a depth fade
+ *       {@code saturate((SceneDepth[eye] - ScreenPosition[raw].w) / d)} camera-position independent.</li>
  * </ul>
  * The {@code default} mode is the canonical UV feeder for the Scene Color / Scene Depth nodes.
  */
@@ -52,14 +55,26 @@ public class ScreenPositionNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl");
-        String uv = "(gl_FragCoord.xy / ScreenSize)";
-        String code = switch (ctx.option("mode", String.class, "default")) {
-            case "pixel" -> "vec4(gl_FragCoord.xy, 0.0, 0.0)";
+        // Build every mode on the editor-preview-aware screen UV. In a node/graph preview the geometry
+        // covers only a small screen sub-rect, so raw gl_FragCoord/ScreenSize would sample just that corner
+        // (center/tiled/pixel would collapse to near-constant values); screenUv() maps the mesh uv there and
+        // keeps true gl_FragCoord screen-space in-world. See ShaderGraphCompiler#screenUv.
+        String uv = ctx.screenUv().code();
+        String mode = ctx.option("mode", String.class, "default");
+        if (mode.equals("pixel") || mode.equals("tiled")) {
+            ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl"); // ScreenSize
+        }
+        String code = switch (mode) {
+            case "pixel" -> "vec4(" + uv + " * ScreenSize, 0.0, 0.0)";
             case "center" -> "vec4(" + uv + " * 2.0 - 1.0, 0.0, 0.0)";
             case "tiled" -> "vec4(fract(vec2((" + uv + ".x * 2.0 - 1.0) * (ScreenSize.x / ScreenSize.y), "
                     + uv + ".y * 2.0 - 1.0)), 0.0, 0.0)";
-            case "raw" -> "vec4(" + uv + ", 0.0, 1.0)";
+            // Homogeneous (pre-divide) screen position: w = the fragment's eye-space depth, so .xy/.w = uv and
+            // (SceneDepth[eye] - .w) is a camera-independent depth fade. See ShaderCompileContext#fragmentEyeDepth.
+            case "raw" -> {
+                String w = ctx.temp(GlslType.FLOAT, ctx.fragmentEyeDepth().code()).code();
+                yield "vec4(" + uv + " * " + w + ", gl_FragCoord.z * " + w + ", " + w + ")";
+            }
             default -> "vec4(" + uv + ", 0.0, 0.0)";
         };
         ctx.output("out", new ShaderExpr(code, GlslType.VEC4));

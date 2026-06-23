@@ -200,6 +200,13 @@ public final class ShaderCompileContext {
         return compiler.sampleSceneDepthLinear01(uv);
     }
 
+    /** Eye-space distance of the current fragment from the camera (world units) — Unity's ScreenPosition raw
+     *  {@code .w}. Reconstructed from {@code gl_FragCoord.z} with the same {@code IProjMat} basis as
+     *  {@link #sampleSceneDepthEye}, so subtracting the two cancels the camera (depth fade). Fragment-only. */
+    public ShaderExpr fragmentEyeDepth() {
+        return compiler.fragmentEyeDepth();
+    }
+
     /** Camera near-plane distance (world units), reconstructed from {@code IProjMat}. */
     public ShaderExpr cameraNear() {
         return compiler.cameraNear();

@@ -165,6 +165,9 @@ public final class ShaderCompilerGameTest {
     private static final String SCREEN_POSITION_MODES = "rendertype_compile_screen_position_modes";
     private static final String CAMERA_NEW_OUTPUTS = "rendertype_compile_camera_new_outputs";
     private static final String SCENE_PREVIEW_UV = "rendertype_compile_scene_preview_uv";
+    private static final String SCREEN_POSITION_PREVIEW = "rendertype_compile_screen_position_preview";
+    private static final String SCREEN_POSITION_RAW_EYE = "rendertype_compile_screen_position_raw_eye";
+    private static final String PREVIEW_OPAQUE_ALPHA = "rendertype_compile_preview_opaque_alpha";
     private static final String BRANCH_SELECT = "rendertype_compile_branch_select";
     private static final String COMPARE_LOGIC = "rendertype_compile_compare_logic";
     private static final String EXPRESSION_NODE = "rendertype_compile_expression_node";
@@ -226,6 +229,9 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunction(SCREEN_POSITION_MODES, ShaderCompilerGameTest::screenPositionModesEmitGlsl);
         KGGameTests.registerFunction(CAMERA_NEW_OUTPUTS, ShaderCompilerGameTest::cameraNodeExposesNewOutputs);
         KGGameTests.registerFunction(SCENE_PREVIEW_UV, ShaderCompilerGameTest::scenePreviewMapsWholeCapture);
+        KGGameTests.registerFunction(SCREEN_POSITION_PREVIEW, ShaderCompilerGameTest::screenPositionPreviewMapsToMeshUv);
+        KGGameTests.registerFunction(SCREEN_POSITION_RAW_EYE, ShaderCompilerGameTest::screenPositionRawCarriesFragmentEyeDepth);
+        KGGameTests.registerFunction(PREVIEW_OPAQUE_ALPHA, ShaderCompilerGameTest::scalarPreviewForcesOpaqueAlpha);
         KGGameTests.registerFunction(BRANCH_SELECT, ShaderCompilerGameTest::branchEmitsSelect);
         KGGameTests.registerFunction(COMPARE_LOGIC, ShaderCompilerGameTest::compareLogicEmitGlsl);
         KGGameTests.registerFunction(EXPRESSION_NODE, ShaderCompilerGameTest::expressionNodeEmitsFunctionAndCall);
@@ -287,6 +293,9 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunctionTest(event, SCREEN_POSITION_MODES, KGGameTests.functionKey(SCREEN_POSITION_MODES), d);
         KGGameTests.registerFunctionTest(event, CAMERA_NEW_OUTPUTS, KGGameTests.functionKey(CAMERA_NEW_OUTPUTS), d);
         KGGameTests.registerFunctionTest(event, SCENE_PREVIEW_UV, KGGameTests.functionKey(SCENE_PREVIEW_UV), d);
+        KGGameTests.registerFunctionTest(event, SCREEN_POSITION_PREVIEW, KGGameTests.functionKey(SCREEN_POSITION_PREVIEW), d);
+        KGGameTests.registerFunctionTest(event, SCREEN_POSITION_RAW_EYE, KGGameTests.functionKey(SCREEN_POSITION_RAW_EYE), d);
+        KGGameTests.registerFunctionTest(event, PREVIEW_OPAQUE_ALPHA, KGGameTests.functionKey(PREVIEW_OPAQUE_ALPHA), d);
         KGGameTests.registerFunctionTest(event, BRANCH_SELECT, KGGameTests.functionKey(BRANCH_SELECT), d);
         KGGameTests.registerFunctionTest(event, COMPARE_LOGIC, KGGameTests.functionKey(COMPARE_LOGIC), d);
         KGGameTests.registerFunctionTest(event, EXPRESSION_NODE, KGGameTests.functionKey(EXPRESSION_NODE), d);
@@ -760,7 +769,7 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph uvPreview = new ShaderGraphCompiler(graph)
                 .compilePreview(uv.getOutputsById().get("out"));
         String uvFsh = uvPreview.fragmentSource();
-        assertTrue(helper, "vec2 preview padded to vec4", uvFsh.contains("fragColor = vec4(") && uvFsh.contains("0.0, 1.0)"));
+        assertTrue(helper, "vec2 preview padded to an opaque vec4", uvFsh.contains("fragColor = vec4(") && uvFsh.contains(", 1.0);"));
         assertTrue(helper, "uv preview sources the quad uv", uvFsh.contains("= vUv;"));
         helper.succeed();
     }
@@ -1776,11 +1785,67 @@ public final class ShaderCompilerGameTest {
 
     /** Each Screen Position mode emits its distinctive GLSL formula. */
     public static void screenPositionModesEmitGlsl(GameTestHelper helper) {
-        assertTrue(helper, "pixel mode is raw fragcoord", screenPosFsh("pixel").contains("vec4(gl_FragCoord.xy, 0.0, 0.0)"));
+        assertTrue(helper, "pixel mode scales the screen uv to pixels", screenPosFsh("pixel").contains("* ScreenSize, 0.0, 0.0)"));
         assertTrue(helper, "center mode remaps to -1..1", screenPosFsh("center").contains("* 2.0 - 1.0"));
         assertTrue(helper, "tiled mode tiles with fract", screenPosFsh("tiled").contains("fract("));
         assertTrue(helper, "default mode normalises by ScreenSize",
                 screenPosFsh("default").contains("gl_FragCoord.xy / ScreenSize"));
+        assertTrue(helper, "raw mode carries the fragment eye depth in W",
+                screenPosFsh("raw").contains("kg_eye_depth(gl_FragCoord.z"));
+        helper.succeed();
+    }
+
+    /**
+     * Screen Position "raw" W must be the fragment's eye-space depth reconstructed from the SAME basis as
+     * Scene Depth "eye" (kg_eye_depth + IProjMat), so {@code SceneDepth[eye] - raw.w} cancels the camera —
+     * a camera-independent depth fade. Regression for the old {@code w=1.0} stub.
+     */
+    public static void screenPositionRawCarriesFragmentEyeDepth(GameTestHelper helper) {
+        String fsh = screenPosFsh("raw");
+        assertTrue(helper, "raw reconstructs eye depth from gl_FragCoord.z", fsh.contains("kg_eye_depth(gl_FragCoord.z"));
+        assertTrue(helper, "raw uses the inverse projection (same basis as Scene Depth eye)", fsh.contains("IProjMat"));
+        assertTrue(helper, "raw pulls in the scene-depth helper include", fsh.contains("kg_scene.glsl"));
+        assertFalse(helper, "raw is no longer the w=1.0 stub", fsh.contains("vec4((gl_FragCoord.xy / ScreenSize), 0.0, 1.0)"));
+        helper.succeed();
+    }
+
+    /**
+     * Screen Position previews must build on the editor-preview screen UV (the quad uv), not raw
+     * gl_FragCoord: in a node thumbnail the geometry covers only a screen sub-rect, so true screen
+     * coordinates would collapse center/tiled/pixel to a near-constant corner. In-world it keeps
+     * gl_FragCoord screen-space.
+     */
+    public static void screenPositionPreviewMapsToMeshUv(GameTestHelper helper) {
+        RenderTypeGraph g = new RenderTypeGraph();
+        NodeModel sp = addNode(g, ScreenPositionNode.class); // default mode
+        String pfsh = new ShaderGraphCompiler(g).compilePreview(sp.getOutputsById().get("out")).fragmentSource();
+        assertFalse(helper, "screen position preview does not use gl_FragCoord", pfsh.contains("gl_FragCoord"));
+        assertTrue(helper, "screen position preview maps to the quad uv", pfsh.contains("vUv"));
+
+        // In-world: the real compile keeps true screen-space.
+        RenderTypeGraph g2 = new RenderTypeGraph();
+        NodeModel sp2 = addNode(g2, ScreenPositionNode.class);
+        wire(g2, addBlock(g2, g2.getFragmentStageModel(), FragmentBaseColorBlock.class).getInputsById().get("color"),
+                sp2.getOutputsById().get("out"));
+        assertTrue(helper, "screen position in-world keeps gl_FragCoord",
+                new ShaderGraphCompiler(g2).compile().fragmentSource().contains("gl_FragCoord"));
+        helper.succeed();
+    }
+
+    /**
+     * A node preview is composited over the editor GUI by its alpha, so a scalar output must be forced
+     * opaque — otherwise a 0 value (alpha 0) would vanish instead of showing black (Unity parity). The
+     * preview colour is {@code vec4(<value>.rgb, 1.0)}, never the {@code vec4(f)} broadcast that aliases
+     * alpha to the value.
+     */
+    public static void scalarPreviewForcesOpaqueAlpha(GameTestHelper helper) {
+        RenderTypeGraph g = new RenderTypeGraph();
+        NodeModel add = addNode(g, AddNode.class); // scalar (dynamic float) output
+        setInputConstant(add, "a", 0.0f);
+        setInputConstant(add, "b", 0.0f);
+        String fsh = new ShaderGraphCompiler(g).compilePreview(add.getOutputsById().get("out")).fragmentSource();
+        assertTrue(helper, "scalar preview broadcasts to rgb with opaque alpha",
+                fsh.contains("fragColor = vec4(vec3(") && fsh.contains(", 1.0);"));
         helper.succeed();
     }
 

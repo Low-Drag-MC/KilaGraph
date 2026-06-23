@@ -113,15 +113,16 @@ public class VertexAttributeInputNode extends ShaderNode implements IVertexForma
 
     /**
      * A fragment-safe preview value for an attribute (the per-node preview has no vertex stage). The
-     * preview vsh forwards {@code Position→vPos} and {@code UV0→vUv}, so position/uv read those
-     * interpolants; the rest fall back to neutral constants (a flat quad has no real color/normal).
+     * preview vsh forwards {@code Position→vPos}, {@code UV0→vUv} and {@code Normal→vNormal}, so those read
+     * the real interpolants (the preview mesh can be a sphere/cube, not just a flat quad); the rest fall back
+     * to neutral constants (the preview vsh does not forward {@code Color}).
      */
     private static ShaderExpr previewExpr(KGVertexElement element) {
         return switch (element.key()) {
             case "position" -> new ShaderExpr("vPos", GlslType.VEC3);
             case "uv0" -> new ShaderExpr("vUv", GlslType.VEC2);
             case "color" -> new ShaderExpr("vec4(1.0)", GlslType.VEC4);
-            case "normal" -> new ShaderExpr("vec3(0.0, 0.0, 1.0)", GlslType.VEC3);
+            case "normal" -> new ShaderExpr("vNormal", GlslType.VEC3);
             default -> zeroExpr(element.glslType()); // uv1/uv2/lineWidth/custom → zero of its type
         };
     }
