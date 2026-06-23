@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.artistic.normal;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -20,6 +21,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  */
 @NodeAttribute(name = "rt_normal_from_texture", group = "rendertype_artistic/normal", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class NormalFromTextureNode extends ArtisticNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_normal_from_texture.tooltip");
+    }
+
     @Override
     public StageAffinity stageAffinity() {
         return StageAffinity.FRAGMENT_ONLY; // texture() auto-lod needs derivatives

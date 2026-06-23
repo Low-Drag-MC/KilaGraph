@@ -11,6 +11,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
+import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -23,6 +25,11 @@ import java.util.Map;
  */
 @NodeAttribute(name = "rt_compare", group = "rendertype_logic", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class CompareNode extends ShaderNode {
+
+    @Override
+    protected @Nullable Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_compare.tooltip");
+    }
 
     /** Option value -> GLSL operator. Insertion order drives the dropdown order. */
     private static final Map<String, String> OPS = new java.util.LinkedHashMap<>();

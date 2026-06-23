@@ -1,5 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.math.vector;
 
+import com.lowdragmc.lowdraglib2.gui.ui.data.Tooltips;
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -8,6 +10,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
@@ -38,6 +41,11 @@ import java.util.List;
  */
 @NodeAttribute(name = "rt_transform", group = "rendertype_math/vector", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class TransformNode extends ShaderNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_transform.tooltip");
+    }
+
 
     private static final List<String> SPACES = List.of("object", "view", "world", "clip");
     private static final List<String> TARGETS = List.of("object", "view", "world", "clip", "screen");
@@ -46,10 +54,13 @@ public class TransformNode extends ShaderNode {
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
         context.addOption("from", TypeHandles.STRING).withDefaultValue("object")
+                .withTooltips(Tooltips.of("kg.node.rt_transform.option.from.tooltip"))
                 .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES)).build();
         context.addOption("to", TypeHandles.STRING).withDefaultValue("world")
+                .withTooltips(Tooltips.of("kg.node.rt_transform.option.to.tooltip"))
                 .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, TARGETS)).build();
         context.addOption("type", TypeHandles.STRING).withDefaultValue("position")
+                .withTooltips(Tooltips.of("kg.node.rt_transform.option.type.tooltip"))
                 .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, TYPES)).build();
     }
 

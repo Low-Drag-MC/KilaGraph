@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.transform;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
@@ -18,6 +19,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  */
 @NodeAttribute(name = "rt_projection_from_position", group = "rendertype_transform", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class ProjectionFromPositionNode extends ShaderNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_projection_from_position.tooltip");
+    }
+
     @Override
     public StageAffinity stageAffinity() {
         return StageAffinity.VERTEX_ONLY;

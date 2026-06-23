@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.entity;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -16,6 +17,11 @@ import java.util.List;
 /** All entities within the inclusive block box {@code [min, max]}. Empty list if level is null. */
 @NodeAttribute(name = "mc_entities_in_aabb", group = "mc_entity", graphTypes = BlueprintGraph.class)
 public class EntitiesInAabbNode extends AnnotatedNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.mc_entities_in_aabb.tooltip");
+    }
+
     @InputPort public Level level;
     @InputPort public BlockPos min = BlockPos.ZERO;
     @InputPort public BlockPos max = BlockPos.ZERO;

@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -19,6 +20,11 @@ import net.minecraft.world.item.Items;
  */
 @NodeAttribute(name = "mc_item_in_tag", group = "mc", graphTypes = BlueprintGraph.class)
 public class ItemInTagNode extends AnnotatedNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.mc_item_in_tag.tooltip");
+    }
+
 
     @InputPort public Item item = Items.AIR;
     @InputPort public String tag = "";

@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.Option;
@@ -12,6 +13,11 @@ import net.minecraft.world.level.block.Blocks;
 /** Emits a constant {@link Block} chosen from the inspector picker (registry accessor). */
 @NodeAttribute(name = "mc_block_const", group = "mc", graphTypes = BlueprintGraph.class)
 public class BlockConstNode extends AnnotatedNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.mc_block_const.tooltip");
+    }
+
 
     @Option public Block value = Blocks.STONE;
     @OutputPort public Block out;

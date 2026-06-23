@@ -1,12 +1,15 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.info;
 
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.ContextNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 import com.lowdragmc.lowdraglib2.syncdata.AccessorRegistries;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
@@ -26,6 +29,20 @@ public abstract class InfoContextNode<T> extends ContextNode {
 
     /** The class whose properties this context's blocks read. Drives the {@code target} port. */
     protected abstract Class<T> targetClass();
+
+    @Override
+    public void setImplementation(NodeModel nodeModel) {
+        super.setImplementation(nodeModel);
+        NodeTooltipHelper.apply(nodeModel, getNodeTooltip());
+    }
+
+    protected @Nullable Component getNodeTooltip() {
+        return null;
+    }
+
+    protected final Component tooltip(String key) {
+        return Component.translatable(key);
+    }
 
     /** Public view of {@link #targetClass()} for the contained blocks. */
     public Class<?> targetType() {

@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.vertex;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
@@ -14,6 +15,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 @UseWithContext(VaryingStageNode.class)
 @NodeAttribute(name = "rt_vertex_custom_vec2", group = "rendertype_vertex", graphTypes = RenderTypeGraph.class)
 public class VaryingCustomVec2Block extends ShaderBlockNode implements IVaryingBlock {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_vertex_custom_vec2.tooltip");
+    }
+
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         super.onDefinePorts(context);

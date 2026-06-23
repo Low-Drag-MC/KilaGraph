@@ -1,5 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.input;
 
+import com.lowdragmc.lowdraglib2.gui.ui.data.Tooltips;
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.UvChannel;
@@ -8,6 +10,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
@@ -23,6 +26,11 @@ import java.util.List;
  */
 @NodeAttribute(name = "rt_uv", group = "rendertype_input", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class UVNode extends ShaderNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_uv.tooltip");
+    }
+
 
     private static final List<String> CHANNELS = List.of("uv0", "uv1", "uv2");
 
@@ -34,6 +42,7 @@ public class UVNode extends ShaderNode {
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
         context.addOption("channel", TypeHandles.STRING).withDefaultValue("uv0")
+                .withTooltips(Tooltips.of("kg.node.rt_uv.option.channel.tooltip"))
                 .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, CHANNELS, String::toUpperCase)).build();
     }
 

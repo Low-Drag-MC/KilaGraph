@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.procedural;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -19,6 +20,11 @@ import org.joml.Vector3f;
  */
 @NodeAttribute(name = "rt_checkerboard", group = "rendertype_procedural", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class CheckerboardNode extends ProceduralNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_checkerboard.tooltip");
+    }
+
 
     @Override
     public StageAffinity stageAffinity() {

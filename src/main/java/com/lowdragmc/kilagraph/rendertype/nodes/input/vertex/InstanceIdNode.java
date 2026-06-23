@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.input.vertex;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
@@ -22,6 +23,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  */
 @NodeAttribute(name = "rt_instance_id", group = "rendertype_input/vertex", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class InstanceIdNode extends ShaderNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_instance_id.tooltip");
+    }
+
     @Override
     public StageAffinity stageAffinity() {
         return StageAffinity.VERTEX_ONLY;

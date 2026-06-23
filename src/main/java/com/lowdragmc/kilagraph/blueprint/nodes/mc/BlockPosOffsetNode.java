@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -12,6 +13,11 @@ import net.minecraft.core.Direction;
 /** Offsets a {@link BlockPos} by {@code amount} blocks in {@code direction}. */
 @NodeAttribute(name = "mc_block_pos_offset", group = "mc", graphTypes = BlueprintGraph.class)
 public class BlockPosOffsetNode extends AnnotatedNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.mc_block_pos_offset.tooltip");
+    }
+
 
     @InputPort public BlockPos pos = BlockPos.ZERO;
     @InputPort public Direction direction = Direction.NORTH;

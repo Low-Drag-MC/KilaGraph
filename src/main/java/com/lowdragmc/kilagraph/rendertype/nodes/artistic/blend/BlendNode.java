@@ -1,5 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.artistic.blend;
 
+import com.lowdragmc.lowdraglib2.gui.ui.data.Tooltips;
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -8,6 +10,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
 import com.lowdragmc.kilagraph.rendertype.nodes.artistic.ArtisticNode;
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
@@ -23,6 +26,11 @@ import java.util.List;
  */
 @NodeAttribute(name = "rt_blend", group = "rendertype_artistic/blend", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class BlendNode extends ArtisticNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_blend.tooltip");
+    }
+
 
     private static final List<String> MODES = List.of(
             "burn", "darken", "difference", "dodge", "divide", "exclusion", "hardlight", "hardmix",
@@ -32,6 +40,7 @@ public class BlendNode extends ArtisticNode {
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
         context.addOption("mode", TypeHandles.STRING).withDefaultValue("overwrite")
+                .withTooltips(Tooltips.of("kg.node.rt_blend.option.mode.tooltip"))
                 .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, MODES)).build();
     }
 

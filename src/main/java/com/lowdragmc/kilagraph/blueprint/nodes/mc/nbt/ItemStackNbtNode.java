@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -14,6 +15,11 @@ import net.minecraft.world.item.component.CustomData;
 /** Reads the {@code custom_data} NBT compound off an {@link ItemStack} (a copy — safe to mutate). */
 @NodeAttribute(name = "mc_nbt_item_stack", group = "mc_nbt", graphTypes = BlueprintGraph.class)
 public class ItemStackNbtNode extends AnnotatedNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.mc_nbt_item_stack.tooltip");
+    }
+
     @InputPort public ItemStack stack;
     @OutputPort public CompoundTag out;
 @Override public void evaluate(EvalContext ctx) {

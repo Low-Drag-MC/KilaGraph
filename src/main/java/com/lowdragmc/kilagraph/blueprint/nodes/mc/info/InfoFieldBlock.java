@@ -5,10 +5,12 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.mc.MemberInfoRegistry;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.kilagraph.graph.util.KGSearchConfigurators;
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
@@ -29,6 +31,16 @@ import java.util.List;
  */
 @NodeAttribute(name = "info_field", group = "mc_info", graphTypes = com.lowdragmc.kilagraph.blueprint.BlueprintGraph.class)
 public class InfoFieldBlock extends BlockNode implements IGraphEvaluable {
+
+    @Override
+    public void setImplementation(NodeModel nodeModel) {
+        super.setImplementation(nodeModel);
+        NodeTooltipHelper.apply(nodeModel, getNodeTooltip());
+    }
+
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.info_field.tooltip");
+    }
 
     @Override
     public Component getDisplayName() {

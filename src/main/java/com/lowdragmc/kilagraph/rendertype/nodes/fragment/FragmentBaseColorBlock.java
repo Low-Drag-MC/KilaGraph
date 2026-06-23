@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.fragment;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.compiler.FragmentOutputs;
@@ -13,6 +14,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 @UseWithContext(FragmentStageNode.class)
 @NodeAttribute(name = "rt_fragment_base_color", group = "rendertype_fragment", graphTypes = RenderTypeGraph.class)
 public class FragmentBaseColorBlock extends ShaderBlockNode implements IFragmentOutputBlock {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_fragment_base_color.tooltip");
+    }
+
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         super.onDefinePorts(context);

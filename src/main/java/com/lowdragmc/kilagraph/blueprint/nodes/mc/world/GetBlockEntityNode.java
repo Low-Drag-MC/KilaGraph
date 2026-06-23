@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.world;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -13,6 +14,11 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 /** {@code level.getBlockEntity(pos)} — null if no block entity (or null level). */
 @NodeAttribute(name = "mc_get_block_entity", group = "mc_world", graphTypes = BlueprintGraph.class)
 public class GetBlockEntityNode extends AnnotatedNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.mc_get_block_entity.tooltip");
+    }
+
 
     @InputPort public Level level;
     @InputPort public BlockPos pos = BlockPos.ZERO;

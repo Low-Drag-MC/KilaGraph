@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -15,6 +16,11 @@ import net.minecraft.nbt.CompoundTag;
  */
 @NodeAttribute(name = "mc_nbt_get", group = "mc_nbt", graphTypes = BlueprintGraph.class)
 public class NbtGetNode extends AnnotatedNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.mc_nbt_get.tooltip");
+    }
+
 
     @Option public NbtValueType valueType = NbtValueType.STRING;
     @InputPort public CompoundTag tag;

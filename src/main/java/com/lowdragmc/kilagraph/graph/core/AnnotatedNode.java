@@ -2,11 +2,14 @@ package com.lowdragmc.kilagraph.graph.core;
 
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Base class for KilaGraph nodes that declare their structure through annotated Java fields
@@ -28,6 +31,16 @@ public abstract class AnnotatedNode extends Node implements IGraphEvaluable {
     NodeMetadata metadata() {
         if (metadata == null) metadata = NodeMetadata.CACHE.computeIfAbsent(getClass(), NodeMetadata::scan);
         return metadata;
+    }
+
+    @Override
+    public void setImplementation(NodeModel nodeModel) {
+        super.setImplementation(nodeModel);
+        NodeTooltipHelper.apply(nodeModel, getNodeTooltip());
+    }
+
+    protected @Nullable Component getNodeTooltip() {
+        return null;
     }
 
     @Override

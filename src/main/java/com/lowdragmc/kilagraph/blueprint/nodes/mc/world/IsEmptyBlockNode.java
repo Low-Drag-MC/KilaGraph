@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.world;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -12,6 +13,11 @@ import net.minecraft.world.level.Level;
 /** {@code level.isEmptyBlock(pos)} (air). Null level → false. */
 @NodeAttribute(name = "mc_is_empty_block", group = "mc_world", graphTypes = BlueprintGraph.class)
 public class IsEmptyBlockNode extends AnnotatedNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.mc_is_empty_block.tooltip");
+    }
+
 
     @InputPort public Level level;
     @InputPort public BlockPos pos = BlockPos.ZERO;

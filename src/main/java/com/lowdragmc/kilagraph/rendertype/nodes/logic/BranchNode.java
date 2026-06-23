@@ -11,6 +11,8 @@ import com.lowdragmc.kilagraph.rendertype.nodes.math.DynamicBinaryNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
+import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Unity's Branch node: {@code out = predicate ? True : False}. This is a data-flow <em>select</em>, not a
@@ -25,6 +27,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  */
 @NodeAttribute(name = "rt_branch", group = "rendertype_logic", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class BranchNode extends ShaderNode {
+
+    @Override
+    protected @Nullable Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_branch.tooltip");
+    }
 
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {

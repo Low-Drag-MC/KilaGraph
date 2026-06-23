@@ -1,5 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.scene;
 
+import com.lowdragmc.lowdraglib2.gui.ui.data.Tooltips;
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -9,6 +11,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
@@ -34,6 +37,11 @@ import java.util.List;
  */
 @NodeAttribute(name = "rt_screen_position", group = "rendertype_scene", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class ScreenPositionNode extends ShaderNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_screen_position.tooltip");
+    }
+
 
     private static final List<String> MODES = List.of("default", "raw", "center", "tiled", "pixel");
 
@@ -45,6 +53,12 @@ public class ScreenPositionNode extends ShaderNode {
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
         context.addOption("mode", TypeHandles.STRING).withDefaultValue("default")
+                .withTooltips(Tooltips.of(
+                        "kg.node.rt_screen_position.option.mode.tooltip.default",
+                        "kg.node.rt_screen_position.option.mode.tooltip.raw",
+                        "kg.node.rt_screen_position.option.mode.tooltip.center",
+                        "kg.node.rt_screen_position.option.mode.tooltip.tiled",
+                        "kg.node.rt_screen_position.option.mode.tooltip.pixel"))
                 .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, MODES, ScreenPositionNode::label)).build();
     }
 

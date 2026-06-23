@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -16,6 +17,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  */
 @NodeAttribute(name = "rt_rectangle", group = "rendertype_procedural/shapes", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class RectangleNode extends ShapeNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_rectangle.tooltip");
+    }
+
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         context.addInputPort("uv", RenderTypeGraphTypes.UV);

@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.fragment;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.FragmentOutputs;
 import com.lowdragmc.kilagraph.rendertype.compiler.IFragmentOutputBlock;
@@ -14,9 +15,14 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 @NodeAttribute(name = "rt_fragment_alpha", group = "rendertype_fragment", graphTypes = RenderTypeGraph.class)
 public class FragmentAlphaBlock extends ShaderBlockNode implements IFragmentOutputBlock {
     @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_fragment_alpha.tooltip");
+    }
+
+    @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         super.onDefinePorts(context);
-        context.addInputPort("alpha", TypeHandles.FLOAT);
+        context.addInputPort("alpha", TypeHandles.FLOAT).withDefaultValue(1f);
     }
 
     @Override

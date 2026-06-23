@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.fragment;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.FragmentOutputs;
 import com.lowdragmc.kilagraph.rendertype.compiler.IFragmentOutputBlock;
@@ -13,6 +14,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 @UseWithContext(FragmentStageNode.class)
 @NodeAttribute(name = "rt_fragment_alpha_discard", group = "rendertype_fragment", graphTypes = RenderTypeGraph.class)
 public class FragmentAlphaDiscardBlock extends ShaderBlockNode implements IFragmentOutputBlock {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_fragment_alpha_discard.tooltip");
+    }
+
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         super.onDefinePorts(context);

@@ -4,7 +4,6 @@ import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
-import com.lowdragmc.kilagraph.client.RenderTypeGraphDebug;
 import com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureHandler;
 import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 import com.lowdragmc.lowdraglib2.syncdata.AccessorRegistries;
@@ -47,7 +46,6 @@ public class Kilagraph {
         KGGameTests.init(modEventBus);
         // Client-only debug command + in-world draw for validating the RenderType pipeline end-to-end.
         if (FMLEnvironment.getDist() == Dist.CLIENT) {
-            RenderTypeGraphDebug.init();
             // Capture the opaque scene colour/depth (for Scene Color/Depth nodes), gated by demand.
             SceneCaptureHandler.init();
         }

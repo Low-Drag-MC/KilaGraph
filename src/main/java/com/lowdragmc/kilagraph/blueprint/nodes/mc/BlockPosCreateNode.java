@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -11,6 +12,11 @@ import net.minecraft.core.BlockPos;
 /** Builds a {@link BlockPos} from x/y/z. */
 @NodeAttribute(name = "mc_block_pos_create", group = "mc", graphTypes = BlueprintGraph.class)
 public class BlockPosCreateNode extends AnnotatedNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.mc_block_pos_create.tooltip");
+    }
+
 
     @InputPort public int x;
     @InputPort public int y;

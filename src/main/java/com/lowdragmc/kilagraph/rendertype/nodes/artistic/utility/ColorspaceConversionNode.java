@@ -1,5 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.artistic.utility;
 
+import com.lowdragmc.lowdraglib2.gui.ui.data.Tooltips;
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -9,6 +11,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
 import com.lowdragmc.kilagraph.rendertype.nodes.artistic.ArtisticGlsl;
 import com.lowdragmc.kilagraph.rendertype.nodes.artistic.ArtisticNode;
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
@@ -24,14 +27,21 @@ import java.util.List;
  */
 @NodeAttribute(name = "rt_colorspace_conversion", group = "rendertype_artistic/utility", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class ColorspaceConversionNode extends ArtisticNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_colorspace_conversion.tooltip");
+    }
+
 
     private static final List<String> SPACES = List.of("rgb", "linear", "hsv");
 
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
         context.addOption("from", TypeHandles.STRING).withDefaultValue("rgb")
+                .withTooltips(Tooltips.of("kg.node.rt_colorspace_conversion.option.from.tooltip"))
                 .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES)).build();
         context.addOption("to", TypeHandles.STRING).withDefaultValue("linear")
+                .withTooltips(Tooltips.of("kg.node.rt_colorspace_conversion.option.to.tooltip"))
                 .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES)).build();
     }
 

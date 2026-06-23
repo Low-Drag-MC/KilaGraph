@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -18,6 +19,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  */
 @NodeAttribute(name = "rt_rounded_polygon", group = "rendertype_procedural/shapes", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class RoundedPolygonNode extends ShapeNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_rounded_polygon.tooltip");
+    }
+
 
     /** Exact signed distance to a unit-circumradius regular n-gon, inset by {@code round} (rounds corners). */
     private static final String SDF = """

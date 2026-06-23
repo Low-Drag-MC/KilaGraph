@@ -12,6 +12,8 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.gui.ExpressionConfigurator;
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
+import com.lowdragmc.lowdraglib2.gui.ui.data.Tooltips;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
@@ -19,6 +21,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -44,6 +47,11 @@ public class ExpressionNode extends ShaderNode implements INodeValidator {
 
     public static final String OPTION = "spec";
 
+    @Override
+    protected @Nullable Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_expression.tooltip");
+    }
+
     /** Wider than a normal node so the inputs/outputs row + GLSL body editor have room. */
     @Override
     public float getNodeWidth() {
@@ -67,6 +75,7 @@ public class ExpressionNode extends ShaderNode implements INodeValidator {
         context.addOption(OPTION, TypeHandles.STRING)
                 .withDefaultValue(DEFAULT_JSON)
                 .withDisplayName(Component.empty())
+                .withTooltips(Tooltips.of("kg.node.rt_expression.option.expression.tooltip"))
                 .withConfigurable((vc, t) -> ExpressionConfigurator.build(vc)).build();
     }
 

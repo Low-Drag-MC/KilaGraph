@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.artistic.filter;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
@@ -18,6 +19,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  */
 @NodeAttribute(name = "rt_dither", group = "rendertype_artistic/filter", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class DitherNode extends ArtisticNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_dither.tooltip");
+    }
+
 
     private static final String DITHER = """
             float kg_dither(float v, vec2 p) {

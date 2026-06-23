@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.uv;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -19,6 +20,11 @@ import org.joml.Vector2f;
  */
 @NodeAttribute(name = "rt_polar_coordinates", group = "rendertype_uv", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class PolarCoordinatesNode extends ShaderNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_polar_coordinates.tooltip");
+    }
+
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         context.addInputPort("uv", RenderTypeGraphTypes.UV);

@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.artistic.adjustment;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -17,6 +18,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  */
 @NodeAttribute(name = "rt_replace_color", group = "rendertype_artistic/adjustment", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class ReplaceColorNode extends ArtisticNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_replace_color.tooltip");
+    }
+
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         context.addInputPort("in", RenderTypeGraphTypes.VEC3);

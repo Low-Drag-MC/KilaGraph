@@ -1,5 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.input.vertex;
 
+import com.lowdragmc.lowdraglib2.gui.ui.data.Tooltips;
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -12,6 +14,7 @@ import com.lowdragmc.kilagraph.rendertype.format.IVertexFormatDependentNode;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.gui.VertexAttributeConfigurator;
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
@@ -33,6 +36,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  */
 @NodeAttribute(name = "rt_in_vertex_attribute", group = "rendertype_input/vertex", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class VertexAttributeInputNode extends ShaderNode implements IVertexFormatDependentNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_in_vertex_attribute.tooltip");
+    }
+
 
     private static final String OPTION = "element";
     private static final String DEFAULT_KEY = "position";
@@ -60,6 +68,7 @@ public class VertexAttributeInputNode extends ShaderNode implements IVertexForma
         // String option holding the element key, edited via the registry dropdown (client-only, lazy).
         context.addOption(OPTION, TypeHandles.STRING)
                 .withDefaultValue(DEFAULT_KEY)
+                .withTooltips(Tooltips.of("kg.node.rt_in_vertex_attribute.option.attribute.tooltip"))
                 .withConfigurable((vc, type) -> VertexAttributeConfigurator.build(vc))
                 .build();
     }

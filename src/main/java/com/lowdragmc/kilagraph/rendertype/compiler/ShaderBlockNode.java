@@ -1,8 +1,11 @@
 package com.lowdragmc.kilagraph.rendertype.compiler;
 
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.kilagraph.rendertype.preview.ShaderPreviewSupport;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.node.NodePreviewContext;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
@@ -23,6 +26,20 @@ import org.jetbrains.annotations.Nullable;
  * thumbnail of that output (e.g. a {@code TexCoord} varying block previews the uv gradient).</p>
  */
 public abstract class ShaderBlockNode extends BlockNode {
+
+    @Override
+    public void setImplementation(NodeModel nodeModel) {
+        super.setImplementation(nodeModel);
+        NodeTooltipHelper.apply(nodeModel, getNodeTooltip());
+    }
+
+    protected @Nullable Component getNodeTooltip() {
+        return null;
+    }
+
+    protected final Component tooltip(String key) {
+        return Component.translatable(key);
+    }
 
     @Override
     public Component getDisplayName() {

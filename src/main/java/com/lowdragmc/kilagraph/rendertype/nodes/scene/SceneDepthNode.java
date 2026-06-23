@@ -8,10 +8,13 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
+import com.lowdragmc.lowdraglib2.gui.ui.data.Tooltips;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
+import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
@@ -31,6 +34,10 @@ import java.util.List;
  */
 @NodeAttribute(name = "rt_scene_depth", group = "rendertype_scene", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class SceneDepthNode extends ShaderNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_scene_depth.tooltip");
+    }
 
     private static final List<String> MODES = List.of("linear01", "raw", "eye");
 
@@ -42,6 +49,10 @@ public class SceneDepthNode extends ShaderNode {
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
         context.addOption("sampling", TypeHandles.STRING).withDefaultValue("linear01")
+                .withTooltips(Tooltips.of(
+                        "kg.node.rt_scene_depth.option.sampling.tooltip.linear01",
+                        "kg.node.rt_scene_depth.option.sampling.tooltip.raw",
+                        "kg.node.rt_scene_depth.option.sampling.tooltip.eye"))
                 .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, MODES, SceneDepthNode::label)).build();
     }
 

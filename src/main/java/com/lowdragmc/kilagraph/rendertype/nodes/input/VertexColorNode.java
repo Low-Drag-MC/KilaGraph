@@ -1,5 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.input;
 
+import com.lowdragmc.lowdraglib2.gui.ui.data.Tooltips;
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -7,6 +9,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
+import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
@@ -28,6 +31,11 @@ import java.util.List;
  */
 @NodeAttribute(name = "rt_vertex_color", group = "rendertype_input", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class VertexColorNode extends ShaderNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_vertex_color.tooltip");
+    }
+
 
     public static final String MODE_MIX_LIGHT = "mix_light";
     public static final String MODE_COLOR = "color";
@@ -42,6 +50,10 @@ public class VertexColorNode extends ShaderNode {
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
         context.addOption("mode", TypeHandles.STRING).withDefaultValue(MODE_MIX_LIGHT)
+                .withTooltips(Tooltips.of(
+                        "kg.node.rt_vertex_color.option.mode.tooltip.mix_light",
+                        "kg.node.rt_vertex_color.option.mode.tooltip.color",
+                        "kg.node.rt_vertex_color.option.mode.tooltip.block"))
                 .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, MODES, VertexColorNode::label)).build();
     }
 

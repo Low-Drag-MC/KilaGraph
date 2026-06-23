@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -19,6 +20,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  */
 @NodeAttribute(name = "rt_voronoi", group = "rendertype_procedural/noise", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class VoronoiNode extends ProceduralNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_voronoi.tooltip");
+    }
+
 
     /** Hashed feature-point offset within a cell, angle-jittered (Unity's voronoi_noise_randomVector). */
     private static final String RANDOM = """

@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.artistic.mask;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -17,6 +18,11 @@ import org.joml.Vector3f;
  */
 @NodeAttribute(name = "rt_channel_mask", group = "rendertype_artistic/mask", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class ChannelMaskNode extends ArtisticNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.rt_channel_mask.tooltip");
+    }
+
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         context.addInputPort("in", RenderTypeGraphTypes.VEC3);

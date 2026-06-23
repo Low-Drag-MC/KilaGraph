@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.entity;
 
+import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -17,6 +18,11 @@ import java.util.List;
 /** All entities within {@code radius} blocks of {@code center}. Empty list if level is null. */
 @NodeAttribute(name = "mc_entities_in_radius", group = "mc_entity", graphTypes = BlueprintGraph.class)
 public class EntitiesInRadiusNode extends AnnotatedNode {
+    @Override
+    protected Component getNodeTooltip() {
+        return Component.translatable("kg.node.mc_entities_in_radius.tooltip");
+    }
+
     @InputPort public Level level;
     @InputPort public BlockPos center = BlockPos.ZERO;
     @InputPort public double radius = 8.0;
