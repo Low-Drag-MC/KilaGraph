@@ -1,4 +1,8 @@
 # ChangeLogs
+## v26.1.0.5
+* Added preview mode persisted
+* Added shader gradient support
+
 ## v26.1.0.4
 * Added Light Ubo + Global Ubo
 * Added more tooltips
