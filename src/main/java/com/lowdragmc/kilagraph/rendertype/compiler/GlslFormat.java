@@ -56,6 +56,9 @@ public final class GlslFormat {
             }
             case MAT4 -> "mat4(1.0)";
             case SAMPLER2D -> ShaderGraphCompiler.MISSING_SAMPLER; // opaque; never a real literal
+            // GRADIENT constants are emitted by GradientNode's own builder; unconnected/LOCAL gradients are
+            // routed through the compiler's defaultGradient()/builder paths, so this is only a safe fallback.
+            case GRADIENT -> "kg_gradientDefault()";
         };
     }
 
@@ -84,6 +87,10 @@ public final class GlslFormat {
                     0f, 0f, 1f, 0f,
                     0f, 0f, 0f, 1f};
             case SAMPLER2D -> new float[0];
+            // EXPOSED gradient default: the std140-packed gradient (header + 8 colour + 8 alpha vec4).
+            case GRADIENT -> value instanceof RenderTypeGraphTypes.GradientValue gv
+                    ? GradientGlsl.pack(gv)
+                    : GradientGlsl.pack(RenderTypeGraphTypes.GradientValue.defaultValue());
         };
     }
 

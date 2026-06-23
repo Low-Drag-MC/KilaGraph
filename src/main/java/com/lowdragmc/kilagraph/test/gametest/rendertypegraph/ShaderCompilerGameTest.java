@@ -78,6 +78,9 @@ import com.lowdragmc.kilagraph.rendertype.nodes.math.derivative.DDXNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.trigonometry.SinNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.uv.TilingAndOffsetNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.constant.TimeNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.constant.GradientNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.artistic.gradient.SampleGradientNode;
+import com.lowdragmc.lowdraglib2.math.GradientColor;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec2Node;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec4Node;
@@ -175,6 +178,9 @@ public final class ShaderCompilerGameTest {
     private static final String EXPORT_FUNCTION = "rendertype_compile_export_function";
     private static final String BUILTIN_FRAG_KEYWORDS = "rendertype_compile_builtin_frag_keywords";
     private static final String BUILTIN_VERTEX_IDS = "rendertype_compile_builtin_vertex_ids";
+    private static final String GRADIENT_NODES = "rendertype_compile_gradient_nodes";
+    private static final String GRADIENT_VARIABLE = "rendertype_compile_gradient_variable";
+    private static final String GRADIENT_VALUE_CODEC = "rendertype_compile_gradient_value_codec";
 
     private ShaderCompilerGameTest() {}
 
@@ -239,6 +245,9 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunction(EXPORT_FUNCTION, ShaderCompilerGameTest::exportBuildsFunctionGraph);
         KGGameTests.registerFunction(BUILTIN_FRAG_KEYWORDS, ShaderCompilerGameTest::builtinFragmentKeywordsEmitGlsl);
         KGGameTests.registerFunction(BUILTIN_VERTEX_IDS, ShaderCompilerGameTest::vertexIdNodesAreVertexOnly);
+        KGGameTests.registerFunction(GRADIENT_NODES, ShaderCompilerGameTest::gradientNodesEmitGlsl);
+        KGGameTests.registerFunction(GRADIENT_VARIABLE, ShaderCompilerGameTest::gradientVariableBecomesUboStruct);
+        KGGameTests.registerFunction(GRADIENT_VALUE_CODEC, ShaderCompilerGameTest::gradientValueCodecRoundTrips);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -303,6 +312,9 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunctionTest(event, EXPORT_FUNCTION, KGGameTests.functionKey(EXPORT_FUNCTION), d);
         KGGameTests.registerFunctionTest(event, BUILTIN_FRAG_KEYWORDS, KGGameTests.functionKey(BUILTIN_FRAG_KEYWORDS), d);
         KGGameTests.registerFunctionTest(event, BUILTIN_VERTEX_IDS, KGGameTests.functionKey(BUILTIN_VERTEX_IDS), d);
+        KGGameTests.registerFunctionTest(event, GRADIENT_NODES, KGGameTests.functionKey(GRADIENT_NODES), d);
+        KGGameTests.registerFunctionTest(event, GRADIENT_VARIABLE, KGGameTests.functionKey(GRADIENT_VARIABLE), d);
+        KGGameTests.registerFunctionTest(event, GRADIENT_VALUE_CODEC, KGGameTests.functionKey(GRADIENT_VALUE_CODEC), d);
     }
 
     private static CompiledShaderGraph compile(RenderTypeGraph graph) {
@@ -690,6 +702,76 @@ public final class ShaderCompilerGameTest {
         var encoded = RenderTypeGraphTypes.SAMPLER2D_CODEC.encodeStart(NbtOps.INSTANCE, value).result().orElse(null);
         assertTrue(helper, "encodes to NBT", encoded != null);
         var decoded = RenderTypeGraphTypes.SAMPLER2D_CODEC.parse(NbtOps.INSTANCE, encoded).result().orElse(null);
+        assertTrue(helper, "decodes equal to original", value.equals(decoded));
+        helper.succeed();
+    }
+
+    /**
+     * A constant Gradient node + Sample Gradient: the {@code KG_Gradient} struct + {@code kg_sampleGradient}
+     * helper are declared (the struct before {@code main()}), a per-gradient builder is baked with the keys
+     * (Fixed mode → {@code header.x == 1}), and the fragment samples it. GRADIENT is opaque (no temp copy).
+     */
+    public static void gradientNodesEmitGlsl(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel baseColor = addBlock(graph, fragment, FragmentBaseColorBlock.class);
+        NodeModel grad = addNode(graph, GradientNode.class);
+        setOption(grad, "gradient", new RenderTypeGraphTypes.GradientValue(
+                new GradientColor(0xFF000000, 0xFFFFFFFF), RenderTypeGraphTypes.BlendMode.FIXED));
+        NodeModel sample = addNode(graph, SampleGradientNode.class);
+        wire(graph, sample.getInputsById().get("gradient"), grad.getOutputsById().get("gradient"));
+        wire(graph, baseColor.getInputsById().get("color"), sample.getOutputsById().get("color"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "KG_Gradient struct declared", fsh.contains("struct KG_Gradient"));
+        assertTrue(helper, "sample helper declared", fsh.contains("vec4 kg_sampleGradient(KG_Gradient"));
+        assertTrue(helper, "per-gradient builder declared", fsh.contains("KG_Gradient kg_grad_"));
+        assertTrue(helper, "Fixed mode bakes header.x = 1.0", fsh.contains("header = vec4(1.0,"));
+        assertTrue(helper, "fragment samples the gradient", fsh.contains("kg_sampleGradient("));
+        assertTrue(helper, "struct declared before main()",
+                fsh.indexOf("struct KG_Gradient") < fsh.indexOf("void main"));
+        helper.succeed();
+    }
+
+    /**
+     * An EXPOSED Gradient variable becomes a {@code KG_Gradient} field in the KG_Material UBO — with the
+     * struct declared <b>before</b> the UBO block (it references the type) — and its default gradient is
+     * std140-packed (header + 8 colour + 8 alpha vec4 = 68 floats) into {@code uniformDefaults}.
+     */
+    public static void gradientVariableBecomesUboStruct(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel baseColor = addBlock(graph, fragment, FragmentBaseColorBlock.class);
+
+        var rampVar = (VariableDeclarationModelBase) graph.graphModel.createVariable(
+                "Ramp", RenderTypeGraphTypes.GRADIENT,
+                RenderTypeGraphTypes.GradientValue.defaultValue(), VariableKind.INPUT);
+        rampVar.setScope(VariableScope.EXPOSED);
+        var rampNode = graph.graphModel.createVariableNode(rampVar, new Vector2f(0, 0), null, null);
+        NodeModel sample = addNode(graph, SampleGradientNode.class);
+        wire(graph, sample.getInputsById().get("gradient"), rampNode.getOutputPort());
+        wire(graph, baseColor.getInputsById().get("color"), sample.getOutputsById().get("color"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "gradient var is a KG_Gradient UBO field", fsh.contains("KG_Gradient kg_Ramp;"));
+        assertTrue(helper, "struct declared before the KG_Material UBO",
+                fsh.indexOf("struct KG_Gradient") < fsh.indexOf("uniform KG_Material"));
+        assertTrue(helper, "gradient uniform default recorded", compiled.uniformDefaults().containsKey("kg_Ramp"));
+        assertEq(helper, "gradient packs 68 std140 floats", 68, compiled.uniformDefaults().get("kg_Ramp").length);
+        assertTrue(helper, "variable name maps to its field for set-by-name",
+                compiled.uniformFields().containsKey("Ramp"));
+        helper.succeed();
+    }
+
+    /** A {@link RenderTypeGraphTypes.GradientValue} round-trips through its codec (so a gradient persists). */
+    public static void gradientValueCodecRoundTrips(GameTestHelper helper) {
+        var value = new RenderTypeGraphTypes.GradientValue(
+                new GradientColor(0xFF112233, 0xFF445566, 0xFF778899), RenderTypeGraphTypes.BlendMode.FIXED);
+        var encoded = RenderTypeGraphTypes.GRADIENT_CODEC.encodeStart(NbtOps.INSTANCE, value).result().orElse(null);
+        assertTrue(helper, "encodes to NBT", encoded != null);
+        var decoded = RenderTypeGraphTypes.GRADIENT_CODEC.parse(NbtOps.INSTANCE, encoded).result().orElse(null);
         assertTrue(helper, "decodes equal to original", value.equals(decoded));
         helper.succeed();
     }

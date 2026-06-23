@@ -63,6 +63,8 @@ public final class ShaderGraphCompiler {
         final Map<PortModel, ShaderExpr> cache = new IdentityHashMap<>();
         final Set<AbstractNodeModel> visiting = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
         int tempCounter;
+        /** Whether this stage references the {@code KG_Gradient} struct (so its decl is emitted in the prelude). */
+        boolean usesGradient;
 
         StageScope(String tempPrefix) {
             this.tempPrefix = tempPrefix;
@@ -266,6 +268,8 @@ public final class ShaderGraphCompiler {
             case VEC4 -> new ShaderExpr("vec4(0.0)", GlslType.VEC4);
             case MAT4 -> new ShaderExpr("mat4(1.0)", GlslType.MAT4);
             case SAMPLER2D -> new ShaderExpr(MISSING_SAMPLER, GlslType.SAMPLER2D);
+            // Defensive: GRADIENT is opaque and never flows as a varying, so this is unreachable in practice.
+            case GRADIENT -> new ShaderExpr("kg_gradientDefault()", GlslType.GRADIENT);
         };
     }
 
@@ -560,6 +564,33 @@ public final class ShaderGraphCompiler {
         return new ShaderExpr(MISSING_SAMPLER, GlslType.SAMPLER2D);
     }
 
+    /** Mark the current stage as referencing {@code KG_Gradient} so its struct decl is emitted in the prelude
+     *  (before the UBO + helper functions). Also registers the shared sample/default functions. */
+    void useGradient() {
+        current.usesGradient = true;
+        addFunction(GradientGlsl.HELPER_KEY, GradientGlsl.HELPER);
+    }
+
+    /** The fallback gradient for an unconnected GRADIENT input — registers the helper, a black->white ramp. */
+    ShaderExpr defaultGradient() {
+        useGradient();
+        return new ShaderExpr("kg_gradientDefault()", GlslType.GRADIENT);
+    }
+
+    private int gradientCounter = 0;
+
+    /**
+     * A constant gradient value: registers the shared {@code KG_Gradient} helper plus a uniquely-named
+     * builder function for these keys, and returns a {@code KG_Gradient}-typed call expression. Used by the
+     * Gradient node and by an unconnected GRADIENT port carrying an inline gradient editor.
+     */
+    ShaderExpr constantGradient(RenderTypeGraphTypes.GradientValue value) {
+        useGradient();
+        String fn = "kg_grad_" + (gradientCounter++);
+        addFunction(fn, GradientGlsl.builderFunction(fn, value));
+        return new ShaderExpr(fn + "()", GlslType.GRADIENT);
+    }
+
     /** Vanilla overlay sampler ({@code Sampler1}); flags the pipeline to enable overlay binding. */
     ShaderExpr overlaySampler() {
         usesOverlay = true;
@@ -676,6 +707,11 @@ public final class ShaderGraphCompiler {
             GlslType declared = GlslType.of(inputPort.getDataTypeHandle());
             // An unconnected sampler can't be a literal — fall back to the missing-texture sampler.
             if (declared == GlslType.SAMPLER2D) return missingSampler();
+            // An unconnected gradient: a constant gradient editor sits on the port — build it (else default).
+            if (declared == GlslType.GRADIENT) {
+                Object c = readConstant(inputPort);
+                return c instanceof RenderTypeGraphTypes.GradientValue gv ? constantGradient(gv) : defaultGradient();
+            }
             Object constant = readConstant(inputPort);
             String code = declared != null
                     ? GlslFormat.literal(constant, declared)
@@ -768,9 +804,11 @@ public final class ShaderGraphCompiler {
             for (PortModel outp : nm.getOutputsByDisplayOrder()) {
                 GlslType decl = GlslType.of(outp.getDataTypeHandle());
                 if (decl == null) continue;
-                // SAMPLER2D is not a constant type (textures come from TextureNode) — guard defensively.
-                current.cache.put(outp, decl == GlslType.SAMPLER2D
-                        ? missingSampler() : hoist(decl, GlslFormat.literal(value, decl)));
+                // SAMPLER2D/GRADIENT are opaque (not a constant scalar) — guard defensively.
+                current.cache.put(outp, decl == GlslType.SAMPLER2D ? missingSampler()
+                        : decl == GlslType.GRADIENT
+                        ? (value instanceof RenderTypeGraphTypes.GradientValue gv ? constantGradient(gv) : defaultGradient())
+                        : hoist(decl, GlslFormat.literal(value, decl)));
             }
             return;
         }
@@ -819,8 +857,8 @@ public final class ShaderGraphCompiler {
                 continue;
             }
             ShaderExpr conv = convert(raw, decl);
-            if (decl == GlslType.SAMPLER2D) {
-                current.cache.put(outp, conv); // opaque — cannot copy into a temp
+            if (decl == GlslType.SAMPLER2D || decl == GlslType.GRADIENT) {
+                current.cache.put(outp, conv); // opaque — cannot/should not copy into a temp
             } else {
                 current.cache.put(outp, hoist(decl, conv.code()));
             }
@@ -862,6 +900,10 @@ public final class ShaderGraphCompiler {
                 uniformDefaults.putIfAbsent(name, GlslFormat.components(defaultValue, decl));
                 variableUniformFields.putIfAbsent(variable.getName(), new MaterialUniformLayout.Field(name, decl));
                 current.cache.put(outp, new ShaderExpr(accessor, decl));
+            } else if (decl == GlslType.GRADIENT) {
+                // LOCAL gradient: bake the actual keys as a builder (opaque — don't hoist into a temp).
+                current.cache.put(outp, defaultValue instanceof RenderTypeGraphTypes.GradientValue gv
+                        ? constantGradient(gv) : defaultGradient());
             } else {
                 // LOCAL / UNKNOWN: bake the declared value inline (mirrors the IConstantNode branch).
                 current.cache.put(outp, hoist(decl, GlslFormat.literal(defaultValue, decl)));
@@ -1050,6 +1092,14 @@ public final class ShaderGraphCompiler {
         current.functions.putIfAbsent(name, glsl);
     }
 
+    /** Emit the {@code KG_Gradient} struct declaration when this stage needs it — before the UBO + functions
+     *  (both reference the type). Needed if the material UBO has a gradient field or a node samples a gradient. */
+    private void appendGradientStruct(StringBuilder sb, StageScope scope) {
+        if (layout.hasGradientField() || scope.usesGradient) {
+            sb.append('\n').append(GradientGlsl.STRUCT).append('\n');
+        }
+    }
+
     /** Emit a stage's helper function definitions (if any), each on its own line, after a blank line. */
     private static void appendFunctions(StringBuilder sb, StageScope scope) {
         if (scope.functions.isEmpty()) return;
@@ -1149,6 +1199,7 @@ public final class ShaderGraphCompiler {
         for (String inc : vertex.includes) sb.append("#moj_import <").append(inc).append(">\n");
         if (!vertex.includes.isEmpty()) sb.append('\n');
         sb.append(vertexAttributes(graph.getSettings().vertexFormatElements()));
+        appendGradientStruct(sb, vertex);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append('\n').append(uniforms);
         appendUniformBlocks(sb, true);
@@ -1182,6 +1233,7 @@ public final class ShaderGraphCompiler {
         sb.append(GLSL_VERSION).append("\n\n");
         for (String inc : fragment.includes) sb.append("#moj_import <").append(inc).append(">\n");
         if (!fragment.includes.isEmpty()) sb.append('\n');
+        appendGradientStruct(sb, fragment);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
         appendUniformBlocks(sb, false);
@@ -1198,6 +1250,7 @@ public final class ShaderGraphCompiler {
         sb.append(GLSL_VERSION).append("\n\n");
         for (String inc : fragment.includes) sb.append("#moj_import <").append(inc).append(">\n");
         if (!fragment.includes.isEmpty()) sb.append('\n');
+        appendGradientStruct(sb, fragment);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
         appendUniformBlocks(sb, false);

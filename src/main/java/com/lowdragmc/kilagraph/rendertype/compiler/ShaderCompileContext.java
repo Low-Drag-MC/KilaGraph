@@ -165,6 +165,26 @@ public final class ShaderCompileContext {
         return compiler.missingSampler();
     }
 
+    /**
+     * Build a constant {@code KG_Gradient} value (a Unity-style gradient) for {@code value}, registering the
+     * shared sample helper + a per-gradient builder, and return a GRADIENT-typed expression. Used by the
+     * Gradient node. A {@code SampleGradient} node turns the result + a float position into a {@code vec4}.
+     */
+    public ShaderExpr constantGradient(com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.GradientValue value) {
+        return compiler.constantGradient(value);
+    }
+
+    /** A default black&rarr;white {@code KG_Gradient} (registers the helper) — for an unconnected gradient. */
+    public ShaderExpr defaultGradient() {
+        return compiler.defaultGradient();
+    }
+
+    /** Declare that this node references {@code KG_Gradient} (emits its struct decl + sample helpers). Call
+     *  before using {@code kg_sampleGradient(...)} — e.g. a Sample Gradient node. */
+    public void useGradient() {
+        compiler.useGradient();
+    }
+
     /** Vanilla overlay sampler ({@code Sampler1}); flags the pipeline to enable overlay binding. */
     public ShaderExpr overlaySampler() {
         return compiler.overlaySampler();

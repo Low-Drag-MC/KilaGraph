@@ -11,6 +11,7 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Full-matrix tests pinning {@link ShaderGraphCompiler#convert}'s type-conversion contract — the
@@ -131,5 +132,53 @@ class ShaderConvertTest {
         assertInstanceOf(org.joml.Vector2f.class, RenderTypeGraphTypes.VEC2.getDefaultValue());
         assertInstanceOf(org.joml.Vector3f.class, RenderTypeGraphTypes.VEC3.getDefaultValue());
         assertInstanceOf(org.joml.Vector4f.class, RenderTypeGraphTypes.VEC4.getDefaultValue());
+    }
+
+    // ---- GRADIENT: opaque wire type + std140 packing -----------------------------------------
+
+    @Test
+    void gradientTypeResolvesAndIsOpaque() {
+        assertEquals(GlslType.GRADIENT, GlslType.of(RenderTypeGraphTypes.GRADIENT));
+        assertInstanceOf(RenderTypeGraphTypes.GradientValue.class, RenderTypeGraphTypes.GRADIENT.getDefaultValue());
+        // opaque: not arithmetic-convertible, code preserved & only retagged (mirrors sampler/mat4).
+        assertEquals("g", convert("g", GlslType.GRADIENT, GlslType.VEC4));
+    }
+
+    @Test
+    void gradientPacksStd140HeaderAndKeys() {
+        // Default gradient: black(0)->white(1), full alpha, BLEND.
+        float[] p = GradientGlsl.pack(RenderTypeGraphTypes.GradientValue.defaultValue());
+        assertEquals(GradientGlsl.PACKED_FLOATS, p.length);
+        assertEquals(68, p.length); // vec4 header + 8 colour vec4 + 8 alpha vec4
+        // header = (type, colorsLength, alphasLength, _)
+        assertEquals(0f, p[0]); // BLEND
+        assertEquals(2f, p[1]); // 2 colour keys
+        assertEquals(2f, p[2]); // 2 alpha keys
+        // colours[0] = (pos, r, g, b) = (0, 0,0,0); colours[1] = (1, 1,1,1)
+        assertEquals(0f, p[4]); assertEquals(0f, p[5]); assertEquals(0f, p[6]); assertEquals(0f, p[7]);
+        assertEquals(1f, p[8]); assertEquals(1f, p[9]); assertEquals(1f, p[10]); assertEquals(1f, p[11]);
+        // alphas[0] = (pos, alpha, 0, 0) = (0, 1, 0, 0); alphas[1] = (1, 1, 0, 0)
+        assertEquals(0f, p[36]); assertEquals(1f, p[37]);
+        assertEquals(1f, p[40]); assertEquals(1f, p[41]);
+    }
+
+    @Test
+    void gradientFixedModePacksTypeOne() {
+        var fixed = RenderTypeGraphTypes.GradientValue.defaultValue()
+                .withMode(RenderTypeGraphTypes.BlendMode.FIXED);
+        assertEquals(1f, GradientGlsl.pack(fixed)[0]);
+    }
+
+    @Test
+    void gradientBuilderEmitsAllSlots() {
+        String glsl = GradientGlsl.builderFunction("kg_test", RenderTypeGraphTypes.GradientValue.defaultValue());
+        assertTrue(glsl.contains("KG_Gradient kg_test()"), glsl);
+        assertTrue(glsl.contains("g.header = vec4(0.0, 2.0, 2.0, 0.0);"), glsl);
+        assertTrue(glsl.contains("g.colors[0] = vec4(0.0, 0.0, 0.0, 0.0);"), glsl);
+        assertTrue(glsl.contains("g.colors[1] = vec4(1.0, 1.0, 1.0, 1.0);"), glsl);
+        // all 8 slots filled (NaN-safety) and the function returns the struct.
+        assertTrue(glsl.contains("g.colors[7] ="), glsl);
+        assertTrue(glsl.contains("g.alphas[7] ="), glsl);
+        assertTrue(glsl.contains("return g;"), glsl);
     }
 }

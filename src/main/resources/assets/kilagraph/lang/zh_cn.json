@@ -50,6 +50,7 @@
   "mask": "遮罩",
   "normal": "法线",
   "utility": "实用工具",
+  "gradient": "渐变",
   "string": "字符串",
   "vertex": "顶点",
   "fragment": "片元",
@@ -78,6 +79,8 @@
   "rt_primitive_id": "图元 ID",
 
   "rt_color": "颜色",
+  "rt_gradient": "渐变",
+  "rt_sample_gradient": "采样渐变",
   "rt_time": "时间",
   "rt_game_time": "游戏时间",
 
@@ -218,6 +221,9 @@
   "kg.sampler.address": "环绕",
   "kg.sampler.mipmap": "Mipmap",
   "kg.sampler.preview": "预览",
+
+  "kg.gradient.bar": "渐变",
+  "kg.gradient.mode": "模式",
 
   "rendertypegraph.settings.title": "RenderType",
   "rendertypegraph.settings.preset": "预设",
@@ -520,6 +526,8 @@
   "kg.node.rt_frag_cylindrical_distance.tooltip": "输出插值后的圆柱雾距离。",
   "kg.node.rt_texture.tooltip": "定义供纹理采样节点使用的纹理采样器源。",
   "kg.node.rt_sampler_texture2d.tooltip": "在 UV 坐标处采样 Texture2D 采样器。",
+  "kg.node.rt_gradient.tooltip": "常量渐变（颜色关键帧 + 透明度关键帧，混合/固定）。将其连入采样渐变节点使用。",
+  "kg.node.rt_sample_gradient.tooltip": "在 Time（0-1）处采样渐变得到颜色。Time 未连接时默认取网格 UV.x，因此预览会沿水平方向扫过整条渐变。",
   "kg.node.rt_overlay_texture.tooltip": "提供 Minecraft Overlay 纹理采样。",
   "kg.node.rt_lightmap_texture.tooltip": "提供 Minecraft 光照贴图纹理采样。",
   "kg.node.rt_screen_position.tooltip": "按选定坐标空间输出片元屏幕位置。",

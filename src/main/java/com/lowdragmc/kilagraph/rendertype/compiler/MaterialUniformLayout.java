@@ -51,6 +51,12 @@ public final class MaterialUniformLayout {
         return fields.isEmpty();
     }
 
+    /** Whether any field is a {@link GlslType#GRADIENT} — the {@code KG_Gradient} struct must then be
+     *  declared (in the stage prelude) before this UBO block, since the block references the type. */
+    public boolean hasGradientField() {
+        return fields.values().stream().anyMatch(f -> f.type() == GlslType.GRADIENT);
+    }
+
     /** Compute the std140 byte size of the UBO (0 when there are no fields). */
     public int std140Size() {
         if (fields.isEmpty()) return 0;
@@ -63,6 +69,8 @@ public final class MaterialUniformLayout {
                 case VEC4 -> calc.putVec4();
                 case MAT4 -> calc.putMat4f();
                 case SAMPLER2D -> { /* samplers are not UBO members */ }
+                // KG_Gradient struct: vec4 header + vec4 colors[8] + vec4 alphas[8] = 17 vec4 (all 16-aligned).
+                case GRADIENT -> { for (int i = 0; i < 1 + GradientGlsl.MAX_KEYS * 2; i++) calc.putVec4(); }
             }
         }
         return calc.get();

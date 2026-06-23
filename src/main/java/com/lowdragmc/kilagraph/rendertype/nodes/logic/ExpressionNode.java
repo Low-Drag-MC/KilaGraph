@@ -305,7 +305,7 @@ public class ExpressionNode extends ShaderNode implements INodeValidator {
             case VEC3 -> "vec3(0.0)";
             case VEC4 -> "vec4(0.0)";
             case MAT4 -> "mat4(1.0)";
-            case SAMPLER2D -> "0"; // unreachable (sampler outputs are dropped)
+            case SAMPLER2D, GRADIENT -> "0"; // unreachable (opaque outputs are dropped)
         };
     }
 }

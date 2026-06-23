@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype;
 
+import com.lowdragmc.lowdraglib2.math.GradientColor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandleHelpers;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
@@ -8,10 +9,13 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.ExtraCodecs;
 import net.minecraft.util.StringRepresentable;
 import org.joml.Vector2f;
+import org.joml.Vector2fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.joml.Vector4fc;
 
 import java.util.List;
 
@@ -42,6 +46,14 @@ public final class RenderTypeGraphTypes {
      * {@code meshUv(UvChannel)}), so a uv port "just works" with the mesh's texcoords by default.
      */
     public static final TypeHandle UV = TypeHandleHelpers.customType(UvChannel.class, "KG_UV", "UV");
+    /**
+     * A Unity-style gradient: a list of colour keys + independent alpha keys with a Blend/Fixed
+     * interpolation mode ({@link GradientValue}, wrapping LDLib2's {@link GradientColor}). Like
+     * {@code SAMPLER2D} it is an opaque wire type — in GLSL it is a {@code KG_Gradient} struct value
+     * (see {@link com.lowdragmc.kilagraph.rendertype.compiler.GlslType#GRADIENT}); a {@code SampleGradient}
+     * node turns it + a float position into a {@code vec4}. Carries a full gradient-bar editor.
+     */
+    public static final TypeHandle GRADIENT = TypeHandleHelpers.customType(GradientValue.class, "KG_GRADIENT", "Gradient");
 
     static {
         // A custom object type's constant starts at its registered default-value supplier (else null).
@@ -66,6 +78,12 @@ public final class RenderTypeGraphTypes {
         TypeHandleHelpers.setCustomColor(UV, 0xFF2EB8A6);
         TypeHandleHelpers.setCustomConfigurable(UV, (valueConfigurable, typeHandle) ->
                 com.lowdragmc.kilagraph.rendertype.gui.UvChannelConfigurator.build(valueConfigurable));
+        // GRADIENT: a fresh black->white gradient default, a magenta-ish port colour, and the client-only
+        // gradient-bar editor (lazy reference so the compiler/headless path never loads the UI class).
+        TypeHandleHelpers.setCustomDefaultValue(GRADIENT, GradientValue::defaultValue);
+        TypeHandleHelpers.setCustomColor(GRADIENT, 0xFFE05CC0);
+        TypeHandleHelpers.setCustomConfigurable(GRADIENT, (valueConfigurable, typeHandle) ->
+                com.lowdragmc.kilagraph.rendertype.gui.GradientConfigurator.build(valueConfigurable));
     }
 
     /** Node-palette type-picker handles shared by RenderTypeGraph and ShaderFunctionGraph. */
@@ -81,7 +99,7 @@ public final class RenderTypeGraphTypes {
      */
     public static final List<TypeHandle> VARIABLE_SUPPORT_TYPES = List.of(
             TypeHandles.BOOL, TypeHandles.INT, TypeHandles.FLOAT,
-            VEC2, VEC3, VEC4, TypeHandles.COLOR, MAT4, SAMPLER2D);
+            VEC2, VEC3, VEC4, TypeHandles.COLOR, MAT4, SAMPLER2D, GRADIENT);
 
     /**
      * Types offered as draggable "Constant" nodes in the item library — scalars only. Vectors come from
@@ -180,4 +198,76 @@ public final class RenderTypeGraphTypes {
                             SamplerFilter.values()[buf.readVarInt()],
                             SamplerAddress.values()[buf.readVarInt()],
                             buf.readBoolean()));
+
+    /** Gradient interpolation between adjacent keys: smooth {@code BLEND} (lerp) or stepped {@code FIXED}. */
+    public enum BlendMode implements StringRepresentable {
+        BLEND("blend"), FIXED("fixed");
+        private final String name;
+        BlendMode(String name) { this.name = name; }
+        @Override public String getSerializedName() { return name; }
+    }
+
+    /**
+     * A {@link #GRADIENT} value: the {@link GradientColor} keys (colours + independent alphas) plus the
+     * {@link BlendMode}. Serialized via {@link #GRADIENT_CODEC} (registered as an accessor at mod init so
+     * it round-trips in graph NBT). {@code GradientColor} is mutable, so {@link #copy()} deep-copies.
+     */
+    public record GradientValue(GradientColor gradient, BlendMode mode) {
+        public static GradientValue defaultValue() {
+            return new GradientValue(new GradientColor(0xFF000000, 0xFFFFFFFF), BlendMode.BLEND);
+        }
+
+        public GradientValue copy() {
+            return new GradientValue(gradient.copy(), mode);
+        }
+
+        public GradientValue withMode(BlendMode mode) {
+            return new GradientValue(gradient.copy(), mode);
+        }
+    }
+
+    /** Codec for LDLib2's {@link GradientColor} (its two key lists). Rebuilds via the mutable getters. */
+    public static final Codec<GradientColor> GRADIENT_COLOR_CODEC = RecordCodecBuilder.create(i -> i.group(
+            Codec.list(ExtraCodecs.VECTOR2F).fieldOf("a").forGetter(GradientColor::getAP),
+            Codec.list(ExtraCodecs.VECTOR4F).fieldOf("rgb").forGetter(GradientColor::getRgbP)
+    ).apply(i, (a, rgb) -> {
+        GradientColor g = new GradientColor();
+        g.getAP().clear();
+        g.getAP().addAll(a);
+        g.getRgbP().clear();
+        g.getRgbP().addAll(rgb);
+        return g;
+    }));
+
+    public static final Codec<GradientValue> GRADIENT_CODEC = RecordCodecBuilder.create(i -> i.group(
+            GRADIENT_COLOR_CODEC.fieldOf("gradient").forGetter(GradientValue::gradient),
+            LDLibExtraCodecs.enumCodec(BlendMode.class, BlendMode.BLEND)
+                    .optionalFieldOf("mode", BlendMode.BLEND).forGetter(GradientValue::mode)
+    ).apply(i, GradientValue::new));
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, GradientValue> GRADIENT_STREAM_CODEC =
+            StreamCodec.of(
+                    (buf, v) -> {
+                        List<Vector2fc> a = v.gradient().getAP();
+                        List<Vector4fc> rgb = v.gradient().getRgbP();
+                        buf.writeVarInt(a.size());
+                        for (Vector2fc p : a) { buf.writeFloat(p.x()); buf.writeFloat(p.y()); }
+                        buf.writeVarInt(rgb.size());
+                        for (Vector4fc p : rgb) {
+                            buf.writeFloat(p.x()); buf.writeFloat(p.y()); buf.writeFloat(p.z()); buf.writeFloat(p.w());
+                        }
+                        buf.writeVarInt(v.mode().ordinal());
+                    },
+                    buf -> {
+                        GradientColor g = new GradientColor();
+                        g.getAP().clear();
+                        g.getRgbP().clear();
+                        int na = buf.readVarInt();
+                        for (int k = 0; k < na; k++) g.getAP().add(new Vector2f(buf.readFloat(), buf.readFloat()));
+                        int nc = buf.readVarInt();
+                        for (int k = 0; k < nc; k++) {
+                            g.getRgbP().add(new Vector4f(buf.readFloat(), buf.readFloat(), buf.readFloat(), buf.readFloat()));
+                        }
+                        return new GradientValue(g, BlendMode.values()[buf.readVarInt()]);
+                    });
 }

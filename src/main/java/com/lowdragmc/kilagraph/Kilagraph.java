@@ -38,6 +38,13 @@ public class Kilagraph {
                 .streamCodec(RenderTypeGraphTypes.UV_STREAM_CODEC)
                 .copyMark(v -> v)
                 .build(), 1000);
+        // The Gradient value (a GradientNode option / Gradient variable). GradientColor is mutable, so the
+        // accessor must deep-copy (copyMark) or undo/instancing would share & mutate one gradient.
+        AccessorRegistries.registerAccessor(CustomDirectAccessor.builder(RenderTypeGraphTypes.GradientValue.class)
+                .codec(RenderTypeGraphTypes.GRADIENT_CODEC)
+                .streamCodec(RenderTypeGraphTypes.GRADIENT_STREAM_CODEC)
+                .copyMark(RenderTypeGraphTypes.GradientValue::copy)
+                .build(), 1000);
         // Touch the registry to trigger annotation scanning; classes annotated with @NodeAttribute
         // bound to BlueprintGraph self-register.
         LOGGER.info("KilaGraph blueprint nodes loaded: {}", BlueprintGraph.NODE_REGISTRY.getNodeClasses().size());

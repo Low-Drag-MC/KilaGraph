@@ -50,6 +50,7 @@
   "mask": "Mask",
   "normal": "Normal",
   "utility": "Utility",
+  "gradient": "Gradient",
   "string": "String",
   "vertex": "Vertex",
   "fragment": "Fragment",
@@ -78,6 +79,8 @@
   "rt_primitive_id": "Primitive ID",
 
   "rt_color": "Color",
+  "rt_gradient": "Gradient",
+  "rt_sample_gradient": "Sample Gradient",
   "rt_time": "Time",
   "rt_game_time": "Game Time",
 
@@ -217,6 +220,9 @@
   "kg.sampler.filter": "Filter",
   "kg.sampler.address": "Wrap",
   "kg.sampler.mipmap": "Mipmap",
+
+  "kg.gradient.bar": "Gradient",
+  "kg.gradient.mode": "Mode",
   "kg.sampler.preview": "Preview",
 
   "rendertypegraph.settings.title": "RenderType",
@@ -521,6 +527,8 @@
   "kg.node.rt_frag_cylindrical_distance.tooltip": "Outputs the interpolated cylindrical fog distance.",
   "kg.node.rt_texture.tooltip": "Defines a texture sampler source for texture sampling nodes.",
   "kg.node.rt_sampler_texture2d.tooltip": "Samples a Texture2D sampler at UV coordinates.",
+  "kg.node.rt_gradient.tooltip": "A constant gradient (color keys + alpha keys, Blend/Fixed). Feed it into a Sample Gradient node.",
+  "kg.node.rt_sample_gradient.tooltip": "Samples a Gradient at Time (0-1) to a color. An unconnected Time defaults to the mesh UV.x, so the preview shows the gradient swept horizontally.",
   "kg.node.rt_overlay_texture.tooltip": "Provides Minecraft overlay texture sampling.",
   "kg.node.rt_lightmap_texture.tooltip": "Provides Minecraft lightmap texture sampling.",
   "kg.node.rt_screen_position.tooltip": "Outputs the fragment screen position in the selected coordinate space.",

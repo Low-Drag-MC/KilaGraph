@@ -153,6 +153,13 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         return setByVariable(variableName, arr);
     }
 
+    /** Set an EXPOSED Gradient variable from a {@link com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.GradientValue}
+     *  — std140-packed (header + 8 colour + 8 alpha vec4) into its {@code KG_Gradient} UBO field. */
+    public boolean setGradient(String variableName, com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.GradientValue value) {
+        return setByVariable(variableName,
+                com.lowdragmc.kilagraph.rendertype.compiler.GradientGlsl.pack(value));
+    }
+
     private boolean setByVariable(String variableName, float... components) {
         MaterialUniformLayout.Field field = uniformFields.get(variableName);
         if (field == null) return false;
