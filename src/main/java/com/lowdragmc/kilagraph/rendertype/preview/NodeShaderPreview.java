@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.preview;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphModel;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeFactory;
@@ -63,6 +64,15 @@ public class NodeShaderPreview extends UIElement {
         this.nodeModel = nodeModel;
         this.previewPortId = previewPortId;
         this.content = defaultContent != null ? defaultContent : KGPreviewContents.QUAD;
+        // Restore the persisted shape (survives reopen + undo/redo; stored on the graph model keyed by
+        // node UID). Falls back to the node's default if there's no saved key or it no longer resolves.
+        if (graph.graphModel instanceof RenderTypeGraphModel m) {
+            String savedKey = m.getNodePreviewContentKey(nodeModel.getUid());
+            if (savedKey != null) {
+                KGPreviewContent saved = KGPreviewContents.get(savedKey);
+                if (saved != null) this.content = saved;
+            }
+        }
         addClass("__kg-node-preview__");
         // Fill the column width, never shrink below 100×100, and stay square — height tracks the resolved
         // width in onLayoutChanged (aspect-ratio wouldn't expand the parent's height).
@@ -110,9 +120,13 @@ public class NodeShaderPreview extends UIElement {
         return material == null ? null : PreviewContentMenu.formatKeys(material.renderType().format());
     }
 
-    /** Switch this preview's geometry — invoked by {@code RenderTypeGraphView.createMenu}'s content items. */
+    /** Switch this preview's geometry — invoked by {@code RenderTypeGraphView.createMenu}'s content items.
+     *  Persists the choice on the graph model (keyed by node UID) so it survives reopen + undo/redo. */
     public void setContent(KGPreviewContent content) {
         this.content = content;
+        if (graph.graphModel instanceof RenderTypeGraphModel m) {
+            m.setNodePreviewContentKey(nodeModel.getUid(), content.key());
+        }
     }
 
     private void submit(SceneRenderContext ctx) {

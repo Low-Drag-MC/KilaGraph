@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.gui;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphModel;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContent;
@@ -118,6 +119,20 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
         RenderTypeGraphMaterial mat = updateMaterial(graph);
         if (mat == null) return;
 
+        // Restore/track the persisted shape (survives reopen + undo/redo; stored on the graph model).
+        // Written through on right-click below, so reading it back here is stable. A saved key that no
+        // longer resolves or is incompatible with the current vertex format is ignored (keeps current).
+        if (graph.graphModel instanceof RenderTypeGraphModel m) {
+            String savedKey = m.getPreviewToolContentKey();
+            if (savedKey != null) {
+                KGPreviewContent saved = KGPreviewContents.get(savedKey);
+                if (saved != null && saved != content
+                        && saved.isCompatible(PreviewContentMenu.formatKeys(mat.renderType().format()))) {
+                    content = saved;
+                }
+            }
+        }
+
         // Emit geometry matching the RenderType we are actually drawing with — never a parallel
         // assumption from Settings. (When a graph is invalid for its vertex format, updateMaterial
         // keeps the last good material; deriving the format from that material avoids any desync
@@ -147,7 +162,14 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
     private void onMouseDown(UIEvent event) {
         if (event.button != 1 || material == null) return; // right-click only
         var formatKeys = PreviewContentMenu.formatKeys(material.renderType().format());
-        PreviewContentMenu.open(this, event, formatKeys, c -> content = c);
+        PreviewContentMenu.open(this, event, formatKeys, c -> {
+            content = c;
+            // Persist the choice on the graph model so it survives reopen + undo/redo.
+            RenderTypeGraph graph = graphView.getRenderTypeGraph();
+            if (graph != null && graph.graphModel instanceof RenderTypeGraphModel m) {
+                m.setPreviewToolContentKey(c.key());
+            }
+        });
     }
 
     /** Recompile + rebuild the material when the graph changed; null if it can't be rendered. */

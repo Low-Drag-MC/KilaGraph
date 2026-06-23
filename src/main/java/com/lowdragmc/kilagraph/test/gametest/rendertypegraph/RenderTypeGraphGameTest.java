@@ -4,7 +4,9 @@ import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
 import com.lowdragmc.kilagraph.editor.RenderTypeGraphResource;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphModel;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
+import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
@@ -83,6 +85,7 @@ public final class RenderTypeGraphGameTest {
     private static final String PREVIEW_TESSELLATOR = "rendertype_preview_tessellator";
     private static final String CHANGE_VERSION = "rendertype_change_version";
     private static final String UNDO_ROUND_TRIP = "rendertype_undo_round_trip";
+    private static final String PREVIEW_SHAPE_PERSISTENCE = "rendertype_preview_shape_persistence";
     private static final String STAGE_AFFINITY_VALIDATION = "rendertype_stage_affinity_validation";
 
     private RenderTypeGraphGameTest() {}
@@ -119,6 +122,8 @@ public final class RenderTypeGraphGameTest {
                 RenderTypeGraphGameTest::onGraphChangedBumpsChangeVersion);
         KGGameTests.registerFunction(UNDO_ROUND_TRIP,
                 RenderTypeGraphGameTest::undoRoundTripPreservesWholeGraphCompile);
+        KGGameTests.registerFunction(PREVIEW_SHAPE_PERSISTENCE,
+                RenderTypeGraphGameTest::previewShapesPersistAcrossRoundTrip);
         KGGameTests.registerFunction(STAGE_AFFINITY_VALIDATION,
                 RenderTypeGraphGameTest::stageAffinityViolationFlaggedOnGraphChanged);
     }
@@ -157,6 +162,8 @@ public final class RenderTypeGraphGameTest {
                 KGGameTests.functionKey(CHANGE_VERSION), d);
         KGGameTests.registerFunctionTest(event, UNDO_ROUND_TRIP,
                 KGGameTests.functionKey(UNDO_ROUND_TRIP), d);
+        KGGameTests.registerFunctionTest(event, PREVIEW_SHAPE_PERSISTENCE,
+                KGGameTests.functionKey(PREVIEW_SHAPE_PERSISTENCE), d);
         KGGameTests.registerFunctionTest(event, STAGE_AFFINITY_VALIDATION,
                 KGGameTests.functionKey(STAGE_AFFINITY_VALIDATION), d);
     }
@@ -226,6 +233,62 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "undone fragment shader still samples the texture",
                 after.fragmentSource().contains("texture(kg_tex"));
         assertEq(helper, "undo preserves the compiled content hash", before.contentHash(), after.contentHash());
+        helper.succeed();
+    }
+
+    /**
+     * The right-click-chosen preview geometry (a {@link KGPreviewContents} key) for each node thumbnail and
+     * for the graph-tool panel is persisted on {@link RenderTypeGraphModel}'s NBT, so it survives BOTH the
+     * reopen path (resource serialize/deserialize into a fresh graph) AND the undo path
+     * ({@code UndoableGraphCommand}: serialize, then deserialize the snapshot back into the SAME live model).
+     * Drives both round-trips directly (no editor UI — see {@code verify-ui-changes-in-client}) since the
+     * keys live in the model, not the ephemeral {@code NodeShaderPreview}/{@code ShaderPreviewTool} elements.
+     */
+    public static void previewShapesPersistAcrossRoundTrip(GameTestHelper helper) {
+        String sphere = KGPreviewContents.SPHERE.key();
+        String quad = KGPreviewContents.QUAD.key();
+        String cube = KGPreviewContents.CUBE.key();
+
+        // --- Reopen path: resource serialize -> deserialize into a brand-new graph. ---
+        RenderTypeGraph graph = new RenderTypeGraph();
+        RenderTypeGraphModel model = (RenderTypeGraphModel) graph.graphModel;
+        NodeModel node = findNode(graph, SamplerTexture2DNode.class);
+        assertTrue(helper, "default graph has a node to tag with a preview shape", node != null);
+        java.util.UUID nodeUid = node.getUid();
+        model.setNodePreviewContentKey(nodeUid, sphere);
+        model.setPreviewToolContentKey(quad);
+
+        var tag = RenderTypeGraphResource.INSTANCE.serializeGraph(graph);
+        RenderTypeGraph restored = RenderTypeGraphResource.INSTANCE.deserializeGraph(tag);
+        RenderTypeGraphModel restoredModel = (RenderTypeGraphModel) restored.graphModel;
+
+        assertEq(helper, "reopen restores the node preview shape (keyed by the node's stable UID)",
+                sphere, restoredModel.getNodePreviewContentKey(nodeUid));
+        assertEq(helper, "reopen restores the graph-tool preview shape",
+                quad, restoredModel.getPreviewToolContentKey());
+        assertTrue(helper, "the tagged node still exists in the reopened graph (same UID)",
+                restored.graphModel.getModel(nodeUid) != null);
+
+        // --- Undo path: snapshot, mutate, then deserialize the snapshot back into the SAME model. ---
+        var provider = com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry();
+        var out = net.minecraft.world.level.storage.TagValueOutput.createWithContext(
+                net.minecraft.util.ProblemReporter.Collector.DISCARDING, provider);
+        graph.graphModel.serialize(out);
+        net.minecraft.nbt.CompoundTag snapshot = out.buildResult();
+
+        // Edit after the snapshot: change both shapes to something else.
+        model.setNodePreviewContentKey(nodeUid, cube);
+        model.setPreviewToolContentKey(cube);
+        assertEq(helper, "node shape reflects the post-snapshot edit", cube, model.getNodePreviewContentKey(nodeUid));
+
+        // Undo: deserialize the pre-edit snapshot back into the live model.
+        graph.graphModel.deserialize(net.minecraft.world.level.storage.TagValueInput.create(
+                net.minecraft.util.ProblemReporter.Collector.DISCARDING, provider, snapshot));
+
+        assertEq(helper, "undo restores the node preview shape from the snapshot",
+                sphere, model.getNodePreviewContentKey(nodeUid));
+        assertEq(helper, "undo restores the graph-tool preview shape from the snapshot",
+                quad, model.getPreviewToolContentKey());
         helper.succeed();
     }
 
