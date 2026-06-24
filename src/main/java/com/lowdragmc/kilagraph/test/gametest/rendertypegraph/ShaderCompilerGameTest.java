@@ -1247,6 +1247,22 @@ public final class ShaderCompilerGameTest {
         String clipFsh = compile(clipGraph).fragmentSource();
         assertTrue(helper, "clip source uses precomputed IProjMat", clipFsh.contains("kg_transforms.IProjMat"));
         assertFalse(helper, "no per-pixel inverse(ProjMat)", clipFsh.contains("inverse(ProjMat)"));
+
+        // clip→world (position) reconstructs a world position from an NDC/depth sample: the inverse
+        // projection (IProjMat) does the perspective divide (.xyz / .w), then view→world via IViewMat +
+        // the camera position. Without the divide the result would be wrong under perspective.
+        RenderTypeGraph clipWorldGraph = new RenderTypeGraph();
+        NodeModel cwFrag = clipWorldGraph.getFragmentStageModel();
+        NodeModel cwT = addNode(clipWorldGraph, com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode.class);
+        setOption(cwT, "from", "clip");
+        setOption(cwT, "to", "world"); // type defaults to position
+        NodeModel cwEmit = addBlock(clipWorldGraph, cwFrag, FragmentEmissionBlock.class);
+        wire(clipWorldGraph, cwEmit.getInputsById().get("color"), cwT.getOutputsById().get("out"));
+        String cwFsh = compile(clipWorldGraph).fragmentSource();
+        assertTrue(helper, "clip→world inverse-projects via IProjMat", cwFsh.contains("kg_transforms.IProjMat"));
+        assertTrue(helper, "clip→world does the perspective divide", cwFsh.contains(".xyz / ") && cwFsh.contains(".w"));
+        assertTrue(helper, "clip→world un-rotates via IViewMat", cwFsh.contains("kg_transforms.IViewMat"));
+        assertTrue(helper, "clip→world adds the camera position", cwFsh.contains("CameraBlockPos"));
         helper.succeed();
     }
 

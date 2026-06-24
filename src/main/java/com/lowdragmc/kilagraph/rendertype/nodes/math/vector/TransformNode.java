@@ -34,10 +34,14 @@ import java.util.List;
  * rotations, so a normal's correct inverse-transpose equals the matrix itself — Direction math + a
  * normalize is exact here; non-uniform scale, which MC doesn't have, would need the inverse-transpose.)
  * The <b>clip</b> target keeps the real perspective {@code w}, so {@code object → clip} equals exactly
- * {@code ProjMat * ModelViewMat * vec4(pos, 1)} and can drive {@code gl_Position} directly. The
- * <b>screen</b> target does the perspective divide → {@code xy} in {@code [0,1]} + {@code z} = NDC depth
- * (target-only; the divide is exact only when this runs per-fragment). Downstream vec3 consumers just
- * read {@code .xyz}. Unity's Tangent / Absolute-World aren't offered — MC has no per-vertex tangent basis.</p>
+ * {@code ProjMat * ModelViewMat * vec4(pos, 1)} and can drive {@code gl_Position} directly. As a
+ * <b>source</b> space, {@code clip → view/world/object} is an inverse projection: for a <b>position</b> it
+ * does the perspective divide ({@code (IProjMat*vec4(ndc,1)).xyz / .w}) to recover the true view point
+ * (exact per-fragment), so e.g. {@code clip → world} reconstructs a world position from a depth/NDC sample;
+ * direction/normal carry no position and keep the linear inverse (no divide). The <b>screen</b> target does
+ * the perspective divide → {@code xy} in {@code [0,1]} + {@code z} = NDC depth (target-only; the divide is
+ * exact only when this runs per-fragment). Downstream vec3 consumers just read {@code .xyz}. Unity's
+ * Tangent / Absolute-World aren't offered — MC has no per-vertex tangent basis.</p>
  */
 @NodeAttribute(name = "rt_transform", group = "rendertype_math/vector", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class TransformNode extends ShaderNode {
@@ -119,7 +123,14 @@ public class TransformNode extends ShaderNode {
             case "world" -> noTranslate
                     ? viewMat(ctx) + " * " + v4
                     : viewMat(ctx) + " * (" + v4 + " - vec4(" + cameraPos(ctx) + ", 0.0))";
-            case "clip" -> iProjMat(ctx) + " * " + v4;
+            // clip(NDC)→view is an inverse projection: IProjMat * vec4(ndc, 1) yields homogeneous view
+            // coords whose w must be divided out to recover the true view-space POSITION (perspective).
+            // direction/normal carry no position (w=0) → keep the linear inverse, never divide (by ~0).
+            case "clip" -> {
+                if (noTranslate) yield iProjMat(ctx) + " * " + v4;
+                ShaderExpr h = ctx.temp(GlslType.VEC4, iProjMat(ctx) + " * " + v4);
+                yield "vec4(" + h.code() + ".xyz / " + h.code() + ".w, 1.0)";
+            }
             default /* object */ -> modelViewMat(ctx) + " * " + v4;
         };
     }
