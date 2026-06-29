@@ -1,0 +1,38 @@
+package com.lowdragmc.kilagraph.rendertype.compiler;
+
+import java.util.List;
+
+/**
+ * The GLSL pieces needed to run a graph's fragment surface shading <em>inside an Iris shaderpack's shared
+ * gbuffers program</em> (see {@code IrisShaderInjector}). Produced by
+ * {@link ShaderGraphCompiler#buildInjectionSnippet()} in <em>injection mode</em>: the fragment graph is
+ * compiled into the body of a {@code vec4 kg_surface(vec2 kg_uv)} function — mesh uv becomes the function
+ * parameter and the vertex varyings degrade to preview defaults (vertexColor/color → white, normal → +Y,
+ * viewDir → +Z, position → 0), so the snippet is self-contained except for the {@code KG_Material} UBO, the
+ * graph's own samplers, and KilaGraph-managed UBOs ({@code KG_Globals}/{@code KG_Transforms}), which the
+ * runtime binds onto the shaderpack program at draw.
+ *
+ * <p>Because the shaderpack compiles <b>one shared program per {@code ShaderKey}</b>, many materials' snippets
+ * coexist in that program, gated by {@code kg_surface_id}. The pieces are kept separate so
+ * {@code IrisSurfaceRegistry} can namespace per-id collision-prone identifiers and the injector can dedup
+ * shared declarations/helpers across snippets. All strings are raw (not yet id-namespaced).</p>
+ *
+ * <p>A graph whose fragment output needs Minecraft engine includes (Fog/Lighting) or the captured scene
+ * (Scene Color/Depth) is <b>not</b> injection-compatible; {@link ShaderGraphCompiler#buildInjectionSnippet()}
+ * returns {@code null} for those and the material falls back to the M0 passthrough under Iris.</p>
+ *
+ * @param declarationUnits global declarations (the {@code KG_Material} block, each sampler line, each managed
+ *                         UBO block, the {@code KG_Gradient} struct) — one complete declaration per element so
+ *                         identical ones dedup across snippets
+ * @param functions        helper function definitions (procedural/gradient), deduped by the injector
+ * @param body             the function body statements (hoisted temps)
+ * @param surfaceArgs      the comma-joined arguments to the {@code kg_Surface(...)} constructor, in the
+ *                         canonical field order: albedo, alpha, normalTS, smoothness, metallic, emission,
+ *                         ao, height, porosity, sss
+ */
+public record InjectionSnippet(
+        List<String> declarationUnits,
+        List<String> functions,
+        String body,
+        String surfaceArgs
+) {}

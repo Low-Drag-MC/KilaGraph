@@ -110,6 +110,11 @@ public final class ShaderGraphCompiler {
     private StageScope current;
     /** Preview mode: compile a single port onto a flat quad, substituting stage inputs with defaults. */
     private boolean preview;
+    /** Injection mode ({@link #buildInjectionSnippet()}): compile the fragment surface into a
+     *  {@code kg_surface(vec2 kg_uv)} function for an Iris shaderpack program. Implies {@link #preview}
+     *  (varyings degrade to preview defaults), but the primary mesh uv resolves to the function parameter
+     *  {@code kg_uv} rather than the preview quad's {@code vUv}. */
+    private boolean injection;
     /** Editor whole-graph preview ({@code ShaderPreviewTool}): compiles the real graph, but screen-space
      *  defaults (see {@link #screenUv()}) map the whole capture onto the preview geometry rather than the
      *  panel's screen sub-rect, so the preview shows the entire scene. In-world rendering is unaffected. */
@@ -197,11 +202,27 @@ public final class ShaderGraphCompiler {
 
         String vsh = assembleVertex();
         String fsh = assembleFragment(out);
+        // Also compile an Iris-injection snippet (a fresh compiler, fragment-only, injection mode) so a
+        // material drawn under a shaderpack can run its real surface shading inside the pack's gbuffers
+        // program. Skipped for the editor whole-graph preview (rendered in GUI/PIP, which Iris never
+        // overrides — so it must not register / trigger Iris reloads). Optional: a failure here never
+        // breaks the (non-Iris) material.
+        InjectionSnippet injectionSnippet = null;
+        if (!editorPreview) {
+            try {
+                injectionSnippet = new ShaderGraphCompiler(graph).buildInjectionSnippet();
+            } catch (RuntimeException e) {
+                // Not injection-compatible (or a transient model issue) — fall back to passthrough under Iris.
+                com.mojang.logging.LogUtils.getLogger()
+                        .warn("[KilaGraph][Iris] injection snippet compile failed -> passthrough", e);
+            }
+        }
         return new CompiledShaderGraph(vsh, fsh, layout, new ArrayList<>(builtinUbos), new ArrayList<>(uniformBlocks),
                 new ArrayList<>(stageErrors.values()), graph.getSettings(),
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes));
+                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes),
+                injectionSnippet);
     }
 
     /**
@@ -226,11 +247,81 @@ public final class ShaderGraphCompiler {
 
         String vsh = assemblePreviewVertex();
         String fsh = assemblePreviewFragment(color);
+        // Node previews render in the editor GUI (offscreen PIP), which Iris never overrides — no injection.
         return new CompiledShaderGraph(vsh, fsh, layout, new ArrayList<>(builtinUbos), new ArrayList<>(uniformBlocks),
                 new ArrayList<>(stageErrors.values()), PREVIEW_SETTINGS,
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes));
+                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes),
+                null);
+    }
+
+    /**
+     * Compile the fragment surface into an {@link InjectionSnippet} for an Iris shaderpack's shared gbuffers
+     * program (see {@code IrisShaderInjector}). Runs only the fragment stage (no {@code gl_Position}) in
+     * injection mode: mesh uv resolves to the {@code kg_surface(vec2 kg_uv)} parameter and vertex varyings
+     * degrade to preview defaults, so the body references only the {@code KG_Material} UBO, the graph's own
+     * samplers, and KilaGraph-managed UBOs — all bound onto the shaderpack program at draw.
+     *
+     * <p>Returns {@code null} when the graph is not injection-compatible: its fragment needs a Minecraft
+     * engine include ({@code #moj_import}, i.e. Fog/Lighting/Projection) or the captured scene
+     * ({@code KG_SceneColor/Depth}), or a stage-affinity error was found. Such a material falls back to the
+     * M0 passthrough under Iris. Call on a fresh compiler instance (it mutates stage scope state).</p>
+     */
+    @Nullable
+    public InjectionSnippet buildInjectionSnippet() {
+        injection = true;
+        preview = true; // reuse varying substitution (vertexColor->white, normal->+Y, viewDir->+Z, ...)
+        current = fragment;
+        ContextNodeModel fragmentStage = asContext(graph.getFragmentStageModel(), "fragment");
+        FragmentOutputs out = new FragmentOutputs();
+        for (BlockNodeModel block : fragmentStage.getBlocks()) {
+            Node node = nodeOf(block);
+            if (node instanceof IFragmentOutputBlock fb) {
+                var ctx = new ShaderCompileContext(this, block);
+                fb.emitFragment(ctx, out);
+            }
+        }
+        // Unsupported subset: a Minecraft engine include (Fog/Lighting/...) or the captured scene can't be
+        // satisfied inside the shaderpack program; a stage error means the GLSL references unavailable data.
+        if (!fragment.includes.isEmpty() || usesSceneColor || usesSceneDepth || !stageErrors.isEmpty()) {
+            return null;
+        }
+
+        List<String> decls = new ArrayList<>();
+        if (layout.hasGradientField() || fragment.usesGradient) decls.add(GradientGlsl.STRUCT);
+        if (!layout.isEmpty()) decls.add(layout.blockGlsl());
+        for (String s : layout.samplers()) decls.add("uniform sampler2D " + s + ";");
+        uniformBlocks.stream()
+                .sorted(java.util.Comparator.comparing(
+                        com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock::uboName))
+                .forEach(b -> decls.add(b.declareGlsl()));
+
+        StringBuilder body = new StringBuilder(fragment.body);
+        // Emission is a vec3 colour block, but LabPBR carries only a scalar emission intensity (the glow
+        // colour is the albedo). Reduce to the max channel, hoisted so the struct arg references it once.
+        // (Under a shaderpack the pack does its own alpha test, so the M1 alpha-discard is intentionally
+        // dropped here — albedo+alpha in the struct is enough.)
+        String emissionArg = "0.0";
+        if (out.emission != null) {
+            String e = out.emission.code();
+            body.append("    float kg_emission_i = max(max((").append(e).append(").r, (")
+                    .append(e).append(").g), (").append(e).append(").b);\n");
+            emissionArg = "kg_emission_i";
+        }
+        String args = String.join(", ",
+                out.baseColor != null ? out.baseColor.code() : "vec3(1.0)",                 // albedo
+                out.alpha != null ? out.alpha.code() : "1.0",                               // alpha
+                out.normalTS != null ? out.normalTS.code() : "vec3(0.0, 0.0, 1.0)",         // normalTS
+                out.smoothness != null ? out.smoothness.code() : "0.0",                     // smoothness
+                out.metallic != null ? out.metallic.code() : "0.0",                         // metallic
+                emissionArg,                                                                // emission
+                out.ao != null ? out.ao.code() : "1.0",                                     // ao
+                out.height != null ? out.height.code() : "1.0",                             // height
+                out.porosity != null ? out.porosity.code() : "0.0",                         // porosity
+                out.sss != null ? out.sss.code() : "0.0");                                  // sss
+        return new InjectionSnippet(decls, new ArrayList<>(fragment.functions.values()),
+                body.toString(), args);
     }
 
     /**
@@ -255,7 +346,7 @@ public final class ShaderGraphCompiler {
 
     /** Default value for a vertex varying when previewing without a vertex stage. */
     private ShaderExpr previewVaryingDefault(String varyingName, GlslType type) {
-        if ("uv0".equals(varyingName)) return new ShaderExpr("vUv", GlslType.VEC2);
+        if ("uv0".equals(varyingName)) return new ShaderExpr(injection ? "kg_uv" : "vUv", GlslType.VEC2);
         if ("vertexColor".equals(varyingName)) return new ShaderExpr("vec4(1.0)", GlslType.VEC4);
         return zero(type);
     }
@@ -288,7 +379,8 @@ public final class ShaderGraphCompiler {
      * not a misleading gradient). Shared first-writer-wins with the matching varying block / fragment input.
      */
     ShaderExpr meshUv(RenderTypeGraphTypes.UvChannel channel) {
-        ShaderExpr quadUv = new ShaderExpr("vUv", GlslType.VEC2);
+        // Injection: UV0 is the kg_surface() function parameter; preview: the quad's gradient uv.
+        ShaderExpr quadUv = new ShaderExpr(injection ? "kg_uv" : "vUv", GlslType.VEC2);
         ShaderExpr flatUv = new ShaderExpr("vec2(0.0)", GlslType.VEC2);
         return switch (channel) {
             case UV0 -> varyingInput("uv0", GlslType.VEC2, () -> uvAttr(KGVertexElements.UV0, false), quadUv);
@@ -475,6 +567,13 @@ public final class ShaderGraphCompiler {
     /** Whether this is a per-node preview compile (single fragment quad; no real vertex stage). */
     boolean isPreview() {
         return preview;
+    }
+
+    /** Whether this is an Iris-injection compile ({@link #buildInjectionSnippet()}). Nodes that depend on
+     *  Minecraft engine state the shaderpack program can't provide (e.g. fog — the pack applies its own in
+     *  its composite pass) should degrade to a no-op/pass-through here so the graph stays injectable. */
+    boolean isInjection() {
+        return injection;
     }
 
     /** Whether the given vertex element is declared in the active vertex format (so its raw {@code in}
