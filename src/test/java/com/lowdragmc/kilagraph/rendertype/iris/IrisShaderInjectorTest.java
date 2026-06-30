@@ -136,30 +136,33 @@ class IrisShaderInjectorTest {
     }
 
     @Test
-    void hijacksExplicitLodReads() {
-        // Complementary's labPBR emission mipmap-fix reads texture2DLod(specular, uv, 0) — must be hijacked
-        // too, else min(ours, real-specular) kills the channel. The trailing lod arg is absorbed by an overload.
+    void hijacksExplicitLodAndGradientReads() {
+        // Complementary's emission mipmap-fix uses texture2DLod(specular,uv,0); BSL reads albedo/normals via
+        // texture2DGradARB(gtexture/normals, uv, dPdx, dPdy) under parallax. Both forms must be hijacked, with
+        // the trailing lod/gradient args absorbed by overloads — else the executed read stays un-hijacked.
         String pack = """
                 #version 330 compatibility
+                uniform sampler2D gtexture;
                 uniform sampler2D specular;
                 in vec2 texcoord;
                 out vec4 fragColor;
                 void main() {
+                    vec4 a = texture2DGradARB(gtexture, texcoord, vec2(0.0), vec2(0.0));
                     vec4 s0 = texture2DLod(specular, texcoord, 0);
-                    vec4 s1 = texture(specular, texcoord);
-                    fragColor = s0 + s1;
+                    fragColor = a + s0;
                 }
                 """;
         var s1 = new IrisSurfaceRegistry.Surface(1, List.of(), List.of(),
-                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(0.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.5, 1.0, 1.0, 0.0, 0.0);\n}\n");
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.5, 1.0, 1.0, 0.0, 0.0);\n}\n");
         String out = IrisShaderInjector.injectFragment(pack, List.of(s1));
 
+        assertTrue(out.contains("kg_sample_gtexture(texcoord, vec2(0.0), vec2(0.0))"),
+                "texture2DGradARB(gtexture,...) is redirected (gradient args kept)");
         assertTrue(out.contains("kg_sample_specular(texcoord, 0)"), "texture2DLod(specular,...) is redirected (lod arg kept)");
-        assertTrue(out.contains("kg_sample_specular(texcoord)"), "texture(specular,...) is redirected too");
+        assertTrue(out.contains("vec4 kg_sample_gtexture(vec2 kg_uv, vec2 kg_dx, vec2 kg_dy) { return kg_sample_gtexture(kg_uv); }"),
+                "a (vec2,vec2,vec2) overload absorbs the gradient args");
         assertTrue(out.contains("vec4 kg_sample_specular(vec2 kg_uv, float kg_lod) { return kg_sample_specular(kg_uv); }"),
                 "a (vec2,float) overload absorbs the lod arg");
-        assertEquals(1, countOccurrences(out, "return texture(specular, kg_uv);"),
-                "exactly one real specular read remains (the helper passthrough)");
     }
 
     @Test

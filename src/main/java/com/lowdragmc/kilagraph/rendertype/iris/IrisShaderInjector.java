@@ -204,7 +204,8 @@ public final class IrisShaderInjector {
      *  {@code (vec2,float)} LOD-absorbing overload, since the pack body may call either before the defs. */
     private static String samplerForwardDecls(String sampler) {
         return "vec4 kg_sample_" + sampler + "(vec2 kg_uv);\n"
-                + "vec4 kg_sample_" + sampler + "(vec2 kg_uv, float kg_lod);\n";
+                + "vec4 kg_sample_" + sampler + "(vec2 kg_uv, float kg_lod);\n"
+                + "vec4 kg_sample_" + sampler + "(vec2 kg_uv, vec2 kg_dx, vec2 kg_dy);\n";
     }
 
     /** A gated sampler helper: for our geometry ({@code kg_surface_id != 0}) it returns the dispatched
@@ -213,11 +214,16 @@ public final class IrisShaderInjector {
      *  ({@code texture2DLod}) resolve (the LOD is dropped — fine for our flat per-fragment surface).
      *  {@code DEBUG_FORCE_TINT} tints the albedo red (seam test). */
     private static String samplerHelper(String sampler, String kind) {
-        String lodOverload = "\nvec4 kg_sample_" + sampler + "(vec2 kg_uv, float kg_lod) { return kg_sample_"
+        // LOD- and gradient-form reads (textureLod / textureGrad / texture2DGradARB) keep their trailing
+        // args after the rewrite; these overloads absorb them and delegate to the (vec2) form (the explicit
+        // LOD/gradient is irrelevant for our flat per-fragment surface).
+        String overloads = "\nvec4 kg_sample_" + sampler + "(vec2 kg_uv, float kg_lod) { return kg_sample_"
+                + sampler + "(kg_uv); }\n"
+                + "vec4 kg_sample_" + sampler + "(vec2 kg_uv, vec2 kg_dx, vec2 kg_dy) { return kg_sample_"
                 + sampler + "(kg_uv); }\n";
         if (DEBUG_FORCE_TINT && kind.equals("albedo")) {
             return "\nvec4 kg_sample_" + sampler + "(vec2 kg_uv) {\n"
-                    + "    return vec4(1.0, 0.0, 0.0, 1.0);\n}\n" + lodOverload;
+                    + "    return vec4(1.0, 0.0, 0.0, 1.0);\n}\n" + overloads;
         }
         String encoded = switch (kind) {
             case "normals" -> "kg_encodeNormal(s.normalTS, s.ao, s.height)";
@@ -226,7 +232,7 @@ public final class IrisShaderInjector {
         };
         return "\nvec4 kg_sample_" + sampler + "(vec2 kg_uv) {\n"
                 + "    if (kg_surface_id != 0) { kg_Surface s = kg_surface(kg_surface_id, kg_uv); return " + encoded + "; }\n"
-                + "    return texture(" + sampler + ", kg_uv);\n}\n" + lodOverload;
+                + "    return texture(" + sampler + ", kg_uv);\n}\n" + overloads;
     }
 
     /** The {@code kg_Surface kg_surface(int id, vec2 uv)} dispatch over the live surfaces (a neutral default
@@ -247,7 +253,10 @@ public final class IrisShaderInjector {
      *  un-hijacked read that breaks the channel). The trailing {@code lod} arg, if present, stays and is
      *  absorbed by the {@code kg_sample_<s>(vec2, float)} overload. */
     private static Pattern samplePattern(String sampler) {
-        return Pattern.compile("texture2?D?(?:Lod)?\\s*\\(\\s*" + sampler + "\\b\\s*,\\s*");
+        // texture / texture2D, optionally with an explicit-LOD (Lod) or gradient (Grad / GradARB) suffix —
+        // BSL reads albedo/normals/specular via texture2DGradARB(...) under parallax, Complementary via
+        // texture2DLod(...). The trailing lod/gradient args stay and are absorbed by the kg_sample overloads.
+        return Pattern.compile("texture2?D?(?:Lod|Grad(?:ARB)?)?\\s*\\(\\s*" + sampler + "\\b\\s*,\\s*");
     }
 
     /** Insert {@code text} immediately before the first line that is real code (not blank/comment/#). */
