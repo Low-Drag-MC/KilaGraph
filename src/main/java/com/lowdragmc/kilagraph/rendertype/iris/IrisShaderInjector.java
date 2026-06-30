@@ -117,9 +117,9 @@ public final class IrisShaderInjector {
         // albedo-sampler tokens the final source contains — so we can see what Complementary actually names
         // its base-colour sampler if it isn't literally `gtexture`.
         if (source != null && LOGGED.add(name)) {
-            LOGGER.info("[KilaGraph][Iris] createShader '{}' len={} gtexture={} tex={} colortex0={} hasMain={}",
-                    name, source.length(), source.contains("gtexture"),
-                    source.matches("(?s).*\\btex\\b.*"), source.contains("colortex0"), source.contains("void main"));
+            LOGGER.info("[KilaGraph][Iris] createShader '{}' reads albedo={} normals={} specular={} (len={})",
+                    name, detectReads(source, ALBEDO_SAMPLERS), detectReads(source, NORMAL_SAMPLERS),
+                    detectReads(source, SPECULAR_SAMPLERS), source.length());
         }
         // Every program in one pack compile is injected from the same registry state; record it so the
         // runtime can detect when a later-registered surface needs a reload to be picked up.
@@ -183,6 +183,13 @@ public final class IrisShaderInjector {
     /** Convenience for the common (registry-driven) call. */
     public static String injectFragment(String source) {
         return injectFragment(source, IrisSurfaceRegistry.snapshot());
+    }
+
+    /** Diagnostic: which of {@code names} the source actually reads via {@code texture(name,…)}. */
+    private static List<String> detectReads(String source, String[] names) {
+        List<String> found = new ArrayList<>();
+        for (String n : names) if (samplePattern(n).matcher(source).find()) found.add(n);
+        return found;
     }
 
     /** Redirect {@code texture(<sampler>,…)} reads to {@code kg_sample_<sampler>(}, recording the sampler if
