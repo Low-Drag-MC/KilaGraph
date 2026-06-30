@@ -64,6 +64,10 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     /** Whether the graph samples the captured scene colour/depth — bound from {@link SceneCaptureManager}. */
     private final boolean usesSceneColor;
     private final boolean usesSceneDepth;
+    /** Non-zero discriminator written to the shaderpack program's injected {@code kg_surface_id} uniform while
+     *  this material draws (see {@code IrisShaderInjector}). 0 = no Iris injection. Set by the factory when a
+     *  shaderpack-compatible variant is active. */
+    private int irisSurfaceId = 0;
 
     private record ResolvedSampler(GpuTextureView view, GpuSampler sampler) {}
 
@@ -97,6 +101,44 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
 
     public String contentHash() {
         return contentHash;
+    }
+
+    /** The {@code kg_surface_id} written to the active shaderpack program while this material draws; 0 = none. */
+    public int irisSurfaceId() {
+        return irisSurfaceId;
+    }
+
+    public void setIrisSurfaceId(int id) {
+        this.irisSurfaceId = id;
+    }
+
+    /** The uploaded {@code KG_Material} buffer slice, for binding onto an Iris shaderpack program at draw
+     *  (see {@code IrisSurfaceUniform}); null when this material has no uniform fields or before upload. */
+    @Nullable
+    public GpuBufferSlice irisMaterialSlice() {
+        return uniforms.slice();
+    }
+
+    /** The KilaGraph-managed UBOs ({@code KG_Globals}/{@code KG_Transforms}/...) this material's graph uses,
+     *  for binding onto an Iris shaderpack program at draw. */
+    public java.util.List<ShaderUniformBlock> irisUniformBlocks() {
+        return uniformBlocks;
+    }
+
+    /** Receives each of this material's dynamic samplers (uniform name + resolved view/params) for binding
+     *  onto an Iris shaderpack program at draw. */
+    public interface IrisSamplerBinder {
+        void bind(String samplerName, GpuTextureView view, GpuSampler sampler);
+    }
+
+    /** Feed each resolved dynamic sampler (with any external-view override applied) to {@code binder}, so
+     *  {@code IrisSurfaceUniform} can bind them onto the shaderpack program. Call after {@link #prepareUniforms}
+     *  (which fills {@link #resolvedTextures}). Excludes overlay/lightmap/scene (not in the dynamic map). */
+    public void bindIrisSamplers(IrisSamplerBinder binder) {
+        for (Map.Entry<String, ResolvedSampler> e : resolvedTextures.entrySet()) {
+            ResolvedSampler r = externalViews.getOrDefault(e.getKey(), e.getValue());
+            binder.bind(e.getKey(), r.view(), r.sampler());
+        }
     }
 
     /**

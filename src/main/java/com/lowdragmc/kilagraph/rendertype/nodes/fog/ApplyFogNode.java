@@ -37,6 +37,14 @@ public class ApplyFogNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
+        // Under an Iris shaderpack we run inside the pack's gbuffers program, which applies its OWN fog in a
+        // later composite pass — and can't satisfy Minecraft's fog.glsl/Fog UBO anyway. So fog is a no-op
+        // here: pass the colour straight through (this also keeps the graph injection-compatible, since we
+        // never pull the fog include / Fog UBO fields). Same intent as the vanilla deferred path.
+        if (ctx.isInjection()) {
+            ctx.output("out", ctx.input("inColor"));
+            return;
+        }
         ctx.include("minecraft:fog.glsl");
         String code = "apply_fog("
                 + ctx.input("inColor").code() + ", "

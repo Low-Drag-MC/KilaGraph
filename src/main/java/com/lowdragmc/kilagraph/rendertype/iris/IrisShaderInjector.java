@@ -156,9 +156,9 @@ public final class IrisShaderInjector {
         LinkedHashSet<String> declUnits = new LinkedHashSet<>();
         for (var s : surfaces) declUnits.addAll(s.declarationUnits());
         for (String unit : declUnits) decls.append(unit);
-        for (String s : albedo) decls.append("vec4 kg_sample_").append(s).append("(vec2 kg_uv);\n");
-        for (String s : normals) decls.append("vec4 kg_sample_").append(s).append("(vec2 kg_uv);\n");
-        for (String s : specular) decls.append("vec4 kg_sample_").append(s).append("(vec2 kg_uv);\n");
+        for (String s : albedo) decls.append(samplerForwardDecls(s));
+        for (String s : normals) decls.append(samplerForwardDecls(s));
+        for (String s : specular) decls.append(samplerForwardDecls(s));
         body = insertAtFirstCodeLine(body, decls.toString());
 
         // 3. At the end (where samplers/uniforms are certainly declared): the encoders, deduped helper
@@ -198,13 +198,24 @@ public final class IrisShaderInjector {
         return read.matcher(body).replaceAll("kg_sample_" + sampler + "(");
     }
 
+    /** Forward declarations for a hijacked sampler's helper — both the {@code (vec2)} form and the
+     *  {@code (vec2,float)} LOD-absorbing overload, since the pack body may call either before the defs. */
+    private static String samplerForwardDecls(String sampler) {
+        return "vec4 kg_sample_" + sampler + "(vec2 kg_uv);\n"
+                + "vec4 kg_sample_" + sampler + "(vec2 kg_uv, float kg_lod);\n";
+    }
+
     /** A gated sampler helper: for our geometry ({@code kg_surface_id != 0}) it returns the dispatched
      *  surface's channel encoded for the sampler's role (albedo / LabPBR normals / LabPBR specular); else the
-     *  real texture read (passthrough). {@code DEBUG_FORCE_TINT} tints the albedo red (seam test). */
+     *  real texture read (passthrough). Emits a {@code (vec2,float)} overload too so explicit-LOD reads
+     *  ({@code texture2DLod}) resolve (the LOD is dropped — fine for our flat per-fragment surface).
+     *  {@code DEBUG_FORCE_TINT} tints the albedo red (seam test). */
     private static String samplerHelper(String sampler, String kind) {
+        String lodOverload = "\nvec4 kg_sample_" + sampler + "(vec2 kg_uv, float kg_lod) { return kg_sample_"
+                + sampler + "(kg_uv); }\n";
         if (DEBUG_FORCE_TINT && kind.equals("albedo")) {
             return "\nvec4 kg_sample_" + sampler + "(vec2 kg_uv) {\n"
-                    + "    return vec4(1.0, 0.0, 0.0, 1.0);\n}\n";
+                    + "    return vec4(1.0, 0.0, 0.0, 1.0);\n}\n" + lodOverload;
         }
         String encoded = switch (kind) {
             case "normals" -> "kg_encodeNormal(s.normalTS, s.ao, s.height)";
@@ -213,7 +224,7 @@ public final class IrisShaderInjector {
         };
         return "\nvec4 kg_sample_" + sampler + "(vec2 kg_uv) {\n"
                 + "    if (kg_surface_id != 0) { kg_Surface s = kg_surface(kg_surface_id, kg_uv); return " + encoded + "; }\n"
-                + "    return texture(" + sampler + ", kg_uv);\n}\n";
+                + "    return texture(" + sampler + ", kg_uv);\n}\n" + lodOverload;
     }
 
     /** The {@code kg_Surface kg_surface(int id, vec2 uv)} dispatch over the live surfaces (a neutral default
@@ -228,9 +239,13 @@ public final class IrisShaderInjector {
         return sb.toString();
     }
 
-    /** {@code texture(<sampler>, } / {@code texture2D(<sampler>,} reads of a specific sampler. */
+    /** Reads of a specific sampler in any of the forms a pack uses: {@code texture(s,…)},
+     *  {@code texture2D(s,…)}, and the explicit-LOD {@code textureLod(s,…,lod)} / {@code texture2DLod(s,…,lod)}
+     *  (Complementary's emission mipmap-fix uses {@code texture2DLod(specular,…,0)} — missing it leaves an
+     *  un-hijacked read that breaks the channel). The trailing {@code lod} arg, if present, stays and is
+     *  absorbed by the {@code kg_sample_<s>(vec2, float)} overload. */
     private static Pattern samplePattern(String sampler) {
-        return Pattern.compile("texture2?D?\\s*\\(\\s*" + sampler + "\\b\\s*,\\s*");
+        return Pattern.compile("texture2?D?(?:Lod)?\\s*\\(\\s*" + sampler + "\\b\\s*,\\s*");
     }
 
     /** Insert {@code text} immediately before the first line that is real code (not blank/comment/#). */

@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8.5",
+  "package": "com.lowdragmc.kilagraph.mixin.iris",
+  "plugin": "com.lowdragmc.kilagraph.mixin.iris.IrisMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "MixinGlCommandEncoder",
+    "MixinGlCommandEncoderSurface",
+    "MixinShaderCreator"
+  ],
+  "mixins": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -33,21 +33,26 @@ public final class PreviewRenderer {
         emit(PreviewTessellator.toStream(mesh, mode), pose, vc, format);
     }
 
-    /** Write a tessellated vertex stream into {@code vc}, filling exactly the format's declared elements. */
+    /** Write a tessellated vertex stream into {@code vc}, filling the format's declared elements that we have
+     *  writers for. Elements without a writer are left unwritten — an <em>extending</em> {@code BufferBuilder}
+     *  (e.g. Iris, which swaps the format to {@code IrisVertexFormats.ENTITY} and auto-fills its extra
+     *  {@code iris_Entity}/{@code mc_midTexCoord}/{@code at_tangent} attributes) populates them itself, exactly
+     *  as it does for vanilla geometry. Aborting the whole draw here instead (the old behaviour) is what made
+     *  graph models invisible under a shaderpack. */
     public static void emit(List<PreviewVertex> stream, PoseStack.Pose pose, VertexConsumer vc, VertexFormat format) {
-        // Resolve a writer for every non-position element up front. If any is missing (a mod registered a
-        // custom VertexFormatElement but no PreviewVertexWriters writer for it), skip the whole draw —
-        // emitting a partial vertex would make BufferBuilder throw "Missing elements in vertex".
         var writers = new ArrayList<PreviewVertexWriters.Writer>();
         for (VertexFormatElement element : format.getElements()) {
             if (element == VertexFormatElement.POSITION) continue;
             var writer = PreviewVertexWriters.get(element);
             if (writer == null) {
+                // Unknown element (e.g. an Iris-extended attribute, or a mod's custom element). Skip it and
+                // rely on the buffer to fill it; warn once so a genuinely-missing writer is still diagnosable.
                 if (WARNED_MISSING_WRITER.add(element.id())) {
-                    LOGGER.warn("[KilaGraph] no preview writer for vertex element id {}; skipping preview. "
-                            + "Register one via PreviewVertexWriters.register.", element.id());
+                    LOGGER.warn("[KilaGraph] no preview writer for vertex element id {}; leaving it for the "
+                            + "buffer to fill (Iris-extended attribute?). Register one via PreviewVertexWriters.register "
+                            + "if it should be written explicitly.", element.id());
                 }
-                return;
+                continue;
             }
             writers.add(writer);
         }

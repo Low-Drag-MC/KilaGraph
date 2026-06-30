@@ -42,7 +42,8 @@ public class FragmentStageNode extends ContextNode {
                 FragmentAmbientOcclusionBlock.class,
                 FragmentHeightBlock.class,
                 FragmentPorosityBlock.class,
-                FragmentSubsurfaceBlock.class
+                FragmentSubsurfaceBlock.class,
+                FragmentEmissivenessBlock.class
         );
     }
 }

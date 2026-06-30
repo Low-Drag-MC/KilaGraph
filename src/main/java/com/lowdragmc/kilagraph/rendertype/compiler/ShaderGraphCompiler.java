@@ -298,12 +298,14 @@ public final class ShaderGraphCompiler {
                 .forEach(b -> decls.add(b.declareGlsl()));
 
         StringBuilder body = new StringBuilder(fragment.body);
-        // Emission is a vec3 colour block, but LabPBR carries only a scalar emission intensity (the glow
-        // colour is the albedo). Reduce to the max channel, hoisted so the struct arg references it once.
-        // (Under a shaderpack the pack does its own alpha test, so the M1 alpha-discard is intentionally
-        // dropped here — albedo+alpha in the struct is enough.)
+        // LabPBR emission (_s.a) is a scalar glow intensity (glow colour = albedo). The dedicated float
+        // Emissiveness block drives it directly; else we fall back to the max channel of the vec3 Emission
+        // colour block (hoisted so the struct arg references it once). (Under a shaderpack the pack does its
+        // own alpha test, so the M1 alpha-discard is intentionally dropped here.)
         String emissionArg = "0.0";
-        if (out.emission != null) {
+        if (out.emissiveness != null) {
+            emissionArg = out.emissiveness.code();
+        } else if (out.emission != null) {
             String e = out.emission.code();
             body.append("    float kg_emission_i = max(max((").append(e).append(").r, (")
                     .append(e).append(").g), (").append(e).append(").b);\n");

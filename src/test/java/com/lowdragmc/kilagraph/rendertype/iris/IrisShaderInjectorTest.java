@@ -136,6 +136,33 @@ class IrisShaderInjectorTest {
     }
 
     @Test
+    void hijacksExplicitLodReads() {
+        // Complementary's labPBR emission mipmap-fix reads texture2DLod(specular, uv, 0) — must be hijacked
+        // too, else min(ours, real-specular) kills the channel. The trailing lod arg is absorbed by an overload.
+        String pack = """
+                #version 330 compatibility
+                uniform sampler2D specular;
+                in vec2 texcoord;
+                out vec4 fragColor;
+                void main() {
+                    vec4 s0 = texture2DLod(specular, texcoord, 0);
+                    vec4 s1 = texture(specular, texcoord);
+                    fragColor = s0 + s1;
+                }
+                """;
+        var s1 = new IrisSurfaceRegistry.Surface(1, List.of(), List.of(),
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(0.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.5, 1.0, 1.0, 0.0, 0.0);\n}\n");
+        String out = IrisShaderInjector.injectFragment(pack, List.of(s1));
+
+        assertTrue(out.contains("kg_sample_specular(texcoord, 0)"), "texture2DLod(specular,...) is redirected (lod arg kept)");
+        assertTrue(out.contains("kg_sample_specular(texcoord)"), "texture(specular,...) is redirected too");
+        assertTrue(out.contains("vec4 kg_sample_specular(vec2 kg_uv, float kg_lod) { return kg_sample_specular(kg_uv); }"),
+                "a (vec2,float) overload absorbs the lod arg");
+        assertEquals(1, countOccurrences(out, "return texture(specular, kg_uv);"),
+                "exactly one real specular read remains (the helper passthrough)");
+    }
+
+    @Test
     void dedupsSharedDeclarationsAndHelpers() {
         // Two surfaces both reference the same shared missing-sampler decl + the same procedural helper.
         String sharedDecl = "uniform sampler2D kg_MissingSampler;\n";

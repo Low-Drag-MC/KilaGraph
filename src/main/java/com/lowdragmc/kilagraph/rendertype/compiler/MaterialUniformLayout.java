@@ -78,17 +78,23 @@ public final class MaterialUniformLayout {
 
     /** Emit the GLSL declaration of the UBO block + sampler uniforms (empty string if none). */
     public String declareGlsl() {
-        StringBuilder sb = new StringBuilder();
-        if (!fields.isEmpty()) {
-            sb.append("layout(std140) uniform ").append(UBO_NAME).append(" {\n");
-            for (Field f : fields.values()) {
-                sb.append("    ").append(f.type().glsl()).append(' ').append(f.name()).append(";\n");
-            }
-            sb.append("} ").append(UBO_INSTANCE).append(";\n");
-        }
+        StringBuilder sb = new StringBuilder(blockGlsl());
         for (String s : samplers) {
             sb.append("uniform sampler2D ").append(s).append(";\n");
         }
+        return sb.toString();
+    }
+
+    /** Emit just the std140 {@code KG_Material} block declaration (no sampler lines); empty when no fields.
+     *  Used by the Iris injection path, which emits the block and each sampler as separate dedup units. */
+    public String blockGlsl() {
+        if (fields.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        sb.append("layout(std140) uniform ").append(UBO_NAME).append(" {\n");
+        for (Field f : fields.values()) {
+            sb.append("    ").append(f.type().glsl()).append(' ').append(f.name()).append(";\n");
+        }
+        sb.append("} ").append(UBO_INSTANCE).append(";\n");
         return sb.toString();
     }
 }

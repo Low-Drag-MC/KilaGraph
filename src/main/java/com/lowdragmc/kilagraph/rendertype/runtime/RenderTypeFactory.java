@@ -9,6 +9,8 @@ import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat;
+import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
+import com.lowdragmc.kilagraph.rendertype.iris.IrisSurfaceRegistry;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.ColorTargetState;
@@ -147,11 +149,26 @@ public final class RenderTypeFactory {
         for (Map.Entry<String, float[]> e : compiled.uniformDefaults().entrySet()) {
             material.setUniformField(e.getKey(), e.getValue());
         }
+        // Iris compatibility: register the graph's compiled surface so a shaderpack routes our geometry
+        // through its entities gbuffers program and runs our real shading there. register() returns a
+        // non-zero kg_surface_id when the graph is injection-compatible (the injected kg_surface(id,...)
+        // dispatch then shades our geometry), or 0 when it isn't — id 0 still assigns to entities so the
+        // geometry renders, falling back to the shaderpack's own albedo (passthrough). No-op without Iris.
+        if (IrisCompat.LOADED) {
+            material.setIrisSurfaceId(IrisSurfaceRegistry.register(compiled));
+            boolean translucent = compiled.settings().blend() != RenderTypeGraph.Settings.BlendMode.OPAQUE;
+            IrisCompat.assignToEntities(pipeline, translucent);
+            // A reload to inject this new surface (if the programs are now stale) is driven from the client
+            // tick (IrisCompat.reloadShadersIfStale via IrisDebugCommand), NOT here — reloading mid-frame
+            // crashes the world pipeline.
+        }
         return material;
     }
 
     /** Release a material's reference to its generated pipeline; evict when the last one drops. */
     static void release(String contentHash) {
+        // Mirror the release into the Iris surface registry (no-op if this graph wasn't injection-registered).
+        if (IrisCompat.LOADED) IrisSurfaceRegistry.release(contentHash);
         REFCOUNTS.compute(contentHash, (h, count) -> {
             if (count == null) return null;
             if (count <= 1) {

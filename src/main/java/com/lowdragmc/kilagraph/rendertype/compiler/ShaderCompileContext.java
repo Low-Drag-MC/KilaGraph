@@ -72,6 +72,14 @@ public final class ShaderCompileContext {
         return compiler.isPreview();
     }
 
+    /** Whether this is an Iris-injection compile (compiling the fragment into a {@code kg_surface} function
+     *  for a shaderpack program). Nodes needing Minecraft engine state the pack program can't provide — fog
+     *  especially (the shaderpack applies its own in composite) — should pass through here so the graph stays
+     *  injectable rather than pulling an unsupported {@code #moj_import} that rejects it. */
+    public boolean isInjection() {
+        return compiler.isInjection();
+    }
+
     // ---- vertex attributes -------------------------------------------------------------------
 
     /**

@@ -73,6 +73,7 @@
   "rt_fragment_metallic": "Metallic",
   "rt_fragment_porosity": "Porosity",
   "rt_fragment_sss": "Subsurface",
+  "rt_fragment_emissiveness": "Emissiveness",
 
   "rt_in_vertex_attribute": "Vertex Attribute",
   "rt_uv": "UV",
@@ -529,6 +530,7 @@
   "kg.node.rt_fragment_metallic.tooltip": "Metallic 0..1 (LabPBR _s.g) — shaderpack only.",
   "kg.node.rt_fragment_porosity.tooltip": "Porosity 0..1 (LabPBR _s.b low range) — shaderpack only.",
   "kg.node.rt_fragment_sss.tooltip": "Subsurface scattering 0..1 (LabPBR _s.b high range) — shaderpack only.",
+  "kg.node.rt_fragment_emissiveness.tooltip": "Glow intensity 0..1 (LabPBR _s.a); glow color = albedo. The float emission control for shaderpacks — shaderpack only.",
   "kg.node.rt_in_vertex_attribute.tooltip": "Reads a raw vertex attribute from the current vertex format.",
   "kg.node.rt_uv.tooltip": "Outputs an interpolated mesh UV channel.",
   "kg.node.rt_vertex_color.tooltip": "Outputs the mesh vertex color with the selected lighting mode.",

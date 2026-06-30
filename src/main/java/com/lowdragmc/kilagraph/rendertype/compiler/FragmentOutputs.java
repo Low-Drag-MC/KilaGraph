@@ -33,4 +33,7 @@ public final class FragmentOutputs {
     @Nullable public ShaderExpr porosity;
     /** Subsurface scattering 0..1 (float). Null = 0. LabPBR _s.b high range (wins over porosity). */
     @Nullable public ShaderExpr sss;
+    /** Emissiveness 0..1 (float), the LabPBR {@code _s.a} glow intensity (glow colour = albedo). Takes
+     *  precedence over the {@link #emission} colour block under injection; null = fall back to emission. */
+    @Nullable public ShaderExpr emissiveness;
 }

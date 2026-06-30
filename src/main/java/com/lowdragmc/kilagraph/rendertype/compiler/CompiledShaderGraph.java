@@ -2,6 +2,7 @@ package com.lowdragmc.kilagraph.rendertype.compiler;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock;
+import org.jetbrains.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -56,7 +57,11 @@ public record CompiledShaderGraph(
         // Attribute names a node/block default referenced that aren't in the vertex format (a safe constant
         // was substituted in the GLSL). Diagnostics only — surfaced as editor warnings; the GLSL already
         // reflects the substitution, so this is NOT part of contentHash().
-        List<String> missingAttributes
+        List<String> missingAttributes,
+        // The fragment surface compiled as a kg_surface() function for injection into an Iris shaderpack's
+        // gbuffers program (see InjectionSnippet / IrisShaderInjector). Null when the graph isn't
+        // injection-compatible or for editor previews. Metadata — NOT part of contentHash().
+        @Nullable InjectionSnippet injectionSnippet
 ) {
 
     /** Whether stage-affinity violations were found (the generated GLSL is then not safe to compile). */
