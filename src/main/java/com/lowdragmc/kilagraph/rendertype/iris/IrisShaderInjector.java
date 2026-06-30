@@ -113,22 +113,19 @@ public final class IrisShaderInjector {
      * shaderpack's programs. {@code name} is the Iris program name (e.g. {@code gbuffers_entities}).
      */
     public static String inject(String name, String source) {
-        // Ground-truth diagnostic: log EVERY createShader call once (proves the mixin fires) with which
-        // albedo-sampler tokens the final source contains — so we can see what Complementary actually names
-        // its base-colour sampler if it isn't literally `gtexture`.
-        if (source != null && LOGGED.add(name)) {
-            LOGGER.info("[KilaGraph][Iris] createShader '{}' reads albedo={} normals={} specular={} (len={})",
-                    name, detectReads(source, ALBEDO_SAMPLERS), detectReads(source, NORMAL_SAMPLERS),
-                    detectReads(source, SPECULAR_SAMPLERS), source.length());
-        }
         // Every program in one pack compile is injected from the same registry state; record it so the
         // runtime can detect when a later-registered surface needs a reload to be picked up.
         lastInjectedGeneration = IrisSurfaceRegistry.generation();
         var surfaces = IrisSurfaceRegistry.snapshot();
         String out = injectFragment(source, surfaces);
-        if (out != source) { // injectFragment returns the same ref on no-op
-            LOGGER.info("[KilaGraph][Iris] -> injected {} surface(s) into '{}' (forceTint={})",
-                    surfaces.size(), name, DEBUG_FORCE_TINT);
+        // Iris calls createShader for BOTH the vertex and fragment of each program (same name); only the
+        // fragment reads gbuffers samplers, so log the diagnostic for the source we actually injected (out !=
+        // source) — and report which sampler families that fragment reads, the ground truth for "does this
+        // pack program do albedo/normal/specular PBR for our geometry". Once per program name.
+        if (out != source && LOGGED.add(name)) {
+            LOGGER.info("[KilaGraph][Iris] injected {} surface(s) into '{}' — fragment reads albedo={} normals={} specular={}",
+                    surfaces.size(), name, detectReads(source, ALBEDO_SAMPLERS),
+                    detectReads(source, NORMAL_SAMPLERS), detectReads(source, SPECULAR_SAMPLERS));
         }
         return out;
     }
