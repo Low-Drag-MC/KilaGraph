@@ -122,7 +122,9 @@ public final class IrisShaderInjector {
         // fragment reads gbuffers samplers, so log the diagnostic for the source we actually injected (out !=
         // source) — and report which sampler families that fragment reads, the ground truth for "does this
         // pack program do albedo/normal/specular PBR for our geometry". Once per program name.
-        if (out != source && LOGGED.add(name)) {
+        // Key the once-per-program log by name + source length so a DIFFERENT pack's same-named program
+        // (different source) re-logs — otherwise switching shaderpacks shows nothing new.
+        if (out != source && LOGGED.add(name + "#" + (source == null ? 0 : source.length()))) {
             LOGGER.info("[KilaGraph][Iris] injected {} surface(s) into '{}' — fragment reads albedo={} normals={} specular={}",
                     surfaces.size(), name, detectReads(source, ALBEDO_SAMPLERS),
                     detectReads(source, NORMAL_SAMPLERS), detectReads(source, SPECULAR_SAMPLERS));
