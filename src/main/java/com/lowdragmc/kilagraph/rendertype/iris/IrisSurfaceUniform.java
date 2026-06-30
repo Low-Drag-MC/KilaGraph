@@ -75,6 +75,12 @@ public final class IrisSurfaceUniform {
         if (currentSurfaceId == 0) return; // nothing of ours drawing — leave the program untouched
         int program = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
         if (program == 0) return;
+        // Only an Iris-injected shaderpack program declares kg_surface_id. When Iris did NOT override our
+        // pipeline (our own program is bound — GUI/editor preview, an unassigned pipeline, or a draw before
+        // the inject reload), this is -1: skip everything. Our own program already binds its KG_Material UBO
+        // + samplers through the normal RenderType.draw path, and re-binding them here (to our high units)
+        // would clobber that correct binding — which showed up as a wrong/garbage albedo texture.
+        if (location(program) < 0) return;
         writeSurfaceId(program, currentSurfaceId);
         bindMaterialBlocks(program);
         bindMaterialSamplers(program);
