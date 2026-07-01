@@ -7,6 +7,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -76,6 +77,13 @@ public final class KGTypeHandles {
         // accessors (pickers + serialization); Level/Entity/Player/BlockEntity don't (wire-only).
         BLOCK_POS = TypeHandleHelpers.fromType(BlockPos.class, "BlockPos");
         BLOCK_STATE = TypeHandleHelpers.fromType(BlockState.class, "BlockState");
+        // LDLib2 2.2.26's TypeHandle.getDefaultValue() returns null for a fromType handle with no registered
+        // default (26.1 fell back to the accessor's own default). BLOCK_POS/BLOCK_STATE are accessor-backed,
+        // so an unconnected input port builds a constant editor that reads getDefaultValue(); a null value
+        // then NPEs inside BlockPosAccessor/BlockStateAccessor (supplier.get().getX()). Seed non-null defaults
+        // explicitly (matching BlockPosAccessor.defaultValue()'s BlockPos(0,0,0)).
+        TypeHandleHelpers.setCustomDefaultValue(BLOCK_POS, () -> new BlockPos(0, 0, 0));
+        TypeHandleHelpers.setCustomDefaultValue(BLOCK_STATE, () -> Blocks.AIR.defaultBlockState());
         LEVEL = TypeHandleHelpers.fromType(Level.class, "Level");
         ENTITY = TypeHandleHelpers.fromType(Entity.class, "Entity");
         PLAYER = TypeHandleHelpers.fromType(Player.class, "Player");
