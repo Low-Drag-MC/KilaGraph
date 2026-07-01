@@ -9,7 +9,6 @@ import com.lowdragmc.lowdraglib2.utils.LocalizationUtils;
 import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NonNull;
 
 import java.util.Collection;
 import java.util.function.Supplier;
@@ -109,7 +108,7 @@ public final class KGSearchConfigurators {
             }
 
             @Override
-            public Component mapping(@NonNull String value) {
+            public Component mapping(@NotNull String value) {
                 return Component.literal(value);
             }
         };
@@ -146,7 +145,7 @@ public final class KGSearchConfigurators {
             }
 
             @Override
-            public Component mapping(@NonNull TypeHandle value) {
+            public Component mapping(@NotNull TypeHandle value) {
                 return Component.literal(value.getFriendlyName());
             }
         };

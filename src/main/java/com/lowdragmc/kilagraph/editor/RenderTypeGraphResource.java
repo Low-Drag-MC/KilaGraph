@@ -11,9 +11,6 @@ import com.lowdragmc.lowdraglib2.gui.texture.Icons;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.editor.GraphResource;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.GraphView;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.TagValueOutput;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Supplier;
@@ -38,9 +35,9 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
 
     public CompoundTag serializeGraph(RenderTypeGraph graph) {
         var root = new CompoundTag();
-        var output = TagValueOutput.createWithContext(ProblemReporter.Collector.DISCARDING, Platform.getFrozenRegistry());
-        graph.graphModel.serialize(output);
-        root.put(GRAPH_TAG, output.buildResult());
+        // 1.21.1: MC has no TagValueInput/Output (added in 1.21.5); LDLib2-1.21's graph model serializes
+        // directly to NBT via serializeNBT(HolderLookup.Provider) — the canonical GraphView/undo pattern.
+        root.put(GRAPH_TAG, graph.graphModel.serializeNBT(Platform.getFrozenRegistry()));
         root.put(SETTINGS_TAG, serializeSettings(graph.getSettings()));
         return root;
     }
@@ -57,8 +54,7 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
         var graph = new RenderTypeGraph(false);
         graph.graphModel.setReferenceResolver(resolver);
         var graphTag = tag.get(GRAPH_TAG) instanceof CompoundTag compound ? compound : tag;
-        graph.graphModel.deserialize(TagValueInput.create(ProblemReporter.Collector.DISCARDING,
-                Platform.getFrozenRegistry(), graphTag));
+        graph.graphModel.deserializeNBT(Platform.getFrozenRegistry(), graphTag);
         graph.graphModel.setReferenceResolver(resolver);
         if (tag.get(SETTINGS_TAG) instanceof CompoundTag settingsTag) {
             graph.setSettings(deserializeSettings(settingsTag));
@@ -90,11 +86,11 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
                         defaults.vertexFormatMode()),
                 readEnum(tag, "blend", RenderTypeGraph.Settings.BlendMode.class, defaults.blend()),
                 readEnum(tag, "depthTest", RenderTypeGraph.Settings.DepthTest.class, defaults.depthTest()),
-                tag.getBoolean("depthWrite").orElse(defaults.depthWrite()),
-                tag.getBoolean("cull").orElse(defaults.cull()),
+                readBool(tag, "depthWrite", defaults.depthWrite()),
+                readBool(tag, "cull", defaults.cull()),
                 readEnum(tag, "outputTarget", RenderTypeGraph.Settings.OutputTarget.class, defaults.outputTarget()),
-                tag.getBoolean("affectsOutline").orElse(defaults.affectsOutline()),
-                tag.getBoolean("sortOnUpload").orElse(defaults.sortOnUpload())
+                readBool(tag, "affectsOutline", defaults.affectsOutline()),
+                readBool(tag, "sortOnUpload", defaults.sortOnUpload())
         );
     }
 
@@ -103,7 +99,7 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
      * {@code vertexFormatPreset} enum string to the equivalent preset key list when needed.
      */
     private static java.util.List<String> readVertexFormatElements(CompoundTag tag, java.util.List<String> fallback) {
-        var joined = tag.getString("vertexFormatElements").orElse("");
+        var joined = tag.getString("vertexFormatElements");
         if (!joined.isBlank()) {
             var keys = new java.util.ArrayList<String>();
             for (var part : joined.split(",")) {
@@ -112,7 +108,7 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
             if (!keys.isEmpty()) return keys;
         }
         // Legacy: map the pre-refactor VertexFormatPreset enum name to its element list.
-        var legacy = tag.getString("vertexFormatPreset").orElse(null);
+        var legacy = tag.contains("vertexFormatPreset") ? tag.getString("vertexFormatPreset") : null;
         if (legacy != null) {
             return switch (legacy) {
                 case "BLOCK" -> com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets.BLOCK;
@@ -123,8 +119,12 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
         return fallback;
     }
 
+    private static boolean readBool(CompoundTag tag, String key, boolean fallback) {
+        return tag.contains(key) ? tag.getBoolean(key) : fallback;
+    }
+
     private static <E extends Enum<E>> E readEnum(CompoundTag tag, String key, Class<E> enumClass, E fallback) {
-        var name = tag.getString(key).orElse(fallback.name());
+        var name = tag.contains(key) ? tag.getString(key) : fallback.name();
         try {
             return Enum.valueOf(enumClass, name);
         } catch (IllegalArgumentException ignored) {

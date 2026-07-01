@@ -124,9 +124,9 @@ public class RenderTypeGraphModel extends ShaderGraphModelBase {
         previewToolContentKey = null;
         if (!(tag instanceof CompoundTag compound)) return;
         if (compound.contains("nodePreviewContents")) {
-            var previews = compound.getCompoundOrEmpty("nodePreviewContents");
-            for (var key : previews.keySet()) {
-                var value = previews.getStringOr(key, "");
+            var previews = compound.getCompound("nodePreviewContents");
+            for (var key : previews.getAllKeys()) {
+                var value = previews.getString(key);
                 if (value.isEmpty()) continue;
                 try {
                     nodePreviewContentKeys.put(UUID.fromString(key), value);
@@ -136,7 +136,7 @@ public class RenderTypeGraphModel extends ShaderGraphModelBase {
             }
         }
         if (compound.contains("previewToolContent")) {
-            var value = compound.getStringOr("previewToolContent", "");
+            var value = compound.getString("previewToolContent");
             previewToolContentKey = value.isEmpty() ? null : value;
         }
     }

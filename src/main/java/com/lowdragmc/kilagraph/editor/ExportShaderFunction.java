@@ -13,8 +13,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableScope;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.wire.WireModel;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.util.ProblemReporter;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2f;
 
@@ -130,8 +128,7 @@ public final class ExportShaderFunction {
     /** Serialize a function graph to the resource {@link CompoundTag} the ShaderFunction resource round-trips
      *  (just the graph model — function graphs carry no extra settings). */
     public static CompoundTag serialize(ShaderFunctionGraph graph) {
-        var output = TagValueOutput.createWithContext(ProblemReporter.Collector.DISCARDING, Platform.getFrozenRegistry());
-        graph.graphModel.serialize(output);
-        return output.buildResult();
+        // 1.21.1: no TagValueOutput — LDLib2-1.21's graph model serializes directly to a CompoundTag.
+        return graph.graphModel.serializeNBT(Platform.getFrozenRegistry());
     }
 }

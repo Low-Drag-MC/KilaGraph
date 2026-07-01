@@ -87,8 +87,8 @@ public final class GradientGlsl {
     /** Emit the per-field assignments that populate a {@code KG_Gradient} variable {@code var}. */
     private static void appendBuild(StringBuilder sb, String var, GradientValue value) {
         GradientColor g = value.gradient();
-        List<Vector4fc> rgb = g.getRgbP();
-        List<Vector2fc> a = g.getAP();
+        var rgb = g.getRgbP();
+        var a = g.getAP();
         int nc = Math.max(1, Math.min(rgb.size(), MAX_KEYS));
         int na = Math.max(1, Math.min(a.size(), MAX_KEYS));
         sb.append(var).append(".header = vec4(")
@@ -114,8 +114,8 @@ public final class GradientGlsl {
     /** std140 float layout of a gradient for the material UBO (header + 8 colour vec4 + 8 alpha vec4). */
     public static float[] pack(GradientValue value) {
         GradientColor g = value.gradient();
-        List<Vector4fc> rgb = g.getRgbP();
-        List<Vector2fc> a = g.getAP();
+        var rgb = g.getRgbP();
+        var a = g.getAP();
         int nc = Math.max(1, Math.min(rgb.size(), MAX_KEYS));
         int na = Math.max(1, Math.min(a.size(), MAX_KEYS));
         float[] out = new float[PACKED_FLOATS];

@@ -8,7 +8,7 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
@@ -34,7 +34,7 @@ public class ItemInTagNode extends AnnotatedNode {
     public void evaluate(EvalContext ctx) {
         Item i = ctx.getInput("item", Item.class, Items.AIR);
         String id = ctx.getInput("tag", String.class, "");
-        Identifier rl = Identifier.tryParse(id);
+        ResourceLocation rl = ResourceLocation.tryParse(id);
         if (i == null || rl == null) {
             ctx.setOutput("out", false);
             return;

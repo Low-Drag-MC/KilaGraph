@@ -1,11 +1,11 @@
 package com.lowdragmc.kilagraph.rendertype.gui;
 
 import com.lowdragmc.lowdraglib2.configurator.ui.ValueConfigurator;
-import com.lowdragmc.lowdraglib2.gui.texture.GuiTexture;
+import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
-import com.lowdragmc.lowdraglib2.gui.ui.rendering.GUIContext;
+import net.minecraft.client.gui.GuiGraphics;
 import com.lowdragmc.lowdraglib2.gui.ui.style.StyleOrigin;
 import com.lowdragmc.lowdraglib2.gui.ui.styletemplate.Sprites;
 import com.lowdragmc.lowdraglib2.math.GradientColor;
@@ -69,9 +69,12 @@ public class GradientColorConfigurator extends ValueConfigurator<GradientColor> 
             style.setPipelineState(StyleOrigin.INLINE);
         }).addClass("configurator_preview_bg").addChildren(new UIElement()
                 .layout(layout -> layout.heightPercent(100))
-                .style(style -> style.backgroundTexture(GuiTexture.of(
-                        (GUIContext ctx, float x, float y, float w, float h) ->
-                                GradientColorSelector.drawGradientBar(ctx, x, y, w, h, value == null ? defaultValue : value))))
+                .style(style -> style.backgroundTexture(new IGuiTexture() {
+                    @Override
+                    public void draw(GuiGraphics graphics, float mouseX, float mouseY, float x, float y, float width, float height, float partialTicks) {
+                        GradientColorSelector.drawGradientBar(graphics, x, y, width, height, value == null ? defaultValue : value);
+                    }
+                }))
                 .addEventListener(UIEvents.MOUSE_DOWN, this::onClick)));
 
         this.gradientSelector.setValue(value, false);

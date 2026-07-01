@@ -13,9 +13,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.editor.IGraphReferenceResolver;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.editor.SubgraphRegistry;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.util.Tuple;
-import net.minecraft.world.level.storage.TagValueInput;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -113,8 +111,7 @@ public class RenderTypeGraphResourceProviderContainer extends GraphResourceProvi
                     return renderTypeGraphResource.deserializeGraph(tag);
                 }
                 var refGraph = graphResource.createGraph();
-                refGraph.graphModel.deserialize(TagValueInput.create(ProblemReporter.Collector.DISCARDING,
-                        Platform.getFrozenRegistry(), tag));
+                refGraph.graphModel.deserializeNBT(Platform.getFrozenRegistry(), tag);
                 return refGraph;
             }
         }

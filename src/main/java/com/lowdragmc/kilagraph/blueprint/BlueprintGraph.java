@@ -9,7 +9,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.HashSet;
 import java.util.List;
@@ -22,7 +22,7 @@ import java.util.List;
 public class BlueprintGraph extends Graph {
 
     public static final GraphNodeRegistry NODE_REGISTRY =
-            GraphNodeRegistry.create(Identifier.fromNamespaceAndPath(Kilagraph.MODID, "blueprint"),
+            GraphNodeRegistry.create(ResourceLocation.fromNamespaceAndPath(Kilagraph.MODID, "blueprint"),
                     BlueprintGraph.class);
 
     @Override

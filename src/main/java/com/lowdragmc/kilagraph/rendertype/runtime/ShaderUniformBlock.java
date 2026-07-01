@@ -1,6 +1,5 @@
 package com.lowdragmc.kilagraph.rendertype.runtime;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -30,7 +29,9 @@ public interface ShaderUniformBlock {
     /** (Re)create + upload the buffer for the current frame. Render thread, BEFORE any render pass opens. */
     void prepareUpload();
 
+    // TODO(1.21-backport milestone 2): return type was com.mojang.blaze3d.buffers.GpuBufferSlice (absent in
+    // 1.21.1). Retyped to Object for the compile-only milestone; restore when the GPU-buffer runtime is rewritten.
     /** The buffer slice to bind for {@link #uboName()} — pure (safe inside a render pass), or null if absent. */
     @Nullable
-    GpuBufferSlice slice();
+    Object slice();
 }

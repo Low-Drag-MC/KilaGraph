@@ -19,7 +19,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.utils.UIElementProvider;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.IFieldValueConfigurable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,7 +58,7 @@ public final class Sampler2DConfigurator {
                     if (m == SamplerMode.ATLAS) {
                         group.addConfigurator(new SearchComponentConfigurator<>(
                                 "kg.sampler.atlas",
-                                () -> Identifier.tryParse(get.get().location()),
+                                () -> ResourceLocation.tryParse(get.get().location()),
                                 id -> vc.setValue(get.get().withLocation(id == null ? "" : id.toString())),
                                 firstAtlasId(), true,
                                 Sampler2DConfigurator::searchAtlases,
@@ -107,7 +107,7 @@ public final class Sampler2DConfigurator {
         preview.inlineContainer.addChild(new UIElement()
                 .layout(l -> l.width(40).height(40))
                 .style(s -> s.backgroundTexture(DynamicTexture.of(() -> {
-                    Identifier id = Identifier.tryParse(get.get().location());
+                    ResourceLocation id = ResourceLocation.tryParse(get.get().location());
                     return id == null ? IGuiTexture.EMPTY : SpriteTexture.of(id);
                 }))));
 
@@ -121,19 +121,22 @@ public final class Sampler2DConfigurator {
      * registered under, so it both binds (withTexture) and renders. The {@code forEach} key is the
      * atlas <em>config</em> id ({@code minecraft:items}), which is not a bindable/loadable texture.
      */
-    private static void searchAtlases(String word, Consumer<Identifier> found) {
+    private static void searchAtlases(String word, Consumer<ResourceLocation> found) {
         var mc = Minecraft.getInstance();
         if (mc == null) return;
         String lower = word.toLowerCase();
-        List<Identifier> ids = new ArrayList<>();
-        mc.getAtlasManager().forEach((id, atlas) -> ids.add(atlas.location()));
-        for (Identifier id : ids) {
+        List<ResourceLocation> ids = new ArrayList<>();
+        // TODO(1.21-backport milestone 2): 1.21.1 has no Minecraft.getAtlasManager() to enumerate the loaded
+        // atlases; offer the common atlas texture locations so the picker still works for the usual cases.
+        ids.add(net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS);
+        ids.add(net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_PARTICLES);
+        for (ResourceLocation id : ids) {
             if (Thread.interrupted()) return;
             if (id.toString().toLowerCase().contains(lower)) found.accept(id);
         }
     }
 
-    private static Identifier firstAtlasId() {
+    private static ResourceLocation firstAtlasId() {
         // A stable, commonly-present atlas as the search default (block textures).
         return net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS;
     }

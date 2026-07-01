@@ -1,7 +1,5 @@
 package com.lowdragmc.kilagraph.rendertype.compiler;
 
-import com.mojang.blaze3d.buffers.Std140SizeCalculator;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,6 +53,27 @@ public final class MaterialUniformLayout {
      *  declared (in the stage prelude) before this UBO block, since the block references the type. */
     public boolean hasGradientField() {
         return fields.values().stream().anyMatch(f -> f.type() == GlslType.GRADIENT);
+    }
+
+    /**
+     * Minimal std140 size calculator. Replaces {@code com.mojang.blaze3d.buffers.Std140SizeCalculator}
+     * (absent in 1.21.1): each put aligns the running offset to the member's base alignment then adds
+     * the member's base size; {@link #get()} rounds the total up to a 16-byte (vec4) boundary.
+     */
+    private static final class Std140SizeCalculator {
+        private int offset = 0;
+
+        private void align(int alignment) {
+            offset = ((offset + alignment - 1) / alignment) * alignment;
+        }
+
+        Std140SizeCalculator putFloat() { align(4); offset += 4; return this; }
+        Std140SizeCalculator putVec2() { align(8); offset += 8; return this; }
+        Std140SizeCalculator putVec3() { align(16); offset += 12; return this; }
+        Std140SizeCalculator putVec4() { align(16); offset += 16; return this; }
+        Std140SizeCalculator putMat4f() { align(16); offset += 64; return this; }
+
+        int get() { return ((offset + 15) / 16) * 16; }
     }
 
     /** Compute the std140 byte size of the UBO (0 when there are no fields). */

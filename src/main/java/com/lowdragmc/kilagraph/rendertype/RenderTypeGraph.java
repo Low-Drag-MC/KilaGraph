@@ -42,7 +42,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.joml.Vector2f;
 import org.joml.Vector4f;
 
@@ -51,7 +51,7 @@ import java.util.Set;
 
 public class RenderTypeGraph extends Graph {
     public static final GraphNodeRegistry NODE_REGISTRY =
-            GraphNodeRegistry.create(Identifier.fromNamespaceAndPath(Kilagraph.MODID, "rendertype"),
+            GraphNodeRegistry.create(ResourceLocation.fromNamespaceAndPath(Kilagraph.MODID, "rendertype"),
                     RenderTypeGraph.class);
 
     private Settings settings = Settings.defaults();

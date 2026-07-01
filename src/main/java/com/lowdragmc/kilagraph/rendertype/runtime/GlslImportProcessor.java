@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.rendertype.runtime;
 
 import com.mojang.blaze3d.preprocessor.GlslPreprocessor;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.jetbrains.annotations.Nullable;
@@ -30,15 +30,15 @@ public final class GlslImportProcessor {
     public static String process(String source) {
         ResourceManager resources = Minecraft.getInstance().getResourceManager();
         GlslPreprocessor preprocessor = new GlslPreprocessor() {
-            private final Set<Identifier> imported = new HashSet<>();
+            private final Set<ResourceLocation> imported = new HashSet<>();
 
             @Override
             @Nullable
             public String applyImport(boolean isRelative, String path) {
-                Identifier location;
+                ResourceLocation location;
                 try {
                     // Generated shaders only use absolute imports, e.g. <minecraft:fog.glsl>.
-                    location = Identifier.parse(path).withPrefix("shaders/include/");
+                    location = ResourceLocation.parse(path).withPrefix("shaders/include/");
                 } catch (RuntimeException e) {
                     return "#error " + e.getMessage();
                 }

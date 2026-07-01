@@ -1,15 +1,15 @@
 package com.lowdragmc.kilagraph.rendertype.gui;
 
 import com.lowdragmc.lowdraglib2.gui.texture.DynamicTexture;
-import com.lowdragmc.lowdraglib2.gui.texture.GuiTexture;
+import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.texture.Icons;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.BindableUIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ColorSelector;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
-import com.lowdragmc.lowdraglib2.gui.ui.rendering.GUIContext;
-import com.lowdragmc.lowdraglib2.gui.util.DrawerHelperClient;
+import com.lowdragmc.lowdraglib2.gui.util.DrawerHelper;
+import net.minecraft.client.gui.GuiGraphics;
 import com.lowdragmc.lowdraglib2.math.GradientColor;
 import com.lowdragmc.lowdraglib2.utils.ColorUtils;
 import dev.vfyjxf.taffy.style.AlignItems;
@@ -56,8 +56,12 @@ public class GradientColorSelector extends BindableUIElement<GradientColor> {
                 new UIElement().layout(layout -> {
                     layout.height(10);
                     layout.widthPercent(100);
-                }).style(style -> style.backgroundTexture(GuiTexture.of(
-                        (GUIContext ctx, float x, float y, float w, float h) -> drawGradientBar(ctx, x, y, w, h, value)))),
+                }).style(style -> style.backgroundTexture(new IGuiTexture() {
+                    @Override
+                    public void draw(GuiGraphics graphics, float mouseX, float mouseY, float x, float y, float width, float height, float partialTicks) {
+                        drawGradientBar(graphics, x, y, width, height, value);
+                    }
+                })),
                 rgbIndicatorContainer.layout(layout -> {
                     layout.flexDirection(FlexDirection.ROW);
                     layout.height(5);
@@ -218,11 +222,11 @@ public class GradientColorSelector extends BindableUIElement<GradientColor> {
     }
 
     /** Draw a smooth gradient bar by sampling {@link GradientColor#getColor} across 1px vertical strips. */
-    static void drawGradientBar(GUIContext ctx, float x, float y, float width, float height, GradientColor gradient) {
+    static void drawGradientBar(GuiGraphics graphics, float x, float y, float width, float height, GradientColor gradient) {
         int steps = Math.max(1, (int) width);
         for (int i = 0; i < steps; i++) {
             float t = steps == 1 ? 0f : i / (float) (steps - 1);
-            DrawerHelperClient.drawSolidRect(ctx, x + i, y, 1, height, gradient.getColor(t));
+            DrawerHelper.drawSolidRect(graphics, x + i, y, 1, height, gradient.getColor(t));
         }
     }
 }

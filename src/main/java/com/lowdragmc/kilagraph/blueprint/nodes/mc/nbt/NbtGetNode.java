@@ -38,13 +38,13 @@ public class NbtGetNode extends AnnotatedNode {
             return;
         }
         Object v = switch (vt) {
-            case INT -> t.getIntOr(k, 0);
-            case LONG -> t.getLongOr(k, 0L);
-            case FLOAT -> t.getFloatOr(k, 0f);
-            case DOUBLE -> t.getDoubleOr(k, 0d);
-            case BOOL -> t.getBooleanOr(k, false);
-            case COMPOUND -> t.getCompoundOrEmpty(k);
-            default -> t.getStringOr(k, "");
+            case INT -> t.getInt(k);
+            case LONG -> t.getLong(k);
+            case FLOAT -> t.getFloat(k);
+            case DOUBLE -> t.getDouble(k);
+            case BOOL -> t.getBoolean(k);
+            case COMPOUND -> t.getCompound(k);
+            default -> t.getString(k);
         };
         ctx.setOutput("out", v);
     }

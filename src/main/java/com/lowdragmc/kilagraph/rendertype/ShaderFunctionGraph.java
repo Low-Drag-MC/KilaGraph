@@ -6,7 +6,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphNodeRegistry;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
 
@@ -24,7 +24,7 @@ import java.util.List;
  */
 public class ShaderFunctionGraph extends Graph {
     public static final GraphNodeRegistry NODE_REGISTRY =
-            GraphNodeRegistry.create(Identifier.fromNamespaceAndPath(Kilagraph.MODID, "shader_function"),
+            GraphNodeRegistry.create(ResourceLocation.fromNamespaceAndPath(Kilagraph.MODID, "shader_function"),
                     ShaderFunctionGraph.class);
 
     @Override

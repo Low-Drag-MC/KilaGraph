@@ -31,7 +31,8 @@ public final class PreviewVertexWriters {
         register(VertexFormatElement.UV1, (vc, pose, v) -> vc.setOverlay(v.overlay));
         register(VertexFormatElement.UV2, (vc, pose, v) -> vc.setLight(v.light));
         register(VertexFormatElement.NORMAL, (vc, pose, v) -> vc.setNormal(pose, v.nx, v.ny, v.nz));
-        register(VertexFormatElement.LINE_WIDTH, (vc, pose, v) -> vc.setLineWidth(v.lineWidth));
+        // TODO(1.21-backport milestone 2): VertexFormatElement.LINE_WIDTH / VertexConsumer.setLineWidth do
+        // not exist in 1.21.1 — the line-width preview writer is omitted until the format is available again.
     }
 
     private PreviewVertexWriters() {}

@@ -228,7 +228,7 @@ public final class RenderTypeGraphTypes {
 
     /** Codec for LDLib2's {@link GradientColor} (its two key lists). Rebuilds via the mutable getters. */
     public static final Codec<GradientColor> GRADIENT_COLOR_CODEC = RecordCodecBuilder.create(i -> i.group(
-            Codec.list(ExtraCodecs.VECTOR2F).fieldOf("a").forGetter(GradientColor::getAP),
+            Codec.list(LDLibExtraCodecs.VECTOR2F).fieldOf("a").forGetter(GradientColor::getAP),
             Codec.list(ExtraCodecs.VECTOR4F).fieldOf("rgb").forGetter(GradientColor::getRgbP)
     ).apply(i, (a, rgb) -> {
         GradientColor g = new GradientColor();
@@ -248,8 +248,8 @@ public final class RenderTypeGraphTypes {
     public static final StreamCodec<RegistryFriendlyByteBuf, GradientValue> GRADIENT_STREAM_CODEC =
             StreamCodec.of(
                     (buf, v) -> {
-                        List<Vector2fc> a = v.gradient().getAP();
-                        List<Vector4fc> rgb = v.gradient().getRgbP();
+                        var a = v.gradient().getAP();
+                        var rgb = v.gradient().getRgbP();
                         buf.writeVarInt(a.size());
                         for (Vector2fc p : a) { buf.writeFloat(p.x()); buf.writeFloat(p.y()); }
                         buf.writeVarInt(rgb.size());

@@ -3,7 +3,7 @@ package com.lowdragmc.kilagraph.editor;
 import com.lowdragmc.lowdraglib2.LDLib2;
 import com.lowdragmc.lowdraglib2.editor.resource.Resources;
 import com.lowdragmc.lowdraglib2.editor.ui.Editor;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import javax.annotation.Nonnull;
 
@@ -12,7 +12,7 @@ import javax.annotation.Nonnull;
  * LDLib2 base class.
  */
 public class KilaGraphEditor extends Editor {
-    public static final Identifier WINDOW_ID = LDLib2.id("kila_graph");
+    public static final ResourceLocation WINDOW_ID = LDLib2.id("kila_graph");
 
     public KilaGraphEditor() {
         this.leftWindow.setDisplay(false);

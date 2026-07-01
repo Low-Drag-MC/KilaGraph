@@ -31,7 +31,7 @@ public final class KGVertexFormat {
     /** Stock formats we prefer to reuse when a composition matches them exactly. */
     private static final List<VertexFormat> KNOWN = List.of(
             DefaultVertexFormat.BLOCK,
-            DefaultVertexFormat.ENTITY,
+            DefaultVertexFormat.NEW_ENTITY,
             DefaultVertexFormat.PARTICLE,
             DefaultVertexFormat.POSITION,
             DefaultVertexFormat.POSITION_COLOR,
@@ -40,9 +40,9 @@ public final class KGVertexFormat {
             DefaultVertexFormat.POSITION_TEX,
             DefaultVertexFormat.POSITION_TEX_COLOR,
             DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP,
-            DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL,
-            DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH,
-            DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH);
+            DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
+            // TODO(1.21-backport milestone 2): DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH /
+            // POSITION_COLOR_NORMAL_LINE_WIDTH don't exist in 1.21.1 — dropped from the reuse set.
 
     private KGVertexFormat() {}
 
@@ -70,7 +70,7 @@ public final class KGVertexFormat {
         }
         if (added == 0) {
             LOGGER.warn("[KilaGraph] empty/unknown vertex format {} — falling back to ENTITY", elementKeys);
-            return DefaultVertexFormat.ENTITY;
+            return DefaultVertexFormat.NEW_ENTITY;
         }
         int pad = (4 - (size % 4)) % 4; // Minecraft requires the vertex size to be a multiple of 4
         if (pad > 0) builder.padding(pad);
@@ -80,7 +80,7 @@ public final class KGVertexFormat {
             built = builder.build();
         } catch (RuntimeException e) {
             LOGGER.warn("[KilaGraph] invalid vertex format {} ({}) — falling back to ENTITY", elementKeys, e.getMessage());
-            return DefaultVertexFormat.ENTITY;
+            return DefaultVertexFormat.NEW_ENTITY;
         }
         for (VertexFormat known : KNOWN) {
             if (known.equals(built)) return known;
