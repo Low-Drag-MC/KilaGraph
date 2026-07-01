@@ -1,18 +1,17 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.AssertNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.NoopNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.PrintNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -24,6 +23,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * Engine-level tests for the exec runtime: queue draining, Entry → chain, Noop pass-through,
  * Print value capture via node state, Assert true/false behaviour.
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class ExecRuntimeGameTest {
     private static final String ENTRY_FIRES_NEXT = "exec_entry_fires_next";
     private static final String UNWIRED_FLOW_NO_OP = "exec_unwired_flow_no_op";
@@ -33,23 +33,9 @@ public final class ExecRuntimeGameTest {
 
     private ExecRuntimeGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(ENTRY_FIRES_NEXT, ExecRuntimeGameTest::entryFiresNext);
-        KGGameTests.registerFunction(UNWIRED_FLOW_NO_OP, ExecRuntimeGameTest::unwiredFlowNoOp);
-        KGGameTests.registerFunction(NOOP_PASSES_THROUGH, ExecRuntimeGameTest::noopPassesThrough);
-        KGGameTests.registerFunction(ASSERT_TRUE_CONTINUES, ExecRuntimeGameTest::assertTrueContinues);
-        KGGameTests.registerFunction(ASSERT_FALSE_THROWS, ExecRuntimeGameTest::assertFalseThrows);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{ENTRY_FIRES_NEXT, UNWIRED_FLOW_NO_OP, NOOP_PASSES_THROUGH,
-                ASSERT_TRUE_CONTINUES, ASSERT_FALSE_THROWS}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
-
     /** Entry → Print: PrintNode.state("last") captures the value, proving the queue drove it. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void entryFiresNext(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -71,6 +57,8 @@ public final class ExecRuntimeGameTest {
     }
 
     /** Entry with no wire on `next` is a no-op — must not throw. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void unwiredFlowNoOp(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -84,6 +72,8 @@ public final class ExecRuntimeGameTest {
     }
 
     /** Entry → Noop → Print. Noop must forward to Print. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void noopPassesThrough(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -107,6 +97,8 @@ public final class ExecRuntimeGameTest {
     }
 
     /** Entry → Assert(true) → Print. Should reach Print. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void assertTrueContinues(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -128,6 +120,8 @@ public final class ExecRuntimeGameTest {
     }
 
     /** Entry → Assert(false) → Print. Should throw AssertionError before Print runs. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void assertFalseThrows(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);

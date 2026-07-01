@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BranchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BreakNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.ContinueNode;
@@ -15,11 +18,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -28,6 +27,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputCo
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
+@GameTestHolder(Kilagraph.MODID)
 public final class ExecLoopsGameTest {
     private static final String FOR_COUNTS = "exec_for_counts";
     private static final String FOR_BREAK = "exec_for_break";
@@ -38,23 +38,9 @@ public final class ExecLoopsGameTest {
 
     private ExecLoopsGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(FOR_COUNTS, ExecLoopsGameTest::forCounts);
-        KGGameTests.registerFunction(FOR_BREAK, ExecLoopsGameTest::forBreak);
-        KGGameTests.registerFunction(FOR_CONTINUE, ExecLoopsGameTest::forContinue);
-        KGGameTests.registerFunction(WHILE_RUNS, ExecLoopsGameTest::whileRuns);
-        KGGameTests.registerFunction(WHILE_MAX_GUARD, ExecLoopsGameTest::whileMaxGuard);
-        KGGameTests.registerFunction(FOREACH_LIST, ExecLoopsGameTest::forEachList);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{FOR_COUNTS, FOR_BREAK, FOR_CONTINUE, WHILE_RUNS, WHILE_MAX_GUARD, FOREACH_LIST}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
-
     /** For(count=5) body: SetVar(counter += 1). Expect counter == 5. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void forCounts(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -85,6 +71,8 @@ public final class ExecLoopsGameTest {
     }
 
     /** For(5) body: Branch(index == 3 ? Break : SetVar). After Break, counter stays at index 2's value (3). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void forBreak(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -124,6 +112,8 @@ public final class ExecLoopsGameTest {
     }
 
     /** For(5) body: Branch(index >= 2 ? Continue : SetVar). Writes only for index 0, 1. counter == 1. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void forContinue(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -161,6 +151,8 @@ public final class ExecLoopsGameTest {
     }
 
     /** While(cond=true, max=3): body should run 3 times then maxIterations cap kicks in. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void whileRuns(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -188,6 +180,8 @@ public final class ExecLoopsGameTest {
     }
 
     /** While(cond=true, max=2): without the cap this would infinite-loop. Should exit cleanly. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void whileMaxGuard(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -209,6 +203,8 @@ public final class ExecLoopsGameTest {
     }
 
     /** ForEach over ["a","b","c"]: counter accumulates count == 3. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void forEachList(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);

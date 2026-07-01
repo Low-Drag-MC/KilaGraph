@@ -1,15 +1,14 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.logic.NotNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.logic.XorNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -17,6 +16,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.newGraph;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputConstant;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 
+@GameTestHolder(Kilagraph.MODID)
 public final class LogicNodeGameTest {
     private static final String NOT = "logic_not_basic";
     private static final String XOR_2 = "logic_xor_pair";
@@ -24,18 +24,9 @@ public final class LogicNodeGameTest {
 
     private LogicNodeGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(NOT, LogicNodeGameTest::notBasic);
-        KGGameTests.registerFunction(XOR_2, LogicNodeGameTest::xorPair);
-        KGGameTests.registerFunction(XOR_3, LogicNodeGameTest::xorOddParity);
-    }
+    @GameTest(template = "empty")
 
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, NOT, KGGameTests.functionKey(NOT), data);
-        KGGameTests.registerFunctionTest(event, XOR_2, KGGameTests.functionKey(XOR_2), data);
-        KGGameTests.registerFunctionTest(event, XOR_3, KGGameTests.functionKey(XOR_3), data);
-    }
+    @PrefixGameTestTemplate(false)
 
     public static void notBasic(GameTestHelper helper) {
         var g = newGraph();
@@ -52,6 +43,10 @@ public final class LogicNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void xorPair(GameTestHelper helper) {
         // 4 cases: FF=F, FT=T, TF=T, TT=F
         boolean[][] cases = {{false,false,false},{false,true,true},{true,false,true},{true,true,false}};
@@ -66,6 +61,10 @@ public final class LogicNodeGameTest {
         }
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void xorOddParity(GameTestHelper helper) {
         // 3 inputs: T T T → T (odd count)

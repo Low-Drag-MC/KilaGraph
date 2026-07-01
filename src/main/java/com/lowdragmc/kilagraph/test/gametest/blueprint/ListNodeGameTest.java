@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListAppendNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
@@ -22,11 +25,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.list.ListSortNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import java.util.List;
 
@@ -37,6 +36,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputCo
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
+@GameTestHolder(Kilagraph.MODID)
 public final class ListNodeGameTest {
     private static final String IS_EMPTY = "list_is_empty";
     private static final String APPEND = "list_append";
@@ -56,33 +56,6 @@ public final class ListNodeGameTest {
     private static final String IMMUTABILITY = "list_immutability";
 
     private ListNodeGameTest() {}
-
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(IS_EMPTY, ListNodeGameTest::isEmpty);
-        KGGameTests.registerFunction(APPEND, ListNodeGameTest::append);
-        KGGameTests.registerFunction(PREPEND, ListNodeGameTest::prepend);
-        KGGameTests.registerFunction(INSERT, ListNodeGameTest::insert);
-        KGGameTests.registerFunction(REMOVE_AT, ListNodeGameTest::removeAt);
-        KGGameTests.registerFunction(REMOVE, ListNodeGameTest::remove);
-        KGGameTests.registerFunction(CONTAINS, ListNodeGameTest::contains);
-        KGGameTests.registerFunction(INDEX_OF, ListNodeGameTest::indexOf);
-        KGGameTests.registerFunction(SLICE, ListNodeGameTest::slice);
-        KGGameTests.registerFunction(CONCAT, ListNodeGameTest::concat);
-        KGGameTests.registerFunction(REVERSE, ListNodeGameTest::reverse);
-        KGGameTests.registerFunction(DISTINCT, ListNodeGameTest::distinct);
-        KGGameTests.registerFunction(SORT, ListNodeGameTest::sort);
-        KGGameTests.registerFunction(RANGE, ListNodeGameTest::range);
-        KGGameTests.registerFunction(REPEAT, ListNodeGameTest::repeat);
-        KGGameTests.registerFunction(IMMUTABILITY, ListNodeGameTest::immutability);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{IS_EMPTY, APPEND, PREPEND, INSERT, REMOVE_AT, REMOVE, CONTAINS,
-                INDEX_OF, SLICE, CONCAT, REVERSE, DISTINCT, SORT, RANGE, REPEAT, IMMUTABILITY}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
 
     /** Build a String-typed ListCombine with the given values; return its output port. */
     private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel
@@ -105,6 +78,10 @@ public final class ListNodeGameTest {
         return get.getOutputsById().get("value");
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void isEmpty(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, ListIsEmptyNode.class);
@@ -120,6 +97,10 @@ public final class ListNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void append(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, ListAppendNode.class);
@@ -132,6 +113,10 @@ public final class ListNodeGameTest {
         assertEq(helper, "tail", "c", out.get(2));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void prepend(GameTestHelper helper) {
         var g = newGraph();
@@ -146,6 +131,10 @@ public final class ListNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void insert(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, ListInsertNode.class);
@@ -159,6 +148,10 @@ public final class ListNodeGameTest {
         assertEq(helper, "[1]", "b", out.get(1));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void removeAt(GameTestHelper helper) {
         var g = newGraph();
@@ -182,6 +175,10 @@ public final class ListNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void remove(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, ListRemoveNode.class);
@@ -194,6 +191,10 @@ public final class ListNodeGameTest {
         assertEq(helper, "[1]", "a", out.get(1));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void contains(GameTestHelper helper) {
         var g = newGraph();
@@ -212,6 +213,10 @@ public final class ListNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void indexOf(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, ListIndexOfNode.class);
@@ -228,6 +233,10 @@ public final class ListNodeGameTest {
                 (int) new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), Integer.class));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void slice(GameTestHelper helper) {
         var g = newGraph();
@@ -253,6 +262,10 @@ public final class ListNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void concat(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, ListConcatNode.class);
@@ -267,6 +280,10 @@ public final class ListNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void reverse(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, ListReverseNode.class);
@@ -278,6 +295,10 @@ public final class ListNodeGameTest {
         assertEq(helper, "[2]", "a", out.get(2));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void distinct(GameTestHelper helper) {
         var g = newGraph();
@@ -291,6 +312,10 @@ public final class ListNodeGameTest {
         assertEq(helper, "[2]", "c", out.get(2));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void sort(GameTestHelper helper) {
         var g = newGraph();
@@ -313,6 +338,10 @@ public final class ListNodeGameTest {
         assertEq(helper, "desc[2]", "a", out2.get(2));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void range(GameTestHelper helper) {
         var g = newGraph();
@@ -349,6 +378,10 @@ public final class ListNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void repeat(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, ListRepeatNode.class);
@@ -362,6 +395,10 @@ public final class ListNodeGameTest {
         assertEq(helper, "[3]", "x", out.get(3));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void immutability(GameTestHelper helper) {
         // Append must not mutate the source list — evaluator can re-evaluate same source port.

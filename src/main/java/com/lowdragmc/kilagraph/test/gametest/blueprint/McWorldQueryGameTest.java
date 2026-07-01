@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.world.GetBlockEntityNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.world.GetBlockNode;
@@ -15,15 +18,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
 import java.util.Map;
@@ -41,23 +40,12 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * the nodes the framework-supported way: a wire-only graph variable seeded with the live level (the
  * executor itself never knows about the world).
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class McWorldQueryGameTest {
     private static final String READ_BLOCK = "mc_world_read_block";
     private static final String EMPTY_AND_BE = "mc_world_empty_and_block_entity";
 
     private McWorldQueryGameTest() {}
-
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(READ_BLOCK, McWorldQueryGameTest::readBlock);
-        KGGameTests.registerFunction(EMPTY_AND_BE, McWorldQueryGameTest::emptyAndBlockEntity);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{READ_BLOCK, EMPTY_AND_BE}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
 
     /** Declares a wire-only "level" INPUT variable, returns its get-node output port. */
     private static PortModel levelSource(BlueprintGraph g) {
@@ -71,6 +59,8 @@ public final class McWorldQueryGameTest {
     }
 
     /** setBlock(stone) then GetBlock / GetBlockState / IsEmptyBlock at that pos. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void readBlock(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         BlockPos abs = helper.absolutePos(new BlockPos(0, 2, 0));
@@ -103,6 +93,8 @@ public final class McWorldQueryGameTest {
     }
 
     /** IsEmptyBlock true over air; GetBlockEntity non-null on a chest, null on stone. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void emptyAndBlockEntity(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         BlockPos air = helper.absolutePos(new BlockPos(0, 6, 0));

@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BranchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
@@ -14,11 +17,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.SpawnFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -37,6 +36,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * the inner run actually reached. Covers: straight-through + data out, data in→out, exclusive
  * multi-exit, 3-level nesting, and child-variable isolation.
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class SubgraphExecGameTest {
     private static final String STRAIGHT_THROUGH = "subgraph_exec_straight_through";
     private static final String DATA_IN_OUT = "subgraph_exec_data_in_out";
@@ -46,22 +46,6 @@ public final class SubgraphExecGameTest {
     private static final String CHILD_VAR_ISOLATED = "subgraph_exec_child_var_isolated";
 
     private SubgraphExecGameTest() {}
-
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(STRAIGHT_THROUGH, SubgraphExecGameTest::straightThrough);
-        KGGameTests.registerFunction(DATA_IN_OUT, SubgraphExecGameTest::dataInOut);
-        KGGameTests.registerFunction(MULTI_EXIT_TRUE, SubgraphExecGameTest::multiExitTrue);
-        KGGameTests.registerFunction(MULTI_EXIT_FALSE, SubgraphExecGameTest::multiExitFalse);
-        KGGameTests.registerFunction(NESTED, SubgraphExecGameTest::nested);
-        KGGameTests.registerFunction(CHILD_VAR_ISOLATED, SubgraphExecGameTest::childVarIsolated);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{STRAIGHT_THROUGH, DATA_IN_OUT, MULTI_EXIT_TRUE, MULTI_EXIT_FALSE, NESTED, CHILD_VAR_ISOLATED}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
 
     // ---- helpers --------------------------------------------------------------------------------
 
@@ -79,6 +63,8 @@ public final class SubgraphExecGameTest {
     }
 
     // ---- 1. exec enters, runs, exits; a WRITE data var is harvested out -------------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void straightThrough(GameTestHelper helper) {
         var outer = newGraph();
         var inner = outer.graphModel.createLocalSubgraphInstance();
@@ -129,6 +115,8 @@ public final class SubgraphExecGameTest {
     }
 
     // ---- 2. subgraph consumes a seeded data input and produces a data output mid-exec -----------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void dataInOut(GameTestHelper helper) {
         var outer = newGraph();
         var inner = outer.graphModel.createLocalSubgraphInstance();
@@ -223,12 +211,20 @@ public final class SubgraphExecGameTest {
         return result;
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void multiExitTrue(GameTestHelper helper) {
         var r = runMultiExit(true);
         assertTrue(helper, "cond=true fires A", r.get("tookA") instanceof Number);
         assertEq(helper, "cond=true does NOT fire B", null, r.get("tookB"));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void multiExitFalse(GameTestHelper helper) {
         var r = runMultiExit(false);
@@ -238,6 +234,8 @@ public final class SubgraphExecGameTest {
     }
 
     // ---- 4. three-level exec nesting: outer → sub1 → (inner1) sub2 → (inner2) and back -----------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void nested(GameTestHelper helper) {
         var outer = newGraph();
         var inner1 = outer.graphModel.createLocalSubgraphInstance();
@@ -290,6 +288,8 @@ public final class SubgraphExecGameTest {
     }
 
     // ---- 5. a child SetVar stays in the child env; it must not leak to the outer env -------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void childVarIsolated(GameTestHelper helper) {
         var outer = newGraph();
         var inner = outer.graphModel.createLocalSubgraphInstance();

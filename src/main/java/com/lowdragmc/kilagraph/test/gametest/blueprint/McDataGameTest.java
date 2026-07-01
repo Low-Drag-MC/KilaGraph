@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.BlockConstNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.BlockPosCreateNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.BlockToItemNode;
@@ -17,15 +20,11 @@ import com.lowdragmc.kilagraph.blueprint.nodes.mc.info.ItemStackInfoNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -38,6 +37,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
 /** Pure-data MC nodes: construct/destructure, conversions, tags. */
+@GameTestHolder(Kilagraph.MODID)
 public final class McDataGameTest {
     private static final String BLOCK_POS_ROUND_TRIP = "mc_block_pos_round_trip";
     private static final String ITEM_STACK_CREATE_READ = "mc_item_stack_create_read";
@@ -47,23 +47,9 @@ public final class McDataGameTest {
 
     private McDataGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(BLOCK_POS_ROUND_TRIP, McDataGameTest::blockPosRoundTrip);
-        KGGameTests.registerFunction(ITEM_STACK_CREATE_READ, McDataGameTest::itemStackCreateRead);
-        KGGameTests.registerFunction(BLOCK_ITEM_ROUND_TRIP, McDataGameTest::blockItemRoundTrip);
-        KGGameTests.registerFunction(DIRECTION_OPS, McDataGameTest::directionOps);
-        KGGameTests.registerFunction(ITEM_IN_TAG, McDataGameTest::itemInTag);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{BLOCK_POS_ROUND_TRIP, ITEM_STACK_CREATE_READ, BLOCK_ITEM_ROUND_TRIP,
-                DIRECTION_OPS, ITEM_IN_TAG}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
-
     /** BlockPosCreate(3,4,5) → BlockPos info context + x/y/z blocks read it back. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void blockPosRoundTrip(GameTestHelper helper) {
         var g = newGraph();
         var create = addNode(g, BlockPosCreateNode.class);
@@ -90,6 +76,8 @@ public final class McDataGameTest {
     }
 
     /** ItemStackCreate(diamond, 5) → ItemStack info context + count/maxStackSize/isEmpty blocks. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void itemStackCreateRead(GameTestHelper helper) {
         var g = newGraph();
         var create = addNode(g, ItemStackCreateNode.class);
@@ -113,6 +101,8 @@ public final class McDataGameTest {
     }
 
     /** BlockConst(stone) → BlockToItem → ItemToBlock round-trips back to stone. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void blockItemRoundTrip(GameTestHelper helper) {
         var g = newGraph();
         var blockConst = addNode(g, BlockConstNode.class);
@@ -131,6 +121,8 @@ public final class McDataGameTest {
     }
 
     /** DirectionOpposite(EAST)=WEST; DirectionAxis(UP)="y". */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void directionOps(GameTestHelper helper) {
         var g = newGraph();
         var opp = addNode(g, DirectionOppositeNode.class);
@@ -145,6 +137,8 @@ public final class McDataGameTest {
     }
 
     /** ItemConst(oak planks) in tag minecraft:planks → true; diamond → false. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void itemInTag(GameTestHelper helper) {
         var g = newGraph();
         var planks = addNode(g, ItemConstNode.class);

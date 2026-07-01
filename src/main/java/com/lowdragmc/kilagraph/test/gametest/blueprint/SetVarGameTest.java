@@ -1,17 +1,16 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import java.util.Map;
 
@@ -26,6 +25,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * Exec-side variable writes through {@link SetVarNode} round-tripping with Phase 1's
  * {@code runOutputs()} via {@link com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment#variables()}.
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class SetVarGameTest {
     private static final String WRITES_TO_STORE = "exec_setvar_writes_to_store";
     private static final String OUTPUT_VAR_SURFACES_VIA_RUN_OUTPUTS = "exec_setvar_runoutputs_pickup";
@@ -33,20 +33,9 @@ public final class SetVarGameTest {
 
     private SetVarGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(WRITES_TO_STORE, SetVarGameTest::writesToStore);
-        KGGameTests.registerFunction(OUTPUT_VAR_SURFACES_VIA_RUN_OUTPUTS, SetVarGameTest::runOutputsPickup);
-        KGGameTests.registerFunction(UNNAMED_NOOP, SetVarGameTest::unnamedNoop);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{WRITES_TO_STORE, OUTPUT_VAR_SURFACES_VIA_RUN_OUTPUTS, UNNAMED_NOOP}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
-
     /** Entry → SetVar(x = 42) → verify env.variables().get("x") == 42. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void writesToStore(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -69,6 +58,8 @@ public final class SetVarGameTest {
     }
 
     /** SetVar writes an OUTPUT-kind graph variable; runOutputs() picks it up via the variable store fallback path. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void runOutputsPickup(GameTestHelper helper) {
         var g = newGraph();
         // Declare 'result' as an OUTPUT variable.
@@ -96,6 +87,8 @@ public final class SetVarGameTest {
     }
 
     /** SetVar with no varName is a no-op; just flows through. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void unnamedNoop(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);

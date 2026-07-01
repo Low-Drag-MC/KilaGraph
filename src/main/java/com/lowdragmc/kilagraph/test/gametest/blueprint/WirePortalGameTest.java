@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
@@ -16,11 +19,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.WirePortalEntryModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.WirePortalExitModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.WirePortalModel;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -36,6 +35,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * shared {@link DeclarationModel}. Covers exec-flow across a portal (incl. multi-exit fan-out),
  * single-stepping across a portal, and a data value reference end-to-end.
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class WirePortalGameTest {
     private static final String EXEC = "portal_exec_across";
     private static final String MULTI = "portal_exec_multi_exit";
@@ -43,20 +43,6 @@ public final class WirePortalGameTest {
     private static final String VALUE = "portal_value_reference";
 
     private WirePortalGameTest() {}
-
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(EXEC, WirePortalGameTest::execAcross);
-        KGGameTests.registerFunction(MULTI, WirePortalGameTest::execMultiExit);
-        KGGameTests.registerFunction(STEP, WirePortalGameTest::stepAcross);
-        KGGameTests.registerFunction(VALUE, WirePortalGameTest::valueReference);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{EXEC, MULTI, STEP, VALUE}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
 
     // ---- helpers --------------------------------------------------------------------------------
 
@@ -76,6 +62,8 @@ public final class WirePortalGameTest {
     }
 
     // ---- 1. exec flow crosses a portal ------------------------------------------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void execAcross(GameTestHelper helper) {
         var g = newGraph();
         var start = addNode(g, EntryNode.class);
@@ -94,6 +82,8 @@ public final class WirePortalGameTest {
     }
 
     // ---- 2. one exec entry, two exec exits → both downstreams fire --------------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void execMultiExit(GameTestHelper helper) {
         var g = newGraph();
         var start = addNode(g, EntryNode.class);
@@ -116,6 +106,8 @@ public final class WirePortalGameTest {
     }
 
     // ---- 3. single-stepping reaches the node past the exit portal ---------------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void stepAcross(GameTestHelper helper) {
         var g = newGraph();
         var start = addNode(g, EntryNode.class);
@@ -138,6 +130,8 @@ public final class WirePortalGameTest {
     }
 
     // ---- 4. data value reference across a portal --------------------------------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void valueReference(GameTestHelper helper) {
         var g = newGraph();
         var producer = addNode(g, AddNode.class);

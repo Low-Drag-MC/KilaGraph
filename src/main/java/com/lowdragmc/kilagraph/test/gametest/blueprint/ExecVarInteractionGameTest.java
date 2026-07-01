@@ -1,18 +1,17 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
 import java.util.Map;
@@ -29,25 +28,16 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * variable (via {@code SetVar}), and a later data-pull / {@code runOutputs} on the <em>same</em>
  * executor observes that mutation. Verifies exec-flow and the variable store share one environment.
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class ExecVarInteractionGameTest {
     private static final String EXEC_SET_THEN_DATA_READ = "exec_set_then_data_read";
     private static final String EXEC_SET_THEN_RUN_OUTPUTS = "exec_set_then_run_outputs";
 
     private ExecVarInteractionGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(EXEC_SET_THEN_DATA_READ, ExecVarInteractionGameTest::execSetThenDataRead);
-        KGGameTests.registerFunction(EXEC_SET_THEN_RUN_OUTPUTS, ExecVarInteractionGameTest::execSetThenRunOutputs);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{EXEC_SET_THEN_DATA_READ, EXEC_SET_THEN_RUN_OUTPUTS}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
-
     /** Entry → SetVar("x", 21); then an INPUT-variable("x") get-node feeds an Add — pulled on the same executor. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void execSetThenDataRead(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -74,6 +64,8 @@ public final class ExecVarInteractionGameTest {
     }
 
     /** Entry → SetVar("y", 9); runOutputs() harvests OUTPUT var "y" from the env fallback. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void execSetThenRunOutputs(GameTestHelper helper) {
         var g = newGraph();
         g.graphModel.createVariable("y", int.class, 0, VariableKind.OUTPUT);

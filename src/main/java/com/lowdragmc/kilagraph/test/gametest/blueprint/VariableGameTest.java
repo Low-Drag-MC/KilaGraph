@@ -1,16 +1,15 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
 import java.util.Map;
@@ -25,6 +24,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * Exercises the executor's variable runtime: env-store-driven {@code IVariableNode} reads
  * and {@link GraphExecutor#runOutputs()} writes through "set var" form variable nodes.
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class VariableGameTest {
     private static final String INPUT_VAR_READ_FROM_STORE = "var_input_read_from_store";
     private static final String OUTPUT_VAR_RUN_OUTPUTS = "var_output_run_outputs";
@@ -33,22 +33,9 @@ public final class VariableGameTest {
 
     private VariableGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(INPUT_VAR_READ_FROM_STORE, VariableGameTest::inputVarReadFromStore);
-        KGGameTests.registerFunction(OUTPUT_VAR_RUN_OUTPUTS, VariableGameTest::outputVarRunOutputs);
-        KGGameTests.registerFunction(OUTPUT_VAR_DEFAULT_WHEN_UNWIRED, VariableGameTest::outputVarDefaultWhenUnwired);
-        KGGameTests.registerFunction(STORE_NULL_OVERRIDES_DEFAULT, VariableGameTest::storeNullOverridesDefault);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, INPUT_VAR_READ_FROM_STORE, KGGameTests.functionKey(INPUT_VAR_READ_FROM_STORE), data);
-        KGGameTests.registerFunctionTest(event, OUTPUT_VAR_RUN_OUTPUTS, KGGameTests.functionKey(OUTPUT_VAR_RUN_OUTPUTS), data);
-        KGGameTests.registerFunctionTest(event, OUTPUT_VAR_DEFAULT_WHEN_UNWIRED, KGGameTests.functionKey(OUTPUT_VAR_DEFAULT_WHEN_UNWIRED), data);
-        KGGameTests.registerFunctionTest(event, STORE_NULL_OVERRIDES_DEFAULT, KGGameTests.functionKey(STORE_NULL_OVERRIDES_DEFAULT), data);
-    }
-
     // --- 1. INPUT variable's "get" node reads from the env store ----------------------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void inputVarReadFromStore(GameTestHelper helper) {
         var graph = newGraph();
 
@@ -72,6 +59,8 @@ public final class VariableGameTest {
     }
 
     // --- 2. runOutputs() pulls AddNode result through OUTPUT variable's "set" node ----------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void outputVarRunOutputs(GameTestHelper helper) {
         var graph = newGraph();
 
@@ -108,6 +97,8 @@ public final class VariableGameTest {
     }
 
     // --- 3. Unwired OUTPUT variable falls back to the declared default ----------------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void outputVarDefaultWhenUnwired(GameTestHelper helper) {
         var graph = newGraph();
         graph.graphModel.createVariable("y", int.class, 42, VariableKind.OUTPUT);
@@ -124,6 +115,8 @@ public final class VariableGameTest {
     }
 
     // --- 4. Variable store entry with null wins over declared default -----------------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void storeNullOverridesDefault(GameTestHelper helper) {
         var graph = newGraph();
         graph.graphModel.createVariable("y", int.class, 42, VariableKind.OUTPUT);

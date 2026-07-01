@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BranchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.GateNode;
@@ -10,11 +13,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.exec.SequenceNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SwitchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -23,6 +22,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputCo
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
+@GameTestHolder(Kilagraph.MODID)
 public final class ExecPrimitivesGameTest {
     private static final String SEQUENCE = "exec_sequence_fires_in_order";
     private static final String BRANCH_TRUE = "exec_branch_true";
@@ -34,24 +34,6 @@ public final class ExecPrimitivesGameTest {
 
     private ExecPrimitivesGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(SEQUENCE, ExecPrimitivesGameTest::sequence);
-        KGGameTests.registerFunction(BRANCH_TRUE, ExecPrimitivesGameTest::branchTrue);
-        KGGameTests.registerFunction(BRANCH_FALSE, ExecPrimitivesGameTest::branchFalse);
-        KGGameTests.registerFunction(GATE_OPEN, ExecPrimitivesGameTest::gateOpen);
-        KGGameTests.registerFunction(GATE_CLOSED, ExecPrimitivesGameTest::gateClosed);
-        KGGameTests.registerFunction(SWITCH_MATCH, ExecPrimitivesGameTest::switchMatch);
-        KGGameTests.registerFunction(SWITCH_DEFAULT, ExecPrimitivesGameTest::switchDefault);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{SEQUENCE, BRANCH_TRUE, BRANCH_FALSE, GATE_OPEN, GATE_CLOSED,
-                SWITCH_MATCH, SWITCH_DEFAULT}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
-
     /** Helper: Add node emitting a Float constant. */
     private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel
             floatSource(com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, float v) {
@@ -60,6 +42,10 @@ public final class ExecPrimitivesGameTest {
         setInputConstant(add, "in2", 0.0f);
         return add;
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void sequence(GameTestHelper helper) {
         // Entry → Sequence(3 outs) → 3 Print nodes
@@ -91,9 +77,17 @@ public final class ExecPrimitivesGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void branchTrue(GameTestHelper helper) {
         runBranch(helper, true, "true-branch", "false-branch", "true-branch");
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void branchFalse(GameTestHelper helper) {
         runBranch(helper, false, "true-branch", "false-branch", "false-branch");
@@ -128,9 +122,17 @@ public final class ExecPrimitivesGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void gateOpen(GameTestHelper helper) {
         runGate(helper, true, true);
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void gateClosed(GameTestHelper helper) {
         runGate(helper, false, false);
@@ -153,6 +155,10 @@ public final class ExecPrimitivesGameTest {
         if (!expectRan && captured != null) { helper.fail("gate=false: sink reached unexpectedly"); return; }
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void switchMatch(GameTestHelper helper) {
         // 3 cases, selector=2 → case2 fires
@@ -183,6 +189,10 @@ public final class ExecPrimitivesGameTest {
         assertEq(helper, "default not hit", null, exec.nodeState(pDef.getUid()).get("last"));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void switchDefault(GameTestHelper helper) {
         // 2 cases, selector=99 → default

@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.compare.LessEqualNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BranchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.ContinueNode;
@@ -13,11 +16,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.math.ModuloNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -39,19 +38,15 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  *
  * Expected: sumEven = 0 + 2 + 4 = 6.
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class ExecIntegrationGameTest {
     private static final String SUM_OF_EVENS = "exec_integration_sum_of_evens";
 
     private ExecIntegrationGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(SUM_OF_EVENS, ExecIntegrationGameTest::sumOfEvens);
-    }
+    @GameTest(template = "empty")
 
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, SUM_OF_EVENS, KGGameTests.functionKey(SUM_OF_EVENS), d);
-    }
+    @PrefixGameTestTemplate(false)
 
     public static void sumOfEvens(GameTestHelper helper) {
         var g = newGraph();

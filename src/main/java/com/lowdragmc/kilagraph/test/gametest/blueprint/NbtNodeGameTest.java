@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.BlockEntityNbtNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.ItemStackNbtNode;
@@ -20,11 +23,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
@@ -32,7 +32,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
 import java.util.Map;
@@ -51,6 +50,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * {@link BlockEntity}. Compound ports are wire-only, so a value source always starts at NbtCreate
  * (or a seeded wire-only variable for the MC-object cases).
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class NbtNodeGameTest {
     private static final String ROUND_TRIP_INT = "nbt_round_trip_int";
     private static final String ROUND_TRIP_STRING = "nbt_round_trip_string";
@@ -60,26 +60,15 @@ public final class NbtNodeGameTest {
 
     private NbtNodeGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(ROUND_TRIP_INT, NbtNodeGameTest::roundTripInt);
-        KGGameTests.registerFunction(ROUND_TRIP_STRING, NbtNodeGameTest::roundTripString);
-        KGGameTests.registerFunction(HAS_AND_REMOVE, NbtNodeGameTest::hasAndRemove);
-        KGGameTests.registerFunction(ITEM_STACK, NbtNodeGameTest::itemStack);
-        KGGameTests.registerFunction(BLOCK_ENTITY, NbtNodeGameTest::blockEntity);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{ROUND_TRIP_INT, ROUND_TRIP_STRING, HAS_AND_REMOVE, ITEM_STACK, BLOCK_ENTITY}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
-
     /** A wire-only variable get-node output, seeded from the env at execution time. */
     private static PortModel source(BlueprintGraph g, String name, TypeHandle type) {
         var v = (VariableDeclarationModelBase) g.graphModel.createVariable(name, type, null, VariableKind.INPUT);
         return g.graphModel.createVariableNode(v, new Vector2f(0, 0), null, null).getOutputPort();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void roundTripInt(GameTestHelper helper) {
         var g = newGraph();
@@ -100,6 +89,10 @@ public final class NbtNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void roundTripString(GameTestHelper helper) {
         var g = newGraph();
         var create = addNode(g, NbtCreateNode.class);
@@ -118,6 +111,10 @@ public final class NbtNodeGameTest {
         assertEq(helper, "nbt string round-trip", "steve", v);
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void hasAndRemove(GameTestHelper helper) {
         var g = newGraph();
@@ -152,6 +149,10 @@ public final class NbtNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void itemStack(GameTestHelper helper) {
         ItemStack stack = new ItemStack(Items.DIAMOND);
         CompoundTag custom = new CompoundTag();
@@ -173,6 +174,10 @@ public final class NbtNodeGameTest {
         assertEq(helper, "itemstack custom_data foo", 5, (int) v);
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void blockEntity(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();

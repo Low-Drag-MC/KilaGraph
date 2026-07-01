@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListGetNode;
@@ -20,11 +23,7 @@ import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import java.util.List;
 import java.util.Map;
@@ -36,6 +35,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputCo
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
+@GameTestHolder(Kilagraph.MODID)
 public final class MapNodeGameTest {
     private static final String CREATE = "map_create";
     private static final String GET = "map_get";
@@ -53,30 +53,6 @@ public final class MapNodeGameTest {
 
     private MapNodeGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(CREATE, MapNodeGameTest::create);
-        KGGameTests.registerFunction(GET, MapNodeGameTest::get);
-        KGGameTests.registerFunction(GET_DEFAULT, MapNodeGameTest::getDefault);
-        KGGameTests.registerFunction(PUT, MapNodeGameTest::put);
-        KGGameTests.registerFunction(REMOVE, MapNodeGameTest::remove);
-        KGGameTests.registerFunction(CONTAINS_KEY, MapNodeGameTest::containsKey);
-        KGGameTests.registerFunction(CONTAINS_VALUE, MapNodeGameTest::containsValue);
-        KGGameTests.registerFunction(KEYS, MapNodeGameTest::keys);
-        KGGameTests.registerFunction(VALUES, MapNodeGameTest::values);
-        KGGameTests.registerFunction(SIZE, MapNodeGameTest::size);
-        KGGameTests.registerFunction(IS_EMPTY, MapNodeGameTest::isEmpty);
-        KGGameTests.registerFunction(MERGE, MapNodeGameTest::merge);
-        KGGameTests.registerFunction(IMMUTABILITY, MapNodeGameTest::immutability);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{CREATE, GET, GET_DEFAULT, PUT, REMOVE, CONTAINS_KEY,
-                CONTAINS_VALUE, KEYS, VALUES, SIZE, IS_EMPTY, MERGE, IMMUTABILITY}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
-
     /** Build a String→String map with the given alternating key/value pairs. */
     private static NodeModel stringStringMap(BlueprintGraph g, String... kvPairs) {
         NodeModel n = addNode(g, MapCreateNode.class);
@@ -91,6 +67,10 @@ public final class MapNodeGameTest {
         return n;
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void create(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1", "b", "2");
@@ -101,6 +81,10 @@ public final class MapNodeGameTest {
         assertEq(helper, "b", "2", map.get("b"));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void get(GameTestHelper helper) {
         var g = newGraph();
@@ -116,6 +100,10 @@ public final class MapNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void getDefault(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1");
@@ -129,6 +117,10 @@ public final class MapNodeGameTest {
                 new GraphExecutor(g).evaluate(get.getOutputsById().get("value"), String.class));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void put(GameTestHelper helper) {
         var g = newGraph();
@@ -146,6 +138,10 @@ public final class MapNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void remove(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1", "b", "2");
@@ -159,6 +155,10 @@ public final class MapNodeGameTest {
         assertEq(helper, "b kept", "2", result.get("b"));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void containsKey(GameTestHelper helper) {
         var g = newGraph();
@@ -180,6 +180,10 @@ public final class MapNodeGameTest {
                 new GraphExecutor(g2).evaluate(ck2.getOutputsById().get("out"), Boolean.class));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void containsValue(GameTestHelper helper) {
         var g = newGraph();
@@ -206,6 +210,10 @@ public final class MapNodeGameTest {
         return get.getOutputsById().get("value");
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void keys(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1", "b", "2", "c", "3");
@@ -222,6 +230,10 @@ public final class MapNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void values(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1", "b", "2");
@@ -235,6 +247,10 @@ public final class MapNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void size(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1", "b", "2", "c", "3");
@@ -244,6 +260,10 @@ public final class MapNodeGameTest {
                 (int) new GraphExecutor(g).evaluate(s.getOutputsById().get("size"), Integer.class));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void isEmpty(GameTestHelper helper) {
         var g = newGraph();
@@ -260,6 +280,10 @@ public final class MapNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void merge(GameTestHelper helper) {
         var g = newGraph();
         var mA = stringStringMap(g, "a", "1", "b", "2");
@@ -275,6 +299,10 @@ public final class MapNodeGameTest {
         assertEq(helper, "c", "3", result.get("c"));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void immutability(GameTestHelper helper) {
         // Put must not mutate the source — re-evaluate source after put.

@@ -1,19 +1,18 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.ItemStackCreateNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.info.EntityInfoNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.info.InfoFieldBlock;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.info.ItemStackInfoNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.mc.MemberInfoRegistry;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.world.item.Items;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -30,6 +29,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * {@link com.lowdragmc.kilagraph.blueprint.nodes.mc.info.InfoContextNode} holds a {@code target};
  * each {@link InfoFieldBlock} added to it reads one selected property of that target.
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class InfoNodeGameTest {
     private static final String MULTI_BLOCK = "info_multi_block";
     private static final String CACHE_IDENTITY = "info_cache_identity";
@@ -47,22 +47,9 @@ public final class InfoNodeGameTest {
 
     private InfoNodeGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(MULTI_BLOCK, InfoNodeGameTest::multiBlock);
-        KGGameTests.registerFunction(CACHE_IDENTITY, InfoNodeGameTest::cacheIdentity);
-        KGGameTests.registerFunction(OVERRIDE, InfoNodeGameTest::overrideExtraExclude);
-        KGGameTests.registerFunction(UNKNOWN_KEY, InfoNodeGameTest::unknownKeyNull);
-        KGGameTests.registerFunction(NULL_TARGET, InfoNodeGameTest::nullTargetNull);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{MULTI_BLOCK, CACHE_IDENTITY, OVERRIDE, UNKNOWN_KEY, NULL_TARGET}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
-
     /** One ItemStack context feeding three blocks reading three different properties. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void multiBlock(GameTestHelper helper) {
         var g = newGraph();
         var create = addNode(g, ItemStackCreateNode.class);
@@ -87,6 +74,8 @@ public final class InfoNodeGameTest {
     }
 
     /** Member map is cached per class — same instance on repeated lookups. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void cacheIdentity(GameTestHelper helper) {
         var a = MemberInfoRegistry.membersFor(net.minecraft.world.item.ItemStack.class);
         var b = MemberInfoRegistry.membersFor(net.minecraft.world.item.ItemStack.class);
@@ -96,6 +85,8 @@ public final class InfoNodeGameTest {
     }
 
     /** registerExtra adds a member; exclude removes a reflective one. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void overrideExtraExclude(GameTestHelper helper) {
         var base = MemberInfoRegistry.membersFor(Dummy.class);
         assertTrue(helper, "field a present", base.containsKey("a"));
@@ -115,6 +106,8 @@ public final class InfoNodeGameTest {
     }
 
     /** An unknown member key yields a null output (no throw). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void unknownKeyNull(GameTestHelper helper) {
         var g = newGraph();
         var create = addNode(g, ItemStackCreateNode.class);
@@ -132,6 +125,8 @@ public final class InfoNodeGameTest {
     }
 
     /** A null target (wire-only Entity context, unconnected) yields a null output. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void nullTargetNull(GameTestHelper helper) {
         var g = newGraph();
         var ctx = addNode(g, EntityInfoNode.class);

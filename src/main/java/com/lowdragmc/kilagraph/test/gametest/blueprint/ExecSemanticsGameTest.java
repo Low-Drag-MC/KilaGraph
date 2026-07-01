@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.ForNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SequenceNode;
@@ -10,11 +13,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -34,22 +33,12 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  *       cache invalidation must not destroy the outer loop's live index.</li>
  * </ol>
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class ExecSemanticsGameTest {
     private static final String SEQUENCE_TO_COMPLETION = "exec_sequence_runs_to_completion";
     private static final String NESTED_FOR_OUTER_INDEX = "exec_nested_for_outer_index";
 
     private ExecSemanticsGameTest() {}
-
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(SEQUENCE_TO_COMPLETION, ExecSemanticsGameTest::sequenceToCompletion);
-        KGGameTests.registerFunction(NESTED_FOR_OUTER_INDEX, ExecSemanticsGameTest::nestedForOuterIndex);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, SEQUENCE_TO_COMPLETION, KGGameTests.functionKey(SEQUENCE_TO_COMPLETION), d);
-        KGGameTests.registerFunctionTest(event, NESTED_FOR_OUTER_INDEX, KGGameTests.functionKey(NESTED_FOR_OUTER_INDEX), d);
-    }
 
     /**
      * <pre>
@@ -61,6 +50,8 @@ public final class ExecSemanticsGameTest {
      * Breadth-first (buggy): setV1, setV2 run before setMarker → marker captures v=2.
      * Asserts marker == 1.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void sequenceToCompletion(GameTestHelper helper) {
         var g = newGraph();
         // 'v' is an INPUT variable → READ modifier → its variable node exposes an OUTPUT (get) port.
@@ -117,6 +108,8 @@ public final class ExecSemanticsGameTest {
      * must be outerIndex == 2. If the inner loop's clearCache destroys the outer index, seen reads
      * null/0 → test fails.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void nestedForOuterIndex(GameTestHelper helper) {
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);

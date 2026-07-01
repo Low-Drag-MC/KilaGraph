@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.CaseNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.ConcatNode;
@@ -18,11 +21,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.string.SubstringNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.TrimNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import java.util.List;
 
@@ -33,6 +32,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputCo
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
+@GameTestHolder(Kilagraph.MODID)
 public final class StringNodeGameTest {
     private static final String CONCAT = "string_concat";
     private static final String LENGTH = "string_length";
@@ -50,38 +50,9 @@ public final class StringNodeGameTest {
 
     private StringNodeGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(CONCAT, StringNodeGameTest::concat);
-        KGGameTests.registerFunction(LENGTH, StringNodeGameTest::length);
-        KGGameTests.registerFunction(SUBSTRING, StringNodeGameTest::substring);
-        KGGameTests.registerFunction(INDEX_OF, StringNodeGameTest::indexOf);
-        KGGameTests.registerFunction(REPLACE, StringNodeGameTest::replace);
-        KGGameTests.registerFunction(SPLIT, StringNodeGameTest::split);
-        KGGameTests.registerFunction(JOIN, StringNodeGameTest::join);
-        KGGameTests.registerFunction(FORMAT, StringNodeGameTest::format);
-        KGGameTests.registerFunction(CASE, StringNodeGameTest::caseOp);
-        KGGameTests.registerFunction(TRIM, StringNodeGameTest::trim);
-        KGGameTests.registerFunction(CONTAINS, StringNodeGameTest::contains);
-        KGGameTests.registerFunction(STARTS_WITH, StringNodeGameTest::startsWith);
-        KGGameTests.registerFunction(ENDS_WITH, StringNodeGameTest::endsWith);
-    }
+    @GameTest(template = "empty")
 
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, CONCAT, KGGameTests.functionKey(CONCAT), d);
-        KGGameTests.registerFunctionTest(event, LENGTH, KGGameTests.functionKey(LENGTH), d);
-        KGGameTests.registerFunctionTest(event, SUBSTRING, KGGameTests.functionKey(SUBSTRING), d);
-        KGGameTests.registerFunctionTest(event, INDEX_OF, KGGameTests.functionKey(INDEX_OF), d);
-        KGGameTests.registerFunctionTest(event, REPLACE, KGGameTests.functionKey(REPLACE), d);
-        KGGameTests.registerFunctionTest(event, SPLIT, KGGameTests.functionKey(SPLIT), d);
-        KGGameTests.registerFunctionTest(event, JOIN, KGGameTests.functionKey(JOIN), d);
-        KGGameTests.registerFunctionTest(event, FORMAT, KGGameTests.functionKey(FORMAT), d);
-        KGGameTests.registerFunctionTest(event, CASE, KGGameTests.functionKey(CASE), d);
-        KGGameTests.registerFunctionTest(event, TRIM, KGGameTests.functionKey(TRIM), d);
-        KGGameTests.registerFunctionTest(event, CONTAINS, KGGameTests.functionKey(CONTAINS), d);
-        KGGameTests.registerFunctionTest(event, STARTS_WITH, KGGameTests.functionKey(STARTS_WITH), d);
-        KGGameTests.registerFunctionTest(event, ENDS_WITH, KGGameTests.functionKey(ENDS_WITH), d);
-    }
+    @PrefixGameTestTemplate(false)
 
     public static void concat(GameTestHelper helper) {
         var g = newGraph();
@@ -94,6 +65,10 @@ public final class StringNodeGameTest {
                 new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), String.class));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void length(GameTestHelper helper) {
         var g = newGraph();
@@ -109,6 +84,10 @@ public final class StringNodeGameTest {
                 (int) new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), Integer.class));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void substring(GameTestHelper helper) {
         var g = newGraph();
@@ -129,6 +108,10 @@ public final class StringNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void indexOf(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, IndexOfNode.class);
@@ -146,6 +129,10 @@ public final class StringNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void replace(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, ReplaceNode.class);
@@ -156,6 +143,10 @@ public final class StringNodeGameTest {
                 new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), String.class));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void split(GameTestHelper helper) {
         var g = newGraph();
@@ -181,6 +172,10 @@ public final class StringNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void join(GameTestHelper helper) {
         var g = newGraph();
         var combine = addNode(g, ListCombineNode.class);
@@ -196,6 +191,10 @@ public final class StringNodeGameTest {
                 new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), String.class));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void format(GameTestHelper helper) {
         // Format requires UNKNOWN-typed args. Use ListGet trick? Easier: directly use a numeric AddNode.
@@ -220,6 +219,10 @@ public final class StringNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void caseOp(GameTestHelper helper) {
         for (var c : new Object[][]{{CaseNode.Op.LOWER, "Hello World", "hello world"},
                                      {CaseNode.Op.UPPER, "Hello World", "HELLO WORLD"},
@@ -234,6 +237,10 @@ public final class StringNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void trim(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, TrimNode.class);
@@ -242,6 +249,10 @@ public final class StringNodeGameTest {
                 new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), String.class));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void contains(GameTestHelper helper) {
         var g = newGraph();
@@ -260,6 +271,10 @@ public final class StringNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void startsWith(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, StartsWithNode.class);
@@ -276,6 +291,10 @@ public final class StringNodeGameTest {
                 new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), Boolean.class));
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void endsWith(GameTestHelper helper) {
         var g = newGraph();

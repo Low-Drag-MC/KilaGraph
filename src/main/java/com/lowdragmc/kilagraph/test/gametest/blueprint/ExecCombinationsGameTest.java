@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.compare.GreaterEqualNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.compare.LessThanNode;
@@ -18,11 +21,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -42,6 +41,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  *   <li>A {@code Sequence} of loops running each loop to completion in order.</li>
  * </ul>
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class ExecCombinationsGameTest {
     private static final String NESTED_ACCUM = "exec_nested_loop_accumulates";
     private static final String BREAK_INNER_SCOPED = "exec_break_inner_loop_scoped";
@@ -50,21 +50,6 @@ public final class ExecCombinationsGameTest {
     private static final String SEQUENCE_OF_LOOPS = "exec_sequence_of_loops";
 
     private ExecCombinationsGameTest() {}
-
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(NESTED_ACCUM, ExecCombinationsGameTest::nestedLoopAccumulates);
-        KGGameTests.registerFunction(BREAK_INNER_SCOPED, ExecCombinationsGameTest::breakInInnerLoopScoped);
-        KGGameTests.registerFunction(BREAK_IN_SEQUENCE, ExecCombinationsGameTest::breakInSequenceUnwindsToLoop);
-        KGGameTests.registerFunction(WHILE_TERMINATES, ExecCombinationsGameTest::whileTerminatesOnCondition);
-        KGGameTests.registerFunction(SEQUENCE_OF_LOOPS, ExecCombinationsGameTest::sequenceOfLoops);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{NESTED_ACCUM, BREAK_INNER_SCOPED, BREAK_IN_SEQUENCE, WHILE_TERMINATES, SEQUENCE_OF_LOOPS}) {
-            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
-        }
-    }
 
     // ---- shared builders -------------------------------------------------------------------
 
@@ -106,6 +91,8 @@ public final class ExecCombinationsGameTest {
     // ---- tests -----------------------------------------------------------------------------
 
     /** For(3) {@code ×} For(2), body increments counter. 3×2 = 6 body executions. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void nestedLoopAccumulates(GameTestHelper helper) {
         var g = newGraph();
         var counter = intVar(g, "counter");
@@ -130,6 +117,8 @@ public final class ExecCombinationsGameTest {
      * ends only the inner loop (2 increments per outer pass: indices 0,1), so the outer still runs
      * all 3 passes → counter = 3 × 2 = 6. If Break leaked to the outer loop, counter would be 2.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void breakInInnerLoopScoped(GameTestHelper helper) {
         var g = newGraph();
         var counter = intVar(g, "counter");
@@ -168,6 +157,8 @@ public final class ExecCombinationsGameTest {
      * Final a=1, b=1. A Break that didn't propagate through Sequence (or didn't reach the loop) would
      * leave b=2 or loop further.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void breakInSequenceUnwindsToLoop(GameTestHelper helper) {
         var g = newGraph();
         var a = intVar(g, "a");
@@ -211,6 +202,8 @@ public final class ExecCombinationsGameTest {
      * While(cond = counter {@code <} 3), body increments counter, maxIterations=1000. The loop must
      * stop because the re-pulled condition goes false (counter reaches 3), not because of the cap.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void whileTerminatesOnCondition(GameTestHelper helper) {
         var g = newGraph();
         var counter = intVar(g, "counter");
@@ -237,6 +230,8 @@ public final class ExecCombinationsGameTest {
      * Sequence(2): out1 = For(2) incrementing counter, out2 = For(3) incrementing counter. out1's
      * loop runs fully before out2's → counter = 2 + 3 = 5.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void sequenceOfLoops(GameTestHelper helper) {
         var g = newGraph();
         var counter = intVar(g, "counter");

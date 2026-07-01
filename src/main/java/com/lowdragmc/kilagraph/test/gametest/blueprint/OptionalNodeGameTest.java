@@ -1,18 +1,17 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.optional.DefaultNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.optional.IsNullNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.optional.NotNullNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -21,6 +20,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputCo
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
+@GameTestHolder(Kilagraph.MODID)
 public final class OptionalNodeGameTest {
     private static final String IS_NULL = "optional_is_null";
     private static final String NOT_NULL = "optional_not_null";
@@ -29,20 +29,9 @@ public final class OptionalNodeGameTest {
 
     private OptionalNodeGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(IS_NULL, OptionalNodeGameTest::isNull);
-        KGGameTests.registerFunction(NOT_NULL, OptionalNodeGameTest::notNull);
-        KGGameTests.registerFunction(DEFAULT_KEEPS, OptionalNodeGameTest::defaultKeeps);
-        KGGameTests.registerFunction(DEFAULT_FALLBACK, OptionalNodeGameTest::defaultFallback);
-    }
+    @GameTest(template = "empty")
 
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, IS_NULL, KGGameTests.functionKey(IS_NULL), data);
-        KGGameTests.registerFunctionTest(event, NOT_NULL, KGGameTests.functionKey(NOT_NULL), data);
-        KGGameTests.registerFunctionTest(event, DEFAULT_KEEPS, KGGameTests.functionKey(DEFAULT_KEEPS), data);
-        KGGameTests.registerFunctionTest(event, DEFAULT_FALLBACK, KGGameTests.functionKey(DEFAULT_FALLBACK), data);
-    }
+    @PrefixGameTestTemplate(false)
 
     public static void isNull(GameTestHelper helper) {
         // null case: unconnected UNKNOWN port has no constant → null
@@ -62,6 +51,10 @@ public final class OptionalNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void notNull(GameTestHelper helper) {
         var g1 = newGraph();
         var n1 = addNode(g1, NotNullNode.class);
@@ -78,6 +71,10 @@ public final class OptionalNodeGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
     public static void defaultKeeps(GameTestHelper helper) {
         // type=Float — DefaultNode's ports become Float-typed which HAVE constants.
         var g = newGraph();
@@ -90,6 +87,10 @@ public final class OptionalNodeGameTest {
                 exec.evaluate(n.getOutputsById().get("out"), Float.class), 1e-5f);
         helper.succeed();
     }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
 
     public static void defaultFallback(GameTestHelper helper) {
         // type=UNKNOWN: no embedded constants → "in" is null → fallback to defaultValue (wired).

@@ -1,7 +1,10 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.minecraft.gametest.framework.GameTest;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
@@ -10,11 +13,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.SpawnFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
 import java.util.Map;
@@ -30,6 +29,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * AddNode + variable wiring), outer reads OUTPUT variables — all through a single
  * {@link GraphExecutor#evaluate} call on the outer subgraph node's port.
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class SubgraphGameTest {
     private static final String DATA_PASSES_THROUGH_LOCAL_SUBGRAPH = "subgraph_data_passes_through_local";
     private static final String UNRESOLVED_EXTERNAL_RETURNS_NULL = "subgraph_unresolved_external_returns_null";
@@ -38,22 +38,9 @@ public final class SubgraphGameTest {
 
     private SubgraphGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(DATA_PASSES_THROUGH_LOCAL_SUBGRAPH, SubgraphGameTest::dataPassesThroughLocalSubgraph);
-        KGGameTests.registerFunction(UNRESOLVED_EXTERNAL_RETURNS_NULL, SubgraphGameTest::unresolvedExternalReturnsNull);
-        KGGameTests.registerFunction(CONSTANT_INPUT_FEEDS_SUBGRAPH, SubgraphGameTest::constantInputFeedsSubgraph);
-        KGGameTests.registerFunction(NESTED_SUBGRAPH, SubgraphGameTest::nestedSubgraph);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, DATA_PASSES_THROUGH_LOCAL_SUBGRAPH, KGGameTests.functionKey(DATA_PASSES_THROUGH_LOCAL_SUBGRAPH), data);
-        KGGameTests.registerFunctionTest(event, UNRESOLVED_EXTERNAL_RETURNS_NULL, KGGameTests.functionKey(UNRESOLVED_EXTERNAL_RETURNS_NULL), data);
-        KGGameTests.registerFunctionTest(event, CONSTANT_INPUT_FEEDS_SUBGRAPH, KGGameTests.functionKey(CONSTANT_INPUT_FEEDS_SUBGRAPH), data);
-        KGGameTests.registerFunctionTest(event, NESTED_SUBGRAPH, KGGameTests.functionKey(NESTED_SUBGRAPH), data);
-    }
-
     // --- 1. Outer feeds vIn → inner Add(+10) → vOut → outer reads ----------------------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void dataPassesThroughLocalSubgraph(GameTestHelper helper) {
         var outer = newGraph();
         var inner = outer.graphModel.createLocalSubgraphInstance();
@@ -114,6 +101,8 @@ public final class SubgraphGameTest {
     }
 
     // --- 2. External subgraph w/o resolver → all outer outputs null, no throw ---------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void unresolvedExternalReturnsNull(GameTestHelper helper) {
         var outer = newGraph();
         // Build a target external graph just to capture variable port shape via portCache
@@ -146,6 +135,8 @@ public final class SubgraphGameTest {
     }
 
     // --- 3. Wire a constant into the outer subgraph input port ---------------------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void constantInputFeedsSubgraph(GameTestHelper helper) {
         var outer = newGraph();
         var inner = outer.graphModel.createLocalSubgraphInstance();
@@ -188,6 +179,8 @@ public final class SubgraphGameTest {
     }
 
     // --- 4. Subgraph inside a subgraph: outer(5) → inner1 → inner2(+10) → 15 -----------------------
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void nestedSubgraph(GameTestHelper helper) {
         var outer = newGraph();
 
