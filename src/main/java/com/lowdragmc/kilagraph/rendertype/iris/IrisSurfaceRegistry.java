@@ -35,8 +35,10 @@ import java.util.Set;
  */
 public final class IrisSurfaceRegistry {
 
-    /** A live surface, with all collision-prone identifiers already id-namespaced. */
-    public record Surface(int id, List<String> declarationUnits, List<String> functions, String surfaceFunction) {}
+    /** A live surface, with all collision-prone identifiers already id-namespaced. {@code usesGeometry} marks
+     *  that the surface reads the mesh normal/viewDir/position varyings (the injector then adds a vertex stage). */
+    public record Surface(int id, List<String> declarationUnits, List<String> functions, String surfaceFunction,
+                          boolean usesGeometry) {}
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Object LOCK = new Object();
@@ -144,7 +146,7 @@ public final class IrisSurfaceRegistry {
         String fn = "kg_Surface kg_surface_" + id + "(vec2 kg_uv) {\n"
                 + namespace(snippet.body(), id)
                 + "    return kg_Surface(" + namespace(snippet.surfaceArgs(), id) + ");\n}\n";
-        return new Surface(id, decls, fns, fn);
+        return new Surface(id, decls, fns, fn, snippet.usesGeometry());
     }
 
     /**

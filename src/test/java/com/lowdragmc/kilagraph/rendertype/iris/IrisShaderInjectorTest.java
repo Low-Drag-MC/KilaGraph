@@ -117,7 +117,7 @@ class IrisShaderInjectorTest {
     void dispatchesToRegisteredSurfacesAsStruct() {
         var s1 = new IrisSurfaceRegistry.Surface(1,
                 List.of("uniform sampler2D kg_tex_a;\n"), List.of(),
-                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(texture(kg_tex_a, kg_uv).rgb, 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n");
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(texture(kg_tex_a, kg_uv).rgb, 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false);
         String out = IrisShaderInjector.injectFragment(PBR_PACK_FSH, List.of(s1));
 
         assertTrue(out.contains("struct kg_Surface {"), "shared struct declared");
@@ -153,7 +153,7 @@ class IrisShaderInjectorTest {
                 }
                 """;
         var s1 = new IrisSurfaceRegistry.Surface(1, List.of(), List.of(),
-                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.5, 1.0, 1.0, 0.0, 0.0);\n}\n");
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.5, 1.0, 1.0, 0.0, 0.0);\n}\n", false);
         String out = IrisShaderInjector.injectFragment(pack, List.of(s1));
 
         assertTrue(out.contains("kg_sample_gtexture(texcoord, vec2(0.0), vec2(0.0))"),
@@ -171,9 +171,9 @@ class IrisShaderInjectorTest {
         String sharedDecl = "uniform sampler2D kg_MissingSampler;\n";
         String sharedFn = "float kg_noise(vec2 p) { return 0.0; }\n";
         var a = new IrisSurfaceRegistry.Surface(1, List.of(sharedDecl), List.of(sharedFn),
-                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(kg_noise(kg_uv)), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n");
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(kg_noise(kg_uv)), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false);
         var b = new IrisSurfaceRegistry.Surface(2, List.of(sharedDecl), List.of(sharedFn),
-                "kg_Surface kg_surface_2(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n");
+                "kg_Surface kg_surface_2(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false);
         String out = IrisShaderInjector.injectFragment(PACK_FSH, List.of(a, b));
 
         assertEquals(1, countOccurrences(out, "uniform sampler2D kg_MissingSampler;"),
@@ -190,7 +190,7 @@ class IrisShaderInjectorTest {
                 List.of("layout(std140) uniform KG_Material {\n    vec4 kg_c;\n} kg_material;\n"),
                 List.of("vec4 kg_grad_0() { return vec4(0.0); }\n"),
                 "    vec4 f_0 = kg_material.kg_c * kg_grad_0();\n",
-                "f_0.rgb, f_0.a, vec3(0.0,0.0,1.0), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0");
+                "f_0.rgb, f_0.a, vec3(0.0,0.0,1.0), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false);
         var one = IrisSurfaceRegistry.build(1, raw);
         var two = IrisSurfaceRegistry.build(2, raw);
 
@@ -215,6 +215,135 @@ class IrisShaderInjectorTest {
         String out = IrisShaderInjector.injectFragment(legacy);
         assertTrue(out.contains("kg_sample_gtexture(gl_TexCoord[0].st)"),
                 "texture2D(gtexture,...) should also be redirected");
+    }
+
+    // ---- M3: per-fragment geometry varyings (normal / viewDir / position) via vertex-stage injection ----
+
+    /** A minimal Iris-transformed shading vertex shader, as Iris hands to createShader (#version 330 core,
+     *  gl_* built-ins rewritten to iris_* attributes + an iris_DynamicTransforms block). The injector gates
+     *  on this shape (iris_Normal + iris_transforms), not the program name. */
+    private static final String PACK_VSH = """
+            #version 330 core
+            in vec3 iris_Position;
+            in vec3 iris_Normal;
+            uniform mat3 iris_NormalMat;
+            uniform mat4 gbufferModelViewInverse;
+            layout(std140) uniform iris_DynamicTransforms {
+                mat4 ModelViewMat;
+                vec4 ColorModulator;
+                vec3 ModelOffset;
+                mat4 TextureMat;
+            } iris_transforms;
+            uniform mat4 iris_ProjMat;
+            out vec3 normal;
+            void main() {
+                gl_Position = iris_ProjMat * iris_transforms.ModelViewMat * vec4(iris_Position, 1.0);
+                normal = normalize(iris_NormalMat * iris_Normal);
+            }
+            """;
+    /** A surface whose body reads the geometry varyings (a Fresnel-style graph). */
+    private static final String GEOM_FN =
+            "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface("
+            + "vec3(dot(normalize(kg_normal), normalize(kg_viewDir))), 1.0, kg_localPos, "
+            + "0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n";
+
+    private static IrisSurfaceRegistry.Surface surface(int id, boolean usesGeometry) {
+        return new IrisSurfaceRegistry.Surface(id, List.of(), List.of(), GEOM_FN, usesGeometry);
+    }
+
+    @Test
+    void injectsGeometryVaryingsIntoVertexShader() {
+        // Iris names entity programs "entities_solid" etc. (NOT gbuffers_*) — gating is by iris_Normal content.
+        String out = IrisShaderInjector.injectVertex("entities_solid", PACK_VSH, List.of(surface(1, true)));
+        assertTrue(out.contains("out vec3 kg_normal;"), "declares the normal out-varying");
+        assertTrue(out.contains("out vec3 kg_viewDir;") && out.contains("out vec3 kg_localPos;"),
+                "declares the viewDir + position out-varyings");
+        assertTrue(out.contains("kg_normal = normalize(mat3(gbufferModelViewInverse) * (iris_NormalMat * iris_Normal));"),
+                "computes world-space normal from Iris's transformed attributes/uniforms");
+        assertTrue(out.contains("iris_transforms.ModelViewMat * vec4((iris_Position + iris_transforms.ModelOffset), 1.0)"),
+                "view position uses the iris_DynamicTransforms model-view + offset");
+        assertTrue(out.indexOf("kg_normal =") > out.indexOf("gl_Position"),
+                "the writes sit inside main(), after gl_Position");
+        assertTrue(out.contains(IrisShaderInjector.MARKER), "marks the source so re-injection is a no-op");
+    }
+
+    @Test
+    void vertexInjectionIsIdempotent() {
+        String once = IrisShaderInjector.injectVertex("entities_solid", PACK_VSH, List.of(surface(1, true)));
+        String twice = IrisShaderInjector.injectVertex("entities_solid", once, List.of(surface(1, true)));
+        assertEquals(once, twice, "re-injecting an already-injected vertex shader must be a no-op");
+    }
+
+    @Test
+    void vertexInjectionNoOpsWhenNotNeeded() {
+        // core-profile composite/deferred passes (no gl_Normal, and whose fragments we never hijack) are skipped.
+        String composite = "#version 150 core\nin vec3 vaPosition;\nvoid main() { gl_Position = vec4(vaPosition, 1.0); }\n";
+        assertEquals(composite, IrisShaderInjector.injectVertex("composite", composite, List.of(surface(1, true))));
+        // no live surface reads geometry.
+        assertEquals(PACK_VSH, IrisShaderInjector.injectVertex("entities_solid", PACK_VSH, List.of(surface(1, false))));
+        // not a vertex shader (no gl_Position).
+        String fsh = "#version 330\nout vec4 c;\nvoid main(){ c = vec4(1.0); }\n";
+        assertEquals(fsh, IrisShaderInjector.injectVertex("entities_solid", fsh, List.of(surface(1, true))));
+    }
+
+    @Test
+    void vertexInjectionIgnoresIrisNormalMatSubstring() {
+        // The `basic` pass (lines/leashes) declares the iris_NormalMat uniform but has NO iris_Normal vertex
+        // attribute. A naive contains("iris_Normal") false-matches iris_NormalMat and injects a reference to
+        // the undeclared iris_Normal -> "undefined variable" compile error that disabled the whole shaderpack.
+        String basic = "#version 330 core\n"
+                + "in vec3 iris_Position;\n"
+                + "uniform mat3 iris_NormalMat;\n"
+                + "layout(std140) uniform iris_DynamicTransforms { mat4 ModelViewMat; vec3 ModelOffset; } iris_transforms;\n"
+                + "void main() { gl_Position = iris_transforms.ModelViewMat * vec4(iris_Position, 1.0); }\n";
+        assertEquals(basic, IrisShaderInjector.injectVertex("basic", basic, List.of(surface(1, true))));
+    }
+
+    @Test
+    void vertexInjectionRequiresAllReferencedUniforms() {
+        // clouds_sodium-like: has the iris_Normal attribute + iris_transforms but NO gbufferModelViewInverse.
+        // Injecting would reference an undefined variable and disable the whole shaderpack, so it must no-op.
+        String clouds = "#version 330 core\n"
+                + "in vec3 iris_Position;\n"
+                + "in vec3 iris_Normal;\n"
+                + "uniform mat3 iris_NormalMat;\n"
+                + "layout(std140) uniform iris_DynamicTransforms { mat4 ModelViewMat; vec3 ModelOffset; } iris_transforms;\n"
+                + "void main() { gl_Position = iris_transforms.ModelViewMat * vec4(iris_Position, 1.0); }\n";
+        assertEquals(clouds, IrisShaderInjector.injectVertex("clouds_sodium", clouds, List.of(surface(1, true))));
+    }
+
+    @Test
+    void vertexInjectionRequiresDynamicTransformsBlock() {
+        // iris_Normal present but no iris_transforms block (ModelViewMat/ModelOffset) — our writes couldn't
+        // compile, so skip rather than emit a reference to an undeclared block.
+        String vsh = "#version 330 core\nin vec3 iris_Position;\nin vec3 iris_Normal;\n"
+                + "void main() { gl_Position = vec4(iris_Position, 1.0); }\n";
+        assertEquals(vsh, IrisShaderInjector.injectVertex("entities_solid", vsh, List.of(surface(1, true))));
+    }
+
+    @Test
+    void fragmentDeclaresGeometryInVaryingsOnlyWhenUsed() {
+        String used = IrisShaderInjector.injectFragment(PBR_PACK_FSH, List.of(surface(1, true)));
+        assertTrue(used.contains("in vec3 kg_normal;") && used.contains("in vec3 kg_viewDir;")
+                        && used.contains("in vec3 kg_localPos;"),
+                "fragment declares the geometry in-varyings when a surface reads them");
+
+        // A surface that doesn't read geometry: no in-varyings declared.
+        var plain = new IrisSurfaceRegistry.Surface(1, List.of(), List.of(),
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n",
+                false);
+        String unused = IrisShaderInjector.injectFragment(PBR_PACK_FSH, List.of(plain));
+        assertFalse(unused.contains("in vec3 kg_normal;"), "no geometry in-varyings when no surface reads them");
+    }
+
+    @Test
+    void registryBuildCarriesUsesGeometry() {
+        var geom = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", true);
+        assertTrue(IrisSurfaceRegistry.build(1, geom).usesGeometry(), "build propagates usesGeometry=true");
+        var plain = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false);
+        assertFalse(IrisSurfaceRegistry.build(2, plain).usesGeometry(), "build propagates usesGeometry=false");
     }
 
     private static int countOccurrences(String haystack, String needle) {

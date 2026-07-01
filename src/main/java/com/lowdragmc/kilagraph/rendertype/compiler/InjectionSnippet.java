@@ -29,10 +29,14 @@ import java.util.List;
  * @param surfaceArgs      the comma-joined arguments to the {@code kg_Surface(...)} constructor, in the
  *                         canonical field order: albedo, alpha, normalTS, smoothness, metallic, emission,
  *                         ao, height, porosity, sss
+ * @param usesGeometry     whether the surface reads the mesh normal / view direction / position (the
+ *                         {@code kg_normal}/{@code kg_viewDir}/{@code kg_localPos} varyings) — the cue for
+ *                         {@code IrisShaderInjector} to inject a vertex stage that computes them
  */
 public record InjectionSnippet(
         List<String> declarationUnits,
         List<String> functions,
         String body,
-        String surfaceArgs
+        String surfaceArgs,
+        boolean usesGeometry
 ) {}

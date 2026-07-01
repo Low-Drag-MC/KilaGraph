@@ -119,6 +119,11 @@ public final class ShaderGraphCompiler {
      *  defaults (see {@link #screenUv()}) map the whole capture onto the preview geometry rather than the
      *  panel's screen sub-rect, so the preview shows the entire scene. In-world rendering is unaffected. */
     private boolean editorPreview;
+    /** Set in injection mode when a node read the mesh normal / view direction / position
+     *  ({@link #meshNormal()}/{@link #meshViewDir()}/{@link #meshPosition()}), so the surface references the
+     *  {@code kg_normal}/{@code kg_viewDir}/{@code kg_localPos} varyings. {@code IrisShaderInjector} then
+     *  injects a tiny vertex stage that computes them (see {@link InjectionSnippet#usesGeometry()}). */
+    private boolean usesGeometryVarying;
     /** KilaGraph-managed UBOs any node referenced (engine globals, transforms, or a mod's own block).
      *  Each is declared in the GLSL + bound on the pipeline + uploaded each frame — the single, generic
      *  extension point that replaced per-block {@code usesX} flags. */
@@ -323,7 +328,7 @@ public final class ShaderGraphCompiler {
                 out.porosity != null ? out.porosity.code() : "0.0",                         // porosity
                 out.sss != null ? out.sss.code() : "0.0");                                  // sss
         return new InjectionSnippet(decls, new ArrayList<>(fragment.functions.values()),
-                body.toString(), args);
+                body.toString(), args, usesGeometryVarying);
     }
 
     /**
@@ -478,10 +483,12 @@ public final class ShaderGraphCompiler {
                     return new ShaderExpr("normalize(mat3(" + iView.code() + ") * mat3(ModelViewMat) * "
                             + n.code() + ")", GlslType.VEC3);
                 },
-                // The preview mesh's own (object-space) normal, interpolated. The preview camera looks down
-                // an axis so object space ≈ view space here, and meshViewDir's +Z preview default is the
-                // matching view direction — so dot(normal, viewDir) is correct on sphere/cube/custom alike.
-                new ShaderExpr("vNormal", GlslType.VEC3));
+                // Injection: the kg_normal varying the injected vertex stage writes (world space, matching the
+                // vsh default above). Else the preview mesh's own (object-space) normal, interpolated — the
+                // preview camera looks down an axis so object space ≈ view space here, and meshViewDir's +Z
+                // preview default is the matching view direction — so dot(normal, viewDir) is correct on
+                // sphere/cube/custom alike.
+                geometryVarying("kg_normal", "vNormal", GlslType.VEC3));
     }
 
     /**
@@ -500,7 +507,8 @@ public final class ShaderGraphCompiler {
                     return new ShaderExpr("normalize(mat3(" + iView.code() + ") * (-" + viewPos + "))",
                             GlslType.VEC3);
                 },
-                new ShaderExpr("vec3(0.0, 0.0, 1.0)", GlslType.VEC3));
+                // Injection: the kg_viewDir varying (world space); else +Z (looking straight at the quad).
+                geometryVarying("kg_viewDir", "vec3(0.0, 0.0, 1.0)", GlslType.VEC3));
     }
 
     /**
@@ -511,7 +519,22 @@ public final class ShaderGraphCompiler {
      */
     ShaderExpr meshPosition() {
         return varyingInput("kg_modelPos", GlslType.VEC3, this::modelPosition,
-                new ShaderExpr("vec3(0.0)", GlslType.VEC3));
+                // Injection: the kg_localPos varying (object/model space, like this node's default); else 0.
+                geometryVarying("kg_localPos", "vec3(0.0)", GlslType.VEC3));
+    }
+
+    /**
+     * The preview/injection default for a mesh-geometry port (normal / view direction / position). In
+     * injection mode this is the named varying the injected vertex stage writes (flagging
+     * {@link #usesGeometryVarying} so {@code IrisShaderInjector} adds that vertex stage); otherwise the
+     * node-preview default expression. See {@link #meshNormal()}.
+     */
+    private ShaderExpr geometryVarying(String injectionVarying, String previewDefault, GlslType type) {
+        if (injection) {
+            usesGeometryVarying = true;
+            return new ShaderExpr(injectionVarying, type);
+        }
+        return new ShaderExpr(previewDefault, type);
     }
 
     /**
