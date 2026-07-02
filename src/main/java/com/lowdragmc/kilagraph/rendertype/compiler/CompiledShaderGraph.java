@@ -1,7 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.compiler;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
-import com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -10,10 +9,8 @@ import java.util.zip.CRC32;
 
 /**
  * The product of compiling a {@link RenderTypeGraph}: the generated vertex/fragment GLSL, the
- * material uniform layout, the set of Minecraft builtin UBOs referenced (e.g. {@code DynamicTransforms},
- * {@code Fog}, {@code Projection}), the KilaGraph-managed {@link ShaderUniformBlock}s the graph uses
- * ({@code KG_Globals}, {@code KG_Transforms}, or a mod's own — each declared in the GLSL, bound on the
- * pipeline, and uploaded each frame), and the render-state settings. {@link #contentHash()} is a stable
+ * material uniform layout, the builtin / KG-managed uniforms the GLSL declares, and the render-state
+ * settings. {@link #contentHash()} is a stable
  * hash over the GLSL + settings used as the cache key for pipeline reuse.
  *
  * <p>{@code uniformDefaults} / {@code samplerDefaults} carry the baked-in values for EXPOSED graph
@@ -39,11 +36,6 @@ public record CompiledShaderGraph(
         // RenderSystem, KG-managed (kg_Time / kg_<transform matrix>) from KilaGraph. Replaces the modern
         // builtin-UBO list (1.21.1 has no core-shader UBOs).
         Map<String, GlslType> builtinUniforms,
-        // KilaGraph-managed UBOs the graph uses (engine globals / transforms / a mod's own). Each is declared
-        // in the generated GLSL (so it's implicitly covered by contentHash via the sources), bound on the
-        // pipeline, and uploaded each frame by the material. Replaced the per-block usesEngineGlobals/
-        // usesTransforms flags — the generic extension point for new engine UBOs.
-        List<ShaderUniformBlock> uniformBlocks,
         List<StageError> stageErrors,
         RenderTypeGraph.Settings settings,
         Map<String, float[]> uniformDefaults,

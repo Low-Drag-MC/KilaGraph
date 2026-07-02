@@ -133,7 +133,6 @@ public final class ShaderCompileContext {
      */
     public void useMinecraftUniform(String uboName, String includePath) {
         compiler.addInclude(includePath);
-        compiler.useBuiltinUbo(uboName);
     }
 
     /**
@@ -331,22 +330,6 @@ public final class ShaderCompileContext {
     public ShaderExpr varyingInput(String name, GlslType type,
                                    java.util.function.Supplier<ShaderExpr> vshDefault, ShaderExpr previewDefault) {
         return compiler.varyingInput(name, type, vshDefault, previewDefault);
-    }
-
-    /**
-     * Register a KilaGraph-managed UBO (a {@link com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock})
-     * this node needs — the generic extension point for engine/mod uniform blocks. Once registered, the
-     * compiler emits the block's {@code declareGlsl()} into the source, the pipeline declares its
-     * {@code uboName()}, and the material drives its per-frame {@code prepareUpload()} + binds its
-     * {@code slice()}. The node then references the block's fields itself, e.g.
-     * {@code ctx.useUniformBlock(MyBlock.INSTANCE); return new ShaderExpr("my_block.Field", GlslType.VEC3);}
-     * (the GLSL block/instance name is whatever the block's {@code declareGlsl()} uses). Idempotent.
-     *
-     * <p>{@link #engineTime()} / {@link #transformField(String, GlslType)} are the built-in conveniences
-     * layered on this for KilaGraph's own {@code KG_Globals} / {@code KG_Transforms} blocks.</p>
-     */
-    public void useUniformBlock(com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock block) {
-        compiler.useUniformBlock(block);
     }
 
     /** World time in seconds, from KilaGraph's engine-globals block (we update it each frame). */

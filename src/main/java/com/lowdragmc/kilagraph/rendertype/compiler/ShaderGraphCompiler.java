@@ -4,9 +4,6 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
-import com.lowdragmc.kilagraph.rendertype.runtime.KGEngineUniforms;
-import com.lowdragmc.kilagraph.rendertype.runtime.KGTransformUniforms;
-import com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IVariableNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.IVariable;
@@ -78,7 +75,6 @@ public final class ShaderGraphCompiler {
     private final StageScope vertex = new StageScope("v");
     private final StageScope fragment = new StageScope("f");
     private final MaterialUniformLayout layout = new MaterialUniformLayout();
-    private final Set<String> builtinUbos = new LinkedHashSet<>();
     /** name -> type of varyings already built in the vertex shader. */
     private final Map<String, GlslType> varyings = new java.util.LinkedHashMap<>();
     /** Baked default values for EXPOSED variable uniforms: uniform field name -> std140 components. */
@@ -117,10 +113,6 @@ public final class ShaderGraphCompiler {
      *  defaults (see {@link #screenUv()}) map the whole capture onto the preview geometry rather than the
      *  panel's screen sub-rect, so the preview shows the entire scene. In-world rendering is unaffected. */
     private boolean editorPreview;
-    /** KilaGraph-managed UBOs any node referenced (engine globals, transforms, or a mod's own block).
-     *  Each is declared in the GLSL + bound on the pipeline + uploaded each frame — the single, generic
-     *  extension point that replaced per-block {@code usesX} flags. */
-    private final Set<com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock> uniformBlocks = new LinkedHashSet<>();
     /** Stage-affinity violations found during traversal, keyed by node uid (first conflict per node). */
     private final Map<UUID, StageError> stageErrors = new LinkedHashMap<>();
     /**
@@ -145,8 +137,6 @@ public final class ShaderGraphCompiler {
 
     public ShaderGraphCompiler(RenderTypeGraph graph) {
         this.graph = graph;
-        // DynamicTransforms is always bound by RenderType.draw, so the pipeline must declare it.
-        builtinUbos.add("DynamicTransforms");
     }
 
     // ---- public entry ------------------------------------------------------------------------
@@ -201,7 +191,7 @@ public final class ShaderGraphCompiler {
 
         String vsh = assembleVertex();
         String fsh = assembleFragment(out);
-        return new CompiledShaderGraph(vsh, fsh, layout, allBuiltinUniforms(), new ArrayList<>(uniformBlocks),
+        return new CompiledShaderGraph(vsh, fsh, layout, allBuiltinUniforms(),
                 new ArrayList<>(stageErrors.values()), graph.getSettings(),
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
@@ -219,7 +209,6 @@ public final class ShaderGraphCompiler {
         preview = true;
         current = fragment;
         // The preview vsh provides Position + UV0 and passes uv through as vUv.
-        builtinUbos.add("Projection"); // vsh uses ProjMat * ModelViewMat
         ShaderExpr value = previewValueOf(outputPort);
         if (value == null) value = new ShaderExpr("vec4(0.0)", GlslType.VEC4);
         // The preview quad is composited over the editor GUI by its alpha, so a value's alpha would control
@@ -230,7 +219,7 @@ public final class ShaderGraphCompiler {
 
         String vsh = assemblePreviewVertex();
         String fsh = assemblePreviewFragment(color);
-        return new CompiledShaderGraph(vsh, fsh, layout, allBuiltinUniforms(), new ArrayList<>(uniformBlocks),
+        return new CompiledShaderGraph(vsh, fsh, layout, allBuiltinUniforms(),
                 new ArrayList<>(stageErrors.values()), PREVIEW_SETTINGS,
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
@@ -532,12 +521,6 @@ public final class ShaderGraphCompiler {
         } finally {
             current = saved;
         }
-    }
-
-    /** Register a KilaGraph-managed UBO (engine globals / transforms / a mod's own) so the GLSL declares it,
-     *  the pipeline binds it, and the material uploads it each frame. Idempotent (a Set). */
-    void useUniformBlock(ShaderUniformBlock block) {
-        uniformBlocks.add(block);
     }
 
     /** World time in seconds from the {@code KG_Globals} engine block (updated by us each frame). */
@@ -1112,18 +1095,6 @@ public final class ShaderGraphCompiler {
         for (String fn : scope.functions.values()) sb.append(fn).append('\n');
     }
 
-    /** Append each used KG-managed UBO's std140 declaration, sorted by name so the generated source (and
-     *  therefore the content hash) is stable regardless of node-traversal order. */
-    private void appendUniformBlocks(StringBuilder sb, boolean leadingNewline) {
-        uniformBlocks.stream()
-                .sorted(java.util.Comparator.comparing(
-                        com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock::uboName))
-                .forEach(b -> {
-                    if (leadingNewline) sb.append('\n');
-                    sb.append(b.declareGlsl());
-                });
-    }
-
     /**
      * Minecraft include files that unconditionally declare a {@code layout(std140) uniform} block.
      * Importing one means the generated GLSL contains that block, so the pipeline must declare the
@@ -1167,10 +1138,6 @@ public final class ShaderGraphCompiler {
 
     void addInclude(String path) {
         current.includes.add(path);
-    }
-
-    void useBuiltinUbo(String name) {
-        builtinUbos.add(name);
     }
 
     MaterialUniformLayout layout() {
@@ -1241,7 +1208,6 @@ public final class ShaderGraphCompiler {
         appendGradientStruct(sb, vertex);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append('\n').append(uniforms);
-        appendUniformBlocks(sb, true);
         if (!varyings.isEmpty()) {
             sb.append('\n');
             for (var e : varyings.entrySet()) {
@@ -1274,7 +1240,6 @@ public final class ShaderGraphCompiler {
         appendGradientStruct(sb, fragment);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
-        appendUniformBlocks(sb, false);
         sb.append("\nin vec2 vUv;\nin vec3 vPos;\nin vec3 vNormal;\n\nout vec4 fragColor;\n");
         appendFunctions(sb, fragment);
         sb.append("\nvoid main() {\n").append(fragment.body);
@@ -1291,7 +1256,6 @@ public final class ShaderGraphCompiler {
         appendGradientStruct(sb, fragment);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
-        appendUniformBlocks(sb, false);
         if (!varyings.isEmpty()) {
             for (var e : varyings.entrySet()) {
                 sb.append("in ").append(e.getValue().glsl()).append(' ').append(e.getKey()).append(";\n");

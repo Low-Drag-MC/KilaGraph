@@ -11,11 +11,12 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
 /**
- * Exposes KilaGraph's {@code KG_Transforms} uniform block — the space-conversion matrices we precompute
- * each draw (see {@link com.lowdragmc.kilagraph.rendertype.runtime.KGTransformUniforms}). Lets a graph do
- * its own space math without the {@code Transform} node: {@code IModelViewMat} (view→object), {@code
- * ViewMat} (world→view rotation), {@code IViewMat} (view→world), {@code IProjMat} (clip→view). Referencing
- * any output flags the pipeline to declare + bind the block.
+ * Exposes KilaGraph's space-conversion matrices — the individual {@code kg_*} uniforms we precompute each
+ * draw (bound by {@link com.lowdragmc.kilagraph.rendertype.runtime.KGBuiltinUniforms}; 1.21.1 has no UBO, so
+ * despite the legacy node name there is no {@code KG_Transforms} block). Lets a graph do its own space math
+ * without the {@code Transform} node: {@code IModelViewMat} (view→object), {@code ViewMat} (world→view
+ * rotation), {@code IViewMat} (view→world), {@code IProjMat} (clip→view). Referencing any output declares +
+ * binds the matching {@code kg_*} uniform.
  *
  * <p>The world camera <em>position</em> is not here — use the {@code Camera} node, which reads
  * {@code globals.glsl}'s precision-split form ({@code CameraBlockPos} + {@code CameraOffset}).</p>
