@@ -56,6 +56,9 @@ public final class ShaderGraphCompiler {
         final String tempPrefix;
         final StringBuilder body = new StringBuilder();
         final Set<String> includes = new LinkedHashSet<>();
+        /** 1.21.1: builtin / KG-managed values referenced in this stage, declared as individual
+         *  {@code uniform <type> <name>;} in the prelude and bound per-draw by the runtime (no UBO). */
+        final Map<String, GlslType> builtinUniforms = new LinkedHashMap<>();
         /** Global-scope helper function definitions for this stage, keyed by function name (first
          *  registration wins, so a same-named helper can't be redefined) and emitted in insertion order
          *  (a dependency registered first is declared first) before main(). */
@@ -190,14 +193,15 @@ public final class ShaderGraphCompiler {
         if (position == null) {
             // No explicit position block — fall back to the standard MVP transform (matching block.vsh,
             // which transforms Position + ModelOffset).
-            addInclude("minecraft:projection.glsl");
+            useBuiltinUniform("ProjMat", GlslType.MAT4);
+            useBuiltinUniform("ModelViewMat", GlslType.MAT4);
             position = new ShaderExpr("ProjMat * ModelViewMat * vec4(" + modelPosition().code() + ", 1.0)", GlslType.VEC4);
         }
         line("gl_Position = " + position.code() + ";");
 
         String vsh = assembleVertex();
         String fsh = assembleFragment(out);
-        return new CompiledShaderGraph(vsh, fsh, layout, new ArrayList<>(builtinUbos), new ArrayList<>(uniformBlocks),
+        return new CompiledShaderGraph(vsh, fsh, layout, allBuiltinUniforms(), new ArrayList<>(uniformBlocks),
                 new ArrayList<>(stageErrors.values()), graph.getSettings(),
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
@@ -226,7 +230,7 @@ public final class ShaderGraphCompiler {
 
         String vsh = assemblePreviewVertex();
         String fsh = assemblePreviewFragment(color);
-        return new CompiledShaderGraph(vsh, fsh, layout, new ArrayList<>(builtinUbos), new ArrayList<>(uniformBlocks),
+        return new CompiledShaderGraph(vsh, fsh, layout, allBuiltinUniforms(), new ArrayList<>(uniformBlocks),
                 new ArrayList<>(stageErrors.values()), PREVIEW_SETTINGS,
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
@@ -307,7 +311,8 @@ public final class ShaderGraphCompiler {
         return varyingInput("vertexColor", GlslType.VEC4,
                 () -> {
                     addInclude("minecraft:light.glsl");
-                    useBuiltinUbo("Lighting");
+                    useBuiltinUniform("Light0_Direction", GlslType.VEC3);
+                    useBuiltinUniform("Light1_Direction", GlslType.VEC3);
                     ShaderExpr normal = attribute(KGVertexElements.NORMAL, GlslType.VEC3,
                             new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
                     ShaderExpr color = attribute(KGVertexElements.COLOR, GlslType.VEC4,
@@ -342,10 +347,10 @@ public final class ShaderGraphCompiler {
                         markMissingAttribute(KGVertexElements.UV2.attribName());
                         return color; // no lightmap coords -> unlit colour
                     }
-                    addInclude("minecraft:sample_lightmap.glsl");
+                    addInclude("minecraft:light.glsl");
                     layout.addSampler("Sampler2"); // declare `uniform sampler2D Sampler2`
                     usesLightmap = true;           // bind the vanilla lightmap, skip the placeholder
-                    return new ShaderExpr(color.code() + " * sample_lightmap(Sampler2, "
+                    return new ShaderExpr(color.code() + " * minecraft_sample_lightmap(Sampler2, "
                             + KGVertexElements.UV2.attribName() + ")", GlslType.VEC4);
                 },
                 new ShaderExpr("vec4(1.0)", GlslType.VEC4));
@@ -377,7 +382,7 @@ public final class ShaderGraphCompiler {
     ShaderExpr meshNormal() {
         return varyingInput("kg_worldNormal", GlslType.VEC3,
                 () -> {
-                    addInclude("minecraft:dynamictransforms.glsl"); // ModelViewMat
+                    useBuiltinUniform("ModelViewMat", GlslType.MAT4);
                     ShaderExpr n = attribute(KGVertexElements.NORMAL, GlslType.VEC3,
                             new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
                     ShaderExpr iView = transformField("IViewMat", GlslType.MAT4); // view -> world (rotation)
@@ -401,6 +406,7 @@ public final class ShaderGraphCompiler {
     ShaderExpr meshViewDir() {
         return varyingInput("kg_worldViewDir", GlslType.VEC3,
                 () -> {
+                    useBuiltinUniform("ModelViewMat", GlslType.MAT4);
                     ShaderExpr iView = transformField("IViewMat", GlslType.MAT4); // view -> world (rotation)
                     String viewPos = "(ModelViewMat * vec4(" + modelPosition().code() + ", 1.0)).xyz";
                     return new ShaderExpr("normalize(mat3(" + iView.code() + ") * (-" + viewPos + "))",
@@ -429,7 +435,7 @@ public final class ShaderGraphCompiler {
         return varyingInput("sphericalVertexDistance", GlslType.FLOAT,
                 () -> {
                     addInclude("minecraft:fog.glsl");
-                    return new ShaderExpr("fog_spherical_distance(" + modelPosition().code() + ")", GlslType.FLOAT);
+                    return new ShaderExpr("fog_distance(" + modelPosition().code() + ", 0)", GlslType.FLOAT);
                 },
                 new ShaderExpr("0.0", GlslType.FLOAT));
     }
@@ -440,7 +446,7 @@ public final class ShaderGraphCompiler {
         return varyingInput("cylindricalVertexDistance", GlslType.FLOAT,
                 () -> {
                     addInclude("minecraft:fog.glsl");
-                    return new ShaderExpr("fog_cylindrical_distance(" + modelPosition().code() + ")", GlslType.FLOAT);
+                    return new ShaderExpr("fog_distance(" + modelPosition().code() + ", 1)", GlslType.FLOAT);
                 },
                 new ShaderExpr("0.0", GlslType.FLOAT));
     }
@@ -448,9 +454,9 @@ public final class ShaderGraphCompiler {
     /** A raw Minecraft {@code Fog} UBO field accessor (e.g. {@code FogColor}, {@code FogEnvironmentalStart}),
      *  registering the fog include + builtin UBO so the field resolves. Mirrors {@code FogUboNode}. */
     ShaderExpr fogField(String name, GlslType type) {
-        addInclude("minecraft:fog.glsl");
-        useBuiltinUbo("Fog");
-        return new ShaderExpr(name, type);
+        // 1.21.1 fog is individual uniforms (FogStart/FogEnd/FogColor/FogShape). Modern environmental/
+        // render-distance fog fields don't exist here; nodes referencing them are handled in the fog pass.
+        return new ShaderExpr(useBuiltinUniform(name, type), type);
     }
 
     /**
@@ -461,7 +467,7 @@ public final class ShaderGraphCompiler {
      * {@code dynamictransforms.glsl} import to the current (vertex) stage.
      */
     ShaderExpr modelPosition() {
-        addInclude("minecraft:dynamictransforms.glsl");
+        useBuiltinUniform("ModelOffset", GlslType.VEC3);
         return new ShaderExpr("(Position + ModelOffset)", GlslType.VEC3);
     }
 
@@ -536,8 +542,8 @@ public final class ShaderGraphCompiler {
 
     /** World time in seconds from the {@code KG_Globals} engine block (updated by us each frame). */
     ShaderExpr engineTime() {
-        useUniformBlock(KGEngineUniforms.BLOCK);
-        return new ShaderExpr(KGEngineUniforms.timeAccessor(), GlslType.FLOAT);
+        // KG-managed world time in seconds — bound as an individual uniform by the runtime each frame.
+        return new ShaderExpr(useBuiltinUniform("kg_Time", GlslType.FLOAT), GlslType.FLOAT);
     }
 
     /**
@@ -547,14 +553,14 @@ public final class ShaderGraphCompiler {
      * accessor's GLSL type ({@code MAT4} for the matrices, {@code VEC3} for {@code CameraPos}).
      */
     ShaderExpr transformField(String field, GlslType type) {
-        useUniformBlock(KGTransformUniforms.BLOCK);
-        return new ShaderExpr(KGTransformUniforms.accessor(field), type);
+        // KG-managed coordinate-space matrix (IModelViewMat/ViewMat/IViewMat/IProjMat), CPU-computed each
+        // frame and bound as an individual uniform (kg_<field>) by the runtime — 1.21.1 has no UBO.
+        return new ShaderExpr(useBuiltinUniform("kg_" + field, type), type);
     }
 
     /** Minecraft's builtin {@code Globals.GameTime} (day fraction). Bound by {@code bindDefaultUniforms}. */
     ShaderExpr mcGameTime() {
-        addInclude("minecraft:globals.glsl");
-        return new ShaderExpr("GameTime", GlslType.FLOAT);
+        return new ShaderExpr(useBuiltinUniform("GameTime", GlslType.FLOAT), GlslType.FLOAT);
     }
 
     /** The fallback sampler for an unconnected Sampler2D — declares it + bakes the MC missing-texture. */
@@ -634,8 +640,7 @@ public final class ShaderGraphCompiler {
      *  the preview geometry's uv (mesh/quad uv) so the preview shows the entire scene.</p> */
     ShaderExpr screenUv() {
         if (preview || editorPreview) return meshUv();
-        addInclude("minecraft:globals.glsl");
-        useBuiltinUbo("Globals");
+        useBuiltinUniform("ScreenSize", GlslType.VEC2);
         return new ShaderExpr("(gl_FragCoord.xy / ScreenSize)", GlslType.VEC2);
     }
 
@@ -1132,10 +1137,36 @@ public final class ShaderGraphCompiler {
             "minecraft:globals.glsl", "Globals"
     );
 
+    /** Emit a stage's function includes. 1.21.1 backport: only the real GLSL helper libraries that exist in
+     *  1.21.1 are ever added ({@code fog/light/projection/matrix.glsl}) — the modern builtin-UBO includes
+     *  (dynamictransforms/projection/globals as uniform blocks) were replaced by {@link #useBuiltinUniform}. */
+    private static void emitIncludes(StringBuilder sb, StageScope stage) {
+        for (String inc : stage.includes) sb.append("#moj_import <").append(inc).append(">\n");
+        if (!stage.includes.isEmpty()) sb.append('\n');
+    }
+
+    /** Emit a stage's builtin / KG-managed uniform declarations (1.21.1: individual uniforms, no UBO). */
+    private static void emitBuiltinUniforms(StringBuilder sb, StageScope stage) {
+        for (var e : stage.builtinUniforms.entrySet()) {
+            sb.append("uniform ").append(e.getValue().glsl()).append(' ').append(e.getKey()).append(";\n");
+        }
+        if (!stage.builtinUniforms.isEmpty()) sb.append('\n');
+    }
+
+    /**
+     * Declare a builtin / KG-managed uniform used in the current stage and return its GLSL accessor (the bare
+     * uniform name). 1.21.1 has no core-shader UBOs, so every such value is an individual {@code uniform} the
+     * runtime binds per-draw by name — vanilla builtins ({@code ModelViewMat}/{@code ProjMat}/{@code FogColor}
+     * /…) from {@code RenderSystem}, KG-managed values ({@code kg_Time} / transform matrices) from KilaGraph's
+     * own per-frame computation. Idempotent per stage.
+     */
+    String useBuiltinUniform(String name, GlslType type) {
+        current.builtinUniforms.putIfAbsent(name, type);
+        return name;
+    }
+
     void addInclude(String path) {
         current.includes.add(path);
-        String ubo = INCLUDE_UBOS.get(path);
-        if (ubo != null) builtinUbos.add(ubo);
     }
 
     void useBuiltinUbo(String name) {
@@ -1144,6 +1175,14 @@ public final class ShaderGraphCompiler {
 
     MaterialUniformLayout layout() {
         return layout;
+    }
+
+    /** The union of both stages' builtin/KG-managed uniforms (name -> type) — the runtime binds each per-draw
+     *  by name (vanilla builtins from RenderSystem; KG-managed kg_* from KilaGraph's own computation). */
+    private Map<String, GlslType> allBuiltinUniforms() {
+        Map<String, GlslType> all = new LinkedHashMap<>(vertex.builtinUniforms);
+        all.putAll(fragment.builtinUniforms);
+        return all;
     }
 
     // ---- type conversion ---------------------------------------------------------------------
@@ -1196,8 +1235,8 @@ public final class ShaderGraphCompiler {
     private String assembleVertex() {
         StringBuilder sb = new StringBuilder();
         sb.append(GLSL_VERSION).append("\n\n");
-        for (String inc : vertex.includes) sb.append("#moj_import <").append(inc).append(">\n");
-        if (!vertex.includes.isEmpty()) sb.append('\n');
+        emitIncludes(sb, vertex);
+        emitBuiltinUniforms(sb, vertex);
         sb.append(vertexAttributes(graph.getSettings().vertexFormatElements()));
         appendGradientStruct(sb, vertex);
         String uniforms = layout.declareGlsl();
@@ -1217,8 +1256,7 @@ public final class ShaderGraphCompiler {
 
     private String assemblePreviewVertex() {
         return GLSL_VERSION + "\n\n"
-                + "#moj_import <minecraft:dynamictransforms.glsl>\n"
-                + "#moj_import <minecraft:projection.glsl>\n\n"
+                + "uniform mat4 ModelViewMat;\nuniform mat4 ProjMat;\n\n"
                 + "in vec3 Position;\nin vec2 UV0;\nin vec3 Normal;\n\nout vec2 vUv;\nout vec3 vPos;\nout vec3 vNormal;\n\n"
                 + "void main() {\n"
                 + "    vUv = UV0;\n"
@@ -1231,8 +1269,8 @@ public final class ShaderGraphCompiler {
     private String assemblePreviewFragment(ShaderExpr color) {
         StringBuilder sb = new StringBuilder();
         sb.append(GLSL_VERSION).append("\n\n");
-        for (String inc : fragment.includes) sb.append("#moj_import <").append(inc).append(">\n");
-        if (!fragment.includes.isEmpty()) sb.append('\n');
+        emitIncludes(sb, fragment);
+        emitBuiltinUniforms(sb, fragment);
         appendGradientStruct(sb, fragment);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
@@ -1248,8 +1286,8 @@ public final class ShaderGraphCompiler {
     private String assembleFragment(FragmentOutputs out) {
         StringBuilder sb = new StringBuilder();
         sb.append(GLSL_VERSION).append("\n\n");
-        for (String inc : fragment.includes) sb.append("#moj_import <").append(inc).append(">\n");
-        if (!fragment.includes.isEmpty()) sb.append('\n');
+        emitIncludes(sb, fragment);
+        emitBuiltinUniforms(sb, fragment);
         appendGradientStruct(sb, fragment);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);

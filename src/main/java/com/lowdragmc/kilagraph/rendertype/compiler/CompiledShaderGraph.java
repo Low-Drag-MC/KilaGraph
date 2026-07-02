@@ -34,7 +34,11 @@ public record CompiledShaderGraph(
         String vertexSource,
         String fragmentSource,
         MaterialUniformLayout layout,
-        List<String> builtinUniforms,
+        // 1.21.1 backport: builtin / KG-managed uniforms the generated GLSL declares (name -> GLSL type),
+        // bound per-draw by the runtime — vanilla builtins (ModelViewMat/ProjMat/FogColor/...) from
+        // RenderSystem, KG-managed (kg_Time / kg_<transform matrix>) from KilaGraph. Replaces the modern
+        // builtin-UBO list (1.21.1 has no core-shader UBOs).
+        Map<String, GlslType> builtinUniforms,
         // KilaGraph-managed UBOs the graph uses (engine globals / transforms / a mod's own). Each is declared
         // in the generated GLSL (so it's implicitly covered by contentHash via the sources), bound on the
         // pipeline, and uploaded each frame by the material. Replaced the per-block usesEngineGlobals/

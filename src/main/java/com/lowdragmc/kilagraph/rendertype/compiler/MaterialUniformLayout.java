@@ -25,10 +25,15 @@ public final class MaterialUniformLayout {
     private final Map<String, Field> fields = new LinkedHashMap<>();
     private final List<String> samplers = new ArrayList<>();
 
-    /** Register a UBO field (idempotent by name). Returns the GLSL accessor for the field. */
+    /**
+     * Register a material field (idempotent by name). Returns the GLSL accessor for the field — which, on
+     * 1.21.1, is just the bare uniform name: the backport uses individual {@code uniform}s (no UBO — vanilla
+     * 1.21.1 shaders have no uniform-block support), so an EXPOSED variable is a plain {@code uniform <T> name}
+     * set per-draw by the material.
+     */
     public String addField(String name, GlslType type) {
         fields.putIfAbsent(name, new Field(name, type));
-        return UBO_INSTANCE + "." + name;
+        return name;
     }
 
     /** Register a sampler (idempotent by name). Returns the sampler name. */
@@ -95,15 +100,15 @@ public final class MaterialUniformLayout {
         return calc.get();
     }
 
-    /** Emit the GLSL declaration of the UBO block + sampler uniforms (empty string if none). */
+    /**
+     * Emit the GLSL declaration of the material's individual field + sampler uniforms (empty string if none).
+     * 1.21.1 backport: each field is a plain {@code uniform <T> name;} (no {@code layout(std140) uniform} block —
+     * see {@link #addField}); a GRADIENT field is a {@code uniform KG_Gradient name;} struct uniform.
+     */
     public String declareGlsl() {
         StringBuilder sb = new StringBuilder();
-        if (!fields.isEmpty()) {
-            sb.append("layout(std140) uniform ").append(UBO_NAME).append(" {\n");
-            for (Field f : fields.values()) {
-                sb.append("    ").append(f.type().glsl()).append(' ').append(f.name()).append(";\n");
-            }
-            sb.append("} ").append(UBO_INSTANCE).append(";\n");
+        for (Field f : fields.values()) {
+            sb.append("uniform ").append(f.type().glsl()).append(' ').append(f.name()).append(";\n");
         }
         for (String s : samplers) {
             sb.append("uniform sampler2D ").append(s).append(";\n");
