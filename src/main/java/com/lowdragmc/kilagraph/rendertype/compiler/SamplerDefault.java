@@ -4,7 +4,6 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.Sampler2DValue;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerAddress;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerFilter;
-import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -16,10 +15,13 @@ import org.jetbrains.annotations.Nullable;
  */
 public record SamplerDefault(ResourceLocation texture, SamplerFilter filter, SamplerAddress address, boolean mipmap) {
 
+    /** {@code minecraft:missingno} — MC's missing-texture placeholder (the literal value of the client-only
+     *  {@code MissingTextureAtlasSprite.getLocation()}, inlined so the compiler/types layer stays headless-safe). */
+    private static final ResourceLocation MISSING_TEXTURE = ResourceLocation.withDefaultNamespace("missingno");
+
     /** The MC missing-texture placeholder with sane defaults — used for unconnected sampler fallbacks. */
     public static SamplerDefault missing() {
-        return new SamplerDefault(MissingTextureAtlasSprite.getLocation(),
-                SamplerFilter.NEAREST, SamplerAddress.CLAMP, false);
+        return new SamplerDefault(MISSING_TEXTURE, SamplerFilter.NEAREST, SamplerAddress.CLAMP, false);
     }
 
     /**

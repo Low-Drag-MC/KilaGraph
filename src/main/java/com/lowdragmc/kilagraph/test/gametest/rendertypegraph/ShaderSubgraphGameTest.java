@@ -1,6 +1,5 @@
 package com.lowdragmc.kilagraph.test.gametest.rendertypegraph;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
@@ -21,9 +20,10 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
+import com.lowdragmc.kilagraph.Kilagraph;
+import net.minecraft.gametest.framework.GameTest;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 
@@ -39,28 +39,10 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * selection→subgraph redirect produces a pure ShaderFunctionGraph (no stages), and stage affinity
  * propagates through inlining.
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class ShaderSubgraphGameTest {
-    private static final String INLINE = "rendertype_subgraph_inline";
-    private static final String REDIRECT = "rendertype_subgraph_redirect_type";
-    private static final String AFFINITY = "rendertype_subgraph_affinity";
-    private static final String RESOURCE_ROUNDTRIP = "rendertype_subgraph_resource_roundtrip";
 
     private ShaderSubgraphGameTest() {}
-
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(INLINE, ShaderSubgraphGameTest::subgraphInlinesIntoFragment);
-        KGGameTests.registerFunction(REDIRECT, ShaderSubgraphGameTest::selectionSubgraphIsShaderFunctionGraph);
-        KGGameTests.registerFunction(AFFINITY, ShaderSubgraphGameTest::subgraphStageAffinityPropagates);
-        KGGameTests.registerFunction(RESOURCE_ROUNDTRIP, ShaderSubgraphGameTest::functionGraphResourceRoundTrips);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, INLINE, KGGameTests.functionKey(INLINE), d);
-        KGGameTests.registerFunctionTest(event, REDIRECT, KGGameTests.functionKey(REDIRECT), d);
-        KGGameTests.registerFunctionTest(event, AFFINITY, KGGameTests.functionKey(AFFINITY), d);
-        KGGameTests.registerFunctionTest(event, RESOURCE_ROUNDTRIP, KGGameTests.functionKey(RESOURCE_ROUNDTRIP), d);
-    }
 
     private static NodeModel innerNode(CustomGraphModelImpl inner, Class<?> nodeClass) {
         AbstractNodeModel m = CustomGraphModelImpl.createNodeFromData(
@@ -74,6 +56,8 @@ public final class ShaderSubgraphGameTest {
      * RenderTypeGraph and wired into base color, is inlined: {@code cross(...)} appears in the fragment
      * GLSL and its result drives {@code kg_baseColor} — proving the READ-var binding + WRITE-var output.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void subgraphInlinesIntoFragment(GameTestHelper helper) {
         RenderTypeGraph outer = new RenderTypeGraph();
         CustomGraphModelImpl inner = outer.graphModel.createLocalSubgraphInstance(ShaderFunctionGraph.class);
@@ -119,6 +103,8 @@ public final class ShaderSubgraphGameTest {
      * The no-arg subgraph creation on a RenderTypeGraph (used by selection→subgraph) yields a pure
      * ShaderFunctionGraph with no fixed stage nodes / entity-shader init — not a cloned RenderTypeGraph.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void selectionSubgraphIsShaderFunctionGraph(GameTestHelper helper) {
         RenderTypeGraph outer = new RenderTypeGraph();
         CustomGraphModelImpl inner = outer.graphModel.createLocalSubgraphInstance();
@@ -137,6 +123,8 @@ public final class ShaderSubgraphGameTest {
      * embedded as a subgraph — the foundation for cross-graph reuse (drag a function asset into any
      * RenderTypeGraph as an external subgraph). The editor/import/dive-in UI itself is client-verified.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void functionGraphResourceRoundTrips(GameTestHelper helper) {
         // Author a function graph via the resource, exactly as a saved asset would be created.
         var resource = com.lowdragmc.kilagraph.editor.ShaderFunctionGraphResource.INSTANCE;
@@ -157,14 +145,10 @@ public final class ShaderSubgraphGameTest {
         authored.graphModel.createWire(outNode.getInputPort(), cross.getOutputsById().get("out"));
 
         // Serialize → deserialize (the resource save/load round-trip).
-        var output = net.minecraft.world.level.storage.TagValueOutput.createWithContext(
-                net.minecraft.util.ProblemReporter.Collector.DISCARDING, com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry());
-        authored.graphModel.serialize(output);
-        var tag = output.buildResult();
+        var tag = authored.graphModel.serializeNBT(com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry());
 
         ShaderFunctionGraph restored = resource.createGraph();
-        restored.graphModel.deserialize(net.minecraft.world.level.storage.TagValueInput.create(
-                net.minecraft.util.ProblemReporter.Collector.DISCARDING, com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry(), tag));
+        restored.graphModel.deserializeNBT(com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry(), tag);
 
         assertTrue(helper, "restored graph is a ShaderFunctionGraph", restored instanceof ShaderFunctionGraph);
         long varCount = restored.graphModel.getGraphVariableModels().stream().filter(java.util.Objects::nonNull).count();
@@ -200,6 +184,8 @@ public final class ShaderSubgraphGameTest {
     }
 
     /** A VERTEX_ONLY node inside a function subgraph, inlined into the fragment stage, is a stage error. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void subgraphStageAffinityPropagates(GameTestHelper helper) {
         RenderTypeGraph outer = new RenderTypeGraph();
         CustomGraphModelImpl inner = outer.graphModel.createLocalSubgraphInstance(ShaderFunctionGraph.class);

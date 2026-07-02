@@ -140,16 +140,8 @@ sourceSets.main.resources {
     srcDir 'src/generated/resources'
     exclude '.cache/'
 }
-// The rendertypegraph (shader) GameTests are pure compiler/GLSL-string tests (no GL) and CAN validate the
-// compiler port, but still use the 26.1 KGGameTests registration harness (KGGameTests/TestData/
-// TestEnvironmentDefinition) — they need the same @GameTestHolder/@GameTest migration the blueprint tests got,
-// plus reconciling a few obsolete UBO-era assertions. Excluded until then.
-sourceSets.main.java {
-    exclude 'com/lowdragmc/kilagraph/test/gametest/rendertypegraph/**'
-}
 sourceSets.main.kotlin {
     srcDir("src/main/java")
-    exclude 'com/lowdragmc/kilagraph/test/gametest/rendertypegraph/**'
 }
 
 // Run once to (re)generate the empty test structure NBT files:

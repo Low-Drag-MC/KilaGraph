@@ -1,6 +1,5 @@
 package com.lowdragmc.kilagraph.test.gametest.rendertypegraph;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
@@ -94,9 +93,10 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableScope;
 import net.minecraft.core.Holder;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
+import com.lowdragmc.kilagraph.Kilagraph;
+import net.minecraft.gametest.framework.GameTest;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
@@ -117,219 +117,34 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * <p>GPU-validity (driver compilation) is not asserted here — that is verified at runtime via
  * {@code GpuDevice.precompilePipeline} (requires a client). These tests pin the generated source.</p>
  */
+@GameTestHolder(Kilagraph.MODID)
 public final class ShaderCompilerGameTest {
-    private static final String DEDUP = "rendertype_compile_dedup";
-    private static final String EMISSION = "rendertype_compile_emission";
-    private static final String ALPHA_DISCARD = "rendertype_compile_alpha_discard";
-    private static final String CUSTOM_VARYING = "rendertype_compile_custom_varying";
-    private static final String FLOAT_BROADCAST = "rendertype_compile_float_broadcast";
-    private static final String VEC4_TO_VEC3_SWIZZLE = "rendertype_compile_vec4_to_vec3";
-    private static final String SAMPLER_NOT_HOISTED = "rendertype_compile_sampler_not_hoisted";
-    private static final String ENGINE_TIME = "rendertype_compile_engine_time";
-    private static final String NODE_PREVIEW = "rendertype_compile_node_preview";
-    private static final String STAGE_AFFINITY = "rendertype_compile_stage_affinity";
-    private static final String VAR_UNIFORM_VS_INLINE = "rendertype_compile_var_uniform_vs_inline";
-    private static final String VAR_SAMPLER = "rendertype_compile_var_sampler";
-    private static final String VAR_COLOR = "rendertype_compile_var_color";
-    private static final String MIX_LIGHT_DEFAULT = "rendertype_compile_mix_light_default";
-    private static final String UNIFORM_FIELD_MAP = "rendertype_compile_uniform_field_map";
-    private static final String MISSING_SAMPLER_FALLBACK = "rendertype_compile_missing_sampler";
-    private static final String TEXTURE_NODE = "rendertype_compile_texture_node";
-    private static final String OVERLAY_LIGHTMAP = "rendertype_compile_overlay_lightmap";
-    private static final String SAMPLER_VALUE_CODEC = "rendertype_compile_sampler_value_codec";
-    private static final String WIRE_PORTAL = "rendertype_compile_wire_portal";
-    private static final String MATH_NODES = "rendertype_compile_math_nodes";
-    private static final String VECTOR_NODES = "rendertype_compile_vector_nodes";
-    private static final String VERTEX_FORMAT_INPUTS = "rendertype_compile_vertex_format_inputs";
-    private static final String FRAGMENT_INPUTS = "rendertype_compile_fragment_inputs";
-    private static final String DYNAMIC_WIDTH = "rendertype_compile_dynamic_width";
-    private static final String MATRIX_NODES = "rendertype_compile_matrix_nodes";
-    private static final String DERIVATIVE_NODES = "rendertype_compile_derivative_nodes";
-    private static final String PREVIEW_VERTEX_ATTR = "rendertype_compile_preview_vertex_attr";
-    private static final String EXTRA_MATH_NODES = "rendertype_compile_extra_math_nodes";
-    private static final String TRANSFORM_NODE = "rendertype_compile_transform_node";
-    private static final String CAMERA_NODE = "rendertype_compile_camera_node";
-    private static final String EXP_LOG_BASE = "rendertype_compile_exp_log_base";
-    private static final String KG_TRANSFORMS_UBO = "rendertype_compile_kg_transforms_ubo";
-    private static final String WORLD_GRID = "rendertype_compile_world_grid";
-    private static final String PROCEDURAL_NODES = "rendertype_compile_procedural_nodes";
-    private static final String ARTISTIC_NODES = "rendertype_compile_artistic_nodes";
-    private static final String FRESNEL_DEFAULTS = "rendertype_compile_fresnel_defaults";
-    private static final String FOG_DISTANCE_VERTEX_ONLY = "rendertype_compile_fog_distance_vertex_only";
-    private static final String FOG_PARAM_DEFAULTS = "rendertype_compile_fog_param_defaults";
-    private static final String SPHERE_MASK_COORDS = "rendertype_compile_sphere_mask_coords";
-    private static final String CHANNEL_NODES = "rendertype_compile_channel_nodes";
-    private static final String UV_NODES = "rendertype_compile_uv_nodes";
-    private static final String UV_CHANNEL = "rendertype_compile_uv_channel";
-    private static final String UV_CHANNEL_CODEC = "rendertype_compile_uv_channel_codec";
-    private static final String UV_PREVIEW = "rendertype_compile_uv_preview";
-    private static final String SCENE_NODES = "rendertype_compile_scene_nodes";
-    private static final String SCENE_SAMPLER_DEFAULT = "rendertype_compile_scene_sampler_default";
-    private static final String SCREEN_POSITION_MODES = "rendertype_compile_screen_position_modes";
-    private static final String CAMERA_NEW_OUTPUTS = "rendertype_compile_camera_new_outputs";
-    private static final String SCENE_PREVIEW_UV = "rendertype_compile_scene_preview_uv";
-    private static final String SCREEN_POSITION_PREVIEW = "rendertype_compile_screen_position_preview";
-    private static final String SCREEN_POSITION_RAW_EYE = "rendertype_compile_screen_position_raw_eye";
-    private static final String PREVIEW_OPAQUE_ALPHA = "rendertype_compile_preview_opaque_alpha";
-    private static final String BRANCH_SELECT = "rendertype_compile_branch_select";
-    private static final String COMPARE_LOGIC = "rendertype_compile_compare_logic";
-    private static final String EXPRESSION_NODE = "rendertype_compile_expression_node";
-    private static final String EXPRESSION_VALIDATION = "rendertype_compile_expression_validation";
-    private static final String EXPORT_FUNCTION = "rendertype_compile_export_function";
-    private static final String BUILTIN_FRAG_KEYWORDS = "rendertype_compile_builtin_frag_keywords";
-    private static final String BUILTIN_VERTEX_IDS = "rendertype_compile_builtin_vertex_ids";
-    private static final String GRADIENT_NODES = "rendertype_compile_gradient_nodes";
-    private static final String GRADIENT_VARIABLE = "rendertype_compile_gradient_variable";
-    private static final String GRADIENT_VALUE_CODEC = "rendertype_compile_gradient_value_codec";
 
     private ShaderCompilerGameTest() {}
-
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(DEDUP, ShaderCompilerGameTest::sharedSubexpressionCompiledOnce);
-        KGGameTests.registerFunction(EMISSION, ShaderCompilerGameTest::emissionBlockAddsToBaseColor);
-        KGGameTests.registerFunction(ALPHA_DISCARD, ShaderCompilerGameTest::alphaDiscardEmitsDiscard);
-        KGGameTests.registerFunction(CUSTOM_VARYING, ShaderCompilerGameTest::customInterpolatorCrossesStages);
-        KGGameTests.registerFunction(FLOAT_BROADCAST, ShaderCompilerGameTest::floatBroadcastsToVec3);
-        KGGameTests.registerFunction(VEC4_TO_VEC3_SWIZZLE, ShaderCompilerGameTest::vec4SwizzlesToVec3);
-        KGGameTests.registerFunction(SAMPLER_NOT_HOISTED, ShaderCompilerGameTest::samplerIsNotHoisted);
-        KGGameTests.registerFunction(ENGINE_TIME, ShaderCompilerGameTest::timeNodeUsesEngineGlobals);
-        KGGameTests.registerFunction(NODE_PREVIEW, ShaderCompilerGameTest::previewCompilesPortSubgraph);
-        KGGameTests.registerFunction(STAGE_AFFINITY, ShaderCompilerGameTest::stageAffinityFlagsMisuse);
-        KGGameTests.registerFunction(VAR_UNIFORM_VS_INLINE, ShaderCompilerGameTest::variableScopeDrivesUniformVsInline);
-        KGGameTests.registerFunction(VAR_SAMPLER, ShaderCompilerGameTest::samplerVariableBecomesUniform);
-        KGGameTests.registerFunction(VAR_COLOR, ShaderCompilerGameTest::colorVariableCompilesToVec4Uniform);
-        KGGameTests.registerFunction(MIX_LIGHT_DEFAULT, ShaderCompilerGameTest::unconnectedVertexColorDefaultsToMixLight);
-        KGGameTests.registerFunction(UNIFORM_FIELD_MAP, ShaderCompilerGameTest::uniformFieldMappingExposesVariableNames);
-        KGGameTests.registerFunction(MISSING_SAMPLER_FALLBACK, ShaderCompilerGameTest::unconnectedSamplerFallsBackToMissing);
-        KGGameTests.registerFunction(TEXTURE_NODE, ShaderCompilerGameTest::textureNodeBecomesUniform);
-        KGGameTests.registerFunction(OVERLAY_LIGHTMAP, ShaderCompilerGameTest::overlayLightmapNodesFlagPipeline);
-        KGGameTests.registerFunction(SAMPLER_VALUE_CODEC, ShaderCompilerGameTest::sampler2DValueCodecRoundTrips);
-        KGGameTests.registerFunction(WIRE_PORTAL, ShaderCompilerGameTest::wirePortalRoutesConnection);
-        KGGameTests.registerFunction(MATH_NODES, ShaderCompilerGameTest::mathNodesEmitGlslCalls);
-        KGGameTests.registerFunction(VECTOR_NODES, ShaderCompilerGameTest::vectorNodesEmitGlslCalls);
-        KGGameTests.registerFunction(VERTEX_FORMAT_INPUTS, ShaderCompilerGameTest::vertexFormatInputsAreVertexOnly);
-        KGGameTests.registerFunction(FRAGMENT_INPUTS, ShaderCompilerGameTest::fragmentInputsEmitVaryings);
-        KGGameTests.registerFunction(DYNAMIC_WIDTH, ShaderCompilerGameTest::dynamicMathInfersWidth);
-        KGGameTests.registerFunction(MATRIX_NODES, ShaderCompilerGameTest::matrixNodesEmitGlsl);
-        KGGameTests.registerFunction(DERIVATIVE_NODES, ShaderCompilerGameTest::derivativeNodesEmitGlsl);
-        KGGameTests.registerFunction(PREVIEW_VERTEX_ATTR, ShaderCompilerGameTest::previewOfVertexAttributeHasNoStageError);
-        KGGameTests.registerFunction(EXTRA_MATH_NODES, ShaderCompilerGameTest::extraMathNodesEmitGlsl);
-        KGGameTests.registerFunction(TRANSFORM_NODE, ShaderCompilerGameTest::transformNodeUsesSpaceMatrices);
-        KGGameTests.registerFunction(CAMERA_NODE, ShaderCompilerGameTest::cameraNodeReadsGlobals);
-        KGGameTests.registerFunction(EXP_LOG_BASE, ShaderCompilerGameTest::expLogBaseOptionDrivesGlsl);
-        KGGameTests.registerFunction(KG_TRANSFORMS_UBO, ShaderCompilerGameTest::kgTransformsUboNodeExposesMatrices);
-        KGGameTests.registerFunction(WORLD_GRID, ShaderCompilerGameTest::worldGridTransformGraphCompiles);
-        KGGameTests.registerFunction(PROCEDURAL_NODES, ShaderCompilerGameTest::proceduralNodesEmitGlsl);
-        KGGameTests.registerFunction(ARTISTIC_NODES, ShaderCompilerGameTest::artisticNodesEmitGlsl);
-        KGGameTests.registerFunction(FRESNEL_DEFAULTS, ShaderCompilerGameTest::fresnelDefaultsToMeshNormalAndViewDir);
-        KGGameTests.registerFunction(FOG_DISTANCE_VERTEX_ONLY, ShaderCompilerGameTest::fogDistanceNodesAreVertexOnly);
-        KGGameTests.registerFunction(FOG_PARAM_DEFAULTS, ShaderCompilerGameTest::fogParamsDefaultToUboAndVaryings);
-        KGGameTests.registerFunction(SPHERE_MASK_COORDS, ShaderCompilerGameTest::sphereMaskCoordsDefaultToMeshPosition);
-        KGGameTests.registerFunction(CHANNEL_NODES, ShaderCompilerGameTest::channelNodesEmitGlsl);
-        KGGameTests.registerFunction(UV_NODES, ShaderCompilerGameTest::uvNodesEmitGlsl);
-        KGGameTests.registerFunction(UV_CHANNEL, ShaderCompilerGameTest::uvTypeResolvesChannel);
-        KGGameTests.registerFunction(UV_CHANNEL_CODEC, ShaderCompilerGameTest::uvChannelValueCodecRoundTrips);
-        KGGameTests.registerFunction(UV_PREVIEW, ShaderCompilerGameTest::uvPreviewSemantics);
-        KGGameTests.registerFunction(SCENE_NODES, ShaderCompilerGameTest::sceneNodesEmitGlsl);
-        KGGameTests.registerFunction(SCENE_SAMPLER_DEFAULT, ShaderCompilerGameTest::sceneSamplersHaveNoBakedDefault);
-        KGGameTests.registerFunction(SCREEN_POSITION_MODES, ShaderCompilerGameTest::screenPositionModesEmitGlsl);
-        KGGameTests.registerFunction(CAMERA_NEW_OUTPUTS, ShaderCompilerGameTest::cameraNodeExposesNewOutputs);
-        KGGameTests.registerFunction(SCENE_PREVIEW_UV, ShaderCompilerGameTest::scenePreviewMapsWholeCapture);
-        KGGameTests.registerFunction(SCREEN_POSITION_PREVIEW, ShaderCompilerGameTest::screenPositionPreviewMapsToMeshUv);
-        KGGameTests.registerFunction(SCREEN_POSITION_RAW_EYE, ShaderCompilerGameTest::screenPositionRawCarriesFragmentEyeDepth);
-        KGGameTests.registerFunction(PREVIEW_OPAQUE_ALPHA, ShaderCompilerGameTest::scalarPreviewForcesOpaqueAlpha);
-        KGGameTests.registerFunction(BRANCH_SELECT, ShaderCompilerGameTest::branchEmitsSelect);
-        KGGameTests.registerFunction(COMPARE_LOGIC, ShaderCompilerGameTest::compareLogicEmitGlsl);
-        KGGameTests.registerFunction(EXPRESSION_NODE, ShaderCompilerGameTest::expressionNodeEmitsFunctionAndCall);
-        KGGameTests.registerFunction(EXPRESSION_VALIDATION, ShaderCompilerGameTest::expressionNodeValidationFlagsBadNames);
-        KGGameTests.registerFunction(EXPORT_FUNCTION, ShaderCompilerGameTest::exportBuildsFunctionGraph);
-        KGGameTests.registerFunction(BUILTIN_FRAG_KEYWORDS, ShaderCompilerGameTest::builtinFragmentKeywordsEmitGlsl);
-        KGGameTests.registerFunction(BUILTIN_VERTEX_IDS, ShaderCompilerGameTest::vertexIdNodesAreVertexOnly);
-        KGGameTests.registerFunction(GRADIENT_NODES, ShaderCompilerGameTest::gradientNodesEmitGlsl);
-        KGGameTests.registerFunction(GRADIENT_VARIABLE, ShaderCompilerGameTest::gradientVariableBecomesUboStruct);
-        KGGameTests.registerFunction(GRADIENT_VALUE_CODEC, ShaderCompilerGameTest::gradientValueCodecRoundTrips);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, DEDUP, KGGameTests.functionKey(DEDUP), d);
-        KGGameTests.registerFunctionTest(event, EMISSION, KGGameTests.functionKey(EMISSION), d);
-        KGGameTests.registerFunctionTest(event, ALPHA_DISCARD, KGGameTests.functionKey(ALPHA_DISCARD), d);
-        KGGameTests.registerFunctionTest(event, CUSTOM_VARYING, KGGameTests.functionKey(CUSTOM_VARYING), d);
-        KGGameTests.registerFunctionTest(event, FLOAT_BROADCAST, KGGameTests.functionKey(FLOAT_BROADCAST), d);
-        KGGameTests.registerFunctionTest(event, VEC4_TO_VEC3_SWIZZLE, KGGameTests.functionKey(VEC4_TO_VEC3_SWIZZLE), d);
-        KGGameTests.registerFunctionTest(event, SAMPLER_NOT_HOISTED, KGGameTests.functionKey(SAMPLER_NOT_HOISTED), d);
-        KGGameTests.registerFunctionTest(event, ENGINE_TIME, KGGameTests.functionKey(ENGINE_TIME), d);
-        KGGameTests.registerFunctionTest(event, NODE_PREVIEW, KGGameTests.functionKey(NODE_PREVIEW), d);
-        KGGameTests.registerFunctionTest(event, STAGE_AFFINITY, KGGameTests.functionKey(STAGE_AFFINITY), d);
-        KGGameTests.registerFunctionTest(event, VAR_UNIFORM_VS_INLINE, KGGameTests.functionKey(VAR_UNIFORM_VS_INLINE), d);
-        KGGameTests.registerFunctionTest(event, VAR_SAMPLER, KGGameTests.functionKey(VAR_SAMPLER), d);
-        KGGameTests.registerFunctionTest(event, VAR_COLOR, KGGameTests.functionKey(VAR_COLOR), d);
-        KGGameTests.registerFunctionTest(event, MIX_LIGHT_DEFAULT, KGGameTests.functionKey(MIX_LIGHT_DEFAULT), d);
-        KGGameTests.registerFunctionTest(event, UNIFORM_FIELD_MAP, KGGameTests.functionKey(UNIFORM_FIELD_MAP), d);
-        KGGameTests.registerFunctionTest(event, MISSING_SAMPLER_FALLBACK, KGGameTests.functionKey(MISSING_SAMPLER_FALLBACK), d);
-        KGGameTests.registerFunctionTest(event, TEXTURE_NODE, KGGameTests.functionKey(TEXTURE_NODE), d);
-        KGGameTests.registerFunctionTest(event, OVERLAY_LIGHTMAP, KGGameTests.functionKey(OVERLAY_LIGHTMAP), d);
-        KGGameTests.registerFunctionTest(event, SAMPLER_VALUE_CODEC, KGGameTests.functionKey(SAMPLER_VALUE_CODEC), d);
-        KGGameTests.registerFunctionTest(event, WIRE_PORTAL, KGGameTests.functionKey(WIRE_PORTAL), d);
-        KGGameTests.registerFunctionTest(event, MATH_NODES, KGGameTests.functionKey(MATH_NODES), d);
-        KGGameTests.registerFunctionTest(event, VECTOR_NODES, KGGameTests.functionKey(VECTOR_NODES), d);
-        KGGameTests.registerFunctionTest(event, VERTEX_FORMAT_INPUTS, KGGameTests.functionKey(VERTEX_FORMAT_INPUTS), d);
-        KGGameTests.registerFunctionTest(event, FRAGMENT_INPUTS, KGGameTests.functionKey(FRAGMENT_INPUTS), d);
-        KGGameTests.registerFunctionTest(event, DYNAMIC_WIDTH, KGGameTests.functionKey(DYNAMIC_WIDTH), d);
-        KGGameTests.registerFunctionTest(event, MATRIX_NODES, KGGameTests.functionKey(MATRIX_NODES), d);
-        KGGameTests.registerFunctionTest(event, DERIVATIVE_NODES, KGGameTests.functionKey(DERIVATIVE_NODES), d);
-        KGGameTests.registerFunctionTest(event, PREVIEW_VERTEX_ATTR, KGGameTests.functionKey(PREVIEW_VERTEX_ATTR), d);
-        KGGameTests.registerFunctionTest(event, EXTRA_MATH_NODES, KGGameTests.functionKey(EXTRA_MATH_NODES), d);
-        KGGameTests.registerFunctionTest(event, TRANSFORM_NODE, KGGameTests.functionKey(TRANSFORM_NODE), d);
-        KGGameTests.registerFunctionTest(event, CAMERA_NODE, KGGameTests.functionKey(CAMERA_NODE), d);
-        KGGameTests.registerFunctionTest(event, EXP_LOG_BASE, KGGameTests.functionKey(EXP_LOG_BASE), d);
-        KGGameTests.registerFunctionTest(event, KG_TRANSFORMS_UBO, KGGameTests.functionKey(KG_TRANSFORMS_UBO), d);
-        KGGameTests.registerFunctionTest(event, WORLD_GRID, KGGameTests.functionKey(WORLD_GRID), d);
-        KGGameTests.registerFunctionTest(event, PROCEDURAL_NODES, KGGameTests.functionKey(PROCEDURAL_NODES), d);
-        KGGameTests.registerFunctionTest(event, ARTISTIC_NODES, KGGameTests.functionKey(ARTISTIC_NODES), d);
-        KGGameTests.registerFunctionTest(event, FRESNEL_DEFAULTS, KGGameTests.functionKey(FRESNEL_DEFAULTS), d);
-        KGGameTests.registerFunctionTest(event, FOG_DISTANCE_VERTEX_ONLY, KGGameTests.functionKey(FOG_DISTANCE_VERTEX_ONLY), d);
-        KGGameTests.registerFunctionTest(event, FOG_PARAM_DEFAULTS, KGGameTests.functionKey(FOG_PARAM_DEFAULTS), d);
-        KGGameTests.registerFunctionTest(event, SPHERE_MASK_COORDS, KGGameTests.functionKey(SPHERE_MASK_COORDS), d);
-        KGGameTests.registerFunctionTest(event, CHANNEL_NODES, KGGameTests.functionKey(CHANNEL_NODES), d);
-        KGGameTests.registerFunctionTest(event, UV_NODES, KGGameTests.functionKey(UV_NODES), d);
-        KGGameTests.registerFunctionTest(event, UV_CHANNEL, KGGameTests.functionKey(UV_CHANNEL), d);
-        KGGameTests.registerFunctionTest(event, UV_CHANNEL_CODEC, KGGameTests.functionKey(UV_CHANNEL_CODEC), d);
-        KGGameTests.registerFunctionTest(event, UV_PREVIEW, KGGameTests.functionKey(UV_PREVIEW), d);
-        KGGameTests.registerFunctionTest(event, SCENE_NODES, KGGameTests.functionKey(SCENE_NODES), d);
-        KGGameTests.registerFunctionTest(event, SCENE_SAMPLER_DEFAULT, KGGameTests.functionKey(SCENE_SAMPLER_DEFAULT), d);
-        KGGameTests.registerFunctionTest(event, SCREEN_POSITION_MODES, KGGameTests.functionKey(SCREEN_POSITION_MODES), d);
-        KGGameTests.registerFunctionTest(event, CAMERA_NEW_OUTPUTS, KGGameTests.functionKey(CAMERA_NEW_OUTPUTS), d);
-        KGGameTests.registerFunctionTest(event, SCENE_PREVIEW_UV, KGGameTests.functionKey(SCENE_PREVIEW_UV), d);
-        KGGameTests.registerFunctionTest(event, SCREEN_POSITION_PREVIEW, KGGameTests.functionKey(SCREEN_POSITION_PREVIEW), d);
-        KGGameTests.registerFunctionTest(event, SCREEN_POSITION_RAW_EYE, KGGameTests.functionKey(SCREEN_POSITION_RAW_EYE), d);
-        KGGameTests.registerFunctionTest(event, PREVIEW_OPAQUE_ALPHA, KGGameTests.functionKey(PREVIEW_OPAQUE_ALPHA), d);
-        KGGameTests.registerFunctionTest(event, BRANCH_SELECT, KGGameTests.functionKey(BRANCH_SELECT), d);
-        KGGameTests.registerFunctionTest(event, COMPARE_LOGIC, KGGameTests.functionKey(COMPARE_LOGIC), d);
-        KGGameTests.registerFunctionTest(event, EXPRESSION_NODE, KGGameTests.functionKey(EXPRESSION_NODE), d);
-        KGGameTests.registerFunctionTest(event, EXPRESSION_VALIDATION, KGGameTests.functionKey(EXPRESSION_VALIDATION), d);
-        KGGameTests.registerFunctionTest(event, EXPORT_FUNCTION, KGGameTests.functionKey(EXPORT_FUNCTION), d);
-        KGGameTests.registerFunctionTest(event, BUILTIN_FRAG_KEYWORDS, KGGameTests.functionKey(BUILTIN_FRAG_KEYWORDS), d);
-        KGGameTests.registerFunctionTest(event, BUILTIN_VERTEX_IDS, KGGameTests.functionKey(BUILTIN_VERTEX_IDS), d);
-        KGGameTests.registerFunctionTest(event, GRADIENT_NODES, KGGameTests.functionKey(GRADIENT_NODES), d);
-        KGGameTests.registerFunctionTest(event, GRADIENT_VARIABLE, KGGameTests.functionKey(GRADIENT_VARIABLE), d);
-        KGGameTests.registerFunctionTest(event, GRADIENT_VALUE_CODEC, KGGameTests.functionKey(GRADIENT_VALUE_CODEC), d);
-    }
 
     private static CompiledShaderGraph compile(RenderTypeGraph graph) {
         return new ShaderGraphCompiler(graph).compile();
     }
 
-    /** Whether the compiled graph registered the KG-managed UBO with the given block name. */
+    /** Whether the compiled graph uses the KG-managed uniforms that the given legacy block name covered.
+     *  (1.21.1 all-uniform backport: the old {@code KG_Transforms}/{@code KG_Globals} UBOs are now individual
+     *  {@code kg_*} uniforms — see {@code ShaderGraphCompiler.transformField}/{@code KGBuiltinUniforms}.) */
     private static boolean usesUniformBlock(CompiledShaderGraph compiled, String uboName) {
-        return compiled.uniformBlocks().stream().anyMatch(b -> b.uboName().equals(uboName));
+        var names = compiled.builtinUniforms().keySet();
+        return switch (uboName) {
+            case "KG_Transforms" -> names.contains("kg_IModelViewMat") || names.contains("kg_ViewMat")
+                    || names.contains("kg_IViewMat") || names.contains("kg_IProjMat");
+            case "KG_Globals" -> names.contains("kg_Time");
+            default -> false;
+        };
     }
 
     // ---- logic / branch / expression / export ------------------------------------------------
 
     /** A Branch node emits a ternary {@code (pred ? t : f)} select; the result width follows the wider
      *  operand (a vec3 {@code t} broadcasts the scalar {@code f} to vec3). The wired Compare emits its op. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void branchEmitsSelect(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
@@ -349,6 +164,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** Compare emits the chosen relational operator (→ bool); And/Or/Not emit {@code &&}/{@code ||}/{@code !}. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void compareLogicEmitGlsl(GameTestHelper helper) {
         String[][] ops = {{"equal", "=="}, {"notEqual", "!="}, {"less", "<"},
                 {"lessEqual", "<="}, {"greater", ">"}, {"greaterEqual", ">="}};
@@ -378,6 +195,8 @@ public final class ShaderCompilerGameTest {
 
     /** The Expression node defines its ports from the spec and compiles to a per-instance helper function
      *  ({@code void kg_expr_…(in …, out …)}) called with the input expressions + declared out temps. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void expressionNodeEmitsFunctionAndCall(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
@@ -404,6 +223,8 @@ public final class ShaderCompilerGameTest {
     /** {@link ExportShaderFunction#build} turns a selection into a standalone ShaderFunctionGraph with one
      *  READ (incoming) + one WRITE (outgoing) boundary variable and the copied nodes — without modifying the
      *  source graph. (The editor menu + resource persistence is client-verified.) */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void exportBuildsFunctionGraph(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel vecA = addRegisteredNode(graph, Vec3Node.class);
@@ -447,6 +268,8 @@ public final class ShaderCompilerGameTest {
 
     /** The Expression node reports a validation error for a reserved/illegal port name (so the editor's
      *  GraphLogger surfaces it next to the node), and none for a valid spec. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void expressionNodeValidationFlagsBadNames(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel exprModel = addNode(graph, ExpressionNode.class);
@@ -469,6 +292,8 @@ public final class ShaderCompilerGameTest {
     /** The fragment-stage built-in keyword nodes emit their GLSL special variables into the fsh with no
      *  stage errors: Front Facing → {@code gl_FrontFacing}, Fragment Coordinate → {@code gl_FragCoord},
      *  Primitive ID → {@code gl_PrimitiveID}. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void builtinFragmentKeywordsEmitGlsl(GameTestHelper helper) {
         // Fragment Coordinate (vec4) → emission color.
         RenderTypeGraph coordGraph = new RenderTypeGraph();
@@ -506,6 +331,8 @@ public final class ShaderCompilerGameTest {
     /** The vertex-stage ID nodes are VERTEX_ONLY: pulled straight into a fragment block they're a stage
      *  error, but routed through a vertex varying block (consumed in fragment) they compile and the vsh
      *  references {@code gl_VertexID} / {@code gl_InstanceID}. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void vertexIdNodesAreVertexOnly(GameTestHelper helper) {
         // Misuse: Vertex ID → fragment emission (fragment stage) → stage error.
         RenderTypeGraph bad = new RenderTypeGraph();
@@ -528,6 +355,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** A shared upstream node (the texture sample, apply_fog) must be emitted exactly once. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void sharedSubexpressionCompiledOnce(GameTestHelper helper) {
         CompiledShaderGraph compiled = compile(new RenderTypeGraph());
         String fsh = compiled.fragmentSource();
@@ -537,6 +366,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** An Emission block contributes an additive term to the base color. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void emissionBlockAddsToBaseColor(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -550,6 +381,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** An Alpha Discard block emits a clip against the cutoff. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void alphaDiscardEmitsDiscard(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -562,6 +395,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** A custom interpolator becomes a vsh {@code out} and a matching fsh {@code in} of the same name. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void customInterpolatorCrossesStages(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel vertex = graph.getVertexStageModel();
@@ -583,6 +418,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** A float wired into a vec3 input is broadcast via a vec3(...) constructor. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void floatBroadcastsToVec3(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -596,6 +433,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** A vec4 wired into a vec3 input is narrowed via a .xyz swizzle (default graph already does this). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void vec4SwizzlesToVec3(GameTestHelper helper) {
         // The default entity graph feeds a vec3 base color built from split floats; instead, wire a
         // vec4 (apply_fog output via a fresh sample) straight into a vec3 base-color block.
@@ -611,6 +450,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** Sampler-typed values are never copied into a temp (illegal in GLSL). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void samplerIsNotHoisted(GameTestHelper helper) {
         CompiledShaderGraph compiled = compile(new RenderTypeGraph());
         String fsh = compiled.fragmentSource();
@@ -622,6 +463,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** An unconnected sampler input falls back to a dedicated {@code kg_MissingSampler} (MC missing-texture). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void unconnectedSamplerFallsBackToMissing(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -641,6 +484,8 @@ public final class ShaderCompilerGameTest {
      * {@code uniform sampler2D kg_tex_*} (never a literal) whose baked {@link SamplerDefault} carries the
      * configured texture + sampler params (filter / address / mipmap).
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void textureNodeBecomesUniform(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -669,6 +514,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** Overlay/LightMap nodes emit Sampler1/Sampler2 and flag the pipeline (replacing Settings toggles). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void overlayLightmapNodesFlagPipeline(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -695,6 +542,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** The expanded {@link RenderTypeGraphTypes.Sampler2DValue} round-trips through its codec (so it persists). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void sampler2DValueCodecRoundTrips(GameTestHelper helper) {
         var value = new RenderTypeGraphTypes.Sampler2DValue("minecraft:textures/block/dirt.png",
                 RenderTypeGraphTypes.SamplerMode.ATLAS, RenderTypeGraphTypes.SamplerFilter.LINEAR,
@@ -711,6 +560,8 @@ public final class ShaderCompilerGameTest {
      * helper are declared (the struct before {@code main()}), a per-gradient builder is baked with the keys
      * (Fixed mode → {@code header.x == 1}), and the fragment samples it. GRADIENT is opaque (no temp copy).
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void gradientNodesEmitGlsl(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -739,6 +590,8 @@ public final class ShaderCompilerGameTest {
      * struct declared <b>before</b> the UBO block (it references the type) — and its default gradient is
      * std140-packed (header + 8 colour + 8 alpha vec4 = 68 floats) into {@code uniformDefaults}.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void gradientVariableBecomesUboStruct(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -756,8 +609,8 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph compiled = compile(graph);
         String fsh = compiled.fragmentSource();
         assertTrue(helper, "gradient var is a KG_Gradient UBO field", fsh.contains("KG_Gradient kg_Ramp;"));
-        assertTrue(helper, "struct declared before the KG_Material UBO",
-                fsh.indexOf("struct KG_Gradient") < fsh.indexOf("uniform KG_Material"));
+        assertTrue(helper, "struct declared before the gradient uniform that uses it",
+                fsh.indexOf("struct KG_Gradient") < fsh.indexOf("uniform KG_Gradient"));
         assertTrue(helper, "gradient uniform default recorded", compiled.uniformDefaults().containsKey("kg_Ramp"));
         assertEq(helper, "gradient packs 68 std140 floats", 68, compiled.uniformDefaults().get("kg_Ramp").length);
         assertTrue(helper, "variable name maps to its field for set-by-name",
@@ -766,6 +619,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** A {@link RenderTypeGraphTypes.GradientValue} round-trips through its codec (so a gradient persists). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void gradientValueCodecRoundTrips(GameTestHelper helper) {
         var value = new RenderTypeGraphTypes.GradientValue(
                 new GradientColor(0xFF112233, 0xFF445566, 0xFF778899), RenderTypeGraphTypes.BlendMode.FIXED);
@@ -782,6 +637,8 @@ public final class ShaderCompilerGameTest {
      * resolve the portal (entry↔exit), not stop at the portal node. Without the fix the consumer would
      * read 0 (the portal node isn't a ShaderNode).
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void wirePortalRoutesConnection(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -802,6 +659,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** A Time node pulls from the engine-globals block (KG_Globals.Time), updated by us each frame. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void timeNodeUsesEngineGlobals(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -813,11 +672,10 @@ public final class ShaderCompilerGameTest {
         String fsh = compiled.fragmentSource();
 
         assertTrue(helper, "graph uses engine globals", usesUniformBlock(compiled, "KG_Globals"));
-        assertTrue(helper, "fsh declares KG_Globals block",
-                fsh.contains("layout(std140) uniform "
-                        + com.lowdragmc.kilagraph.rendertype.runtime.KGEngineUniforms.UBO_NAME));
-        assertTrue(helper, "fsh declares Time member", fsh.contains("float Time;"));
-        assertTrue(helper, "fsh references kg_globals.Time", fsh.contains("kg_globals.Time"));
+        assertTrue(helper, "fsh declares the kg_Time builtin uniform", fsh.contains("uniform float kg_Time"));
+        // (1.21.1 all-uniform backport: the Time node reads the individual kg_Time uniform directly — there is no
+        // KG_Globals UBO struct/member, so the old "float Time;" / "kg_globals.Time" assertions are dropped.)
+        assertTrue(helper, "fsh uses kg_Time", fsh.contains("kg_Time"));
         helper.succeed();
     }
 
@@ -825,6 +683,8 @@ public final class ShaderCompilerGameTest {
      * compilePreview emits a flat-quad preview shader for an arbitrary output port: mesh uv becomes
      * the quad's {@code vUv}, the subgraph is folded in, and the port value drives {@code fragColor}.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void previewCompilesPortSubgraph(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel uv = addNode(graph, UVNode.class);
@@ -860,6 +720,8 @@ public final class ShaderCompilerGameTest {
      * A VERTEX_ONLY node (Normal) pulled into the fragment stage is flagged as a stage error; the same
      * node feeding a vertex varying block is fine.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void stageAffinityFlagsMisuse(GameTestHelper helper) {
         // Misuse: Normal -> fragment base color (fragment stage) → error.
         RenderTypeGraph bad = new RenderTypeGraph();
@@ -894,6 +756,8 @@ public final class ShaderCompilerGameTest {
      * uniform field (with its declared default baked into {@code uniformDefaults}); a LOCAL one is
      * inlined as a literal (no uniform field).
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void variableScopeDrivesUniformVsInline(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -919,9 +783,7 @@ public final class ShaderCompilerGameTest {
         String fsh = compiled.fragmentSource();
 
         // EXPOSED -> uniform field kg_Tint in KG_Material, with the default baked in.
-        assertTrue(helper, "exposed var declared in KG_Material",
-                fsh.contains("layout(std140) uniform "
-                        + com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout.UBO_NAME));
+        assertTrue(helper, "exposed var declared as an individual uniform", fsh.contains("uniform float kg_Tint"));
         assertTrue(helper, "exposed float uniform field present", fsh.contains("float kg_Tint;"));
         assertTrue(helper, "layout has exactly the one exposed field", compiled.layout().fields().size() == 1);
         assertEq(helper, "exposed field name", "kg_Tint", compiled.layout().fields().getFirst().name());
@@ -936,6 +798,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** A Sampler2D variable is ALWAYS a uniform sampler (opaque type), regardless of scope. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void samplerVariableBecomesUniform(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -966,6 +830,8 @@ public final class ShaderCompilerGameTest {
      * an ARGB color-picker but compiles to a {@code vec4} (EXPOSED → KG_Material uniform), with the
      * ARGB default unpacked into rgba components.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void colorVariableCompilesToVec4Uniform(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1001,6 +867,8 @@ public final class ShaderCompilerGameTest {
      * callers knowing the mangled {@code kg_*} identifiers. EXPOSED scalar/vec/color vars land in
      * {@code uniformFields} (name + GlslType); Sampler2D vars land in {@code variableSamplers}.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void uniformFieldMappingExposesVariableNames(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1060,6 +928,8 @@ public final class ShaderCompilerGameTest {
      * {@code ctx.litVertexColor()} to vanilla per-vertex diffuse lighting ({@code minecraft_mix_light}),
      * importing {@code minecraft:light.glsl} — the same default the old vertex Color block carried.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void unconnectedVertexColorDefaultsToMixLight(GameTestHelper helper) {
         CompiledShaderGraph compiled = compile(new RenderTypeGraph());
         String vsh = compiled.vertexSource();
@@ -1072,6 +942,8 @@ public final class ShaderCompilerGameTest {
      * A chain of scalar math nodes (Abs→Sin→Add(+Length)→Min→Lerp→Pow→Clamp→alpha) compiles each to
      * its GLSL builtin / operator. Confirms the unary/binary/ternary node families wire and emit.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void mathNodesEmitGlslCalls(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1107,6 +979,8 @@ public final class ShaderCompilerGameTest {
      * vec3 produces a {@code vec3} result (the float is broadcast), while two floats keep a {@code float}
      * result. Confirms the compile-time width inference + single-evaluation hoist.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void dynamicMathInfersWidth(GameTestHelper helper) {
         // float (Sin output) × vec3 (Vec3 node) -> the Multiply result is hoisted as a vec3 temp.
         RenderTypeGraph graph = new RenderTypeGraph();
@@ -1133,6 +1007,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** Construct→Transform→Split of a mat4 emits {@code mat4(}, a {@code m * v} transform, and column reads. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void matrixNodesEmitGlsl(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1156,6 +1032,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** A derivative node compiles to its GLSL builtin and, in the fragment stage, raises no stage error. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void derivativeNodesEmitGlsl(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1176,6 +1054,8 @@ public final class ShaderCompilerGameTest {
      * error (a preview is a single fragment quad), and the attribute resolves to a fragment-safe default
      * — so the thumbnail compiles instead of going blank. Regression for the preview-recompile bug.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void previewOfVertexAttributeHasNoStageError(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel attr = addNode(graph, VertexAttributeInputNode.class); // default element: position (VERTEX_ONLY)
@@ -1191,6 +1071,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** The newly added Unity math nodes (Posterize/Sphere Mask/wave/Rejection) emit their GLSL formulas. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void extraMathNodesEmitGlsl(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1217,6 +1099,8 @@ public final class ShaderCompilerGameTest {
      * and references the world-space matrices (ModelViewMat in the vsh path, ViewMat/CameraPos from our
      * block) — confirming the precomputed-matrix UBO is wired end to end.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void transformNodeUsesSpaceMatrices(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1229,14 +1113,14 @@ public final class ShaderCompilerGameTest {
         assertFalse(helper, "transform graph has no stage errors", compiled.hasStageErrors());
         assertTrue(helper, "graph flags usesTransforms", usesUniformBlock(compiled, "KG_Transforms"));
         String fsh = compiled.fragmentSource();
-        assertTrue(helper, "fsh declares KG_Transforms", fsh.contains("uniform KG_Transforms"));
+        assertTrue(helper, "fsh declares KG_Transforms", fsh.contains("uniform mat4 kg_"));
         assertTrue(helper, "fsh references ModelViewMat (object->view)", fsh.contains("ModelViewMat"));
         // object->world = ModelViewMat (to view) then IViewMat + camera position (view to absolute world);
         // the camera position comes from MC's globals.glsl (precision-split), not our KG block.
-        assertTrue(helper, "fsh references the inverse camera view matrix", fsh.contains("kg_transforms.IViewMat"));
+        assertTrue(helper, "fsh references the inverse camera view matrix", fsh.contains("kg_IViewMat"));
         assertTrue(helper, "fsh reads the camera position from globals", fsh.contains("CameraBlockPos"));
 
-        // clip→view uses the precomputed inverse projection (kg_transforms.IProjMat), not a per-pixel inverse.
+        // clip→view uses the precomputed inverse projection (kg_IProjMat), not a per-pixel inverse.
         RenderTypeGraph clipGraph = new RenderTypeGraph();
         NodeModel clipFrag = clipGraph.getFragmentStageModel();
         NodeModel clipT = addNode(clipGraph, com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode.class);
@@ -1245,7 +1129,7 @@ public final class ShaderCompilerGameTest {
         NodeModel clipEmit = addBlock(clipGraph, clipFrag, FragmentEmissionBlock.class);
         wire(clipGraph, clipEmit.getInputsById().get("color"), clipT.getOutputsById().get("out"));
         String clipFsh = compile(clipGraph).fragmentSource();
-        assertTrue(helper, "clip source uses precomputed IProjMat", clipFsh.contains("kg_transforms.IProjMat"));
+        assertTrue(helper, "clip source uses precomputed IProjMat", clipFsh.contains("kg_IProjMat"));
         assertFalse(helper, "no per-pixel inverse(ProjMat)", clipFsh.contains("inverse(ProjMat)"));
 
         // clip→world (position) reconstructs a world position from an NDC/depth sample: the inverse
@@ -1259,14 +1143,16 @@ public final class ShaderCompilerGameTest {
         NodeModel cwEmit = addBlock(clipWorldGraph, cwFrag, FragmentEmissionBlock.class);
         wire(clipWorldGraph, cwEmit.getInputsById().get("color"), cwT.getOutputsById().get("out"));
         String cwFsh = compile(clipWorldGraph).fragmentSource();
-        assertTrue(helper, "clip→world inverse-projects via IProjMat", cwFsh.contains("kg_transforms.IProjMat"));
+        assertTrue(helper, "clip→world inverse-projects via IProjMat", cwFsh.contains("kg_IProjMat"));
         assertTrue(helper, "clip→world does the perspective divide", cwFsh.contains(".xyz / ") && cwFsh.contains(".w"));
-        assertTrue(helper, "clip→world un-rotates via IViewMat", cwFsh.contains("kg_transforms.IViewMat"));
+        assertTrue(helper, "clip→world un-rotates via IViewMat", cwFsh.contains("kg_IViewMat"));
         assertTrue(helper, "clip→world adds the camera position", cwFsh.contains("CameraBlockPos"));
         helper.succeed();
     }
 
     /** The merged Exponential/Log nodes pick their GLSL variant from a {@code base} option dropdown. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void expLogBaseOptionDrivesGlsl(GameTestHelper helper) {
         // Default Exponential = exp; switching base to 2 = exp2.
         assertTrue(helper, "default exp emits exp(", expFsh(null).contains("exp("));
@@ -1303,6 +1189,8 @@ public final class ShaderCompilerGameTest {
      * VERTEX_ONLY but crosses to fragment via the varying) and reflects the world matrices, so a client
      * launch isn't wasted on a broken graph.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void worldGridTransformGraphCompiles(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel vertexStage = graph.getVertexStageModel();
@@ -1321,7 +1209,7 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph compiled = compile(graph);
         assertFalse(helper, "world-grid graph has no stage errors", compiled.hasStageErrors());
         assertTrue(helper, "world-grid graph flags usesTransforms", usesUniformBlock(compiled, "KG_Transforms"));
-        assertTrue(helper, "vsh transforms to world via IViewMat", compiled.vertexSource().contains("kg_transforms.IViewMat"));
+        assertTrue(helper, "vsh transforms to world via IViewMat", compiled.vertexSource().contains("kg_IViewMat"));
         assertTrue(helper, "fsh fracts the interpolated world position", compiled.fragmentSource().contains("fract("));
         helper.succeed();
     }
@@ -1333,6 +1221,8 @@ public final class ShaderCompilerGameTest {
      * screen-space derivatives ({@code dFdx}). A per-node preview of a fragment-only shape also compiles
      * (its helper-less {@code fwidth} field) and a noise preview carries its helper function.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void proceduralNodesEmitGlsl(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1420,6 +1310,8 @@ public final class ShaderCompilerGameTest {
      * Also checks the shared HSV helper is name-deduped (Hue + Colorspace both register {@code kg_rgb2hsv}
      * → one definition) and that the Blend mode dropdown drives the emitted formula.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void artisticNodesEmitGlsl(GameTestHelper helper) {
         String pkg = "com.lowdragmc.kilagraph.rendertype.nodes.artistic.";
         RenderTypeGraph graph = new RenderTypeGraph();
@@ -1501,6 +1393,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** The Camera node reads the Globals block (camera world position + screen size). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void cameraNodeReadsGlobals(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1517,6 +1411,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** The KG_Transforms UBO node exposes our precomputed space matrices (flags + declares the block). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void kgTransformsUboNodeExposesMatrices(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel ubo = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.transform.KGTransformsUboNode.class);
@@ -1530,12 +1426,14 @@ public final class ShaderCompilerGameTest {
         assertFalse(helper, "KG transforms UBO graph has no stage errors", compiled.hasStageErrors());
         assertTrue(helper, "graph flags usesTransforms", usesUniformBlock(compiled, "KG_Transforms"));
         String fsh = compiled.fragmentSource();
-        assertTrue(helper, "fsh declares KG_Transforms", fsh.contains("uniform KG_Transforms"));
-        assertTrue(helper, "fsh references kg_transforms.ViewMat", fsh.contains("kg_transforms.ViewMat"));
+        assertTrue(helper, "fsh declares KG_Transforms", fsh.contains("uniform mat4 kg_"));
+        assertTrue(helper, "fsh references kg_ViewMat", fsh.contains("kg_ViewMat"));
         helper.succeed();
     }
 
     /** Vector construct (Vec2/Vec4) and vec3 ops (Cross/Normalize/Dot) compile to their GLSL builtins. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void vectorNodesEmitGlslCalls(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1572,9 +1470,11 @@ public final class ShaderCompilerGameTest {
     /**
      * Fresnel's {@code normal}/{@code viewDir} ports have no configurator: left unconnected they fall back
      * to the interpolated world-space mesh normal / view direction. The vsh declares + writes both varyings
-     * (object→world via ModelViewMat + kg_transforms.IViewMat), the fsh reads them, and the graph registers
+     * (object→world via ModelViewMat + kg_IViewMat), the fsh reads them, and the graph registers
      * the KG_Transforms block.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void fresnelDefaultsToMeshNormalAndViewDir(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fresnel = addNode(graph, FresnelNode.class); // normal/viewDir intentionally unconnected
@@ -1588,7 +1488,7 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "vsh declares kg_worldNormal out", vsh.contains("out vec3 kg_worldNormal;"));
         assertTrue(helper, "vsh declares kg_worldViewDir out", vsh.contains("out vec3 kg_worldViewDir;"));
         assertTrue(helper, "world normal uses ModelViewMat", vsh.contains("mat3(ModelViewMat)"));
-        assertTrue(helper, "defaults rotate to world via IViewMat", vsh.contains("kg_transforms.IViewMat"));
+        assertTrue(helper, "defaults rotate to world via IViewMat", vsh.contains("kg_IViewMat"));
         assertTrue(helper, "fsh reads kg_worldNormal in", fsh.contains("in vec3 kg_worldNormal;"));
         assertTrue(helper, "fsh reads kg_worldViewDir in", fsh.contains("in vec3 kg_worldViewDir;"));
         assertTrue(helper, "fsh emits the fresnel pow", fsh.contains("pow(1.0 - clamp(dot("));
@@ -1610,6 +1510,8 @@ public final class ShaderCompilerGameTest {
      * Fog distance nodes are VERTEX_ONLY: pulling one into a fragment block is a stage error, but feeding a
      * vsh varying block works and an unconnected {@code pos} defaults to the model-space vertex position.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void fogDistanceNodesAreVertexOnly(GameTestHelper helper) {
         // (a) into a fragment block → stage error keyed to the fog node.
         RenderTypeGraph badGraph = new RenderTypeGraph();
@@ -1628,8 +1530,8 @@ public final class ShaderCompilerGameTest {
         wire(okGraph, varying.getInputsById().get("value"), fogOk.getOutputsById().get("out"));
         CompiledShaderGraph okCompiled = compile(okGraph);
         assertFalse(helper, "fog distance feeding a vsh block is legal", okCompiled.hasStageErrors());
-        assertTrue(helper, "pos defaults to fog_spherical_distance of the model position",
-                okCompiled.vertexSource().contains("fog_spherical_distance((Position + ModelOffset))"));
+        assertTrue(helper, "vsh computes a fog distance of the model position",
+                okCompiled.vertexSource().contains("fog_distance((Position + ModelOffset), 0)"));
         helper.succeed();
     }
 
@@ -1637,6 +1539,8 @@ public final class ShaderCompilerGameTest {
      * ApplyFog / TotalFogValue parameters left unconnected fall back to the Fog UBO fields + the fog-distance
      * varyings, so the node fogs with the current scene settings out of the box.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void fogParamsDefaultToUboAndVaryings(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
@@ -1651,8 +1555,8 @@ public final class ShaderCompilerGameTest {
             assertTrue(helper, "fsh references " + field, fsh.contains(field));
         }
         assertTrue(helper, "fsh reads the spherical distance varying", fsh.contains("in float sphericalVertexDistance;"));
-        assertTrue(helper, "vsh writes the spherical distance default",
-                compiled.vertexSource().contains("fog_spherical_distance((Position + ModelOffset))"));
+        assertTrue(helper, "vsh writes the spherical distance default (of the model position)",
+                compiled.vertexSource().contains("fog_distance((Position + ModelOffset), 0)"));
 
         // TotalFogValue: same field/varying defaults (float output → alpha).
         RenderTypeGraph tot = new RenderTypeGraph();
@@ -1668,6 +1572,8 @@ public final class ShaderCompilerGameTest {
 
     /** SphereMask's coords port has no configurator: unconnected it defaults to the interpolated mesh
      *  model-space position (kg_modelPos varying). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void sphereMaskCoordsDefaultToMeshPosition(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel alpha = addBlock(graph, graph.getFragmentStageModel(), FragmentAlphaBlock.class);
@@ -1685,6 +1591,8 @@ public final class ShaderCompilerGameTest {
      * Channel nodes: Combine assembles R/G/B/A into vectors, Swizzle remaps channels (GLSL swizzle), Flip
      * mirrors selected channels (Unity's {@code (flip*-2+1)*in+flip}), Split breaks a vector into floats.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void channelNodesEmitGlsl(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1732,6 +1640,8 @@ public final class ShaderCompilerGameTest {
      * UV nodes: the 6 pure-uv transforms (chained, each unconnected uv auto-resolving to the mesh uv) +
      * Triplanar. Asserts their distinctive GLSL appears and there are no stage errors.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void uvNodesEmitGlsl(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1772,6 +1682,8 @@ public final class ShaderCompilerGameTest {
      * {@code uv0} varying from the {@code UV0} attribute; UV1 writes {@code uv1} from {@code vec2(UV1)}; and
      * when the chosen channel's attribute is absent from the format it falls back to UV0.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void uvTypeResolvesChannel(GameTestHelper helper) {
         // Default (UV0): the ENTITY format has UV0 → uv0 = UV0.
         RenderTypeGraph g0 = new RenderTypeGraph();
@@ -1806,6 +1718,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** The UV channel value round-trips through its codec (registered so it survives graph save). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void uvChannelValueCodecRoundTrips(GameTestHelper helper) {
         var value = RenderTypeGraphTypes.UvChannel.UV2;
         var encoded = RenderTypeGraphTypes.UV_CODEC.encodeStart(NbtOps.INSTANCE, value).result().orElse(null);
@@ -1820,6 +1734,8 @@ public final class ShaderCompilerGameTest {
      * Asserts the captured-scene samplers + their flags, the gl_FragCoord-derived UV, and that Linear01/Eye
      * reconstruct linear depth via the inverse-projection helper.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void sceneNodesEmitGlsl(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -1869,6 +1785,8 @@ public final class ShaderCompilerGameTest {
      * The captured scene samplers are declared in the layout but carry <b>no</b> baked default texture (unlike
      * a Sampler2D / the missing-texture fallback) — the runtime binds them live from the capture manager.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void sceneSamplersHaveNoBakedDefault(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel sceneColor = addNode(graph, SceneColorNode.class);
@@ -1882,6 +1800,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** Each Screen Position mode emits its distinctive GLSL formula. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void screenPositionModesEmitGlsl(GameTestHelper helper) {
         assertTrue(helper, "pixel mode scales the screen uv to pixels", screenPosFsh("pixel").contains("* ScreenSize, 0.0, 0.0)"));
         assertTrue(helper, "center mode remaps to -1..1", screenPosFsh("center").contains("* 2.0 - 1.0"));
@@ -1898,6 +1818,8 @@ public final class ShaderCompilerGameTest {
      * Scene Depth "eye" (kg_eye_depth + IProjMat), so {@code SceneDepth[eye] - raw.w} cancels the camera —
      * a camera-independent depth fade. Regression for the old {@code w=1.0} stub.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void screenPositionRawCarriesFragmentEyeDepth(GameTestHelper helper) {
         String fsh = screenPosFsh("raw");
         assertTrue(helper, "raw reconstructs eye depth from gl_FragCoord.z", fsh.contains("kg_eye_depth(gl_FragCoord.z"));
@@ -1913,6 +1835,8 @@ public final class ShaderCompilerGameTest {
      * coordinates would collapse center/tiled/pixel to a near-constant corner. In-world it keeps
      * gl_FragCoord screen-space.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void screenPositionPreviewMapsToMeshUv(GameTestHelper helper) {
         RenderTypeGraph g = new RenderTypeGraph();
         NodeModel sp = addNode(g, ScreenPositionNode.class); // default mode
@@ -1936,6 +1860,8 @@ public final class ShaderCompilerGameTest {
      * preview colour is {@code vec4(<value>.rgb, 1.0)}, never the {@code vec4(f)} broadcast that aliases
      * alpha to the value.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void scalarPreviewForcesOpaqueAlpha(GameTestHelper helper) {
         RenderTypeGraph g = new RenderTypeGraph();
         NodeModel add = addNode(g, AddNode.class); // scalar (dynamic float) output
@@ -1962,6 +1888,8 @@ public final class ShaderCompilerGameTest {
      * gl_FragCoord screen-space for in-world rendering — so a preview shows the entire scene, not the panel's
      * screen sub-rect.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void scenePreviewMapsWholeCapture(GameTestHelper helper) {
         // Node thumbnail (compilePreview): screen default becomes the quad uv, not gl_FragCoord.
         RenderTypeGraph g = new RenderTypeGraph();
@@ -1986,6 +1914,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** The extended Camera node exposes Direction (IViewMat), Near/Far (inverse-projection) and Orthographic. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void cameraNodeExposesNewOutputs(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel camera = addNode(graph, CameraNode.class);
@@ -2015,6 +1945,8 @@ public final class ShaderCompilerGameTest {
      * through a varying block by a fixed value previews that fixed value downstream (not the quad uv) — the
      * varying boundary reuses the block's own preview logic.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void uvPreviewSemantics(GameTestHelper helper) {
         // (A) UV node channel previews.
         RenderTypeGraph g0 = new RenderTypeGraph();
@@ -2047,6 +1979,8 @@ public final class ShaderCompilerGameTest {
     }
 
     /** A VertexFormat input (raw vsh attribute) is VERTEX_ONLY: pulling it into fragment is a stage error. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void vertexFormatInputsAreVertexOnly(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel baseColor = addBlock(graph, graph.getFragmentStageModel(), FragmentBaseColorBlock.class);
@@ -2064,6 +1998,8 @@ public final class ShaderCompilerGameTest {
      * A standalone FragmentInput node reads a fixed interpolated varying, ensuring the vsh declares and
      * writes it with the block's default (no vertex block placed). uv0 → UV0; vertexColor → light mix.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void fragmentInputsEmitVaryings(GameTestHelper helper) {
         // TexCoord input → base color: uv0 varying with UV0 default, no kg_uv anywhere.
         RenderTypeGraph uvGraph = new RenderTypeGraph();

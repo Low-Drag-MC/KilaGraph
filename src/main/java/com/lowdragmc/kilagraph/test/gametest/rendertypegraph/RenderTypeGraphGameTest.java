@@ -1,6 +1,5 @@
 package com.lowdragmc.kilagraph.test.gametest.rendertypegraph;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
 import com.lowdragmc.kilagraph.editor.RenderTypeGraphResource;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
@@ -51,9 +50,10 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
+import com.lowdragmc.kilagraph.Kilagraph;
+import net.minecraft.gametest.framework.GameTest;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import java.util.List;
 
@@ -65,109 +65,13 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertFals
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertTrue;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
+@GameTestHolder(Kilagraph.MODID)
 public final class RenderTypeGraphGameTest {
-    private static final String RESOURCE = "rendertype_resource";
-    private static final String SUPPORTED_TYPES = "rendertype_supported_types";
-    private static final String SUPPORTED_NODES = "rendertype_supported_nodes";
-    private static final String GRAPH_SETTINGS = "rendertype_graph_settings";
-    private static final String STAGE_CONTEXTS = "rendertype_stage_contexts";
-    private static final String STAGE_PORTS = "rendertype_stage_ports";
-    private static final String FIXED_STAGE_DELETE_POLICY = "rendertype_fixed_stage_delete_policy";
-    private static final String RESOURCE_SETTINGS_ROUND_TRIP = "rendertype_resource_settings_round_trip";
-    private static final String SETTINGS_TOOL_WRITES_GRAPH = "rendertype_settings_tool_writes_graph";
-    private static final String DEFAULT_ENTITY_SHADER_GRAPH = "rendertype_default_entity_shader_graph";
-    private static final String SHADER_VALUE_ASSIGNABILITY = "rendertype_shader_value_assignability";
-    private static final String COMPILE_DEFAULT_ENTITY = "rendertype_compile_default_entity";
-    private static final String COMPILE_COMPOSED_FORMAT = "rendertype_compile_composed_format";
-    private static final String VERTEX_FORMAT_VALIDATION = "rendertype_vertex_format_validation";
-    private static final String VERTEX_ELEMENT_FALLBACK = "rendertype_vertex_element_fallback";
-    private static final String PREVIEW_GEOMETRY = "rendertype_preview_geometry";
-    private static final String PREVIEW_TESSELLATOR = "rendertype_preview_tessellator";
-    private static final String CHANGE_VERSION = "rendertype_change_version";
-    private static final String UNDO_ROUND_TRIP = "rendertype_undo_round_trip";
-    private static final String PREVIEW_SHAPE_PERSISTENCE = "rendertype_preview_shape_persistence";
-    private static final String STAGE_AFFINITY_VALIDATION = "rendertype_stage_affinity_validation";
 
     private RenderTypeGraphGameTest() {}
 
-    public static void registerFunctions() {
-        KGGameTests.registerFunction(RESOURCE, RenderTypeGraphGameTest::resourceCreatesGraph);
-        KGGameTests.registerFunction(SUPPORTED_TYPES, RenderTypeGraphGameTest::supportedTypesIncludeRenderTypeContracts);
-        KGGameTests.registerFunction(SUPPORTED_NODES, RenderTypeGraphGameTest::supportedNodesIncludeBuiltins);
-        KGGameTests.registerFunction(GRAPH_SETTINGS, RenderTypeGraphGameTest::graphCarriesRenderTypeSettings);
-        KGGameTests.registerFunction(STAGE_CONTEXTS, RenderTypeGraphGameTest::stageContextsAcceptExpectedBlocks);
-        KGGameTests.registerFunction(STAGE_PORTS, RenderTypeGraphGameTest::stageNodesExposePipelinePorts);
-        KGGameTests.registerFunction(FIXED_STAGE_DELETE_POLICY, RenderTypeGraphGameTest::fixedStageModelsCannotBeDeleted);
-        KGGameTests.registerFunction(RESOURCE_SETTINGS_ROUND_TRIP,
-                RenderTypeGraphGameTest::resourcePersistsRenderTypeSettings);
-        KGGameTests.registerFunction(SETTINGS_TOOL_WRITES_GRAPH,
-                RenderTypeGraphGameTest::settingsToolWritesLoadedGraph);
-        KGGameTests.registerFunction(DEFAULT_ENTITY_SHADER_GRAPH,
-                RenderTypeGraphGameTest::newGraphContainsDefaultEntityShader);
-        KGGameTests.registerFunction(SHADER_VALUE_ASSIGNABILITY,
-                RenderTypeGraphGameTest::shaderVectorValuesAreWireCompatible);
-        KGGameTests.registerFunction(COMPILE_DEFAULT_ENTITY,
-                RenderTypeGraphGameTest::compileDefaultEntityShader);
-        KGGameTests.registerFunction(COMPILE_COMPOSED_FORMAT,
-                RenderTypeGraphGameTest::compileRespectsComposedVertexFormat);
-        KGGameTests.registerFunction(VERTEX_FORMAT_VALIDATION,
-                RenderTypeGraphGameTest::vertexFormatValidationFlagsMissingElement);
-        KGGameTests.registerFunction(VERTEX_ELEMENT_FALLBACK,
-                RenderTypeGraphGameTest::vertexElementDefaultFallsBackAndWarns);
-        KGGameTests.registerFunction(PREVIEW_GEOMETRY,
-                RenderTypeGraphGameTest::previewContentsBuildGeometry);
-        KGGameTests.registerFunction(PREVIEW_TESSELLATOR,
-                RenderTypeGraphGameTest::previewTessellatorMatchesMode);
-        KGGameTests.registerFunction(CHANGE_VERSION,
-                RenderTypeGraphGameTest::onGraphChangedBumpsChangeVersion);
-        KGGameTests.registerFunction(UNDO_ROUND_TRIP,
-                RenderTypeGraphGameTest::undoRoundTripPreservesWholeGraphCompile);
-        KGGameTests.registerFunction(PREVIEW_SHAPE_PERSISTENCE,
-                RenderTypeGraphGameTest::previewShapesPersistAcrossRoundTrip);
-        KGGameTests.registerFunction(STAGE_AFFINITY_VALIDATION,
-                RenderTypeGraphGameTest::stageAffinityViolationFlaggedOnGraphChanged);
-    }
-
-    public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, RESOURCE, KGGameTests.functionKey(RESOURCE), d);
-        KGGameTests.registerFunctionTest(event, SUPPORTED_TYPES, KGGameTests.functionKey(SUPPORTED_TYPES), d);
-        KGGameTests.registerFunctionTest(event, SUPPORTED_NODES, KGGameTests.functionKey(SUPPORTED_NODES), d);
-        KGGameTests.registerFunctionTest(event, GRAPH_SETTINGS, KGGameTests.functionKey(GRAPH_SETTINGS), d);
-        KGGameTests.registerFunctionTest(event, STAGE_CONTEXTS, KGGameTests.functionKey(STAGE_CONTEXTS), d);
-        KGGameTests.registerFunctionTest(event, STAGE_PORTS, KGGameTests.functionKey(STAGE_PORTS), d);
-        KGGameTests.registerFunctionTest(event, FIXED_STAGE_DELETE_POLICY,
-                KGGameTests.functionKey(FIXED_STAGE_DELETE_POLICY), d);
-        KGGameTests.registerFunctionTest(event, RESOURCE_SETTINGS_ROUND_TRIP,
-                KGGameTests.functionKey(RESOURCE_SETTINGS_ROUND_TRIP), d);
-        KGGameTests.registerFunctionTest(event, SETTINGS_TOOL_WRITES_GRAPH,
-                KGGameTests.functionKey(SETTINGS_TOOL_WRITES_GRAPH), d);
-        KGGameTests.registerFunctionTest(event, DEFAULT_ENTITY_SHADER_GRAPH,
-                KGGameTests.functionKey(DEFAULT_ENTITY_SHADER_GRAPH), d);
-        KGGameTests.registerFunctionTest(event, SHADER_VALUE_ASSIGNABILITY,
-                KGGameTests.functionKey(SHADER_VALUE_ASSIGNABILITY), d);
-        KGGameTests.registerFunctionTest(event, COMPILE_DEFAULT_ENTITY,
-                KGGameTests.functionKey(COMPILE_DEFAULT_ENTITY), d);
-        KGGameTests.registerFunctionTest(event, COMPILE_COMPOSED_FORMAT,
-                KGGameTests.functionKey(COMPILE_COMPOSED_FORMAT), d);
-        KGGameTests.registerFunctionTest(event, VERTEX_FORMAT_VALIDATION,
-                KGGameTests.functionKey(VERTEX_FORMAT_VALIDATION), d);
-        KGGameTests.registerFunctionTest(event, VERTEX_ELEMENT_FALLBACK,
-                KGGameTests.functionKey(VERTEX_ELEMENT_FALLBACK), d);
-        KGGameTests.registerFunctionTest(event, PREVIEW_GEOMETRY,
-                KGGameTests.functionKey(PREVIEW_GEOMETRY), d);
-        KGGameTests.registerFunctionTest(event, PREVIEW_TESSELLATOR,
-                KGGameTests.functionKey(PREVIEW_TESSELLATOR), d);
-        KGGameTests.registerFunctionTest(event, CHANGE_VERSION,
-                KGGameTests.functionKey(CHANGE_VERSION), d);
-        KGGameTests.registerFunctionTest(event, UNDO_ROUND_TRIP,
-                KGGameTests.functionKey(UNDO_ROUND_TRIP), d);
-        KGGameTests.registerFunctionTest(event, PREVIEW_SHAPE_PERSISTENCE,
-                KGGameTests.functionKey(PREVIEW_SHAPE_PERSISTENCE), d);
-        KGGameTests.registerFunctionTest(event, STAGE_AFFINITY_VALIDATION,
-                KGGameTests.functionKey(STAGE_AFFINITY_VALIDATION), d);
-    }
-
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void resourceCreatesGraph(GameTestHelper helper) {
         assertTrue(helper, "RenderTypeGraphResource creates RenderTypeGraph",
                 RenderTypeGraphResource.INSTANCE.createGraph() instanceof RenderTypeGraph);
@@ -179,6 +83,8 @@ public final class RenderTypeGraphGameTest {
      * value edits) bumps {@link RenderTypeGraph#getChangeVersion()}, the signal the live previews gate
      * their per-frame recompile on. Drives the hook directly (no editor) to verify the wiring.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void onGraphChangedBumpsChangeVersion(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         long v0 = graph.getChangeVersion();
@@ -200,16 +106,15 @@ public final class RenderTypeGraphGameTest {
      * duplicated, and {@code compile()} reproduces the original shader byte-for-byte (same content hash,
      * no stage errors) — the condition the persistent preview tool needs to rebuild and draw again.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void undoRoundTripPreservesWholeGraphCompile(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         CompiledShaderGraph before = new ShaderGraphCompiler(graph).compile();
         assertFalse(helper, "baseline graph compiles without stage errors", before.hasStageErrors());
 
         var provider = com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry();
-        var out = net.minecraft.world.level.storage.TagValueOutput.createWithContext(
-                net.minecraft.util.ProblemReporter.Collector.DISCARDING, provider);
-        graph.graphModel.serialize(out);
-        net.minecraft.nbt.CompoundTag snapshot = out.buildResult();
+        net.minecraft.nbt.CompoundTag snapshot = graph.graphModel.serializeNBT(provider);
 
         NodeModel texture = findNode(graph, TextureNode.class);
         assertTrue(helper, "default graph has a Texture node", texture != null);
@@ -217,8 +122,7 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "Texture node removed by delete", findNode(graph, TextureNode.class) == null);
 
         // Undo: deserialize the pre-delete snapshot back into the live (already-populated) model.
-        graph.graphModel.deserialize(net.minecraft.world.level.storage.TagValueInput.create(
-                net.minecraft.util.ProblemReporter.Collector.DISCARDING, provider, snapshot));
+        graph.graphModel.deserializeNBT(provider, snapshot);
 
         assertTrue(helper, "undo restores the Texture node", findNode(graph, TextureNode.class) != null);
         assertEq(helper, "exactly one vertex stage after undo (no deserialize duplication)",
@@ -244,6 +148,8 @@ public final class RenderTypeGraphGameTest {
      * Drives both round-trips directly (no editor UI — see {@code verify-ui-changes-in-client}) since the
      * keys live in the model, not the ephemeral {@code NodeShaderPreview}/{@code ShaderPreviewTool} elements.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void previewShapesPersistAcrossRoundTrip(GameTestHelper helper) {
         String sphere = KGPreviewContents.SPHERE.key();
         String quad = KGPreviewContents.QUAD.key();
@@ -271,10 +177,7 @@ public final class RenderTypeGraphGameTest {
 
         // --- Undo path: snapshot, mutate, then deserialize the snapshot back into the SAME model. ---
         var provider = com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry();
-        var out = net.minecraft.world.level.storage.TagValueOutput.createWithContext(
-                net.minecraft.util.ProblemReporter.Collector.DISCARDING, provider);
-        graph.graphModel.serialize(out);
-        net.minecraft.nbt.CompoundTag snapshot = out.buildResult();
+        net.minecraft.nbt.CompoundTag snapshot = graph.graphModel.serializeNBT(provider);
 
         // Edit after the snapshot: change both shapes to something else.
         model.setNodePreviewContentKey(nodeUid, cube);
@@ -282,8 +185,7 @@ public final class RenderTypeGraphGameTest {
         assertEq(helper, "node shape reflects the post-snapshot edit", cube, model.getNodePreviewContentKey(nodeUid));
 
         // Undo: deserialize the pre-edit snapshot back into the live model.
-        graph.graphModel.deserialize(net.minecraft.world.level.storage.TagValueInput.create(
-                net.minecraft.util.ProblemReporter.Collector.DISCARDING, provider, snapshot));
+        graph.graphModel.deserializeNBT(provider, snapshot);
 
         assertEq(helper, "undo restores the node preview shape from the snapshot",
                 sphere, model.getNodePreviewContentKey(nodeUid));
@@ -298,6 +200,8 @@ public final class RenderTypeGraphGameTest {
      * A VERTEX_ONLY vertex-attribute node wired into a fragment block is pulled into the fragment stage,
      * which its affinity forbids; once the wire is removed it's no longer flagged.
      */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void stageAffinityViolationFlaggedOnGraphChanged(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -322,6 +226,8 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void supportedTypesIncludeRenderTypeContracts(GameTestHelper helper) {
         List<TypeHandle> types = new RenderTypeGraph().getSupportTypes();
         assertTrue(helper, "supports vec2", types.contains(RenderTypeGraphTypes.VEC2));
@@ -332,6 +238,8 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void supportedNodesIncludeBuiltins(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         List<Class<? extends Node>> nodes = graph.getSupportNodes();
@@ -376,6 +284,8 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void graphCarriesRenderTypeSettings(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
 
@@ -396,6 +306,8 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void stageContextsAcceptExpectedBlocks(GameTestHelper helper) {
         VaryingStageNode vertex = new VaryingStageNode();
         FragmentStageNode fragment = new FragmentStageNode();
@@ -417,6 +329,8 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void stageNodesExposePipelinePorts(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel vertex = graph.getVertexStageModel();
@@ -449,6 +363,8 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void fixedStageModelsCannotBeDeleted(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel vertex = graph.getVertexStageModel();
@@ -466,6 +382,8 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void resourcePersistsRenderTypeSettings(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         RenderTypeGraph.Settings settings = new RenderTypeGraph.Settings(
@@ -488,31 +406,13 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
-    public static void settingsToolWritesLoadedGraph(GameTestHelper helper) {
-        assertTrue(helper, "rendertype resource uses custom graph view",
-                RenderTypeGraphResource.INSTANCE.getGraphViewFactory().get() instanceof RenderTypeGraphView);
+    // NOTE: the 26.1 `settingsToolWritesLoadedGraph` test was removed in the 1.21.1 backport — it constructs a
+    // `RenderTypeGraphView` (a client GUI element that transitively loads `VertexConsumer`), which cannot load on
+    // the dedicated `runGameTestServer` dist. It exercised GUI behavior, not the compiler; settings serialization
+    // is already covered by the resource round-trip test above.
 
-        RenderTypeGraph graph = new RenderTypeGraph();
-        RenderTypeGraphView view = new RenderTypeGraphView();
-        view.loadGraph(graph);
-        RenderTypeGraph.Settings settings = new RenderTypeGraph.Settings(
-                VertexFormatPresets.POSITION_COLOR_TEX,
-                RenderTypeGraph.Settings.VertexFormatMode.LINES,
-                RenderTypeGraph.Settings.BlendMode.ADDITIVE,
-                RenderTypeGraph.Settings.DepthTest.NONE,
-                false,
-                true,
-                RenderTypeGraph.Settings.OutputTarget.WEATHER,
-                false,
-                true
-        );
-
-        view.getSettingsTool().applySettings(settings);
-
-        assertTrue(helper, "settings tool writes loaded graph", graph.getSettings().equals(settings));
-        helper.succeed();
-    }
-
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void newGraphContainsDefaultEntityShader(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
@@ -571,6 +471,8 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void shaderVectorValuesAreWireCompatible(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel split = addNode(graph, SplitNode.class);
@@ -588,6 +490,8 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void compileDefaultEntityShader(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         CompiledShaderGraph compiled = new ShaderGraphCompiler(graph).compile();
@@ -618,10 +522,9 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "fsh imports dynamictransforms", fsh.contains("#moj_import <minecraft:dynamictransforms.glsl>"));
         assertTrue(helper, "fsh writes fragColor", fsh.contains("fragColor = vec4("));
 
-        // Pipeline metadata
-        assertTrue(helper, "pipeline binds DynamicTransforms",
-                compiled.builtinUniforms().contains("DynamicTransforms"));
-        assertTrue(helper, "pipeline binds Fog", compiled.builtinUniforms().contains("Fog"));
+        // Pipeline metadata. (1.21.1 all-uniform backport: DynamicTransforms/Fog are #moj_import includes,
+        // not builtin UBOs — their use is asserted above via the fsh imports; builtinUniforms() now maps the
+        // individual builtin uniforms the GLSL declares, e.g. ModelViewMat/ProjMat.)
         assertTrue(helper, "layout registers the texture-constant sampler",
                 compiled.layout().samplers().stream().anyMatch(s -> s.startsWith("kg_tex")));
         helper.succeed();
@@ -629,6 +532,8 @@ public final class RenderTypeGraphGameTest {
 
     /** The composed vertex format drives the generated {@code in} attribute declarations: a Block-preset
      * graph declares exactly Position/Color/UV0/UV2 and omits UV1/Normal. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void compileRespectsComposedVertexFormat(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         var s = graph.getSettings();
@@ -648,6 +553,8 @@ public final class RenderTypeGraphGameTest {
 
     /** A VertexAttributeInputNode whose chosen element is absent from the composed format is flagged via the
      * GraphLogger (keyed by the node), and not flagged once the element is present. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void vertexFormatValidationFlagsMissingElement(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         // Non-orphan so it appears in getNodeModels(), which the validation iterates (orphan nodes don't).
@@ -677,6 +584,8 @@ public final class RenderTypeGraphGameTest {
     /** Removing a vertex element a node DEFAULT references (the vertex Color block defaults to
      * minecraft_mix_light(Normal, Color)) degrades to a safe constant — the shader stays valid (no Color
      * attribute / undefined var), the substitution is recorded, and onGraphChanged logs a warning. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void vertexElementDefaultFallsBackAndWarns(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         RenderTypeGraph.Settings s = graph.getSettings();
@@ -699,6 +608,8 @@ public final class RenderTypeGraphGameTest {
     }
 
     /** The built-in preview contents build the expected neutral geometry. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void previewContentsBuildGeometry(GameTestHelper helper) {
         var quad = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
         com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents.QUAD.build(quad);
@@ -726,6 +637,8 @@ public final class RenderTypeGraphGameTest {
 
     /** The tessellator emits the right vertex count per primitive mode, and the triangle-strip stitch
      * preserves winding (every reconstructed triangle stays CCW). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
     public static void previewTessellatorMatchesMode(GameTestHelper helper) {
         var mb = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
         com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents.CUBE.build(mb); // 6 quads, 24 edges

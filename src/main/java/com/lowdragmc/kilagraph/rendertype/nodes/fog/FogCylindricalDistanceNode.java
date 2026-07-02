@@ -40,6 +40,6 @@ public class FogCylindricalDistanceNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         ctx.include("minecraft:fog.glsl");
         String pos = (ctx.isConnected("pos") ? ctx.input("pos") : ctx.modelPosition()).code();
-        ctx.output("out", new ShaderExpr("fog_cylindrical_distance(" + pos + ")", GlslType.FLOAT));
+        ctx.output("out", new ShaderExpr("fog_distance(" + pos + ", 1)", GlslType.FLOAT));
     }
 }
