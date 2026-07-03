@@ -19,10 +19,10 @@ import java.util.List;
  * uniforms (no UBO); the material's {@link RenderTypeGraphMaterial#applyUniforms()} stages the KG-managed + EXPOSED
  * ones at draw while {@code ShaderInstance.setDefaultUniforms} handles the vanilla builtins.
  *
- * <p>TODO(1.21-backport milestone 2): vanilla RenderType integration (via a {@code ShaderStateShard(() -> shader)})
- * + material caching/refcounting by content hash (26.1 cached pipelines and drew through a real {@code RenderType});
- * for the current preview slice each call builds a fresh ShaderInstance and the material is short-lived (the preview
- * rebuilds only on content-hash change).</p>
+ * <p>The material exposes a vanilla {@code RenderType} for in-world rendering ({@link RenderTypeGraphMaterial#renderType()}
+ * — verified drawing through a {@code MultiBufferSource}). TODO(1.21-backport milestone 2): material
+ * caching/refcounting by content hash (26.1 cached pipelines); each call currently builds a fresh ShaderInstance and
+ * the material is short-lived (the preview rebuilds only on content-hash change).</p>
  */
 public final class RenderTypeFactory {
 

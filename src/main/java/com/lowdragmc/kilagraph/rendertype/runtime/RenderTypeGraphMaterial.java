@@ -41,10 +41,10 @@ import java.util.Map;
  * ({@code ModelViewMat}/{@code ProjMat}/{@code Fog*}/…) via {@code ShaderInstance.setDefaultUniforms} and uploads
  * everything in {@code ShaderInstance.apply()}.</p>
  *
- * <p>TODO(1.21-backport milestone 2): scene/lightmap/overlay dynamic samplers are not yet applied (their node
- * groups are deferred); vanilla RenderType integration for in-world rendering is a later increment (this material
- * is currently driven by the editor preview's manual draw). GRADIENT struct uniforms ARE now applied (member-wise —
- * see {@link #setGradient}).</p>
+ * <p>The material can be drawn either immediately (the editor preview: {@link #applyRenderState()} +
+ * {@code drawWithShader}) or through its vanilla {@link #renderType()} on a {@code MultiBufferSource} (in-world —
+ * verified). GRADIENT struct uniforms ARE applied (member-wise — see {@link #setGradient}). TODO(1.21-backport
+ * milestone 2): scene/lightmap/overlay dynamic samplers are not yet applied (their node groups are deferred).</p>
  */
 public final class RenderTypeGraphMaterial implements AutoCloseable {
 
