@@ -2,6 +2,7 @@ package com.lowdragmc.kilagraph.rendertype.runtime;
 
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
+import com.lowdragmc.kilagraph.rendertype.compiler.GradientGlsl;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 
 import java.util.ArrayList;
@@ -36,15 +37,12 @@ public final class KGShaderManifest {
         }
         sb.append(samplers.isEmpty() ? "],\n" : " ],\n");
 
-        // uniforms: builtin/KG-managed + EXPOSED fields (samplers/gradient excluded)
+        // uniforms: builtin/KG-managed + EXPOSED fields (samplers excluded; a GRADIENT field expands to its
+        // 17 vec4 struct members — see appendUniforms).
         List<String> uniforms = new ArrayList<>();
-        compiled.builtinUniforms().forEach((name, type) -> {
-            String u = uniform(name, type);
-            if (u != null) uniforms.add(u);
-        });
+        compiled.builtinUniforms().forEach((name, type) -> appendUniforms(uniforms, name, type));
         for (MaterialUniformLayout.Field f : compiled.layout().fields()) {
-            String u = uniform(f.name(), f.type());
-            if (u != null) uniforms.add(u);
+            appendUniforms(uniforms, f.name(), f.type());
         }
         sb.append("  \"uniforms\": [\n");
         sb.append(String.join(",\n", uniforms));
@@ -52,8 +50,27 @@ public final class KGShaderManifest {
         return sb.toString();
     }
 
-    private static String uniform(String name, GlslType type) {
-        return switch (type) {
+    /**
+     * Append the manifest {@code uniform} entries for one field. Scalars/vectors/matrices are a single entry;
+     * a {@link GlslType#GRADIENT} {@code uniform KG_Gradient <name>;} is a <em>struct</em>, which GLSL/GL address
+     * per member — so it expands to its 17 {@code vec4} members ({@code <name>.header}, {@code <name>.colors[i]},
+     * {@code <name>.alphas[i]}), matching {@link GradientGlsl}'s packing and the runtime's member-wise upload in
+     * {@code RenderTypeGraphMaterial}. A {@code Uniform} name is passed verbatim to {@code glGetUniformLocation},
+     * which resolves struct/array member names. Samplers are declared in the {@code "samplers"} list, not here.
+     */
+    private static void appendUniforms(List<String> out, String name, GlslType type) {
+        if (type == GlslType.SAMPLER2D) return;
+        if (type == GlslType.GRADIENT) {
+            out.add(entry(name + ".header", "float", 4, "0.0, 0.0, 0.0, 0.0"));
+            for (int i = 0; i < GradientGlsl.MAX_KEYS; i++) {
+                out.add(entry(name + ".colors[" + i + "]", "float", 4, "0.0, 0.0, 0.0, 0.0"));
+            }
+            for (int i = 0; i < GradientGlsl.MAX_KEYS; i++) {
+                out.add(entry(name + ".alphas[" + i + "]", "float", 4, "0.0, 0.0, 0.0, 0.0"));
+            }
+            return;
+        }
+        out.add(switch (type) {
             case FLOAT -> entry(name, "float", 1, "0.0");
             case VEC2 -> entry(name, "float", 2, "0.0, 0.0");
             case VEC3 -> entry(name, "float", 3, "0.0, 0.0, 0.0");
@@ -61,9 +78,8 @@ public final class KGShaderManifest {
             case INT, BOOL -> entry(name, "int", 1, "0");
             case MAT4 -> entry(name, "matrix4x4", 16,
                     "1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0");
-            // Samplers are declared in the "samplers" list; GRADIENT struct uniforms are milestone-2 deferred.
-            case SAMPLER2D, GRADIENT -> null;
-        };
+            case SAMPLER2D, GRADIENT -> throw new IllegalStateException("handled above");
+        });
     }
 
     private static String entry(String name, String type, int count, String values) {

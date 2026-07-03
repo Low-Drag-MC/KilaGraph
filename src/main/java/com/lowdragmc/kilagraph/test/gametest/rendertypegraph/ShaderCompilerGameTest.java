@@ -615,6 +615,12 @@ public final class ShaderCompilerGameTest {
         assertEq(helper, "gradient packs 68 std140 floats", 68, compiled.uniformDefaults().get("kg_Ramp").length);
         assertTrue(helper, "variable name maps to its field for set-by-name",
                 compiled.uniformFields().containsKey("Ramp"));
+        // The manifest must declare every struct member the GLSL uses, else ShaderInstance creates no Uniform
+        // for it and the gradient stays zero at runtime (the systemic manifest-consistency invariant).
+        String manifest = com.lowdragmc.kilagraph.rendertype.runtime.KGShaderManifest.json(compiled, "test");
+        assertTrue(helper, "manifest declares gradient header member", manifest.contains("\"kg_Ramp.header\""));
+        assertTrue(helper, "manifest declares first colour key", manifest.contains("\"kg_Ramp.colors[0]\""));
+        assertTrue(helper, "manifest declares last alpha key", manifest.contains("\"kg_Ramp.alphas[7]\""));
         helper.succeed();
     }
 

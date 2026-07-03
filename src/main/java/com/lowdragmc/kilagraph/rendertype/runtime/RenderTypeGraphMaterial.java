@@ -4,6 +4,7 @@ import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
+import com.lowdragmc.kilagraph.rendertype.compiler.GradientGlsl;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.lowdraglib2.client.shader.LDShaderInstance;
@@ -40,9 +41,10 @@ import java.util.Map;
  * ({@code ModelViewMat}/{@code ProjMat}/{@code Fog*}/…) via {@code ShaderInstance.setDefaultUniforms} and uploads
  * everything in {@code ShaderInstance.apply()}.</p>
  *
- * <p>TODO(1.21-backport milestone 2): GRADIENT struct uniforms and scene/lightmap/overlay dynamic samplers are
- * not yet applied (their node groups are deferred); vanilla RenderType integration for in-world rendering is a
- * later increment (this material is currently driven by the editor preview's manual draw).</p>
+ * <p>TODO(1.21-backport milestone 2): scene/lightmap/overlay dynamic samplers are not yet applied (their node
+ * groups are deferred); vanilla RenderType integration for in-world rendering is a later increment (this material
+ * is currently driven by the editor preview's manual draw). GRADIENT struct uniforms ARE now applied (member-wise —
+ * see {@link #setGradient}).</p>
  */
 public final class RenderTypeGraphMaterial implements AutoCloseable {
 
@@ -290,9 +292,32 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
             case VEC3 -> u.set(at(v, 0), at(v, 1), at(v, 2));
             case VEC4 -> u.set(at(v, 0), at(v, 1), at(v, 2), at(v, 3));
             case MAT4 -> u.set(new Matrix4f().set(v == null ? new float[16] : v));
-            // TODO(1.21-backport milestone 2): GRADIENT struct uniform; SAMPLER2D bound via setSampler above.
-            case SAMPLER2D, GRADIENT -> { }
+            // A GRADIENT field is a KG_Gradient struct uniform, uploaded member-by-member (setUniform's `u` — the
+            // whole-struct name — has no GL location; the members do). SAMPLER2D is bound via setSampler above.
+            case GRADIENT -> setGradient(name, v);
+            case SAMPLER2D -> { }
         }
+    }
+
+    /**
+     * Upload a packed gradient (the {@code GradientGlsl.pack} 68-float layout: header + 8 colour + 8 alpha vec4)
+     * into the {@code KG_Gradient} struct uniform {@code name}'s members ({@code name.header},
+     * {@code name.colors[i]}, {@code name.alphas[i]}) — the manifest declares each as a vec4 (see
+     * {@code KGShaderManifest.appendUniforms}).
+     */
+    private void setGradient(String name, float[] v) {
+        if (v == null) return;
+        setVec4(name + ".header", v, 0);
+        for (int i = 0; i < GradientGlsl.MAX_KEYS; i++) {
+            setVec4(name + ".colors[" + i + "]", v, 4 + i * 4);
+            setVec4(name + ".alphas[" + i + "]", v, 4 + GradientGlsl.MAX_KEYS * 4 + i * 4);
+        }
+    }
+
+    private void setVec4(String uniformName, float[] v, int base) {
+        Uniform u = shader.getUniform(uniformName);
+        if (u == null) return;
+        u.set(at(v, base), at(v, base + 1), at(v, base + 2), at(v, base + 3));
     }
 
     private static float at(float[] v, int i) { return v != null && i < v.length ? v[i] : 0f; }
