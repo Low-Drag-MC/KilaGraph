@@ -220,6 +220,15 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
      * <p>TODO(1.21-backport milestone 2): main-texture (Sampler0) state — a graph sampling a block/entity atlas
      * needs a {@code TextureStateShard} for it; currently only the graph's own EXPOSED samplers (set by name) and
      * lightmap/overlay are bound.</p>
+     *
+     * <p><b>Lifecycle constraint (read before building a runtime consumption API).</b> The returned RenderType
+     * captures {@code this::shader}, and {@link #close()} closes that {@code ShaderInstance}. A material is a
+     * <em>single content-hash snapshot</em> — the editor/consumer rebuilds a fresh material (and closes the old
+     * one) on every graph change — so a RenderType held across an edit would draw with a CLOSED shader (GL error).
+     * Callers must therefore treat the RenderType as valid only for this material's lifetime: <b>own materials in
+     * a refcounted cache keyed by graph id and re-fetch the RenderType each frame</b> rather than caching the
+     * object. (Today only the previews build materials, and they draw immediately without ever calling this — so
+     * there is no live consumer of the RenderType yet; this note guards the future one.)</p>
      */
     public RenderType renderType() {
         if (renderType == null) renderType = buildRenderType();

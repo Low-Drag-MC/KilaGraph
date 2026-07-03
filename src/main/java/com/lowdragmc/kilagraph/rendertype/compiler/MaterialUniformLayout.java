@@ -16,11 +16,8 @@ import java.util.Map;
  */
 public final class MaterialUniformLayout {
 
-    /** A single UBO field. */
+    /** A single material uniform field. */
     public record Field(String name, GlslType type) {}
-
-    public static final String UBO_NAME = "KG_Material";
-    public static final String UBO_INSTANCE = "kg_material";
 
     private final Map<String, Field> fields = new LinkedHashMap<>();
     private final List<String> samplers = new ArrayList<>();
@@ -55,49 +52,9 @@ public final class MaterialUniformLayout {
     }
 
     /** Whether any field is a {@link GlslType#GRADIENT} — the {@code KG_Gradient} struct must then be
-     *  declared (in the stage prelude) before this UBO block, since the block references the type. */
+     *  declared (in the stage prelude) before the field that references the type. */
     public boolean hasGradientField() {
         return fields.values().stream().anyMatch(f -> f.type() == GlslType.GRADIENT);
-    }
-
-    /**
-     * Minimal std140 size calculator. Replaces {@code com.mojang.blaze3d.buffers.Std140SizeCalculator}
-     * (absent in 1.21.1): each put aligns the running offset to the member's base alignment then adds
-     * the member's base size; {@link #get()} rounds the total up to a 16-byte (vec4) boundary.
-     */
-    private static final class Std140SizeCalculator {
-        private int offset = 0;
-
-        private void align(int alignment) {
-            offset = ((offset + alignment - 1) / alignment) * alignment;
-        }
-
-        Std140SizeCalculator putFloat() { align(4); offset += 4; return this; }
-        Std140SizeCalculator putVec2() { align(8); offset += 8; return this; }
-        Std140SizeCalculator putVec3() { align(16); offset += 12; return this; }
-        Std140SizeCalculator putVec4() { align(16); offset += 16; return this; }
-        Std140SizeCalculator putMat4f() { align(16); offset += 64; return this; }
-
-        int get() { return ((offset + 15) / 16) * 16; }
-    }
-
-    /** Compute the std140 byte size of the UBO (0 when there are no fields). */
-    public int std140Size() {
-        if (fields.isEmpty()) return 0;
-        var calc = new Std140SizeCalculator();
-        for (Field f : fields.values()) {
-            switch (f.type()) {
-                case FLOAT, INT, BOOL -> calc.putFloat();
-                case VEC2 -> calc.putVec2();
-                case VEC3 -> calc.putVec3();
-                case VEC4 -> calc.putVec4();
-                case MAT4 -> calc.putMat4f();
-                case SAMPLER2D -> { /* samplers are not UBO members */ }
-                // KG_Gradient struct: vec4 header + vec4 colors[8] + vec4 alphas[8] = 17 vec4 (all 16-aligned).
-                case GRADIENT -> { for (int i = 0; i < 1 + GradientGlsl.MAX_KEYS * 2; i++) calc.putVec4(); }
-            }
-        }
-        return calc.get();
     }
 
     /**
