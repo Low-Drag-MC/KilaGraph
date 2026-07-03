@@ -209,6 +209,11 @@ public final class ShaderGraphCompiler {
         preview = true;
         current = fragment;
         // The preview vsh provides Position + UV0 and passes uv through as vUv.
+        // assemblePreviewVertex hardcodes `uniform mat4 ModelViewMat/ProjMat` and does `ProjMat*ModelViewMat*pos`;
+        // register them here so KGShaderManifest declares them and ShaderInstance.setDefaultUniforms binds them —
+        // otherwise they default to ZERO matrices and gl_Position collapses (the whole preview quad disappears).
+        vertex.builtinUniforms.putIfAbsent("ModelViewMat", GlslType.MAT4);
+        vertex.builtinUniforms.putIfAbsent("ProjMat", GlslType.MAT4);
         ShaderExpr value = previewValueOf(outputPort);
         if (value == null) value = new ShaderExpr("vec4(0.0)", GlslType.VEC4);
         // The preview quad is composited over the editor GUI by its alpha, so a value's alpha would control

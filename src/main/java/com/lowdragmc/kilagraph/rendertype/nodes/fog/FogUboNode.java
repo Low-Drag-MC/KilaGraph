@@ -32,13 +32,17 @@ public class FogUboNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Fog", "minecraft:fog.glsl");
-        ctx.output("FogColor", new ShaderExpr("FogColor", GlslType.VEC4));
-        ctx.output("FogEnvironmentalStart", new ShaderExpr("FogEnvironmentalStart", GlslType.FLOAT));
-        ctx.output("FogEnvironmentalEnd", new ShaderExpr("FogEnvironmentalEnd", GlslType.FLOAT));
-        ctx.output("FogRenderDistanceStart", new ShaderExpr("FogRenderDistanceStart", GlslType.FLOAT));
-        ctx.output("FogRenderDistanceEnd", new ShaderExpr("FogRenderDistanceEnd", GlslType.FLOAT));
-        ctx.output("FogSkyEnd", new ShaderExpr("FogSkyEnd", GlslType.FLOAT));
-        ctx.output("FogCloudsEnd", new ShaderExpr("FogCloudsEnd", GlslType.FLOAT));
+        ctx.include("minecraft:fog.glsl");
+        // 1.21.1 fog is a single band: FogStart/FogEnd/FogColor (individual uniforms, set by setDefaultUniforms).
+        // The 1.21.5 multi-band outputs are kept as ports (graph compat) but all map onto that single band.
+        ShaderExpr fogStart = ctx.fogField("FogStart", GlslType.FLOAT);
+        ShaderExpr fogEnd = ctx.fogField("FogEnd", GlslType.FLOAT);
+        ctx.output("FogColor", ctx.fogField("FogColor", GlslType.VEC4));
+        ctx.output("FogEnvironmentalStart", fogStart);
+        ctx.output("FogEnvironmentalEnd", fogEnd);
+        ctx.output("FogRenderDistanceStart", fogStart);
+        ctx.output("FogRenderDistanceEnd", fogEnd);
+        ctx.output("FogSkyEnd", fogEnd);
+        ctx.output("FogCloudsEnd", fogEnd);
     }
 }

@@ -30,8 +30,8 @@ public class ScreenNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl");
-        ctx.output("Width", new ShaderExpr("ScreenSize.x", GlslType.FLOAT));
-        ctx.output("Height", new ShaderExpr("ScreenSize.y", GlslType.FLOAT));
+        String ss = ctx.useBuiltinUniform("ScreenSize", GlslType.VEC2);
+        ctx.output("Width", new ShaderExpr(ss + ".x", GlslType.FLOAT));
+        ctx.output("Height", new ShaderExpr(ss + ".y", GlslType.FLOAT));
     }
 }

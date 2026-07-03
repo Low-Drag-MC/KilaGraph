@@ -28,10 +28,11 @@ public class DynamicTransformsUboNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl");
-        ctx.output("ModelViewMat", new ShaderExpr("ModelViewMat", GlslType.MAT4));
-        ctx.output("ColorModulator", new ShaderExpr("ColorModulator", GlslType.VEC4));
-        ctx.output("ModelOffset", new ShaderExpr("ModelOffset", GlslType.VEC3));
-        ctx.output("TextureMat", new ShaderExpr("TextureMat", GlslType.MAT4));
+        // 1.21.1: these are individual uniforms (no dynamictransforms.glsl UBO). ModelViewMat/ColorModulator/
+        // TextureMat are auto-set by ShaderInstance.setDefaultUniforms; ModelOffset by KGBuiltinUniforms (0).
+        ctx.output("ModelViewMat", new ShaderExpr(ctx.useBuiltinUniform("ModelViewMat", GlslType.MAT4), GlslType.MAT4));
+        ctx.output("ColorModulator", new ShaderExpr(ctx.useBuiltinUniform("ColorModulator", GlslType.VEC4), GlslType.VEC4));
+        ctx.output("ModelOffset", new ShaderExpr(ctx.useBuiltinUniform("ModelOffset", GlslType.VEC3), GlslType.VEC3));
+        ctx.output("TextureMat", new ShaderExpr(ctx.useBuiltinUniform("TextureMat", GlslType.MAT4), GlslType.MAT4));
     }
 }

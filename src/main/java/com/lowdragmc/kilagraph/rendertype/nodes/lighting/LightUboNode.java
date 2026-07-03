@@ -26,8 +26,7 @@ public class LightUboNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Lighting", "minecraft:light.glsl");
-        ctx.output("Light0_Direction", new ShaderExpr("Light0_Direction", GlslType.VEC3));
-        ctx.output("Light1_Direction", new ShaderExpr("Light1_Direction", GlslType.VEC3));
+        ctx.output("Light0_Direction", new ShaderExpr(ctx.useBuiltinUniform("Light0_Direction", GlslType.VEC3), GlslType.VEC3));
+        ctx.output("Light1_Direction", new ShaderExpr(ctx.useBuiltinUniform("Light1_Direction", GlslType.VEC3), GlslType.VEC3));
     }
 }

@@ -76,7 +76,7 @@ public class ScreenPositionNode extends ShaderNode {
         String uv = ctx.screenUv().code();
         String mode = ctx.option("mode", String.class, "default");
         if (mode.equals("pixel") || mode.equals("tiled")) {
-            ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl"); // ScreenSize
+            ctx.useBuiltinUniform("ScreenSize", GlslType.VEC2);
         }
         String code = switch (mode) {
             case "pixel" -> "vec4(" + uv + " * ScreenSize, 0.0, 0.0)";

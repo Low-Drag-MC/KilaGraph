@@ -32,14 +32,16 @@ public class GlobalsUboNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl");
-        // CameraBlockPos is an ivec3 in the UBO; cast to vec3 for the float-vector port.
-        ctx.output("CameraBlockPos", new ShaderExpr("vec3(CameraBlockPos)", GlslType.VEC3));
-        ctx.output("CameraOffset", new ShaderExpr("CameraOffset", GlslType.VEC3));
-        ctx.output("ScreenSize", new ShaderExpr("ScreenSize", GlslType.VEC2));
-        ctx.output("GlintAlpha", new ShaderExpr("GlintAlpha", GlslType.FLOAT));
-        ctx.output("GameTime", new ShaderExpr("GameTime", GlslType.FLOAT));
-        ctx.output("MenuBlurRadius", new ShaderExpr("MenuBlurRadius", GlslType.INT));
-        ctx.output("UseRgss", new ShaderExpr("UseRgss", GlslType.INT));
+        // 1.21.1 has no globals.glsl. ScreenSize/GlintAlpha/GameTime are individual vanilla uniforms
+        // (setDefaultUniforms); camera world position is our KG-managed kg_CameraPos (camera-relative render),
+        // split into the block/offset pair the modern Globals UBO exposed. MenuBlurRadius/UseRgss: no 1.21.1 source.
+        String camPos = ctx.useBuiltinUniform("kg_CameraPos", GlslType.VEC3);
+        ctx.output("CameraBlockPos", new ShaderExpr("floor(" + camPos + ")", GlslType.VEC3));
+        ctx.output("CameraOffset", new ShaderExpr("(floor(" + camPos + ") - " + camPos + ")", GlslType.VEC3));
+        ctx.output("ScreenSize", new ShaderExpr(ctx.useBuiltinUniform("ScreenSize", GlslType.VEC2), GlslType.VEC2));
+        ctx.output("GlintAlpha", new ShaderExpr(ctx.useBuiltinUniform("GlintAlpha", GlslType.FLOAT), GlslType.FLOAT));
+        ctx.output("GameTime", new ShaderExpr(ctx.useBuiltinUniform("GameTime", GlslType.FLOAT), GlslType.FLOAT));
+        ctx.output("MenuBlurRadius", new ShaderExpr("0", GlslType.INT));
+        ctx.output("UseRgss", new ShaderExpr("0", GlslType.INT));
     }
 }

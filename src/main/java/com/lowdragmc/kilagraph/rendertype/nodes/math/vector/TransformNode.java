@@ -151,13 +151,11 @@ public class TransformNode extends ShaderNode {
     // ---- matrix accessors (register the owning UBO) -----------------------------------------
 
     private String modelViewMat(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl");
-        return "ModelViewMat";
+        return ctx.useBuiltinUniform("ModelViewMat", GlslType.MAT4);
     }
 
     private String projMat(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Projection", "minecraft:projection.glsl");
-        return "ProjMat";
+        return ctx.useBuiltinUniform("ProjMat", GlslType.MAT4);
     }
 
     private String iModelViewMat(ShaderCompileContext ctx) {
@@ -180,7 +178,6 @@ public class TransformNode extends ShaderNode {
     /** Absolute world camera position from MC's {@code globals.glsl}. MC stores CameraBlockPos =
      *  floor(camPos) and CameraOffset = floor(camPos) - camPos, so camPos = block - offset. */
     private String cameraPos(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl");
-        return "(vec3(CameraBlockPos) - CameraOffset)";
+        return ctx.useBuiltinUniform("kg_CameraPos", GlslType.VEC3);
     }
 }

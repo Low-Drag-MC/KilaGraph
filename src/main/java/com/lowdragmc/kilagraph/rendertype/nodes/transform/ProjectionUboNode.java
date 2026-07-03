@@ -25,7 +25,6 @@ public class ProjectionUboNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Projection", "minecraft:projection.glsl");
-        ctx.output("ProjMat", new ShaderExpr("ProjMat", GlslType.MAT4));
+        ctx.output("ProjMat", new ShaderExpr(ctx.useBuiltinUniform("ProjMat", GlslType.MAT4), GlslType.MAT4));
     }
 }

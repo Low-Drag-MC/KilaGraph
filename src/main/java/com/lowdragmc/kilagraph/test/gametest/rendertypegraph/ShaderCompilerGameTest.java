@@ -361,7 +361,7 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph compiled = compile(new RenderTypeGraph());
         String fsh = compiled.fragmentSource();
         assertEq(helper, "texture(...) emitted once", 1, count(fsh, "texture("));
-        assertEq(helper, "apply_fog(...) emitted once", 1, count(fsh, "apply_fog("));
+        assertEq(helper, "linear_fog(...) emitted once", 1, count(fsh, "linear_fog("));
         helper.succeed();
     }
 
@@ -1118,7 +1118,7 @@ public final class ShaderCompilerGameTest {
         // object->world = ModelViewMat (to view) then IViewMat + camera position (view to absolute world);
         // the camera position comes from MC's globals.glsl (precision-split), not our KG block.
         assertTrue(helper, "fsh references the inverse camera view matrix", fsh.contains("kg_IViewMat"));
-        assertTrue(helper, "fsh reads the camera position from globals", fsh.contains("CameraBlockPos"));
+        assertTrue(helper, "fsh reads the camera position (kg_CameraPos)", fsh.contains("kg_CameraPos"));
 
         // clip→view uses the precomputed inverse projection (kg_IProjMat), not a per-pixel inverse.
         RenderTypeGraph clipGraph = new RenderTypeGraph();
@@ -1146,7 +1146,7 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "clip→world inverse-projects via IProjMat", cwFsh.contains("kg_IProjMat"));
         assertTrue(helper, "clip→world does the perspective divide", cwFsh.contains(".xyz / ") && cwFsh.contains(".w"));
         assertTrue(helper, "clip→world un-rotates via IViewMat", cwFsh.contains("kg_IViewMat"));
-        assertTrue(helper, "clip→world adds the camera position", cwFsh.contains("CameraBlockPos"));
+        assertTrue(helper, "clip→world adds the camera position", cwFsh.contains("kg_CameraPos"));
         helper.succeed();
     }
 
@@ -1405,8 +1405,8 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph compiled = compile(graph);
         assertFalse(helper, "camera graph has no stage errors", compiled.hasStageErrors());
         String fsh = compiled.fragmentSource();
-        assertTrue(helper, "camera node reads CameraBlockPos", fsh.contains("CameraBlockPos"));
-        assertTrue(helper, "camera node reads CameraOffset", fsh.contains("CameraOffset"));
+        assertTrue(helper, "camera node Position reads kg_CameraPos", fsh.contains("kg_CameraPos"));
+        assertTrue(helper, "camera node declares kg_CameraPos uniform", fsh.contains("uniform vec3 kg_CameraPos"));
         helper.succeed();
     }
 
@@ -1550,8 +1550,7 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph compiled = compile(graph);
         assertFalse(helper, "fog defaults are not a stage error", compiled.hasStageErrors());
         String fsh = compiled.fragmentSource();
-        for (String field : new String[]{"FogColor", "FogEnvironmentalStart", "FogEnvironmentalEnd",
-                "FogRenderDistanceStart", "FogRenderDistanceEnd"}) {
+        for (String field : new String[]{"FogColor", "FogStart", "FogEnd"}) {
             assertTrue(helper, "fsh references " + field, fsh.contains(field));
         }
         assertTrue(helper, "fsh reads the spherical distance varying", fsh.contains("in float sphericalVertexDistance;"));
@@ -1564,9 +1563,9 @@ public final class ShaderCompilerGameTest {
         NodeModel total = addNode(tot, TotalFogValueNode.class);
         wire(tot, alpha.getInputsById().get("alpha"), total.getOutputsById().get("out"));
         String totFsh = compile(tot).fragmentSource();
-        assertTrue(helper, "total_fog_value references the Fog UBO", totFsh.contains("FogEnvironmentalStart"));
-        assertTrue(helper, "total_fog_value reads the cylindrical varying",
-                totFsh.contains("in float cylindricalVertexDistance;"));
+        assertTrue(helper, "total fog value uses linear_fog_fade", totFsh.contains("linear_fog_fade("));
+        assertTrue(helper, "total fog value reads the spherical distance varying",
+                totFsh.contains("in float sphericalVertexDistance;"));
         helper.succeed();
     }
 

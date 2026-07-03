@@ -508,7 +508,7 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "vsh outputs uv0 varying", vsh.contains("out vec2 uv0;"));
         assertTrue(helper, "vsh outputs spherical distance varying", vsh.contains("out float sphericalVertexDistance;"));
         assertTrue(helper, "vsh assigns uv0 from UV0", vsh.contains("uv0 = UV0;"));
-        assertTrue(helper, "vsh imports projection", vsh.contains("#moj_import <minecraft:projection.glsl>"));
+        assertTrue(helper, "vsh does the projection transform", vsh.contains("ProjMat * ModelViewMat"));
 
         // Fragment shader
         assertTrue(helper, "fsh declares version", fsh.startsWith("#version 330"));
@@ -517,9 +517,9 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "fsh reads uv0 varying", fsh.contains("in vec2 uv0;"));
         assertTrue(helper, "fsh samples the texture constant", fsh.contains("texture(kg_tex"));
         assertTrue(helper, "fsh declares the texture-constant sampler uniform", fsh.contains("uniform sampler2D kg_tex"));
-        assertTrue(helper, "fsh applies fog", fsh.contains("apply_fog("));
+        assertTrue(helper, "fsh applies fog", fsh.contains("linear_fog("));
         assertTrue(helper, "fsh imports fog", fsh.contains("#moj_import <minecraft:fog.glsl>"));
-        assertTrue(helper, "fsh imports dynamictransforms", fsh.contains("#moj_import <minecraft:dynamictransforms.glsl>"));
+        assertTrue(helper, "fsh declares the ColorModulator builtin uniform", fsh.contains("uniform vec4 ColorModulator"));
         assertTrue(helper, "fsh writes fragColor", fsh.contains("fragColor = vec4("));
 
         // Pipeline metadata. (1.21.1 all-uniform backport: DynamicTransforms/Fog are #moj_import includes,

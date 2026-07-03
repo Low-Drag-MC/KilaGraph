@@ -41,6 +41,12 @@ public final class KGBuiltinUniforms {
                 // TODO(1.21-backport milestone 2, transform group): world<->view rotation matrices need the live
                 // camera; identity for now (only the Transform / world-normal nodes reference these).
                 case "kg_ViewMat", "kg_IViewMat" -> u.set(new Matrix4f());
+                // KG-managed absolute world camera position (1.21.1 renders camera-relative; no vanilla camera
+                // uniform). Bound from the live render camera each frame — see CameraNode/GlobalsUboNode/Transform.
+                case "kg_CameraPos" -> {
+                    var p = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+                    u.set((float) p.x, (float) p.y, (float) p.z);
+                }
                 default -> { /* vanilla builtin (setDefaultUniforms) or EXPOSED material uniform (material) — skip */ }
             }
         }

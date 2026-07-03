@@ -38,14 +38,14 @@ public class ApplyFogNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         ctx.include("minecraft:fog.glsl");
-        String code = "apply_fog("
+        // 1.21.1 has a single linear fog band: linear_fog(inColor, vertexDistance, fogStart, fogEnd, fogColor).
+        // The 1.21.5 environmental band maps to FogStart/FogEnd; the extra 1.21.5 inputs (cylindrical /
+        // renderDistance) remain as ports for graph compatibility but linear_fog uses one band + FogColor.
+        String code = "linear_fog("
                 + ctx.input("inColor").code() + ", "
                 + fog(ctx, "sphericalVertexDistance", ctx.sphericalVertexDistance()) + ", "
-                + fog(ctx, "cylindricalVertexDistance", ctx.cylindricalVertexDistance()) + ", "
-                + fog(ctx, "environmentalStart", ctx.fogField("FogEnvironmentalStart", GlslType.FLOAT)) + ", "
-                + fog(ctx, "environmentalEnd", ctx.fogField("FogEnvironmentalEnd", GlslType.FLOAT)) + ", "
-                + fog(ctx, "renderDistanceStart", ctx.fogField("FogRenderDistanceStart", GlslType.FLOAT)) + ", "
-                + fog(ctx, "renderDistanceEnd", ctx.fogField("FogRenderDistanceEnd", GlslType.FLOAT)) + ", "
+                + fog(ctx, "environmentalStart", ctx.fogField("FogStart", GlslType.FLOAT)) + ", "
+                + fog(ctx, "environmentalEnd", ctx.fogField("FogEnd", GlslType.FLOAT)) + ", "
                 + fog(ctx, "fogColor", ctx.fogField("FogColor", GlslType.VEC4)) + ")";
         ctx.output("out", new ShaderExpr(code, GlslType.VEC4));
     }

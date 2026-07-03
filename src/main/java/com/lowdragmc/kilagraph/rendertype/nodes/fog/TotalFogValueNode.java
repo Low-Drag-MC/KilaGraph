@@ -33,13 +33,12 @@ public class TotalFogValueNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         ctx.include("minecraft:fog.glsl");
-        String code = "total_fog_value("
+        // 1.21.1: single linear fog band; total fog value = 1 - fade(dist, FogStart, FogEnd). The 1.21.5
+        // cylindrical/renderDistance inputs stay as ports for graph compat; the single band uses environmental.
+        String code = "(1.0 - linear_fog_fade("
                 + fog(ctx, "sphericalVertexDistance", ctx.sphericalVertexDistance()) + ", "
-                + fog(ctx, "cylindricalVertexDistance", ctx.cylindricalVertexDistance()) + ", "
-                + fog(ctx, "environmentalStart", ctx.fogField("FogEnvironmentalStart", GlslType.FLOAT)) + ", "
-                + fog(ctx, "environmentalEnd", ctx.fogField("FogEnvironmentalEnd", GlslType.FLOAT)) + ", "
-                + fog(ctx, "renderDistanceStart", ctx.fogField("FogRenderDistanceStart", GlslType.FLOAT)) + ", "
-                + fog(ctx, "renderDistanceEnd", ctx.fogField("FogRenderDistanceEnd", GlslType.FLOAT)) + ")";
+                + fog(ctx, "environmentalStart", ctx.fogField("FogStart", GlslType.FLOAT)) + ", "
+                + fog(ctx, "environmentalEnd", ctx.fogField("FogEnd", GlslType.FLOAT)) + "))";
         ctx.output("out", new ShaderExpr(code, GlslType.FLOAT));
     }
 

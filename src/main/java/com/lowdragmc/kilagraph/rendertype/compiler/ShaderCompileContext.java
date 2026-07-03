@@ -136,6 +136,17 @@ public final class ShaderCompileContext {
     }
 
     /**
+     * Declare a vanilla / KG-managed builtin uniform in the current stage (1.21.1: individual {@code uniform}s —
+     * there is no {@code dynamictransforms.glsl}/{@code globals.glsl}, so ModelViewMat / ProjMat / ColorModulator /
+     * TextureMat / ScreenSize / GameTime etc. must be declared directly). Returns the GLSL accessor (the bare
+     * name), so a node emits {@code ctx.useBuiltinUniform("ProjMat", GlslType.MAT4)} instead of a raw string.
+     * Vanilla builtins are auto-set by {@code ShaderInstance.setDefaultUniforms}; KG-managed by KGBuiltinUniforms.
+     */
+    public String useBuiltinUniform(String name, GlslType type) {
+        return compiler.useBuiltinUniform(name, type);
+    }
+
+    /**
      * Register a material UBO field and return a {@link ShaderExpr} referencing it. The field is
      * exposed to users as a per-material uniform.
      */
