@@ -63,11 +63,11 @@ public final class GlslFormat {
     }
 
     /**
-     * The std140 float components for a graph value, given its target GLSL type — used to bake an
-     * EXPOSED variable's declared default into a material uniform via {@code MaterialUniformBuffer.set}.
-     * Mirrors {@link #literal}'s value handling. {@code MAT4} yields a 16-float column-major identity
-     * (the {@code Mat4Value} record currently carries no components). {@code SAMPLER2D} is opaque and
-     * has no UBO representation — returns an empty array.
+     * The float components for a graph value, given its target GLSL type — used to bake an EXPOSED
+     * variable's declared default into its material uniform (staged on the {@code ShaderInstance} by
+     * {@code RenderTypeGraphMaterial.applyUniforms}). Mirrors {@link #literal}'s value handling. {@code MAT4}
+     * yields a 16-float column-major identity (the {@code Mat4Value} record currently carries no components).
+     * {@code SAMPLER2D} is opaque — returns an empty array.
      */
     public static float[] components(Object value, GlslType type) {
         return switch (type) {

@@ -147,9 +147,9 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     /**
      * Apply the graph {@code Settings}' blend / cull / depth to {@code RenderSystem} for an immediate-mode draw
      * (the preview). Mirrors what a vanilla {@code RenderType}'s {@code RenderStateShard}s would set up; call before
-     * {@link #applyUniforms()} + the draw. (The eventual {@code RenderType} export encodes the same intent as shards
-     * instead — this is the immediate-draw equivalent, and doesn't need the AT-gated {@code RenderStateShard}
-     * constants.) Blend funcs mirror the corresponding vanilla transparency shards; exotic modes are approximated.
+     * {@link #applyUniforms()} + the draw. Depth/cull/blend come from the SAME {@link #blendFactors} /
+     * {@code depthFunc} mapping the {@link #renderType()} export uses, so an immediate draw and a batched
+     * RenderType draw of the same graph render identically.
      */
     public void applyRenderState() {
         // Depth test + write.
@@ -169,35 +169,42 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         // Back-face culling.
         if (settings.cull()) RenderSystem.enableCull(); else RenderSystem.disableCull();
 
-        // Blend / transparency.
-        if (settings.blend() == RenderTypeGraph.Settings.BlendMode.OPAQUE) {
+        // Blend / transparency (blendFactors is shared with the RenderType path so both honour every mode).
+        Blend b = blendFactors(settings.blend());
+        if (b == null) {
             RenderSystem.disableBlend();
             return;
         }
         RenderSystem.enableBlend();
-        var src = GlStateManager.SourceFactor.SRC_ALPHA;
-        var dst = GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA;
-        var srcA = GlStateManager.SourceFactor.ONE;
-        var dstA = GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA;
-        switch (settings.blend()) {
-            case TRANSLUCENT, ENTITY_OUTLINE_BLIT -> { /* defaults above (translucent) */ }
-            case TRANSLUCENT_PREMULTIPLIED_ALPHA -> { src = GlStateManager.SourceFactor.ONE; }
-            case ADDITIVE, LIGHTNING, OVERLAY -> {
-                src = GlStateManager.SourceFactor.SRC_ALPHA; dst = GlStateManager.DestFactor.ONE;
-                srcA = GlStateManager.SourceFactor.SRC_ALPHA; dstA = GlStateManager.DestFactor.ONE;
-            }
-            case GLINT -> {
-                src = GlStateManager.SourceFactor.SRC_COLOR; dst = GlStateManager.DestFactor.ONE;
-                srcA = GlStateManager.SourceFactor.ZERO; dstA = GlStateManager.DestFactor.ONE;
-            }
-            case INVERT -> {
-                src = GlStateManager.SourceFactor.ONE_MINUS_DST_COLOR; dst = GlStateManager.DestFactor.ONE_MINUS_SRC_COLOR;
-                srcA = GlStateManager.SourceFactor.ONE; dstA = GlStateManager.DestFactor.ZERO;
-            }
-            case OPAQUE -> { /* handled above */ }
-        }
-        RenderSystem.blendFuncSeparate(src, dst, srcA, dstA);
+        RenderSystem.blendFuncSeparate(b.src(), b.dst(), b.srcAlpha(), b.dstAlpha());
     }
+
+    /** The separable blend factors for a {@code BlendMode} ({@code null} = opaque / no blend). The single source of
+     *  truth shared by the immediate-draw path ({@link #applyRenderState()}) and the RenderType path
+     *  ({@link #transparencyOf}), so every mode is honoured identically by both — including the ones with no vanilla
+     *  {@code TransparencyStateShard} constant (premultiplied-alpha / entity-outline-blit / invert), which used to
+     *  silently collapse to plain translucent on the RenderType path. */
+    @org.jetbrains.annotations.Nullable
+    private static Blend blendFactors(RenderTypeGraph.Settings.BlendMode blend) {
+        var A = GlStateManager.SourceFactor.SRC_ALPHA;
+        var OMSA = GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA;
+        var ONE_S = GlStateManager.SourceFactor.ONE;
+        var ONE_D = GlStateManager.DestFactor.ONE;
+        return switch (blend) {
+            case OPAQUE -> null;
+            case TRANSLUCENT, ENTITY_OUTLINE_BLIT -> new Blend(A, OMSA, ONE_S, OMSA);
+            case TRANSLUCENT_PREMULTIPLIED_ALPHA -> new Blend(ONE_S, OMSA, ONE_S, OMSA);
+            case ADDITIVE, LIGHTNING, OVERLAY -> new Blend(A, ONE_D, A, ONE_D);
+            case GLINT -> new Blend(GlStateManager.SourceFactor.SRC_COLOR, ONE_D,
+                    GlStateManager.SourceFactor.ZERO, ONE_D);
+            case INVERT -> new Blend(GlStateManager.SourceFactor.ONE_MINUS_DST_COLOR,
+                    GlStateManager.DestFactor.ONE_MINUS_SRC_COLOR, ONE_S, GlStateManager.DestFactor.ZERO);
+        };
+    }
+
+    /** A separable blend function (colour src/dst + alpha src/dst). */
+    private record Blend(GlStateManager.SourceFactor src, GlStateManager.DestFactor dst,
+                         GlStateManager.SourceFactor srcAlpha, GlStateManager.DestFactor dstAlpha) {}
 
     // ---- RenderType export -------------------------------------------------------------------
 
@@ -212,7 +219,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
      *
      * <p>TODO(1.21-backport milestone 2): main-texture (Sampler0) state — a graph sampling a block/entity atlas
      * needs a {@code TextureStateShard} for it; currently only the graph's own EXPOSED samplers (set by name) and
-     * lightmap/overlay are bound, and {@code Settings.DepthTest.LESS} maps to {@code LEQUAL} (no public LESS shard).</p>
+     * lightmap/overlay are bound.</p>
      */
     public RenderType renderType() {
         if (renderType == null) renderType = buildRenderType();
@@ -238,22 +245,32 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     }
 
     private static RenderStateShard.TransparencyStateShard transparencyOf(RenderTypeGraph.Settings.BlendMode blend) {
-        return switch (blend) {
-            case OPAQUE -> RenderStateShard.NO_TRANSPARENCY;
-            case ADDITIVE, OVERLAY -> RenderStateShard.ADDITIVE_TRANSPARENCY;
-            case LIGHTNING -> RenderStateShard.LIGHTNING_TRANSPARENCY;
-            case GLINT -> RenderStateShard.GLINT_TRANSPARENCY;
-            // No vanilla shard for premultiplied / entity-outline-blit / invert — closest is translucent.
-            case TRANSLUCENT, TRANSLUCENT_PREMULTIPLIED_ALPHA, ENTITY_OUTLINE_BLIT, INVERT ->
-                    RenderStateShard.TRANSLUCENT_TRANSPARENCY;
-        };
+        Blend b = blendFactors(blend);
+        if (b == null) return RenderStateShard.NO_TRANSPARENCY;
+        // A custom shard built from the shared blendFactors — the public (name, setup, clear) constructor lets us
+        // honour every mode exactly (incl. those with no vanilla constant), and matches applyRenderState 1:1.
+        return new RenderStateShard.TransparencyStateShard("kg_" + blend.name().toLowerCase(java.util.Locale.ROOT),
+                () -> {
+                    RenderSystem.enableBlend();
+                    RenderSystem.blendFuncSeparate(b.src(), b.dst(), b.srcAlpha(), b.dstAlpha());
+                },
+                () -> {
+                    RenderSystem.disableBlend();
+                    RenderSystem.defaultBlendFunc();
+                });
     }
+
+    /** {@code LESS} has no public vanilla shard constant, but {@code DepthTestStateShard(name, glDepthFunc)} is
+     *  public — so we honour {@code GL_LESS} exactly rather than downgrading to {@code LEQUAL}. */
+    private static final RenderStateShard.DepthTestStateShard LESS_DEPTH_TEST =
+            new RenderStateShard.DepthTestStateShard("less", GL11.GL_LESS);
 
     private static RenderStateShard.DepthTestStateShard depthTestOf(RenderTypeGraph.Settings.DepthTest depth) {
         return switch (depth) {
             case NONE, ALWAYS -> RenderStateShard.NO_DEPTH_TEST;
             case EQUAL -> RenderStateShard.EQUAL_DEPTH_TEST;
-            case LEQUAL, LESS -> RenderStateShard.LEQUAL_DEPTH_TEST; // no public LESS shard — LEQUAL is closest
+            case LEQUAL -> RenderStateShard.LEQUAL_DEPTH_TEST;
+            case LESS -> LESS_DEPTH_TEST;
         };
     }
 

@@ -38,9 +38,11 @@ public final class KGBuiltinUniforms {
                 case "kg_Time" -> u.set(timeSeconds());
                 case "kg_IModelViewMat" -> u.set(new Matrix4f(RenderSystem.getModelViewMatrix()).invert());
                 case "kg_IProjMat" -> u.set(new Matrix4f(RenderSystem.getProjectionMatrix()).invert());
-                // TODO(1.21-backport milestone 2, transform group): world<->view rotation matrices need the live
-                // camera; identity for now (only the Transform / world-normal nodes reference these).
-                case "kg_ViewMat", "kg_IViewMat" -> u.set(new Matrix4f());
+                // 1.21.1 renders camera-relative, so geometry carries no model matrix at the shader level and the
+                // view matrix IS the modelview (camera rotation, camera at origin) — what the Transform /
+                // world-normal / clip<->world nodes need. (Was identity, which left those nodes world==view.)
+                case "kg_ViewMat" -> u.set(new Matrix4f(RenderSystem.getModelViewMatrix()));
+                case "kg_IViewMat" -> u.set(new Matrix4f(RenderSystem.getModelViewMatrix()).invert());
                 // KG-managed absolute world camera position (1.21.1 renders camera-relative; no vanilla camera
                 // uniform). Bound from the live render camera each frame — see CameraNode/GlobalsUboNode/Transform.
                 case "kg_CameraPos" -> {

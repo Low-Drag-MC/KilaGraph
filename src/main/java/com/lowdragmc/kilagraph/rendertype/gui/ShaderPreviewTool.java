@@ -46,9 +46,9 @@ import org.slf4j.Logger;
  * keeps rendering the last good material. The cube geometry is emitted in whatever vertex format/mode the material
  * uses ({@link PreviewRenderer}), so the preview matches the pipeline's expectations.</p>
  *
- * <p>TODO(1.21-backport milestone 2): apply the graph {@code Settings}' blend/cull/depth render state (a sane
- * opaque default is used for now); vanilla {@code RenderType} export via a {@code ShaderStateShard(() -> shader)}
- * is a later increment.</p>
+ * <p>The draw honours the graph {@code Settings}' blend/cull/depth via {@link RenderTypeGraphMaterial#applyRenderState()}
+ * (the immediate-mode equivalent of the {@link RenderTypeGraphMaterial#renderType()} export's {@code RenderStateShard}s,
+ * from the same mapping — so preview and in-world render match).</p>
  */
 public class ShaderPreviewTool extends UIElement implements IGraphTool {
 
