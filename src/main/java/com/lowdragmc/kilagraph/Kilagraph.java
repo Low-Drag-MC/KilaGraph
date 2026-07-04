@@ -48,11 +48,6 @@ public class Kilagraph {
         // bound to BlueprintGraph self-register.
         LOGGER.info("KilaGraph blueprint nodes loaded: {}", BlueprintGraph.NODE_REGISTRY.getNodeClasses().size());
         LOGGER.info("KilaGraph rendertype nodes loaded: {}", RenderTypeGraph.NODE_REGISTRY.getNodeClasses().size());
-        // TODO(1.21-backport milestone 2): GameTests are excluded from the main source set for the
-        // compile-only milestone — the test/gametest package targets the 1.21.5+ registration-based gametest
-        // API (TestData/TestEnvironmentDefinition/registerTest), absent in 1.21.1. Re-enable KGGameTests.init
-        // after migrating the tests to the 1.21.1 @GameTest/@GameTestHolder + GameTestHelper model.
-        // Client-only debug command + in-world draw for validating the RenderType pipeline end-to-end.
         if (FMLEnvironment.dist == Dist.CLIENT) {
             // Capture the opaque scene colour/depth (for Scene Color/Depth nodes), gated by demand.
             SceneCaptureHandler.init();

@@ -43,9 +43,10 @@ import java.util.Map;
  * everything in {@code ShaderInstance.apply()}.</p>
  *
  * <p>The material can be drawn either immediately (the editor preview: {@link #applyRenderState()} +
- * {@code drawWithShader}) or through its vanilla {@link #renderType()} on a {@code MultiBufferSource} (in-world —
- * verified). GRADIENT struct uniforms ARE applied (member-wise — see {@link #setGradient}). TODO(1.21-backport
- * milestone 2): scene/lightmap/overlay dynamic samplers are not yet applied (their node groups are deferred).</p>
+ * {@code drawWithShader}) or through its vanilla {@link #renderType()} on a {@code MultiBufferSource} (in-world).
+ * GRADIENT struct uniforms (member-wise, {@link #setGradient}) and Scene Color/Depth samplers
+ * ({@link SceneCaptureManager}) are applied here; lightmap/overlay samplers (Sampler1/Sampler2) are bound by the
+ * RenderType's {@code LIGHTMAP}/{@code OVERLAY} shards on the in-world path, not by the immediate preview draw.</p>
  */
 public final class RenderTypeGraphMaterial implements AutoCloseable {
 

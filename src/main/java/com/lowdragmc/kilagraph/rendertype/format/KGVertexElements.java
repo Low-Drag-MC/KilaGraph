@@ -59,7 +59,4 @@ public final class KGVertexElements {
     public static Collection<KGVertexElement> all() {
         return Collections.unmodifiableCollection(BY_KEY.values());
     }
-
-    /** Ensures the static initializer has run so the built-ins are present. */
-    public static void bootstrap() {}
 }
