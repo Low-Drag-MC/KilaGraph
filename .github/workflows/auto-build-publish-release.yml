@@ -29,7 +29,7 @@ on:
         default: false
 
 env:
-  JAVA_VERSION: '25'
+  JAVA_VERSION: '21'
   JAVA_DISTRIBUTION: 'temurin'
 
 jobs:
@@ -226,19 +226,18 @@ jobs:
             build/libs/!(*-@(all|dev|sources|javadoc|dev-shadow)).jar
             build/libs/*-@(sources).jar
 
-          name: KilaGraph-26.1.x-${{ needs.validate.outputs.version }}-neoforge
-          version: mc26.1.x-${{ needs.validate.outputs.version }}-neoforge
+          name: KilaGraph-1.21.1-${{ needs.validate.outputs.version }}-neoforge
+          version: mc1.21.1-${{ needs.validate.outputs.version }}-neoforge
           version-type: ${{ inputs.versionType }}
           changelog-file: CHANGELOG.*
 
           loaders: |
             neoforge
           game-versions: |
-            26.1.1
-            26.1.2
+            1.21.1
           game-version-filter: none
           java: |
-            25
+            21
           retry-attempts: 3
           retry-delay: 10000
           fail-mode: fail
