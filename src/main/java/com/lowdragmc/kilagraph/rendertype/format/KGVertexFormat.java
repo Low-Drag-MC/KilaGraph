@@ -41,8 +41,8 @@ public final class KGVertexFormat {
             DefaultVertexFormat.POSITION_TEX_COLOR,
             DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP,
             DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
-            // TODO(1.21-backport milestone 2): DefaultVertexFormat.POSITION_COLOR_LINE_WIDTH /
-            // POSITION_COLOR_NORMAL_LINE_WIDTH don't exist in 1.21.1 — dropped from the reuse set.
+            // (No line-width formats: 1.21.1 has no LineWidth vertex element — line width is a render-state,
+            // not a per-vertex attribute — so POSITION_COLOR_LINE_WIDTH / …_NORMAL_LINE_WIDTH don't exist here.)
 
     private KGVertexFormat() {}
 

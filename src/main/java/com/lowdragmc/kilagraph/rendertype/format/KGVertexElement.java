@@ -9,7 +9,7 @@ package com.lowdragmc.kilagraph.rendertype.format;
  * <p>The bridge to the real Minecraft element is {@link #mcElementId()} — a stable id into
  * {@link com.mojang.blaze3d.vertex.VertexFormatElement#byId(int)} — resolved only on the client when an
  * actual {@code VertexFormat} is built ({@link KGVertexFormat}). Built-ins use Minecraft's reserved ids
- * (POSITION=0 … LINE_WIDTH=6); custom elements registered by other mods pass the id they obtained from
+ * (POSITION=0 … NORMAL=5); custom elements registered by other mods pass the id they obtained from
  * {@code VertexFormatElement.register(findNextId(), …)}.</p>
  *
  * @param key        registry key, e.g. {@code "position"}, {@code "uv0"}

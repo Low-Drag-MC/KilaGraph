@@ -132,7 +132,7 @@ public class VertexAttributeInputNode extends ShaderNode implements IVertexForma
             case "uv0" -> new ShaderExpr("vUv", GlslType.VEC2);
             case "color" -> new ShaderExpr("vec4(1.0)", GlslType.VEC4);
             case "normal" -> new ShaderExpr("vNormal", GlslType.VEC3);
-            default -> zeroExpr(element.glslType()); // uv1/uv2/lineWidth/custom → zero of its type
+            default -> zeroExpr(element.glslType()); // uv1/uv2/custom → zero of its type
         };
     }
 

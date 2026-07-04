@@ -6,7 +6,7 @@ import java.util.Map;
 
 /**
  * One preview vertex in a format-agnostic, <b>client-safe</b> form: position + the attributes any preview
- * content might supply (uv, normal, color, light/overlay, line width). A {@code PreviewContent} fills these;
+ * content might supply (uv, normal, color, light/overlay). A {@code PreviewContent} fills these;
  * the client-side writer then emits only the attributes the target {@code VertexFormat} actually declares.
  *
  * <p>No {@code com.mojang.blaze3d} types, so the geometry/mode logic stays headless-testable. The packed
@@ -29,7 +29,6 @@ public final class PreviewVertex {
     public int color = 0xFFFFFFFF;          // ARGB white
     public int light = FULL_BRIGHT;
     public int overlay = NO_OVERLAY;
-    public float lineWidth = 1f;
 
     /** Per-vertex values for mod-registered custom elements, keyed by the element's registry key. Lazily
      *  allocated (most vertices use only the built-in fields). */
@@ -60,7 +59,7 @@ public final class PreviewVertex {
     /** A positional/uv/normal copy (attributes carry over) — used when a vertex is reused across primitives. */
     public PreviewVertex copy() {
         var c = new PreviewVertex(x, y, z, u, v, nx, ny, nz);
-        c.color = color; c.light = light; c.overlay = overlay; c.lineWidth = lineWidth;
+        c.color = color; c.light = light; c.overlay = overlay;
         if (custom != null) c.custom = new java.util.HashMap<>(custom);
         return c;
     }
