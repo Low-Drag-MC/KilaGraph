@@ -31,6 +31,10 @@ import java.util.List;
  * <p><b>Only meaningful for translucent materials</b> (the capture is taken after opaque geometry).
  * Fragment-only. The canonical use is a soft-particle / depth-fade by comparing against the fragment's
  * own depth.</p>
+ *
+ * <p><b>Editor previews show a flat value</b> — the capture runs during the world render, not behind the graph
+ * editor's offscreen preview scene, so there is no scene depth to sample there (as in Unity). It renders
+ * correctly in-world.</p>
  */
 @NodeAttribute(name = "rt_scene_depth", group = "rendertype_scene", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class SceneDepthNode extends ShaderNode {

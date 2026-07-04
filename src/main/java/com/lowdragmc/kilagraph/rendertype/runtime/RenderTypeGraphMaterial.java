@@ -7,6 +7,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.GradientGlsl;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
+import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.lowdraglib2.client.shader.LDShaderInstance;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.shaders.Uniform;
@@ -68,6 +69,9 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     /** Whether an Overlay/LightMap node referenced Sampler1/Sampler2 — drives the RenderType's overlay/lightmap shards. */
     private final boolean usesOverlay;
     private final boolean usesLightmap;
+    /** Whether a Scene Color/Depth node referenced KG_SceneColor/KG_SceneDepth — drives the scene capture
+     *  ({@link SceneCaptureManager}, acquired for this material's lifetime) + binds those samplers at draw. */
+    private final boolean usesScene;
     /** Lazily-built vanilla RenderType bound to {@link #shader} (for in-world rendering / export). */
     @org.jetbrains.annotations.Nullable
     private RenderType renderType;
@@ -85,6 +89,9 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         this.variableSamplers = new HashMap<>(compiled.variableSamplers());
         this.usesOverlay = compiled.usesOverlay();
         this.usesLightmap = compiled.usesLightmap();
+        this.usesScene = compiled.usesSceneColor() || compiled.usesSceneDepth();
+        // A scene-using material keeps the opaque-scene capture alive for its lifetime (balanced in close()).
+        if (usesScene) SceneCaptureManager.INSTANCE.acquire();
         // Bake EXPOSED-variable default values + default sampler textures.
         this.values.putAll(compiled.uniformDefaults());
         for (Map.Entry<String, SamplerDefault> e : compiled.samplerDefaults().entrySet()) {
@@ -306,6 +313,13 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         }
         var textureManager = Minecraft.getInstance().getTextureManager();
         samplerTextures.forEach((name, loc) -> shader.setSampler(name, textureManager.getTexture(loc)));
+        // Scene Color/Depth: bind the opaque-scene capture's texture ids (as raw GL ids — ShaderInstance.apply
+        // accepts Integer samplers, cf. RenderTarget._blitToScreen). A sampler the shader didn't declare is a
+        // harmless no-op (apply only binds names in the manifest), so bind both when the material uses the scene.
+        if (usesScene) {
+            shader.setSampler(ShaderGraphCompiler.SCENE_COLOR_SAMPLER, SceneCaptureManager.INSTANCE.colorTextureId());
+            shader.setSampler(ShaderGraphCompiler.SCENE_DEPTH_SAMPLER, SceneCaptureManager.INSTANCE.depthTextureId());
+        }
     }
 
     private void setUniform(String name, GlslType type, float[] v) {
@@ -352,6 +366,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     public void close() {
         if (closed) return;
         closed = true;
+        if (usesScene) SceneCaptureManager.INSTANCE.release(); // balance the acquire() in the ctor
         shader.close();
     }
 }

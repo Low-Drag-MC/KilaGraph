@@ -18,6 +18,10 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  *
  * <p><b>Only meaningful for translucent materials</b> ({@code BlendMode != OPAQUE}): the capture is taken
  * after all opaque geometry, so an opaque material draws before it exists. Fragment-only.</p>
+ *
+ * <p><b>Editor previews show black</b> — the capture runs during the world render ({@code SceneCaptureManager}),
+ * which does not happen behind the graph editor's offscreen preview scene, so there is no scene to sample there
+ * (as in Unity). It renders correctly in-world.</p>
  */
 @NodeAttribute(name = "rt_scene_color", group = "rendertype_scene", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class SceneColorNode extends ShaderNode {
