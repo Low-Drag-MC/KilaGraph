@@ -55,11 +55,13 @@ public final class KGBuiltinUniforms {
     }
 
     /** World time in seconds, wrapping every MC day (24000 ticks = 1200 s) to keep float precision — matches
-     *  the KG_Globals {@code Time} the 26.1 engine block provided. Tick granularity (partial-tick smoothing is
-     *  a milestone-2 refinement). */
+     *  the KG_Globals {@code Time} the 26.1 engine block provided. Adds the render partial-tick so the value
+     *  advances smoothly per frame instead of stepping at 20 Hz (1.21.1: {@code Minecraft.getTimer()} is the
+     *  {@link net.minecraft.client.DeltaTracker}; 26.1 spells the accessor {@code getDeltaTracker()}). */
     private static float timeSeconds() {
         Minecraft mc = Minecraft.getInstance();
         long gameTime = mc.level != null ? mc.level.getGameTime() : 0L;
-        return (gameTime % 24000L) / 20.0f;
+        float partial = mc.getTimer().getGameTimeDeltaPartialTick(false);
+        return ((gameTime % 24000L) + partial) / 20.0f;
     }
 }
