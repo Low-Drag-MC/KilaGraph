@@ -118,6 +118,14 @@ public class RenderTypeGraph extends Graph {
         return VertexColorNode.MODE_MIX_LIGHT;
     }
 
+    /**
+     * The vertex-position block class the default shader places in the vertex stage. Subclasses with their
+     * own fixed transform override this so the default graph — and nothing else — uses their block.
+     */
+    protected Class<? extends BlockNode> defaultVertexPositionBlockClass() {
+        return VertexPositionBlock.class;
+    }
+
     /** Set a node option's value (mirrors the editor's option-constant write). */
     private static void setNodeOption(NodeModel node, String optionId, Object value) {
         for (var opt : node.getNodeOptions()) {
@@ -175,7 +183,7 @@ public class RenderTypeGraph extends Graph {
         // Only Position is an explicit vertex block now. The mesh uv (texture sample's uv), the lit vertex
         // colour (VertexColorNode), and the fog distances (inside the fog subgraph) all come from compiler
         // defaults — no specialized varying blocks needed.
-        createBlock(vertexStage, VertexPositionBlock.class);
+        createBlock(vertexStage, defaultVertexPositionBlockClass());
         var vertexColor = createNode(VertexColorNode.class, 208, 112); // lit vertex colour (fsh)
         setNodeOption(vertexColor, "mode", defaultVertexColorMode());
         vertexColor.setPreviewExpanded(false);
@@ -289,6 +297,15 @@ public class RenderTypeGraph extends Graph {
         return settings;
     }
 
+    /**
+     * The compiler used everywhere this graph is turned into GLSL — real compiles, editor previews,
+     * per-node previews, and validation. Subclasses with a different compile target override this to
+     * supply their {@link ShaderGraphCompiler} subclass.
+     */
+    public ShaderGraphCompiler createCompiler() {
+        return new ShaderGraphCompiler(this);
+    }
+
     public NodeModel getVertexStageModel() {
         return vertexStageModel;
     }
@@ -357,7 +374,7 @@ public class RenderTypeGraph extends Graph {
         //    path). Reported as WARNINGs — the shader still compiles (the default degraded to a constant).
         if (logger == null) return;
         try {
-            var compiled = new ShaderGraphCompiler(this).compile();
+            var compiled = createCompiler().compile();
             for (String attrib : compiled.missingAttributes()) {
                 if (flaggedAttribs.add(attrib)) {
                     logger.warning(Component.translatable("rendertypegraph.warn.vertex_element_defaulted", attrib));

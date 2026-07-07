@@ -51,6 +51,7 @@
   "normal": "法线",
   "utility": "实用工具",
   "gradient": "渐变",
+  "curve": "曲线",
   "string": "字符串",
   "vertex": "顶点",
   "fragment": "片元",
@@ -81,6 +82,8 @@
   "rt_color": "颜色",
   "rt_gradient": "渐变",
   "rt_sample_gradient": "采样渐变",
+  "rt_curve": "曲线",
+  "rt_sample_curve": "采样曲线",
   "rt_time": "时间",
   "rt_game_time": "游戏时间",
 
@@ -224,6 +227,7 @@
 
   "kg.gradient.bar": "渐变",
   "kg.gradient.mode": "模式",
+  "kg.curve.lock_control_points": "锁定控制点",
 
   "rendertypegraph.settings.title": "RenderType",
   "rendertypegraph.settings.preset": "预设",
@@ -528,6 +532,8 @@
   "kg.node.rt_sampler_texture2d.tooltip": "在 UV 坐标处采样 Texture2D 采样器。",
   "kg.node.rt_gradient.tooltip": "常量渐变（颜色关键帧 + 透明度关键帧，混合/固定）。将其连入采样渐变节点使用。",
   "kg.node.rt_sample_gradient.tooltip": "在 Time（0-1）处采样渐变得到颜色。Time 未连接时默认取网格 UV.x，因此预览会沿水平方向扫过整条渐变。",
+  "kg.node.rt_curve.tooltip": "常量浮点曲线（贝塞尔关键点，重映射到 [lower, upper]）。接入采样曲线节点使用；需要运行时可调时请改用 Curve 变量。",
+  "kg.node.rt_sample_curve.tooltip": "在 Time（0-1）处采样曲线，输出 [lower, upper] 范围内的浮点值。Time 未连接时默认取网格 UV.x，预览会沿水平方向扫过整条曲线。",
   "kg.node.rt_overlay_texture.tooltip": "提供 Minecraft Overlay 纹理采样。",
   "kg.node.rt_lightmap_texture.tooltip": "提供 Minecraft 光照贴图纹理采样。",
   "kg.node.rt_screen_position.tooltip": "按选定坐标空间输出片元屏幕位置。",

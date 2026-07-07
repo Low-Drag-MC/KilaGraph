@@ -160,6 +160,13 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
                 com.lowdragmc.kilagraph.rendertype.compiler.GradientGlsl.pack(value));
     }
 
+    /** Set an EXPOSED Curve variable from a {@link com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.CurveValue}
+     *  — std140-packed (header + 16 segment vec4) into its {@code KG_Curve} UBO field. */
+    public boolean setCurve(String variableName, com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.CurveValue value) {
+        return setByVariable(variableName,
+                com.lowdragmc.kilagraph.rendertype.compiler.CurveGlsl.pack(value));
+    }
+
     private boolean setByVariable(String variableName, float... components) {
         MaterialUniformLayout.Field field = uniformFields.get(variableName);
         if (field == null) return false;

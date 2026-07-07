@@ -27,7 +27,7 @@ import java.util.function.Supplier;
 public class ShaderFunctionGraphResource extends GraphResource<ShaderFunctionGraph> {
     public static final ShaderFunctionGraphResource INSTANCE = new ShaderFunctionGraphResource();
 
-    private ShaderFunctionGraphResource() {}
+    protected ShaderFunctionGraphResource() {}
 
     @Override
     public ShaderFunctionGraph createGraph() {

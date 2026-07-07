@@ -51,6 +51,7 @@
   "normal": "Normal",
   "utility": "Utility",
   "gradient": "Gradient",
+  "curve": "Curve",
   "string": "String",
   "vertex": "Vertex",
   "fragment": "Fragment",
@@ -81,6 +82,8 @@
   "rt_color": "Color",
   "rt_gradient": "Gradient",
   "rt_sample_gradient": "Sample Gradient",
+  "rt_curve": "Curve",
+  "rt_sample_curve": "Sample Curve",
   "rt_time": "Time",
   "rt_game_time": "Game Time",
 
@@ -223,6 +226,7 @@
 
   "kg.gradient.bar": "Gradient",
   "kg.gradient.mode": "Mode",
+  "kg.curve.lock_control_points": "Lock Control Points",
   "kg.sampler.preview": "Preview",
 
   "rendertypegraph.settings.title": "RenderType",
@@ -529,6 +533,8 @@
   "kg.node.rt_sampler_texture2d.tooltip": "Samples a Texture2D sampler at UV coordinates.",
   "kg.node.rt_gradient.tooltip": "A constant gradient (color keys + alpha keys, Blend/Fixed). Feed it into a Sample Gradient node.",
   "kg.node.rt_sample_gradient.tooltip": "Samples a Gradient at Time (0-1) to a color. An unconnected Time defaults to the mesh UV.x, so the preview shows the gradient swept horizontally.",
+  "kg.node.rt_curve.tooltip": "A constant float curve (bezier keys remapped to [lower, upper]). Feed it into a Sample Curve node. For a runtime-adjustable curve, expose a Curve variable instead.",
+  "kg.node.rt_sample_curve.tooltip": "Samples a Curve at Time (0-1) to a float in the curve's [lower, upper] range. An unconnected Time defaults to the mesh UV.x, so the preview shows the curve swept horizontally.",
   "kg.node.rt_overlay_texture.tooltip": "Provides Minecraft overlay texture sampling.",
   "kg.node.rt_lightmap_texture.tooltip": "Provides Minecraft lightmap texture sampling.",
   "kg.node.rt_screen_position.tooltip": "Outputs the fragment screen position in the selected coordinate space.",
