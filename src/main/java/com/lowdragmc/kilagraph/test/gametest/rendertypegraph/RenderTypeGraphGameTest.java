@@ -531,7 +531,7 @@ public final class RenderTypeGraphGameTest {
     }
 
     /** The composed vertex format drives the generated {@code in} attribute declarations: a Block-preset
-     * graph declares exactly Position/Color/UV0/UV2 and omits UV1/Normal. */
+     * graph declares exactly Position/Color/UV0/UV2/Normal (the stock BLOCK layout) and omits UV1. */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void compileRespectsComposedVertexFormat(GameTestHelper helper) {
@@ -546,8 +546,8 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "block vsh declares Color", vsh.contains("in vec4 Color;"));
         assertTrue(helper, "block vsh declares UV0", vsh.contains("in vec2 UV0;"));
         assertTrue(helper, "block vsh declares UV2", vsh.contains("in ivec2 UV2;"));
+        assertTrue(helper, "block vsh declares Normal", vsh.contains("in vec3 Normal;"));
         assertFalse(helper, "block vsh omits UV1", vsh.contains("in ivec2 UV1;"));
-        assertFalse(helper, "block vsh omits Normal", vsh.contains("in vec3 Normal;"));
         helper.succeed();
     }
 

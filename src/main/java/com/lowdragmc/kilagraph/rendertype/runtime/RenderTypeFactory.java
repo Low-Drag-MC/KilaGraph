@@ -31,7 +31,7 @@ public final class RenderTypeFactory {
     /** Compile {@code graph} and build a material from it. Returns {@code null} if the GLSL fails to compile. */
     @Nullable
     public static RenderTypeGraphMaterial createMaterial(RenderTypeGraph graph) {
-        return createMaterial(new ShaderGraphCompiler(graph).compile());
+        return createMaterial(graph.createCompiler().compile());
     }
 
     /** Build a material from an already-compiled graph. Returns {@code null} on stage errors or GLSL compile

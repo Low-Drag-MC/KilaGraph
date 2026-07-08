@@ -2,6 +2,7 @@ package com.lowdragmc.kilagraph.rendertype.runtime;
 
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
+import com.lowdragmc.kilagraph.rendertype.compiler.CurveGlsl;
 import com.lowdragmc.kilagraph.rendertype.compiler.GradientGlsl;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 
@@ -70,6 +71,14 @@ public final class KGShaderManifest {
             }
             return;
         }
+        // A CURVE struct uniform expands the same way: header + 2*MAX_SEGMENTS segment vec4 members.
+        if (type == GlslType.CURVE) {
+            out.add(entry(name + ".header", "float", 4, "0.0, 0.0, 0.0, 0.0"));
+            for (int i = 0; i < CurveGlsl.MAX_SEGMENTS * 2; i++) {
+                out.add(entry(name + ".segments[" + i + "]", "float", 4, "0.0, 0.0, 0.0, 0.0"));
+            }
+            return;
+        }
         out.add(switch (type) {
             case FLOAT -> entry(name, "float", 1, "0.0");
             case VEC2 -> entry(name, "float", 2, "0.0, 0.0");
@@ -78,7 +87,7 @@ public final class KGShaderManifest {
             case INT, BOOL -> entry(name, "int", 1, "0");
             case MAT4 -> entry(name, "matrix4x4", 16,
                     "1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0");
-            case SAMPLER2D, GRADIENT -> throw new IllegalStateException("handled above");
+            case SAMPLER2D, GRADIENT, CURVE -> throw new IllegalStateException("handled above");
         });
     }
 

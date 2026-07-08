@@ -22,8 +22,7 @@ import org.joml.Vector4f;
 import java.util.function.Consumer;
 
 /**
- * An interactive Unity-style gradient editor widget (ported from Photon's {@code GradientColorSelector},
- * adapted to LDLib2 26.1's GUI API). A live gradient bar with two indicator rails: alpha keys above,
+ * An interactive Unity-style gradient editor widget. A live gradient bar with two indicator rails: alpha keys above,
  * colour keys below. Double-click a rail to add a key, drag an indicator to move it, right-click to
  * remove it, left-click to select it and edit its value in the embedded {@link ColorSelector} (alpha
  * slider for alpha keys, full picker for colour keys). Operates directly on a {@link GradientColor}

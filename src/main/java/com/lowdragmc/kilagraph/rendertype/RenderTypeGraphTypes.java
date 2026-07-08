@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype;
 
 import com.lowdragmc.lowdraglib2.math.GradientColor;
+import com.lowdragmc.lowdraglib2.math.curve.ExplicitCubicBezierCurve2;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandleHelpers;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
@@ -17,6 +18,7 @@ import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -54,6 +56,15 @@ public final class RenderTypeGraphTypes {
      * node turns it + a float position into a {@code vec4}. Carries a full gradient-bar editor.
      */
     public static final TypeHandle GRADIENT = TypeHandleHelpers.customType(GradientValue.class, "KG_GRADIENT", "Gradient");
+    /**
+     * A Unity-style float curve: explicit cubic bezier segments (normalized 0..1 x/y) remapped to a
+     * {@code [lower, upper]} output range ({@link CurveValue}, wrapping LDLib2's
+     * {@link ExplicitCubicBezierCurve2}). Like {@code GRADIENT} it is an opaque wire type — in GLSL it
+     * is a {@code KG_Curve} struct value (see
+     * {@link com.lowdragmc.kilagraph.rendertype.compiler.GlslType#CURVE}); a {@code SampleCurve} node
+     * turns it + a float position into a {@code float}. Carries a full curve-graph editor.
+     */
+    public static final TypeHandle CURVE = TypeHandleHelpers.customType(CurveValue.class, "KG_CURVE", "Curve");
 
     static {
         // A custom object type's constant starts at its registered default-value supplier (else null).
@@ -84,6 +95,12 @@ public final class RenderTypeGraphTypes {
         TypeHandleHelpers.setCustomColor(GRADIENT, 0xFFE05CC0);
         TypeHandleHelpers.setCustomConfigurable(GRADIENT, (valueConfigurable, typeHandle) ->
                 com.lowdragmc.kilagraph.rendertype.gui.GradientConfigurator.build(valueConfigurable));
+        // CURVE: a fresh linear 0->1 ramp default, an amber port colour, and the client-only curve-graph
+        // editor (lazy reference so the compiler/headless path never loads the UI class).
+        TypeHandleHelpers.setCustomDefaultValue(CURVE, CurveValue::defaultValue);
+        TypeHandleHelpers.setCustomColor(CURVE, 0xFFE0A33C);
+        TypeHandleHelpers.setCustomConfigurable(CURVE, (valueConfigurable, typeHandle) ->
+                com.lowdragmc.kilagraph.rendertype.gui.CurveConfigurator.build(valueConfigurable));
     }
 
     /** Node-palette type-picker handles shared by RenderTypeGraph and ShaderFunctionGraph. */
@@ -99,7 +116,7 @@ public final class RenderTypeGraphTypes {
      */
     public static final List<TypeHandle> VARIABLE_SUPPORT_TYPES = List.of(
             TypeHandles.BOOL, TypeHandles.INT, TypeHandles.FLOAT,
-            VEC2, VEC3, VEC4, TypeHandles.COLOR, MAT4, SAMPLER2D, GRADIENT);
+            VEC2, VEC3, VEC4, TypeHandles.COLOR, MAT4, SAMPLER2D, GRADIENT, CURVE);
 
     /**
      * Types offered as draggable "Constant" nodes in the item library — scalars only. Vectors come from
@@ -269,5 +286,104 @@ public final class RenderTypeGraphTypes {
                             g.getRgbP().add(new Vector4f(buf.readFloat(), buf.readFloat(), buf.readFloat(), buf.readFloat()));
                         }
                         return new GradientValue(g, BlendMode.values()[buf.readVarInt()]);
+                    });
+
+    /**
+     * A {@link #CURVE} value: explicit cubic bezier segments over a normalized 0..1 x/y square (LDLib2's
+     * {@link ExplicitCubicBezierCurve2}; segments are contiguous and sorted by x), whose sampled y is
+     * remapped to {@code [lower, upper]}. Serialized via {@link #CURVE_CODEC} (registered as an accessor
+     * at mod init so it round-trips in graph NBT). Segments are mutable (the editor drags points in
+     * place), so {@link #copy()} deep-copies.
+     */
+    public record CurveValue(List<ExplicitCubicBezierCurve2> segments, float lower, float upper) {
+        /** A linear 0 &rarr; 1 ramp over [0, 1] — the most useful starting point for a shader curve. */
+        public static CurveValue defaultValue() {
+            var segments = new ArrayList<ExplicitCubicBezierCurve2>();
+            segments.add(new ExplicitCubicBezierCurve2(
+                    new Vector2f(0f, 0f), new Vector2f(0.25f, 0.25f),
+                    new Vector2f(0.75f, 0.75f), new Vector2f(1f, 1f)));
+            return new CurveValue(segments, 0f, 1f);
+        }
+
+        public CurveValue copy() {
+            var copied = new ArrayList<ExplicitCubicBezierCurve2>(segments.size());
+            for (var segment : segments) copied.add(segment.copy());
+            return new CurveValue(copied, lower, upper);
+        }
+
+        /**
+         * The normalized (0..1) curve y at {@code x}: before the first key holds the first y, after the
+         * last key holds the last y, and a zero-width
+         * segment steps to its later point instead of dividing by zero.
+         */
+        public float getCurveY(float x) {
+            if (segments.isEmpty()) return 0.5f;
+            var value = segments.getFirst().p0.y;
+            var found = x < segments.getFirst().p0.x;
+            if (!found) {
+                for (var curve : segments) {
+                    if (x >= curve.p0.x && x <= curve.p1.x) {
+                        var dx = curve.p1.x - curve.p0.x;
+                        value = dx <= 0 ? curve.p1.y : curve.getPoint((x - curve.p0.x) / dx).y;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found) {
+                value = segments.getLast().p1.y;
+            }
+            return value;
+        }
+
+        /** The remapped curve value at {@code x}: {@code lerp(lower, upper, getCurveY(x))}. */
+        public float sample(float x) {
+            return lower + (upper - lower) * getCurveY(x);
+        }
+
+        public CurveValue withBounds(float lower, float upper) {
+            return new CurveValue(segments, lower, upper);
+        }
+    }
+
+    /** Codec for one bezier segment (its four control points). Rebuilds via the public point fields. */
+    public static final Codec<ExplicitCubicBezierCurve2> CURVE_SEGMENT_CODEC = RecordCodecBuilder.create(i -> i.group(
+            LDLibExtraCodecs.VECTOR2F.fieldOf("p0").forGetter(c -> c.p0),
+            LDLibExtraCodecs.VECTOR2F.fieldOf("c0").forGetter(c -> c.c0),
+            LDLibExtraCodecs.VECTOR2F.fieldOf("c1").forGetter(c -> c.c1),
+            LDLibExtraCodecs.VECTOR2F.fieldOf("p1").forGetter(c -> c.p1)
+    ).apply(i, ExplicitCubicBezierCurve2::new));
+
+    public static final Codec<CurveValue> CURVE_CODEC = RecordCodecBuilder.create(i -> i.group(
+            Codec.list(CURVE_SEGMENT_CODEC).fieldOf("segments")
+                    .forGetter(v -> List.copyOf(v.segments())),
+            Codec.FLOAT.optionalFieldOf("lower", 0f).forGetter(CurveValue::lower),
+            Codec.FLOAT.optionalFieldOf("upper", 1f).forGetter(CurveValue::upper)
+    ).apply(i, (segments, lower, upper) -> new CurveValue(new ArrayList<>(segments), lower, upper)));
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, CurveValue> CURVE_STREAM_CODEC =
+            StreamCodec.of(
+                    (buf, v) -> {
+                        buf.writeVarInt(v.segments().size());
+                        for (var s : v.segments()) {
+                            buf.writeFloat(s.p0.x); buf.writeFloat(s.p0.y);
+                            buf.writeFloat(s.c0.x); buf.writeFloat(s.c0.y);
+                            buf.writeFloat(s.c1.x); buf.writeFloat(s.c1.y);
+                            buf.writeFloat(s.p1.x); buf.writeFloat(s.p1.y);
+                        }
+                        buf.writeFloat(v.lower());
+                        buf.writeFloat(v.upper());
+                    },
+                    buf -> {
+                        int n = buf.readVarInt();
+                        var segments = new ArrayList<ExplicitCubicBezierCurve2>(n);
+                        for (int k = 0; k < n; k++) {
+                            segments.add(new ExplicitCubicBezierCurve2(
+                                    new Vector2f(buf.readFloat(), buf.readFloat()),
+                                    new Vector2f(buf.readFloat(), buf.readFloat()),
+                                    new Vector2f(buf.readFloat(), buf.readFloat()),
+                                    new Vector2f(buf.readFloat(), buf.readFloat())));
+                        }
+                        return new CurveValue(segments, buf.readFloat(), buf.readFloat());
                     });
 }

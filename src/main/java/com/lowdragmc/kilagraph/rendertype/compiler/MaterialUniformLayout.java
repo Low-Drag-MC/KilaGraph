@@ -57,6 +57,12 @@ public final class MaterialUniformLayout {
         return fields.values().stream().anyMatch(f -> f.type() == GlslType.GRADIENT);
     }
 
+    /** Whether any field is a {@link GlslType#CURVE} — the {@code KG_Curve} struct must then be
+     *  declared (in the stage prelude) before the field that references the type. */
+    public boolean hasCurveField() {
+        return fields.values().stream().anyMatch(f -> f.type() == GlslType.CURVE);
+    }
+
     /**
      * Emit the GLSL declaration of the material's individual field + sampler uniforms (empty string if none).
      * 1.21.1 backport: each field is a plain {@code uniform <T> name;} (no {@code layout(std140) uniform} block —

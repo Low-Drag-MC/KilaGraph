@@ -78,8 +78,11 @@ import com.lowdragmc.kilagraph.rendertype.nodes.math.trigonometry.SinNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.uv.TilingAndOffsetNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.constant.TimeNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.constant.GradientNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.constant.CurveNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.artistic.gradient.SampleGradientNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.artistic.curve.SampleCurveNode;
 import com.lowdragmc.lowdraglib2.math.GradientColor;
+import com.lowdragmc.lowdraglib2.math.curve.ExplicitCubicBezierCurve2;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec2Node;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec4Node;
@@ -634,6 +637,94 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "encodes to NBT", encoded != null);
         var decoded = RenderTypeGraphTypes.GRADIENT_CODEC.parse(NbtOps.INSTANCE, encoded).result().orElse(null);
         assertTrue(helper, "decodes equal to original", value.equals(decoded));
+        helper.succeed();
+    }
+
+    /**
+     * A constant Curve node + Sample Curve (the CURVE twin of {@link #gradientNodesEmitGlsl}): the
+     * {@code KG_Curve} struct + {@code kg_sampleCurve} helper are declared (struct before {@code main()}),
+     * a per-curve builder is baked with the segments, and the fragment samples it (opaque — no temp copy).
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void curveNodesEmitGlsl(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel baseColor = addBlock(graph, fragment, FragmentBaseColorBlock.class);
+        NodeModel curve = addNode(graph, CurveNode.class);
+        setOption(curve, "curve", RenderTypeGraphTypes.CurveValue.defaultValue().withBounds(0f, 2f));
+        NodeModel sample = addNode(graph, SampleCurveNode.class);
+        wire(graph, sample.getInputsById().get("curve"), curve.getOutputsById().get("curve"));
+        wire(graph, baseColor.getInputsById().get("color"), sample.getOutputsById().get("value"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "KG_Curve struct declared", fsh.contains("struct KG_Curve"));
+        assertTrue(helper, "sample helper declared", fsh.contains("float kg_sampleCurve(KG_Curve"));
+        assertTrue(helper, "per-curve builder declared", fsh.contains("KG_Curve kg_curve_"));
+        assertTrue(helper, "bounds baked into header", fsh.contains("c.header = vec4(1.0, 0.0, 2.0, 0.0);"));
+        assertTrue(helper, "fragment samples the curve", fsh.contains("kg_sampleCurve("));
+        assertTrue(helper, "struct declared before main()",
+                fsh.indexOf("struct KG_Curve") < fsh.indexOf("void main"));
+        helper.succeed();
+    }
+
+    /**
+     * An EXPOSED Curve variable becomes a {@code KG_Curve} uniform (the CURVE twin of
+     * {@link #gradientVariableBecomesUboStruct}): struct declared before the uniform, default packed
+     * (header + 16 segment vec4 = 68 floats), set-by-name mapping recorded, and the manifest declares
+     * every struct member (else ShaderInstance creates no Uniform and the curve stays zero at runtime).
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void curveVariableBecomesUniformStruct(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel baseColor = addBlock(graph, fragment, FragmentBaseColorBlock.class);
+
+        var curveVar = (VariableDeclarationModelBase) graph.graphModel.createVariable(
+                "Fade", RenderTypeGraphTypes.CURVE,
+                RenderTypeGraphTypes.CurveValue.defaultValue(), VariableKind.INPUT);
+        curveVar.setScope(VariableScope.EXPOSED);
+        var curveNode = graph.graphModel.createVariableNode(curveVar, new Vector2f(0, 0), null, null);
+        NodeModel sample = addNode(graph, SampleCurveNode.class);
+        wire(graph, sample.getInputsById().get("curve"), curveNode.getOutputPort());
+        wire(graph, baseColor.getInputsById().get("color"), sample.getOutputsById().get("value"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        String fsh = compiled.fragmentSource();
+        assertTrue(helper, "curve var is a KG_Curve uniform", fsh.contains("KG_Curve kg_Fade;"));
+        assertTrue(helper, "struct declared before the curve uniform that uses it",
+                fsh.indexOf("struct KG_Curve") < fsh.indexOf("uniform KG_Curve"));
+        assertTrue(helper, "curve uniform default recorded", compiled.uniformDefaults().containsKey("kg_Fade"));
+        assertEq(helper, "curve packs 68 floats", 68, compiled.uniformDefaults().get("kg_Fade").length);
+        assertTrue(helper, "variable name maps to its field for set-by-name",
+                compiled.uniformFields().containsKey("Fade"));
+        String manifest = com.lowdragmc.kilagraph.rendertype.runtime.KGShaderManifest.json(compiled, "test");
+        assertTrue(helper, "manifest declares curve header member", manifest.contains("\"kg_Fade.header\""));
+        assertTrue(helper, "manifest declares first segment", manifest.contains("\"kg_Fade.segments[0]\""));
+        assertTrue(helper, "manifest declares last segment", manifest.contains("\"kg_Fade.segments[15]\""));
+        helper.succeed();
+    }
+
+    /** A {@link RenderTypeGraphTypes.CurveValue} round-trips through its codec, and its CPU evaluation
+     *  holds first/last y outside the key range (the same contract the GLSL sampler implements). */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void curveValueCodecRoundTrips(GameTestHelper helper) {
+        var segments = new java.util.ArrayList<ExplicitCubicBezierCurve2>();
+        segments.add(new ExplicitCubicBezierCurve2(
+                new Vector2f(0.2f, 0.1f), new Vector2f(0.4f, 0.9f),
+                new Vector2f(0.6f, 0.9f), new Vector2f(0.8f, 0.3f)));
+        var value = new RenderTypeGraphTypes.CurveValue(segments, -1f, 3f);
+        var encoded = RenderTypeGraphTypes.CURVE_CODEC.encodeStart(NbtOps.INSTANCE, value).result().orElse(null);
+        assertTrue(helper, "encodes to NBT", encoded != null);
+        var decoded = RenderTypeGraphTypes.CURVE_CODEC.parse(NbtOps.INSTANCE, encoded).result().orElse(null);
+        assertTrue(helper, "decodes equal to original", value.equals(decoded));
+        assertTrue(helper, "before-first holds first y", Math.abs(value.getCurveY(0f) - 0.1f) < 1e-5f);
+        assertTrue(helper, "after-last holds last y", Math.abs(value.getCurveY(1f) - 0.3f) < 1e-5f);
+        assertTrue(helper, "sample remaps into [lower, upper]",
+                Math.abs(value.sample(0f) - (-1f + 4f * 0.1f)) < 1e-4f);
         helper.succeed();
     }
 

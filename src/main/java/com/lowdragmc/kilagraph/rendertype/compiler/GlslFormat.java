@@ -59,6 +59,8 @@ public final class GlslFormat {
             // GRADIENT constants are emitted by GradientNode's own builder; unconnected/LOCAL gradients are
             // routed through the compiler's defaultGradient()/builder paths, so this is only a safe fallback.
             case GRADIENT -> "kg_gradientDefault()";
+            // CURVE mirrors GRADIENT: real constants go through the compiler's constantCurve() builder.
+            case CURVE -> "kg_curveDefault()";
         };
     }
 
@@ -91,6 +93,10 @@ public final class GlslFormat {
             case GRADIENT -> value instanceof RenderTypeGraphTypes.GradientValue gv
                     ? GradientGlsl.pack(gv)
                     : GradientGlsl.pack(RenderTypeGraphTypes.GradientValue.defaultValue());
+            // EXPOSED curve default: the packed curve (header + 16 segment vec4s).
+            case CURVE -> value instanceof RenderTypeGraphTypes.CurveValue cv
+                    ? CurveGlsl.pack(cv)
+                    : CurveGlsl.pack(RenderTypeGraphTypes.CurveValue.defaultValue());
         };
     }
 

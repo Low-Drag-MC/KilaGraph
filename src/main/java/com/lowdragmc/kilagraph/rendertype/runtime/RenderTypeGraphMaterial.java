@@ -2,23 +2,19 @@ package com.lowdragmc.kilagraph.rendertype.runtime;
 
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
-import com.lowdragmc.kilagraph.rendertype.compiler.GradientGlsl;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
-import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.lowdraglib2.client.shader.LDShaderInstance;
 import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.shaders.Uniform;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
-import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 import org.joml.Matrix4fc;
 import org.joml.Vector2fc;
@@ -26,7 +22,6 @@ import org.joml.Vector3fc;
 import org.joml.Vector4fc;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -57,16 +52,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     private final String contentHash;
     /** builtin / KG-managed uniforms the GLSL declares (name -> type), staged each draw via {@link KGBuiltinUniforms}. */
     private final Map<String, GlslType> builtinUniforms;
-    /** EXPOSED-variable uniform fields (name -> type), set each draw from {@link #values}. */
-    private final List<MaterialUniformLayout.Field> materialFields;
-    /** EXPOSED variable display name -> its uniform field, for set-by-name updates. */
-    private final Map<String, MaterialUniformLayout.Field> uniformFields;
-    /** Sampler2D variable display name -> sampler uniform name, so setTexture accepts the friendly name. */
-    private final Map<String, String> variableSamplers;
-    /** uniform name -> current components. */
-    private final Map<String, float[]> values = new HashMap<>();
-    /** sampler uniform name -> bound texture, resolved to an AbstractTexture at {@link #applyUniforms()}. */
-    private final Map<String, ResourceLocation> samplerTextures = new HashMap<>();
+    /** The EXPOSED-variable uniform values + sampler bindings (set-by-name store, staged each draw). */
+    private final KGMaterialValues values;
     /** Whether an Overlay/LightMap node referenced Sampler1/Sampler2 — drives the RenderType's overlay/lightmap shards. */
     private final boolean usesOverlay;
     private final boolean usesLightmap;
@@ -85,19 +72,13 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         this.settings = compiled.settings();
         this.contentHash = compiled.contentHash();
         this.builtinUniforms = new HashMap<>(compiled.builtinUniforms());
-        this.materialFields = compiled.layout().fields();
-        this.uniformFields = new HashMap<>(compiled.uniformFields());
-        this.variableSamplers = new HashMap<>(compiled.variableSamplers());
+        // Bakes EXPOSED-variable default values + default sampler textures.
+        this.values = new KGMaterialValues(compiled);
         this.usesOverlay = compiled.usesOverlay();
         this.usesLightmap = compiled.usesLightmap();
         this.usesScene = compiled.usesSceneColor() || compiled.usesSceneDepth();
         // A scene-using material keeps the opaque-scene capture alive for its lifetime (balanced in close()).
         if (usesScene) SceneCaptureManager.INSTANCE.acquire();
-        // Bake EXPOSED-variable default values + default sampler textures.
-        this.values.putAll(compiled.uniformDefaults());
-        for (Map.Entry<String, SamplerDefault> e : compiled.samplerDefaults().entrySet()) {
-            samplerTextures.put(e.getKey(), e.getValue().texture());
-        }
     }
 
     public VertexFormat format() { return format; }
@@ -105,49 +86,44 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     public RenderTypeGraph.Settings settings() { return settings; }
     public String contentHash() { return contentHash; }
     public LDShaderInstance shader() { return shader; }
+    /** Whether the shader samples the vanilla lightmap ({@code Sampler2}) — an immediate-mode caller (the
+     *  editor preview) must then enable the light layer itself; the RenderType path binds it via its shard. */
+    public boolean usesLightmap() { return usesLightmap; }
 
     /** Re-bake baked defaults from a freshly compiled graph with the same content hash (value-only edit). */
     public void refreshDefaults(CompiledShaderGraph compiled) {
-        values.putAll(compiled.uniformDefaults());
-        for (Map.Entry<String, SamplerDefault> e : compiled.samplerDefaults().entrySet()) {
-            samplerTextures.put(e.getKey(), e.getValue().texture());
-        }
+        values.bakeDefaults(compiled);
     }
 
     // ---- uniform / texture setters (by EXPOSED variable display name) -------------------------
 
-    public void setUniformField(String fieldName, float... components) { values.put(fieldName, components.clone()); }
+    /** The per-instance value store, for callers that manage values directly (see {@link KGMaterialValues}). */
+    public KGMaterialValues values() { return values; }
 
-    public boolean setUniform(String variableName, float value) { return setByVariable(variableName, value); }
-    public boolean setUniform(String variableName, Vector2fc v) { return setByVariable(variableName, v.x(), v.y()); }
-    public boolean setUniform(String variableName, Vector3fc v) { return setByVariable(variableName, v.x(), v.y(), v.z()); }
-    public boolean setUniform(String variableName, Vector4fc v) { return setByVariable(variableName, v.x(), v.y(), v.z(), v.w()); }
+    public void setUniformField(String fieldName, float... components) { values.setUniformField(fieldName, components); }
 
-    public boolean setUniform(String variableName, Matrix4fc m) {
-        float[] arr = new float[16];
-        m.get(arr);
-        return setByVariable(variableName, arr);
-    }
+    public boolean setUniform(String variableName, float value) { return values.setUniform(variableName, value); }
+    public boolean setUniform(String variableName, Vector2fc v) { return values.setUniform(variableName, v); }
+    public boolean setUniform(String variableName, Vector3fc v) { return values.setUniform(variableName, v); }
+    public boolean setUniform(String variableName, Vector4fc v) { return values.setUniform(variableName, v); }
+    public boolean setUniform(String variableName, Matrix4fc m) { return values.setUniform(variableName, m); }
 
     /** Set a vec4 (e.g. a Color variable) from an ARGB int — unpacked to rgba in 0..1. */
-    public boolean setColorUniform(String variableName, int argb) {
-        float a = ((argb >> 24) & 0xFF) / 255f, r = ((argb >> 16) & 0xFF) / 255f;
-        float g = ((argb >> 8) & 0xFF) / 255f, b = (argb & 0xFF) / 255f;
-        return setByVariable(variableName, r, g, b, a);
+    public boolean setColorUniform(String variableName, int argb) { return values.setColorUniform(variableName, argb); }
+
+    /** Set a Gradient variable by display name (packed to the {@code KG_Gradient} member layout). */
+    public boolean setGradient(String variableName, RenderTypeGraphTypes.GradientValue value) {
+        return values.setGradient(variableName, value);
     }
 
-    private boolean setByVariable(String variableName, float... components) {
-        MaterialUniformLayout.Field field = uniformFields.get(variableName);
-        if (field == null) return false;
-        values.put(field.name(), components);
-        return true;
+    /** Set a Curve variable by display name (packed to the {@code KG_Curve} member layout). */
+    public boolean setCurve(String variableName, RenderTypeGraphTypes.CurveValue value) {
+        return values.setCurve(variableName, value);
     }
 
     /** Bind a texture to a Sampler2D variable by display name (or raw sampler name). Returns false if unknown. */
     public boolean setTexture(String name, ResourceLocation texture) {
-        String sampler = variableSamplers.getOrDefault(name, name);
-        samplerTextures.put(sampler, texture);
-        return true;
+        return values.setTexture(name, texture);
     }
 
     // ---- draw-time binding -------------------------------------------------------------------
@@ -309,11 +285,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     public void applyUniforms() {
         if (closed) return;
         KGBuiltinUniforms.bind(shader, builtinUniforms);
-        for (MaterialUniformLayout.Field f : materialFields) {
-            setUniform(f.name(), f.type(), values.get(f.name()));
-        }
-        var textureManager = Minecraft.getInstance().getTextureManager();
-        samplerTextures.forEach((name, loc) -> shader.setSampler(name, textureManager.getTexture(loc)));
+        values.apply(shader);
         // Scene Color/Depth: bind the opaque-scene capture's texture ids (as raw GL ids — ShaderInstance.apply
         // accepts Integer samplers, cf. RenderTarget._blitToScreen). A sampler the shader didn't declare is a
         // harmless no-op (apply only binds names in the manifest), so bind both when the material uses the scene.
@@ -322,46 +294,6 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
             shader.setSampler(ShaderGraphCompiler.SCENE_DEPTH_SAMPLER, SceneCaptureManager.INSTANCE.depthTextureId());
         }
     }
-
-    private void setUniform(String name, GlslType type, float[] v) {
-        Uniform u = shader.getUniform(name);
-        if (u == null) return;
-        switch (type) {
-            case FLOAT -> u.set(at(v, 0));
-            case INT, BOOL -> u.set((int) at(v, 0));
-            case VEC2 -> u.set(at(v, 0), at(v, 1));
-            case VEC3 -> u.set(at(v, 0), at(v, 1), at(v, 2));
-            case VEC4 -> u.set(at(v, 0), at(v, 1), at(v, 2), at(v, 3));
-            case MAT4 -> u.set(new Matrix4f().set(v == null ? new float[16] : v));
-            // A GRADIENT field is a KG_Gradient struct uniform, uploaded member-by-member (setUniform's `u` — the
-            // whole-struct name — has no GL location; the members do). SAMPLER2D is bound via setSampler above.
-            case GRADIENT -> setGradient(name, v);
-            case SAMPLER2D -> { }
-        }
-    }
-
-    /**
-     * Upload a packed gradient (the {@code GradientGlsl.pack} 68-float layout: header + 8 colour + 8 alpha vec4)
-     * into the {@code KG_Gradient} struct uniform {@code name}'s members ({@code name.header},
-     * {@code name.colors[i]}, {@code name.alphas[i]}) — the manifest declares each as a vec4 (see
-     * {@code KGShaderManifest.appendUniforms}).
-     */
-    private void setGradient(String name, float[] v) {
-        if (v == null) return;
-        setVec4(name + ".header", v, 0);
-        for (int i = 0; i < GradientGlsl.MAX_KEYS; i++) {
-            setVec4(name + ".colors[" + i + "]", v, 4 + i * 4);
-            setVec4(name + ".alphas[" + i + "]", v, 4 + GradientGlsl.MAX_KEYS * 4 + i * 4);
-        }
-    }
-
-    private void setVec4(String uniformName, float[] v, int base) {
-        Uniform u = shader.getUniform(uniformName);
-        if (u == null) return;
-        u.set(at(v, base), at(v, base + 1), at(v, base + 2), at(v, base + 3));
-    }
-
-    private static float at(float[] v, int i) { return v != null && i < v.length ? v[i] : 0f; }
 
     @Override
     public void close() {

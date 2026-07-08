@@ -158,10 +158,18 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
         // Apply the graph Settings' blend/cull/depth (the immediate-mode equivalent of the RenderType's shards).
         mat.applyRenderState();
 
+        // A lightmap-sampling shader (e.g. the block-style vertex colour) needs Sampler2 bound — the
+        // RenderType path gets it from the LIGHTMAP shard; this immediate draw must enable it itself,
+        // else the preview renders black.
+        var lightTexture = net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture();
+        if (mat.usesLightmap()) lightTexture.turnOnLightLayer();
+
         RenderSystem.setShader(mat::shader);
         mat.applyUniforms();
         // drawWithShader sets the vanilla builtins (setDefaultUniforms), applies, draws, and closes the mesh.
         BufferUploader.drawWithShader(mesh);
+
+        if (mat.usesLightmap()) lightTexture.turnOffLightLayer();
     }
 
     /** Map the pipeline's primitive mode back to the graph's {@link RenderTypeGraph.Settings.VertexFormatMode}
@@ -203,7 +211,7 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
         try {
             // editorPreview(): screen-space defaults (Scene Color/Depth's unconnected UV) map the whole capture onto
             // the cube instead of the panel's screen sub-rect. In-world materials still use true screen-space.
-            compiled = new ShaderGraphCompiler(graph).editorPreview().compile();
+            compiled = graph.createCompiler().editorPreview().compile();
         } catch (RuntimeException e) {
             if (!lastCompileFailed) {
                 LOGGER.warn("[KilaGraph] preview graph failed to compile: {}", e.getMessage());
