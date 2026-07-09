@@ -78,7 +78,7 @@ public final class RenderTypeFactory {
      */
     @Nullable
     public static RenderTypeGraphMaterial createMaterial(RenderTypeGraph graph) {
-        return createMaterial(new ShaderGraphCompiler(graph).compile());
+        return createMaterial(graph.createCompiler().compile());
     }
 
     /**

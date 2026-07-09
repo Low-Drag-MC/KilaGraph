@@ -155,7 +155,7 @@ public class NodeShaderPreview extends UIElement {
 
         CompiledShaderGraph compiled;
         try {
-            compiled = new ShaderGraphCompiler(graph).compilePreview(outputPort);
+            compiled = graph.createCompiler().compilePreview(outputPort);
         } catch (RuntimeException e) {
             if (!lastCompileFailed) {
                 LOGGER.warn("[KilaGraph] node preview failed to compile: {}", e.getMessage());

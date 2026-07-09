@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.runtime;
 
+import com.lowdragmc.kilagraph.rendertype.compiler.CurveGlsl;
 import com.lowdragmc.kilagraph.rendertype.compiler.GradientGlsl;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.mojang.blaze3d.buffers.GpuBuffer;
@@ -101,6 +102,14 @@ public final class MaterialUniformBuffer implements AutoCloseable {
                         // KG_Gradient: vec4 header + 8 colour vec4 + 8 alpha vec4 (std140 16-aligned each).
                         // v is GradientGlsl.pack(): [header(4), colors(32), alphas(32)] = 68 contiguous floats.
                         for (int i = 0; i < 1 + GradientGlsl.MAX_KEYS * 2; i++) {
+                            int base = i * 4;
+                            b.putVec4(at(v, base), at(v, base + 1), at(v, base + 2), at(v, base + 3));
+                        }
+                    }
+                    case CURVE -> {
+                        // KG_Curve: vec4 header + 16 segment vec4 (std140 16-aligned each).
+                        // v is CurveGlsl.pack(): [header(4), segments(64)] = 68 contiguous floats.
+                        for (int i = 0; i < 1 + CurveGlsl.MAX_SEGMENTS * 2; i++) {
                             int base = i * 4;
                             b.putVec4(at(v, base), at(v, base + 1), at(v, base + 2), at(v, base + 3));
                         }

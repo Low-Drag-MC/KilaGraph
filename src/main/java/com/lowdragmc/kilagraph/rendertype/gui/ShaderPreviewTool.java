@@ -185,7 +185,7 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
             // editorPreview(): screen-space defaults (Scene Color/Depth's unconnected UV) map the whole capture
             // onto the cube instead of the panel's screen sub-rect — otherwise the preview would only show the
             // small on-screen rectangle it occupies. In-world materials still use true screen-space.
-            compiled = new ShaderGraphCompiler(graph).editorPreview().compile();
+            compiled = graph.createCompiler().editorPreview().compile();
         } catch (RuntimeException e) {
             if (!lastCompileFailed) {
                 LOGGER.warn("[KilaGraph] preview graph failed to compile: {}", e.getMessage());

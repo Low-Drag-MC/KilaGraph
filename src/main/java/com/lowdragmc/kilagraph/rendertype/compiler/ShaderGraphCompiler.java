@@ -47,7 +47,7 @@ import java.util.UUID;
  * compiler treats it as a stage boundary: the varying is built once in the vertex scope and the
  * fragment scope receives a reference to the interpolated {@code in} variable.</p>
  */
-public final class ShaderGraphCompiler {
+public class ShaderGraphCompiler {
 
     private static final String GLSL_VERSION = "#version 330";
 
@@ -65,6 +65,8 @@ public final class ShaderGraphCompiler {
         int tempCounter;
         /** Whether this stage references the {@code KG_Gradient} struct (so its decl is emitted in the prelude). */
         boolean usesGradient;
+        /** Whether this stage references the {@code KG_Curve} struct (so its decl is emitted in the prelude). */
+        boolean usesCurve;
 
         StageScope(String tempPrefix) {
             this.tempPrefix = tempPrefix;
@@ -170,6 +172,11 @@ public final class ShaderGraphCompiler {
         return this;
     }
 
+    /** Whether this is an editor whole-graph preview compile (see {@link #editorPreview()}). */
+    protected boolean isEditorPreview() {
+        return editorPreview;
+    }
+
     public CompiledShaderGraph compile() {
         ContextNodeModel vertexStage = asContext(graph.getVertexStageModel(), "vertex");
         ContextNodeModel fragmentStage = asContext(graph.getFragmentStageModel(), "fragment");
@@ -248,7 +255,16 @@ public final class ShaderGraphCompiler {
         // visibility — a scalar broadcast (vec4(f)) makes alpha == the value, so a 0 vanishes instead of
         // showing black. Force opaque: take the value's rgb (scalars broadcast to grey) and append alpha 1,
         // matching Unity (a 0 previews as black). See NodeShaderPreview / ShaderPreviewTool.
-        ShaderExpr color = new ShaderExpr("vec4(" + convert(value, GlslType.VEC3).code() + ", 1.0)", GlslType.VEC4);
+        // A real vec4 (a texture sample / colour with alpha) is premultiplied (rgb * a) first: particle
+        // textures carry their shape in alpha over a flat rgb (often pure white), so an opaque rgb-only
+        // preview would show a featureless square — premultiplying shows the shape over black instead.
+        ShaderExpr color;
+        if (value.type() == GlslType.VEC4) {
+            ShaderExpr v = hoist(GlslType.VEC4, value.code());
+            color = new ShaderExpr("vec4(" + v.code() + ".rgb * " + v.code() + ".a, 1.0)", GlslType.VEC4);
+        } else {
+            color = new ShaderExpr("vec4(" + convert(value, GlslType.VEC3).code() + ", 1.0)", GlslType.VEC4);
+        }
 
         String vsh = assemblePreviewVertex();
         String fsh = assemblePreviewFragment(color);
@@ -366,13 +382,14 @@ public final class ShaderGraphCompiler {
             case VEC4 -> new ShaderExpr("vec4(0.0)", GlslType.VEC4);
             case MAT4 -> new ShaderExpr("mat4(1.0)", GlslType.MAT4);
             case SAMPLER2D -> new ShaderExpr(MISSING_SAMPLER, GlslType.SAMPLER2D);
-            // Defensive: GRADIENT is opaque and never flows as a varying, so this is unreachable in practice.
+            // Defensive: GRADIENT/CURVE are opaque and never flow as varyings, so these are unreachable in practice.
             case GRADIENT -> new ShaderExpr("kg_gradientDefault()", GlslType.GRADIENT);
+            case CURVE -> new ShaderExpr("kg_curveDefault()", GlslType.CURVE);
         };
     }
 
     /** The interpolated primary mesh uv (UV0). See {@link #meshUv(RenderTypeGraphTypes.UvChannel)}. */
-    ShaderExpr meshUv() {
+    protected ShaderExpr meshUv() {
         return meshUv(RenderTypeGraphTypes.UvChannel.UV0);
     }
 
@@ -385,7 +402,7 @@ public final class ShaderGraphCompiler {
      * the preview mesh and are constant per draw, so they preview as a flat {@code vec2(0.0)} (a solid colour,
      * not a misleading gradient). Shared first-writer-wins with the matching varying block / fragment input.
      */
-    ShaderExpr meshUv(RenderTypeGraphTypes.UvChannel channel) {
+    protected ShaderExpr meshUv(RenderTypeGraphTypes.UvChannel channel) {
         // Injection: UV0 is the kg_surface() function parameter; preview: the quad's gradient uv.
         ShaderExpr quadUv = new ShaderExpr(injection ? "kg_uv" : "vUv", GlslType.VEC2);
         ShaderExpr flatUv = new ShaderExpr("vec2(0.0)", GlslType.VEC2);
@@ -402,7 +419,7 @@ public final class ShaderGraphCompiler {
      * + {@code Color} attributes), so an entity is lit out of the box with no lighting block placed. (Mix
      * light is vertex-only, hence a varying.) Missing Normal/Color degrade to up / white. Preview: white.
      */
-    ShaderExpr litVertexColor() {
+    protected ShaderExpr litVertexColor() {
         return varyingInput("vertexColor", GlslType.VEC4,
                 () -> {
                     addInclude("minecraft:light.glsl");
@@ -419,7 +436,7 @@ public final class ShaderGraphCompiler {
 
     /** The interpolated <b>raw</b> (unlit) vertex colour — the {@code Color} attribute through the
      *  {@code rawColor} varying. Missing Color degrades to white. Preview: white. */
-    ShaderExpr meshColor() {
+    protected ShaderExpr meshColor() {
         return varyingInput("rawColor", GlslType.VEC4,
                 () -> attribute(KGVertexElements.COLOR, GlslType.VEC4, new ShaderExpr("vec4(1.0)", GlslType.VEC4)),
                 new ShaderExpr("vec4(1.0)", GlslType.VEC4));
@@ -432,7 +449,7 @@ public final class ShaderGraphCompiler {
      * {@code usesLightmap} so the runtime binds the vanilla lightmap. Missing UV2 degrades to the raw Color
      * (unlit); missing Color degrades to white. Preview: white.
      */
-    ShaderExpr blockVertexColor() {
+    protected ShaderExpr blockVertexColor() {
         return varyingInput("blockColor", GlslType.VEC4,
                 () -> {
                     ShaderExpr color = attribute(KGVertexElements.COLOR, GlslType.VEC4,
@@ -445,21 +462,21 @@ public final class ShaderGraphCompiler {
                     layout.addSampler("Sampler2"); // declare `uniform sampler2D Sampler2`
                     usesLightmap = true;           // bind the vanilla lightmap, skip the placeholder
                     return new ShaderExpr(color.code() + " * sample_lightmap(Sampler2, "
-                            + KGVertexElements.UV2.attribName() + ")", GlslType.VEC4);
+                            + attributeRef(KGVertexElements.UV2) + ")", GlslType.VEC4);
                 },
                 new ShaderExpr("vec4(1.0)", GlslType.VEC4));
     }
 
     /** A uv channel's vsh value: the attribute (cast {@code vec2(...)} for the ivec2 UV1/UV2), else a
      *  fallback to UV0, else {@code vec2(0.0)} — recording the missing attribute for editor warnings. */
-    private ShaderExpr uvAttr(KGVertexElement element, boolean integer) {
+    protected ShaderExpr uvAttr(KGVertexElement element, boolean integer) {
         if (hasAttribute(element)) {
-            String ref = integer ? "vec2(" + element.attribName() + ")" : element.attribName();
+            String ref = integer ? "vec2(" + attributeRef(element) + ")" : attributeRef(element);
             return new ShaderExpr(ref, GlslType.VEC2);
         }
         markMissingAttribute(element.attribName());
         if (element != KGVertexElements.UV0 && hasAttribute(KGVertexElements.UV0)) {
-            return new ShaderExpr(KGVertexElements.UV0.attribName(), GlslType.VEC2);
+            return new ShaderExpr(attributeRef(KGVertexElements.UV0), GlslType.VEC2);
         }
         return new ShaderExpr("vec2(0.0)", GlslType.VEC2);
     }
@@ -473,7 +490,7 @@ public final class ShaderGraphCompiler {
      * attribute, see {@code PREVIEW_SETTINGS}) — exact on every preview geometry, like Unity's sphere
      * preview. Registers DynamicTransforms + KG_Transforms.
      */
-    ShaderExpr meshNormal() {
+    protected ShaderExpr meshNormal() {
         return varyingInput("kg_worldNormal", GlslType.VEC3,
                 () -> {
                     addInclude("minecraft:dynamictransforms.glsl"); // ModelViewMat
@@ -499,7 +516,7 @@ public final class ShaderGraphCompiler {
      * {@code (cameraPos - worldPos)}. Consumers should renormalize after interpolation. Preview: {@code +Z}
      * (looking straight at the quad). Registers DynamicTransforms + KG_Transforms.
      */
-    ShaderExpr meshViewDir() {
+    protected ShaderExpr meshViewDir() {
         return varyingInput("kg_worldViewDir", GlslType.VEC3,
                 () -> {
                     ShaderExpr iView = transformField("IViewMat", GlslType.MAT4); // view -> world (rotation)
@@ -517,7 +534,7 @@ public final class ShaderGraphCompiler {
      * port. Fragment-safe (vsh writes it, fsh reads the interpolated value). Wire a Transform node for world
      * space. Preview: {@code vec3(0.0)}.
      */
-    ShaderExpr meshPosition() {
+    protected ShaderExpr meshPosition() {
         return varyingInput("kg_modelPos", GlslType.VEC3, this::modelPosition,
                 // Injection: the kg_localPos varying (object/model space, like this node's default); else 0.
                 geometryVarying("kg_localPos", "vec3(0.0)", GlslType.VEC3));
@@ -542,7 +559,7 @@ public final class ShaderGraphCompiler {
      * model position. The vsh default ({@code fog_spherical_distance((Position + ModelOffset))}) is only used
      * if no varying block already wrote {@code sphericalVertexDistance} (first-writer-wins).
      */
-    ShaderExpr sphericalVertexDistance() {
+    protected ShaderExpr sphericalVertexDistance() {
         return varyingInput("sphericalVertexDistance", GlslType.FLOAT,
                 () -> {
                     addInclude("minecraft:fog.glsl");
@@ -553,7 +570,7 @@ public final class ShaderGraphCompiler {
 
     /** The interpolated {@code cylindricalVertexDistance} varying (vanilla's cylindrical fog distance). See
      *  {@link #sphericalVertexDistance()}. */
-    ShaderExpr cylindricalVertexDistance() {
+    protected ShaderExpr cylindricalVertexDistance() {
         return varyingInput("cylindricalVertexDistance", GlslType.FLOAT,
                 () -> {
                     addInclude("minecraft:fog.glsl");
@@ -577,9 +594,9 @@ public final class ShaderGraphCompiler {
      * harmless when unused, so it's the correct default for {@code gl_Position} and fog distances. Adds the
      * {@code dynamictransforms.glsl} import to the current (vertex) stage.
      */
-    ShaderExpr modelPosition() {
+    protected ShaderExpr modelPosition() {
         addInclude("minecraft:dynamictransforms.glsl");
-        return new ShaderExpr("(Position + ModelOffset)", GlslType.VEC3);
+        return new ShaderExpr("(" + attributeRef(KGVertexElements.POSITION) + " + ModelOffset)", GlslType.VEC3);
     }
 
     /** The element keys actually declared as {@code in} attributes in the current compile: the graph's
@@ -590,7 +607,7 @@ public final class ShaderGraphCompiler {
     }
 
     /** Whether this is a per-node preview compile (single fragment quad; no real vertex stage). */
-    boolean isPreview() {
+    protected boolean isPreview() {
         return preview;
     }
 
@@ -603,8 +620,18 @@ public final class ShaderGraphCompiler {
 
     /** Whether the given vertex element is declared in the active vertex format (so its raw {@code in}
      *  attribute can be referenced without producing an undefined-variable shader). */
-    boolean hasAttribute(KGVertexElement element) {
+    protected boolean hasAttribute(KGVertexElement element) {
         return availableAttributes().contains(element.key());
+    }
+
+    /**
+     * The GLSL expression that reads a raw vertex attribute in the vertex stage. Default: the element's
+     * {@code in} attribute name. A subclass whose vertex inputs come from somewhere other than raw
+     * attributes (e.g. an instanced/struct layout declared by an include) overrides this to route every
+     * attribute read through its own source.
+     */
+    protected String attributeRef(KGVertexElement element) {
+        return element.attribName();
     }
 
     /**
@@ -613,15 +640,15 @@ public final class ShaderGraphCompiler {
      * user removed degrades to a safe constant instead of emitting undefined-variable GLSL (which the GPU
      * rejects). Records the substituted attribute so the editor can warn about the degraded default.
      */
-    ShaderExpr attribute(KGVertexElement element, GlslType type, ShaderExpr fallback) {
-        if (hasAttribute(element)) return new ShaderExpr(element.attribName(), type);
+    protected ShaderExpr attribute(KGVertexElement element, GlslType type, ShaderExpr fallback) {
+        if (hasAttribute(element)) return new ShaderExpr(attributeRef(element), type);
         missingAttributes.add(element.attribName());
         return fallback;
     }
 
     /** Record that a referenced attribute is absent from the format (for callers that build the ref
      *  themselves, e.g. an explicit attribute node that casts {@code ivec2 → vec2}). */
-    void markMissingAttribute(String attribName) {
+    protected void markMissingAttribute(String attribName) {
         missingAttributes.add(attribName);
     }
 
@@ -631,7 +658,7 @@ public final class ShaderGraphCompiler {
      * {@code vshDefault} (unless a vertex varying block already built it — first writer wins) and returns
      * a reference to it. Used by {@code FragmentInputNode}s and {@link #meshUv()}.
      */
-    ShaderExpr varyingInput(String name, GlslType type,
+    protected ShaderExpr varyingInput(String name, GlslType type,
                             java.util.function.Supplier<ShaderExpr> vshDefault, ShaderExpr previewDefault) {
         if (preview) return previewDefault;
         ensureVaryingWithDefault(name, type, vshDefault);
@@ -670,7 +697,7 @@ public final class ShaderGraphCompiler {
      * Minecraft's {@code DynamicTransforms}/{@code Projection} blocks don't expose. The {@code type} is the
      * accessor's GLSL type ({@code MAT4} for the matrices, {@code VEC3} for {@code CameraPos}).
      */
-    ShaderExpr transformField(String field, GlslType type) {
+    protected ShaderExpr transformField(String field, GlslType type) {
         useUniformBlock(KGTransformUniforms.BLOCK);
         return new ShaderExpr(KGTransformUniforms.accessor(field), type);
     }
@@ -715,6 +742,33 @@ public final class ShaderGraphCompiler {
         return new ShaderExpr(fn + "()", GlslType.GRADIENT);
     }
 
+    /** Mark the current stage as referencing {@code KG_Curve} so its struct decl is emitted in the prelude
+     *  (before the UBO + helper functions). Also registers the shared sample/default functions. */
+    void useCurve() {
+        current.usesCurve = true;
+        addFunction(CurveGlsl.HELPER_KEY, CurveGlsl.HELPER);
+    }
+
+    /** The fallback curve for an unconnected CURVE input — registers the helper, a linear 0->1 ramp. */
+    ShaderExpr defaultCurve() {
+        useCurve();
+        return new ShaderExpr("kg_curveDefault()", GlslType.CURVE);
+    }
+
+    private int curveCounter = 0;
+
+    /**
+     * A constant curve value: registers the shared {@code KG_Curve} helper plus a uniquely-named builder
+     * function for these segments, and returns a {@code KG_Curve}-typed call expression. Used by the
+     * Curve node and by an unconnected CURVE port carrying an inline curve editor.
+     */
+    ShaderExpr constantCurve(RenderTypeGraphTypes.CurveValue value) {
+        useCurve();
+        String fn = "kg_curve_" + (curveCounter++);
+        addFunction(fn, CurveGlsl.builderFunction(fn, value));
+        return new ShaderExpr(fn + "()", GlslType.CURVE);
+    }
+
     /** Vanilla overlay sampler ({@code Sampler1}); flags the pipeline to enable overlay binding. */
     ShaderExpr overlaySampler() {
         usesOverlay = true;
@@ -738,17 +792,32 @@ public final class ShaderGraphCompiler {
      * capture + bind it. Unlike a Sampler2D it gets no baked missing-texture default — the runtime binds
      * the live capture (see {@code RenderTypeFactory}/{@code RenderTypeGraphMaterial}).
      */
-    ShaderExpr sceneColorSampler() {
+    protected ShaderExpr sceneColorSampler() {
         usesSceneColor = true;
-        layout.addSampler(SCENE_COLOR_SAMPLER);
-        return new ShaderExpr(SCENE_COLOR_SAMPLER, GlslType.SAMPLER2D);
+        layout.addSampler(sceneColorSamplerName());
+        return new ShaderExpr(sceneColorSamplerName(), GlslType.SAMPLER2D);
     }
 
     /** Sampler for the captured opaque scene depth (Unity's Scene Depth). See {@link #sceneColorSampler()}. */
-    ShaderExpr sceneDepthSampler() {
+    protected ShaderExpr sceneDepthSampler() {
         usesSceneDepth = true;
-        layout.addSampler(SCENE_DEPTH_SAMPLER);
-        return new ShaderExpr(SCENE_DEPTH_SAMPLER, GlslType.SAMPLER2D);
+        layout.addSampler(sceneDepthSamplerName());
+        return new ShaderExpr(sceneDepthSamplerName(), GlslType.SAMPLER2D);
+    }
+
+    /**
+     * The sampler uniform the Scene Color node reads. Default: {@code KG_SceneColor}, bound at draw from
+     * {@code SceneCaptureManager}. A subclass whose runtime owns its own scene capture overrides these
+     * names so its material binds them instead — the {@code usesSceneColor}/{@code usesSceneDepth} flags
+     * still signal the demand.
+     */
+    protected String sceneColorSamplerName() {
+        return SCENE_COLOR_SAMPLER;
+    }
+
+    /** The sampler uniform the Scene Depth node reads. See {@link #sceneColorSamplerName()}. */
+    protected String sceneDepthSamplerName() {
+        return SCENE_DEPTH_SAMPLER;
     }
 
     /** Screen-space UV {@code gl_FragCoord.xy / ScreenSize} (vec2) — the default UV for Scene Color/Depth
@@ -756,7 +825,7 @@ public final class ShaderGraphCompiler {
      *  <p>In an editor preview the geometry only covers a small screen sub-rect, so true screen coordinates
      *  would sample just that corner of the full-screen capture; there we map the whole captured frame across
      *  the preview geometry's uv (mesh/quad uv) so the preview shows the entire scene.</p> */
-    ShaderExpr screenUv() {
+    protected ShaderExpr screenUv() {
         if (preview || editorPreview) return meshUv();
         addInclude("minecraft:globals.glsl");
         useBuiltinUbo("Globals");
@@ -835,6 +904,11 @@ public final class ShaderGraphCompiler {
             if (declared == GlslType.GRADIENT) {
                 Object c = readConstant(inputPort);
                 return c instanceof RenderTypeGraphTypes.GradientValue gv ? constantGradient(gv) : defaultGradient();
+            }
+            // An unconnected curve: a constant curve editor sits on the port — build it (else default).
+            if (declared == GlslType.CURVE) {
+                Object c = readConstant(inputPort);
+                return c instanceof RenderTypeGraphTypes.CurveValue cv ? constantCurve(cv) : defaultCurve();
             }
             Object constant = readConstant(inputPort);
             String code = declared != null
@@ -928,10 +1002,12 @@ public final class ShaderGraphCompiler {
             for (PortModel outp : nm.getOutputsByDisplayOrder()) {
                 GlslType decl = GlslType.of(outp.getDataTypeHandle());
                 if (decl == null) continue;
-                // SAMPLER2D/GRADIENT are opaque (not a constant scalar) — guard defensively.
+                // SAMPLER2D/GRADIENT/CURVE are opaque (not a constant scalar) — guard defensively.
                 current.cache.put(outp, decl == GlslType.SAMPLER2D ? missingSampler()
                         : decl == GlslType.GRADIENT
                         ? (value instanceof RenderTypeGraphTypes.GradientValue gv ? constantGradient(gv) : defaultGradient())
+                        : decl == GlslType.CURVE
+                        ? (value instanceof RenderTypeGraphTypes.CurveValue cv ? constantCurve(cv) : defaultCurve())
                         : hoist(decl, GlslFormat.literal(value, decl)));
             }
             return;
@@ -981,7 +1057,7 @@ public final class ShaderGraphCompiler {
                 continue;
             }
             ShaderExpr conv = convert(raw, decl);
-            if (decl == GlslType.SAMPLER2D || decl == GlslType.GRADIENT) {
+            if (decl == GlslType.SAMPLER2D || decl == GlslType.GRADIENT || decl == GlslType.CURVE) {
                 current.cache.put(outp, conv); // opaque — cannot/should not copy into a temp
             } else {
                 current.cache.put(outp, hoist(decl, conv.code()));
@@ -1028,6 +1104,10 @@ public final class ShaderGraphCompiler {
                 // LOCAL gradient: bake the actual keys as a builder (opaque — don't hoist into a temp).
                 current.cache.put(outp, defaultValue instanceof RenderTypeGraphTypes.GradientValue gv
                         ? constantGradient(gv) : defaultGradient());
+            } else if (decl == GlslType.CURVE) {
+                // LOCAL curve: bake the actual segments as a builder (opaque — don't hoist into a temp).
+                current.cache.put(outp, defaultValue instanceof RenderTypeGraphTypes.CurveValue cv
+                        ? constantCurve(cv) : defaultCurve());
             } else {
                 // LOCAL / UNKNOWN: bake the declared value inline (mirrors the IConstantNode branch).
                 current.cache.put(outp, hoist(decl, GlslFormat.literal(defaultValue, decl)));
@@ -1193,14 +1273,14 @@ public final class ShaderGraphCompiler {
 
     // ---- emission helpers (called via ShaderCompileContext) ----------------------------------
 
-    ShaderExpr hoist(GlslType type, String code) {
+    protected ShaderExpr hoist(GlslType type, String code) {
         String name = current.tempPrefix + "_" + (current.tempCounter++);
         current.body.append("    ").append(type.glsl()).append(' ').append(name)
                 .append(" = ").append(code).append(";\n");
         return new ShaderExpr(name, type);
     }
 
-    void line(String statement) {
+    protected void line(String statement) {
         current.body.append("    ").append(statement).append('\n');
     }
 
@@ -1216,11 +1296,15 @@ public final class ShaderGraphCompiler {
         current.functions.putIfAbsent(name, glsl);
     }
 
-    /** Emit the {@code KG_Gradient} struct declaration when this stage needs it — before the UBO + functions
-     *  (both reference the type). Needed if the material UBO has a gradient field or a node samples a gradient. */
-    private void appendGradientStruct(StringBuilder sb, StageScope scope) {
+    /** Emit the {@code KG_Gradient} / {@code KG_Curve} struct declarations when this stage needs them —
+     *  before the UBO + functions (both reference the types). Needed if the material UBO has a
+     *  gradient/curve field or a node samples a gradient/curve. */
+    private void appendStructDecls(StringBuilder sb, StageScope scope) {
         if (layout.hasGradientField() || scope.usesGradient) {
             sb.append('\n').append(GradientGlsl.STRUCT).append('\n');
+        }
+        if (layout.hasCurveField() || scope.usesCurve) {
+            sb.append('\n').append(CurveGlsl.STRUCT).append('\n');
         }
     }
 
@@ -1256,7 +1340,7 @@ public final class ShaderGraphCompiler {
             "minecraft:globals.glsl", "Globals"
     );
 
-    void addInclude(String path) {
+    protected void addInclude(String path) {
         current.includes.add(path);
         String ubo = INCLUDE_UBOS.get(path);
         if (ubo != null) builtinUbos.add(ubo);
@@ -1272,7 +1356,7 @@ public final class ShaderGraphCompiler {
 
     // ---- type conversion ---------------------------------------------------------------------
 
-    static ShaderExpr convert(ShaderExpr expr, @Nullable GlslType target) {
+    protected static ShaderExpr convert(ShaderExpr expr, @Nullable GlslType target) {
         if (expr == null || target == null || expr.type() == target) return expr;
         GlslType from = expr.type();
         String code = expr.code();
@@ -1322,8 +1406,8 @@ public final class ShaderGraphCompiler {
         sb.append(GLSL_VERSION).append("\n\n");
         for (String inc : vertex.includes) sb.append("#moj_import <").append(inc).append(">\n");
         if (!vertex.includes.isEmpty()) sb.append('\n');
-        sb.append(vertexAttributes(graph.getSettings().vertexFormatElements()));
-        appendGradientStruct(sb, vertex);
+        sb.append(vertexInputsBlock());
+        appendStructDecls(sb, vertex);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append('\n').append(uniforms);
         appendUniformBlocks(sb, true);
@@ -1335,8 +1419,27 @@ public final class ShaderGraphCompiler {
         }
         appendFunctions(sb, vertex);
         sb.append("\nvoid main() {\n");
+        sb.append(vertexPrologue());
         sb.append(vertex.body).append("}\n");
         return sb.toString();
+    }
+
+    /**
+     * The vertex-stage input declarations, emitted after the includes/builtin uniforms. Default: one
+     * {@code in <type> <name>;} per element of the graph's composed vertex format. A subclass whose inputs
+     * come from an include (declaring the attribute layouts itself) overrides this to emit its import instead.
+     */
+    protected String vertexInputsBlock() {
+        return vertexAttributes(graph.getSettings().vertexFormatElements());
+    }
+
+    /**
+     * Statements emitted at the very top of the vertex {@code main()}, before any generated body statement.
+     * Default: none. A subclass overrides this to set up its input state (e.g. a struct pulled from an
+     * include) so {@link #attributeRef} expressions resolve.
+     */
+    protected String vertexPrologue() {
+        return "";
     }
 
     private String assemblePreviewVertex() {
@@ -1357,7 +1460,7 @@ public final class ShaderGraphCompiler {
         sb.append(GLSL_VERSION).append("\n\n");
         for (String inc : fragment.includes) sb.append("#moj_import <").append(inc).append(">\n");
         if (!fragment.includes.isEmpty()) sb.append('\n');
-        appendGradientStruct(sb, fragment);
+        appendStructDecls(sb, fragment);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
         appendUniformBlocks(sb, false);
@@ -1374,7 +1477,7 @@ public final class ShaderGraphCompiler {
         sb.append(GLSL_VERSION).append("\n\n");
         for (String inc : fragment.includes) sb.append("#moj_import <").append(inc).append(">\n");
         if (!fragment.includes.isEmpty()) sb.append('\n');
-        appendGradientStruct(sb, fragment);
+        appendStructDecls(sb, fragment);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
         appendUniformBlocks(sb, false);

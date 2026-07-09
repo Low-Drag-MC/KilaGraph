@@ -16,8 +16,10 @@ public final class VertexFormatPresets {
 
     /** {@code DefaultVertexFormat.ENTITY}: Position, Color, UV0, UV1, UV2, Normal. */
     public static final List<String> ENTITY = List.of("position", "color", "uv0", "uv1", "uv2", "normal");
-    /** {@code DefaultVertexFormat.BLOCK}: Position, Color, UV0, UV2. */
-    public static final List<String> BLOCK = List.of("position", "color", "uv0", "uv2");
+    /** {@code DefaultVertexFormat.BLOCK}: Position, Color, UV0, UV2, Normal. (The stock BLOCK format
+     *  really does carry a Normal — 3 bytes + 1 padding; omitting it here made {@code hasAttribute(NORMAL)}
+     *  fail for block-format graphs, degrading Fresnel/normal defaults to a constant up vector.) */
+    public static final List<String> BLOCK = List.of("position", "color", "uv0", "uv2", "normal");
     /** {@code DefaultVertexFormat.POSITION_TEX_COLOR}: Position, UV0, Color. */
     public static final List<String> POSITION_COLOR_TEX = List.of("position", "uv0", "color");
     /** {@code DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL}: Position, UV0, Color, Normal. Used by the

@@ -25,7 +25,10 @@ public enum GlslType {
     SAMPLER2D("sampler2D", 0),
     /** A Unity-style gradient ({@code KG_Gradient} struct). Opaque like {@link #SAMPLER2D}: it never does
      *  arithmetic, only feeds {@code kg_sampleGradient(...)}. See {@link GradientGlsl}. */
-    GRADIENT("KG_Gradient", 0);
+    GRADIENT("KG_Gradient", 0),
+    /** A Unity-style float curve ({@code KG_Curve} struct). Opaque like {@link #GRADIENT}: it never does
+     *  arithmetic, only feeds {@code kg_sampleCurve(...)}. See {@link CurveGlsl}. */
+    CURVE("KG_Curve", 0);
 
     private final String glsl;
     private final int components;
@@ -81,6 +84,7 @@ public enum GlslType {
         if (type.equals(RenderTypeGraphTypes.MAT4)) return MAT4;
         if (type.equals(RenderTypeGraphTypes.SAMPLER2D)) return SAMPLER2D;
         if (type.equals(RenderTypeGraphTypes.GRADIENT)) return GRADIENT;
+        if (type.equals(RenderTypeGraphTypes.CURVE)) return CURVE;
         return null;
     }
 }

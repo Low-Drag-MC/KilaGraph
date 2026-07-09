@@ -24,7 +24,7 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
 
     public static final RenderTypeGraphResource INSTANCE = new RenderTypeGraphResource();
 
-    private RenderTypeGraphResource() {}
+    protected RenderTypeGraphResource() {}
 
     @Override
     public RenderTypeGraph createGraph() {
@@ -49,12 +49,20 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
         return deserializeGraph(tag, null);
     }
 
+    /**
+     * The empty (uninitialized) graph instance {@link #deserializeGraph} loads into. Subclass resources
+     * override this so a load produces their graph type.
+     */
+    protected RenderTypeGraph newGraphForLoad() {
+        return new RenderTypeGraph(false);
+    }
+
     public RenderTypeGraph deserializeGraph(CompoundTag tag, @Nullable IGraphReferenceResolver resolver) {
         // Start from an empty graph (no default node network): deserialize below clears and reloads
         // nodeModels, so building the default graph here would be wasted work and would leave the model's
         // getNodes() cache primed with stale default nodes. restoreFixedStagesAfterDeserialize() re-ensures
         // the fixed stages after the load.
-        var graph = new RenderTypeGraph(false);
+        var graph = newGraphForLoad();
         graph.graphModel.setReferenceResolver(resolver);
         var graphTag = tag.get(GRAPH_TAG) instanceof CompoundTag compound ? compound : tag;
         graph.graphModel.deserialize(TagValueInput.create(ProblemReporter.Collector.DISCARDING,

@@ -193,6 +193,26 @@ public final class ShaderCompileContext {
         compiler.useGradient();
     }
 
+    /**
+     * Build a constant {@code KG_Curve} value (a Unity-style float curve) for {@code value}, registering the
+     * shared sample helper + a per-curve builder, and return a CURVE-typed expression. Used by the Curve
+     * node. A {@code SampleCurve} node turns the result + a float position into a {@code float}.
+     */
+    public ShaderExpr constantCurve(com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.CurveValue value) {
+        return compiler.constantCurve(value);
+    }
+
+    /** A default linear 0&rarr;1 {@code KG_Curve} (registers the helper) — for an unconnected curve. */
+    public ShaderExpr defaultCurve() {
+        return compiler.defaultCurve();
+    }
+
+    /** Declare that this node references {@code KG_Curve} (emits its struct decl + sample helpers). Call
+     *  before using {@code kg_sampleCurve(...)} — e.g. a Sample Curve node. */
+    public void useCurve() {
+        compiler.useCurve();
+    }
+
     /** Vanilla overlay sampler ({@code Sampler1}); flags the pipeline to enable overlay binding. */
     public ShaderExpr overlaySampler() {
         return compiler.overlaySampler();

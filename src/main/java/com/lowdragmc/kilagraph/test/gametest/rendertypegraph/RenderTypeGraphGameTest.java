@@ -641,8 +641,8 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "block vsh declares Color", vsh.contains("in vec4 Color;"));
         assertTrue(helper, "block vsh declares UV0", vsh.contains("in vec2 UV0;"));
         assertTrue(helper, "block vsh declares UV2", vsh.contains("in ivec2 UV2;"));
+        assertTrue(helper, "block vsh declares Normal", vsh.contains("in vec3 Normal;"));
         assertFalse(helper, "block vsh omits UV1", vsh.contains("in ivec2 UV1;"));
-        assertFalse(helper, "block vsh omits Normal", vsh.contains("in vec3 Normal;"));
         helper.succeed();
     }
 
