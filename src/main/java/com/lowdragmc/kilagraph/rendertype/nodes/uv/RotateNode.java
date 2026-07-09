@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.uv;
 
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
@@ -25,6 +26,11 @@ public class RotateNode extends ShaderNode {
     }
 
     @Override
+    public void onDefineOptions(IOptionDefinitionContext context) {
+        context.addOption("unit", AngleUnit.class).withDefaultValue(AngleUnit.RADIANS);
+    }
+
+    @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         context.addInputPort("uv", RenderTypeGraphTypes.UV);
         context.addInputPort("center", RenderTypeGraphTypes.VEC2).withDefaultValue(new Vector2f(0.5f, 0.5f));
@@ -36,6 +42,9 @@ public class RotateNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         String center = ctx.input("center").code();
         String rot = ctx.input("rotation").code();
+        if (ctx.option("unit", AngleUnit.class, AngleUnit.RADIANS) == AngleUnit.DEGREES) {
+            rot = "radians(" + rot + ")";
+        }
         ShaderExpr p = ctx.temp(GlslType.VEC2, "(" + ctx.input("uv").code() + " - " + center + ")");
         ShaderExpr c = ctx.temp(GlslType.FLOAT, "cos(" + rot + ")");
         ShaderExpr s = ctx.temp(GlslType.FLOAT, "sin(" + rot + ")");
