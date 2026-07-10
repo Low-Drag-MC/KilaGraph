@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.compiler;
 
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
@@ -21,7 +22,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
-import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
@@ -225,8 +225,7 @@ public class ShaderGraphCompiler {
                 injectionSnippet = new ShaderGraphCompiler(graph).buildInjectionSnippet();
             } catch (RuntimeException e) {
                 // Not injection-compatible (or a transient model issue) — fall back to passthrough under Iris.
-                com.mojang.logging.LogUtils.getLogger()
-                        .warn("[KilaGraph][Iris] injection snippet compile failed -> passthrough", e);
+                Kilagraph.LOGGER.warn("[KilaGraph][Iris] injection snippet compile failed -> passthrough", e);
             }
         }
         return new CompiledShaderGraph(vsh, fsh, layout, new ArrayList<>(builtinUbos), new ArrayList<>(uniformBlocks),
@@ -491,6 +490,7 @@ public class ShaderGraphCompiler {
      * preview. Registers DynamicTransforms + KG_Transforms.
      */
     protected ShaderExpr meshNormal() {
+        if (injection) return injectionNormal();
         return varyingInput("kg_worldNormal", GlslType.VEC3,
                 () -> {
                     addInclude("minecraft:dynamictransforms.glsl"); // ModelViewMat
@@ -500,12 +500,10 @@ public class ShaderGraphCompiler {
                     return new ShaderExpr("normalize(mat3(" + iView.code() + ") * mat3(ModelViewMat) * "
                             + n.code() + ")", GlslType.VEC3);
                 },
-                // Injection: the kg_normal varying the injected vertex stage writes (world space, matching the
-                // vsh default above). Else the preview mesh's own (object-space) normal, interpolated — the
-                // preview camera looks down an axis so object space ≈ view space here, and meshViewDir's +Z
-                // preview default is the matching view direction — so dot(normal, viewDir) is correct on
-                // sphere/cube/custom alike.
-                geometryVarying("kg_normal", "vNormal", GlslType.VEC3));
+                // The preview mesh's own (object-space) normal, interpolated — the preview camera looks down
+                // an axis so object space ≈ view space here, and meshViewDir's +Z preview default is the
+                // matching view direction — so dot(normal, viewDir) is correct on sphere/cube/custom alike.
+                new ShaderExpr("vNormal", GlslType.VEC3));
     }
 
     /**
@@ -517,6 +515,7 @@ public class ShaderGraphCompiler {
      * (looking straight at the quad). Registers DynamicTransforms + KG_Transforms.
      */
     protected ShaderExpr meshViewDir() {
+        if (injection) return injectionViewDir();
         return varyingInput("kg_worldViewDir", GlslType.VEC3,
                 () -> {
                     ShaderExpr iView = transformField("IViewMat", GlslType.MAT4); // view -> world (rotation)
@@ -524,8 +523,8 @@ public class ShaderGraphCompiler {
                     return new ShaderExpr("normalize(mat3(" + iView.code() + ") * (-" + viewPos + "))",
                             GlslType.VEC3);
                 },
-                // Injection: the kg_viewDir varying (world space); else +Z (looking straight at the quad).
-                geometryVarying("kg_viewDir", "vec3(0.0, 0.0, 1.0)", GlslType.VEC3));
+                // Preview: +Z (looking straight at the quad).
+                new ShaderExpr("vec3(0.0, 0.0, 1.0)", GlslType.VEC3));
     }
 
     /**
@@ -535,23 +534,74 @@ public class ShaderGraphCompiler {
      * space. Preview: {@code vec3(0.0)}.
      */
     protected ShaderExpr meshPosition() {
+        if (injection) return injectionWorldPos();
         return varyingInput("kg_modelPos", GlslType.VEC3, this::modelPosition,
-                // Injection: the kg_localPos varying (object/model space, like this node's default); else 0.
-                geometryVarying("kg_localPos", "vec3(0.0)", GlslType.VEC3));
+                new ShaderExpr("vec3(0.0)", GlslType.VEC3)); // preview: 0
     }
 
-    /**
-     * The preview/injection default for a mesh-geometry port (normal / view direction / position). In
-     * injection mode this is the named varying the injected vertex stage writes (flagging
-     * {@link #usesGeometryVarying} so {@code IrisShaderInjector} adds that vertex stage); otherwise the
-     * node-preview default expression. See {@link #meshNormal()}.
-     */
-    private ShaderExpr geometryVarying(String injectionVarying, String previewDefault, GlslType type) {
-        if (injection) {
-            usesGeometryVarying = true;
-            return new ShaderExpr(injectionVarying, type);
-        }
-        return new ShaderExpr(previewDefault, type);
+    // ---- Injection-mode fragment reconstruction (see IrisShaderInjector) --------------------------------
+    // Under a shaderpack we never touch the pack's vertex shader (any undefined reference there disables the
+    // whole pack). Instead the geometry/screen inputs are reconstructed in the fragment from gl_FragCoord and
+    // KilaGraph's own bound UBOs (KG_Globals.ScreenSize + KG_Transforms.IProjMat/IViewMat) — names we control,
+    // so this can never break a pack. Only the smooth surface normal needs the pack: the injector fills a
+    // kg_normalView global from the pack's own view-space normal varying when it can detect one. All outputs
+    // are world-space, matching the non-injection meshNormal/meshViewDir so previews and in-world agree.
+
+    /** The framebuffer size ({@code kg_globals.ScreenSize}) from our own KG_Globals UBO — bound on both the
+     *  vanilla pipeline and the injected shaderpack program, so screen-space nodes work in both without a
+     *  Minecraft include (which would make a graph non-injectable). */
+    protected ShaderExpr screenSize() {
+        useUniformBlock(KGEngineUniforms.BLOCK);
+        return new ShaderExpr(KGEngineUniforms.screenSizeAccessor(), GlslType.VEC2);
+    }
+
+    /** Injection-only: the reconstructed <b>view-space</b> position of this fragment (see the private helper);
+     *  {@code -viewPos} is the surface&rarr;camera direction with length = distance. Used by ViewDirection. */
+    protected ShaderExpr reconstructedViewPos() {
+        return injectionViewPos();
+    }
+
+    /** View-space position of this fragment from {@code gl_FragCoord} + {@code IProjMat} + {@code ScreenSize}. */
+    private ShaderExpr injectionViewPos() {
+        useUniformBlock(KGEngineUniforms.BLOCK);      // ScreenSize
+        useUniformBlock(KGTransformUniforms.BLOCK);   // IProjMat (clip -> view)
+        addFunction("kg_recon_viewPos",
+                "vec3 kg_recon_viewPos() {\n"
+              + "    vec2 kg_ndc = gl_FragCoord.xy / " + KGEngineUniforms.screenSizeAccessor() + " * 2.0 - 1.0;\n"
+              + "    vec4 kg_vp = " + KGTransformUniforms.accessor("IProjMat")
+                    + " * vec4(kg_ndc, gl_FragCoord.z * 2.0 - 1.0, 1.0);\n"
+              + "    return kg_vp.xyz / kg_vp.w;\n}\n");
+        return new ShaderExpr("kg_recon_viewPos()", GlslType.VEC3);
+    }
+
+    /** World-space surface normal: the pack's own view-space normal ({@code kg_normalView}, filled by the
+     *  injector) rotated into world via {@code IViewMat}. */
+    private ShaderExpr injectionNormal() {
+        usesGeometryVarying = true; // the injector must declare + fill the kg_normalView global
+        useUniformBlock(KGTransformUniforms.BLOCK);
+        addFunction("kg_recon_normal",
+                "vec3 kg_recon_normal() { return normalize(mat3("
+                        + KGTransformUniforms.accessor("IViewMat") + ") * kg_normalView); }\n");
+        return new ShaderExpr("kg_recon_normal()", GlslType.VEC3);
+    }
+
+    /** World-space surface&rarr;camera view direction from the reconstructed view position. */
+    private ShaderExpr injectionViewDir() {
+        injectionViewPos();
+        addFunction("kg_recon_viewDir",
+                "vec3 kg_recon_viewDir() { return normalize(mat3("
+                        + KGTransformUniforms.accessor("IViewMat") + ") * (-kg_recon_viewPos())); }\n");
+        return new ShaderExpr("kg_recon_viewDir()", GlslType.VEC3);
+    }
+
+    /** Camera-relative world position from the reconstructed view position ({@code IViewMat} is rotation-only,
+     *  so this is world-space relative to the camera — good enough for world-ish position effects). */
+    private ShaderExpr injectionWorldPos() {
+        injectionViewPos();
+        addFunction("kg_recon_worldPos",
+                "vec3 kg_recon_worldPos() { return mat3("
+                        + KGTransformUniforms.accessor("IViewMat") + ") * kg_recon_viewPos(); }\n");
+        return new ShaderExpr("kg_recon_worldPos()", GlslType.VEC3);
     }
 
     /**
@@ -827,9 +877,10 @@ public class ShaderGraphCompiler {
      *  the preview geometry's uv (mesh/quad uv) so the preview shows the entire scene.</p> */
     protected ShaderExpr screenUv() {
         if (preview || editorPreview) return meshUv();
-        addInclude("minecraft:globals.glsl");
-        useBuiltinUbo("Globals");
-        return new ShaderExpr("(gl_FragCoord.xy / ScreenSize)", GlslType.VEC2);
+        // Framebuffer size from our own KG_Globals UBO (bound on both the vanilla pipeline and — crucially —
+        // the injected shaderpack program), so screen-space nodes need no Minecraft include and stay injectable.
+        useUniformBlock(KGEngineUniforms.BLOCK);
+        return new ShaderExpr("(gl_FragCoord.xy / " + KGEngineUniforms.screenSizeAccessor() + ")", GlslType.VEC2);
     }
 
     /** Sample the captured opaque scene colour (vec3) at {@code uv} — Unity's Scene Color. */

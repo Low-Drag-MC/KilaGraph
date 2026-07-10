@@ -75,13 +75,12 @@ public class ScreenPositionNode extends ShaderNode {
         // keeps true gl_FragCoord screen-space in-world. See ShaderGraphCompiler#screenUv.
         String uv = ctx.screenUv().code();
         String mode = ctx.option("mode", String.class, "default");
-        if (mode.equals("pixel") || mode.equals("tiled")) {
-            ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl"); // ScreenSize
-        }
+        // ScreenSize from our own KG_Globals UBO (no Minecraft include) so pixel/tiled stay injectable.
+        String screenSize = (mode.equals("pixel") || mode.equals("tiled")) ? ctx.screenSize().code() : null;
         String code = switch (mode) {
-            case "pixel" -> "vec4(" + uv + " * ScreenSize, 0.0, 0.0)";
+            case "pixel" -> "vec4(" + uv + " * " + screenSize + ", 0.0, 0.0)";
             case "center" -> "vec4(" + uv + " * 2.0 - 1.0, 0.0, 0.0)";
-            case "tiled" -> "vec4(fract(vec2((" + uv + ".x * 2.0 - 1.0) * (ScreenSize.x / ScreenSize.y), "
+            case "tiled" -> "vec4(fract(vec2((" + uv + ".x * 2.0 - 1.0) * (" + screenSize + ".x / " + screenSize + ".y), "
                     + uv + ".y * 2.0 - 1.0)), 0.0, 0.0)";
             // Homogeneous (pre-divide) screen position: w = the fragment's eye-space depth, so .xy/.w = uv and
             // (SceneDepth[eye] - .w) is a camera-independent depth fade. See ShaderCompileContext#fragmentEyeDepth.

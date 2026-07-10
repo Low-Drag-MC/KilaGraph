@@ -57,8 +57,15 @@ public class ViewDirectionNode extends ShaderNode {
         // Camera is at the view-space origin, so the surface->camera direction is -viewPos; its length is the
         // distance to the camera. MC's matrices are pure rotation (mat3) + translation, so the view->world /
         // view->object rotations below preserve that length across spaces.
-        ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl");
-        ShaderExpr vd = ctx.temp(GlslType.VEC3, "-(ModelViewMat * vec4(" + ctx.meshPosition().code() + ", 1.0)).xyz");
+        ShaderExpr vd;
+        if (ctx.isInjection()) {
+            // Under a shaderpack we can't read ModelViewMat; reconstruct the view-space position from
+            // gl_FragCoord + our own UBOs (pack-independent — see ShaderGraphCompiler.injection*).
+            vd = ctx.temp(GlslType.VEC3, "-" + ctx.reconstructedViewPos().code());
+        } else {
+            ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl");
+            vd = ctx.temp(GlslType.VEC3, "-(ModelViewMat * vec4(" + ctx.meshPosition().code() + ", 1.0)).xyz");
+        }
         String out = switch (space) {
             case "object" -> "mat3(" + ctx.transformField("IModelViewMat", GlslType.MAT4).code() + ") * " + vd.code();
             case "view" -> vd.code();

@@ -228,6 +228,18 @@ public final class ShaderCompileContext {
         return compiler.screenUv();
     }
 
+    /** The framebuffer size in pixels ({@code vec2}) from KilaGraph's own KG_Globals UBO — no Minecraft
+     *  include, so screen-space nodes stay injectable under a shaderpack. */
+    public ShaderExpr screenSize() {
+        return compiler.screenSize();
+    }
+
+    /** Injection-only: the reconstructed <b>view-space</b> position of this fragment ({@code vec3}); negate for
+     *  the surface&rarr;camera direction (length = distance). Only valid when {@link #isInjection()}. */
+    public ShaderExpr reconstructedViewPos() {
+        return compiler.reconstructedViewPos();
+    }
+
     /** Sample the captured opaque scene colour (vec3) at {@code uv} — Unity's Scene Color node. */
     public ShaderExpr sampleSceneColor(ShaderExpr uv) {
         return compiler.sampleSceneColor(uv);

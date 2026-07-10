@@ -64,25 +64,13 @@ public final class IrisShaderInjector {
     /** LabPBR specular-map sampler name(s). */
     private static final String[] SPECULAR_SAMPLERS = {"specular"};
 
-    /** The {@code iris_Normal} <b>vertex attribute declaration</b> (not the {@code iris_NormalMat} uniform,
-     *  which shares the prefix): the precise signal that a vertex shader carries per-vertex normals, so our
-     *  {@code kg_normal = iris_NormalMat * iris_Normal} write compiles. A plain {@code contains("iris_Normal")}
-     *  false-matches {@code iris_NormalMat} on normal-less passes like {@code basic} (lines/leashes) → an
-     *  {@code undefined variable "iris_Normal"} compile error that breaks the whole pack. */
-    private static final Pattern IRIS_NORMAL_ATTR = Pattern.compile("\\bin\\s+vec3\\s+iris_Normal\\b");
-
-    /** The per-fragment geometry varyings a surface may read (world-space normal + surface→camera view
-     *  direction, object-space position). Computed once by the injected vertex stage ({@link #injectVertex})
-     *  and read by the fragment surfaces. Order/names match {@code ShaderGraphCompiler}'s injection defaults. */
-    private static final String[] GEOMETRY_VARYINGS = {"kg_normal", "kg_viewDir", "kg_localPos"};
-
-    /** Every uniform/attribute/block our injected vertex writes reference. A shading pass must declare <b>all</b>
-     *  of them or our writes won't compile — passes differ (e.g. {@code clouds_sodium} has {@code iris_Normal}
-     *  but no {@code gbufferModelViewInverse}; {@code basic} has {@code iris_NormalMat} but no {@code iris_Normal}
-     *  attribute). {@code iris_Normal} itself is matched by {@link #IRIS_NORMAL_ATTR} (attribute-decl, not the
-     *  {@code iris_NormalMat} substring). Missing any ⇒ skip (an undefined reference disables the whole pack). */
-    private static final String[] GEOMETRY_WRITE_TOKENS =
-            {"iris_Position", "iris_NormalMat", "iris_transforms", "gbufferModelViewInverse"};
+    /** The pack's own <b>view-space smooth normal</b> fragment varying, if it declares one named
+     *  {@code normal} ({@code in vec3 normal;} / {@code varying vec3 normal;} — Complementary/BSL/Solas all do;
+     *  photon doesn't). When present we feed it into {@code kg_normalView} for a smooth surface normal; when
+     *  absent we fall back to a constant, so a graph's normal/Fresnel degrades gracefully but never breaks the
+     *  pack. Word-exact on {@code normal} so it doesn't catch {@code normalM}/{@code newNormal}/etc. */
+    private static final Pattern PACK_NORMAL_VARYING =
+            Pattern.compile("(?m)^\\s*(?:flat\\s+)?(?:in|varying)\\s+vec3\\s+normal\\s*;");
 
     /** Shared GLSL: the surface struct, emitted once when any surface is injected. Field order is the
      *  canonical one used by {@code buildInjectionSnippet} / {@code IrisSurfaceRegistry} / the encoders. */
@@ -137,26 +125,20 @@ public final class IrisShaderInjector {
         // runtime can detect when a later-registered surface needs a reload to be picked up.
         lastInjectedGeneration = IrisSurfaceRegistry.generation();
         var surfaces = IrisSurfaceRegistry.snapshot();
-        // Iris calls createShader for BOTH the vertex and fragment of each program (same name). The fragment
-        // reads gbuffers samplers (hijacked); the vertex shader writes gl_Position. Try the fragment transform
-        // first; if it didn't change the source it wasn't a hijackable fragment, so try the vertex transform.
+        // We only ever transform the FRAGMENT (hijack the gbuffers samplers). We deliberately never touch the
+        // vertex shader: any undefined reference there disables the whole pack, and the pack programs each
+        // declare a different name subset. Geometry/screen inputs are reconstructed in the fragment from
+        // gl_FragCoord + our own bound UBOs (see ShaderGraphCompiler.injection*), which can't break a pack.
         String out = injectFragment(source, surfaces);
-        if (out != source) {
+        if (out != source && LOGGED.add(name + "#" + (source == null ? 0 : source.length()))) {
             // Report which sampler families the injected fragment reads — the ground truth for "does this pack
             // program do albedo/normal/specular PBR for our geometry". Key by name + source length so a
             // DIFFERENT pack's same-named program (different source) re-logs.
-            if (LOGGED.add(name + "#" + (source == null ? 0 : source.length()))) {
-                LOGGER.info("[KilaGraph][Iris] injected {} surface(s) into '{}' — fragment reads albedo={} normals={} specular={}",
-                        surfaces.size(), name, detectReads(source, ALBEDO_SAMPLERS),
-                        detectReads(source, NORMAL_SAMPLERS), detectReads(source, SPECULAR_SAMPLERS));
-            }
-            return out;
+            LOGGER.info("[KilaGraph][Iris] injected {} surface(s) into '{}' — fragment reads albedo={} normals={} specular={}",
+                    surfaces.size(), name, detectReads(source, ALBEDO_SAMPLERS),
+                    detectReads(source, NORMAL_SAMPLERS), detectReads(source, SPECULAR_SAMPLERS));
         }
-        String vsh = injectVertex(name, source, surfaces);
-        if (vsh != source && LOGGED.add(name + "#vsh#" + (source == null ? 0 : source.length()))) {
-            LOGGER.info("[KilaGraph][Iris] injected geometry varyings into vertex shader '{}'", name);
-        }
-        return vsh;
+        return out;
     }
 
     /**
@@ -182,11 +164,15 @@ public final class IrisShaderInjector {
         //    declaration per hijacked sampler helper.
         StringBuilder decls = new StringBuilder("\n// " + MARKER + "\nuniform int kg_surface_id;\n");
         decls.append(KG_SURFACE_STRUCT);
-        // If any surface reads the mesh normal/viewDir/position, declare those varyings here (matching vertex
-        // stage written by injectVertex); the surface functions reference them. Qualifier per GLSL era.
-        if (surfaces.stream().anyMatch(IrisSurfaceRegistry.Surface::usesGeometry)) {
-            decls.append(geometryVaryingDecls(glslVersion(source) >= 130 ? "in" : "varying"));
-        }
+        // A surface that reads the mesh normal (Fresnel etc.) needs a smooth view-space normal. We never touch
+        // the vsh, so we take the pack's OWN view-space normal varying when it declares one named `normal`
+        // (Complementary/BSL/Solas do; photon doesn't → constant fallback), filled per hijacked sampler below
+        // into this global — the compiler's kg_recon_normal() rotates it to world. viewDir/position/screen need
+        // nothing from the pack (reconstructed from gl_FragCoord + our UBOs).
+        boolean anyGeometry = surfaces.stream().anyMatch(IrisSurfaceRegistry.Surface::usesGeometry);
+        String normalFill = !anyGeometry ? null
+                : (PACK_NORMAL_VARYING.matcher(source).find() ? "normal" : "vec3(0.0, 0.0, 1.0)");
+        if (anyGeometry) decls.append("vec3 kg_normalView;\n");
         LinkedHashSet<String> declUnits = new LinkedHashSet<>();
         for (var s : surfaces) declUnits.addAll(s.declarationUnits());
         for (String unit : declUnits) decls.append(unit);
@@ -205,94 +191,15 @@ public final class IrisShaderInjector {
         for (var s : surfaces) defs.append('\n').append(s.surfaceFunction());
         defs.append('\n').append(dispatchFunction(surfaces));
 
-        for (String s : albedo) defs.append(samplerHelper(s, "albedo"));
-        for (String s : normals) defs.append(samplerHelper(s, "normals"));
-        for (String s : specular) defs.append(samplerHelper(s, "specular"));
+        for (String s : albedo) defs.append(samplerHelper(s, "albedo", normalFill));
+        for (String s : normals) defs.append(samplerHelper(s, "normals", normalFill));
+        for (String s : specular) defs.append(samplerHelper(s, "specular", normalFill));
         return body + defs;
     }
 
     /** Convenience for the common (registry-driven) call. */
     public static String injectFragment(String source) {
         return injectFragment(source, IrisSurfaceRegistry.snapshot());
-    }
-
-    /**
-     * Transform a <b>vertex</b>-stage source so it computes the per-fragment geometry varyings
-     * ({@link #GEOMETRY_VARYINGS}) a surface may read (Fresnel etc.). Returns {@code source} unchanged unless
-     * <em>all</em> of: it's a vertex shader ({@code gl_Position}), it's an Iris-transformed shading pass (has
-     * the {@code iris_Normal} attribute + the {@code iris_transforms} DynamicTransforms block), at least one
-     * surface reads geometry, and it isn't already injected.
-     *
-     * <p><b>Iris renames the GL built-ins.</b> Iris compiles packs as {@code #version 330 core} "Generated by
-     * glsl-transformer", so by {@code createShader} the vertex source uses {@code iris_Position}/
-     * {@code iris_Normal} attributes, an {@code iris_NormalMat} (mat3 object&rarr;view normal matrix), and the
-     * model-view/offset inside a {@code layout(std140) uniform iris_DynamicTransforms {...} iris_transforms}
-     * block — <em>not</em> {@code gl_Vertex}/{@code gl_Normal}/{@code gl_ModelViewMatrix}. {@code gbufferModelViewInverse}
-     * (view&rarr;world) and {@code cameraPosition} survive unchanged. We compute exactly as the pack does (cf.
-     * its own {@code normal = normalize(iris_NormalMat * iris_Normal)} and
-     * {@code iris_transforms.ModelViewMat * translate(ModelOffset) * vec4(iris_Position,1)}), so world normal +
-     * surface&rarr;camera view direction + object-space position come out in the same frame as the editor
-     * preview. Gating on {@code iris_Normal}/{@code iris_transforms} also guarantees these names exist, so core-
-     * profile composite/deferred passes (which lack them, and whose fragments we never hijack) are skipped.
-     *
-     * <p>The varyings are geometry-only (identical for every surface), so they're declared once, not per id,
-     * and aren't gated on {@code kg_surface_id} (writing them for non-KilaGraph geometry is harmless).</p>
-     */
-    public static String injectVertex(String name, String source, List<IrisSurfaceRegistry.Surface> surfaces) {
-        if (source == null || source.contains(MARKER)) return source;
-        if (!source.contains("gl_Position")) return source;      // vertex shader only (fragments have none)
-        if (!IRIS_NORMAL_ATTR.matcher(source).find()) return source; // has the iris_Normal attribute (not just iris_NormalMat)
-        if (surfaces.stream().noneMatch(IrisSurfaceRegistry.Surface::usesGeometry)) return source;
-        // Skip any pass missing a name our writes reference (declaration sets differ per pass) — injecting an
-        // undefined reference fails compilation and disables the entire shaderpack.
-        for (String tok : GEOMETRY_WRITE_TOKENS) if (!source.contains(tok)) return source;
-
-        String decls = "\n// " + MARKER + "\n" + geometryVaryingDecls(glslVersion(source) >= 130 ? "out" : "varying");
-        String body = insertAtFirstCodeLine(source, decls);
-        // Model-space position incl. the chunk/entity offset — matches the pack's own transform (ModelOffset is
-        // 0 for entities, the section offset for terrain). The frame matches the non-injection meshPosition.
-        String modelPos = "(iris_Position + iris_transforms.ModelOffset)";
-        String writes = "\n    {\n"
-                + "        vec3 kgVP = (iris_transforms.ModelViewMat * vec4(" + modelPos + ", 1.0)).xyz;\n"
-                + "        kg_normal = normalize(mat3(gbufferModelViewInverse) * (iris_NormalMat * iris_Normal));\n"
-                + "        kg_viewDir = normalize(mat3(gbufferModelViewInverse) * (-kgVP));\n"
-                + "        kg_localPos = " + modelPos + ";\n"
-                + "    }\n";
-        return insertBeforeMainEnd(body, writes);
-    }
-
-    /** Declarations of the geometry varyings with the given storage qualifier ({@code in}/{@code out}/
-     *  {@code varying}) — used in both the fragment (read) and vertex (write) stages. */
-    private static String geometryVaryingDecls(String qualifier) {
-        StringBuilder sb = new StringBuilder();
-        for (String v : GEOMETRY_VARYINGS) sb.append(qualifier).append(" vec3 ").append(v).append(";\n");
-        return sb.toString();
-    }
-
-    /** The GLSL version from the leading {@code #version N} directive (110 if absent) — picks {@code in}/
-     *  {@code out} (core, &ge;130) vs {@code varying} (legacy) for our varying declarations. */
-    private static int glslVersion(String source) {
-        Matcher m = Pattern.compile("(?m)^\\s*#version\\s+(\\d+)").matcher(source);
-        return m.find() ? Integer.parseInt(m.group(1)) : 110;
-    }
-
-    /** Insert {@code code} just before the closing brace of {@code void main(){...}} (brace-matched from the
-     *  first {@code {} after {@code main}). Returns {@code source} unchanged if no balanced {@code main} body
-     *  is found. */
-    private static String insertBeforeMainEnd(String source, String code) {
-        Matcher m = Pattern.compile("void\\s+main\\s*\\(").matcher(source);
-        if (!m.find()) return source;
-        int open = source.indexOf('{', m.end());
-        if (open < 0) return source;
-        int depth = 0;
-        for (int i = open; i < source.length(); i++) {
-            char c = source.charAt(i);
-            if (c == '{') depth++;
-            else if (c == '}' && --depth == 0) {
-                return source.substring(0, i) + code + source.substring(i);
-            }
-        }
-        return source; // unbalanced braces — leave untouched
     }
 
     /** Diagnostic: which of {@code names} the source actually reads via {@code texture(name,…)}. */
@@ -324,7 +231,7 @@ public final class IrisShaderInjector {
      *  real texture read (passthrough). Emits a {@code (vec2,float)} overload too so explicit-LOD reads
      *  ({@code texture2DLod}) resolve (the LOD is dropped — fine for our flat per-fragment surface).
      *  {@code DEBUG_FORCE_TINT} tints the albedo red (seam test). */
-    private static String samplerHelper(String sampler, String kind) {
+    private static String samplerHelper(String sampler, String kind, String normalFill) {
         // LOD- and gradient-form reads (textureLod / textureGrad / texture2DGradARB) keep their trailing
         // args after the rewrite; these overloads absorb them and delegate to the (vec2) form (the explicit
         // LOD/gradient is irrelevant for our flat per-fragment surface).
@@ -341,8 +248,11 @@ public final class IrisShaderInjector {
             case "specular" -> "kg_encodeSpecular(s.smoothness, s.metallic, s.porosity, s.sss, s.emission)";
             default -> "vec4(s.albedo, s.alpha)";
         };
+        // Fill the per-program normal global (from the pack's own varying or a constant) right before the
+        // surface runs, so kg_recon_normal() has a value. Only when some surface reads geometry.
+        String geom = normalFill != null ? "kg_normalView = " + normalFill + "; " : "";
         return "\nvec4 kg_sample_" + sampler + "(vec2 kg_uv) {\n"
-                + "    if (kg_surface_id != 0) { kg_Surface s = kg_surface(kg_surface_id, kg_uv); return " + encoded + "; }\n"
+                + "    if (kg_surface_id != 0) { " + geom + "kg_Surface s = kg_surface(kg_surface_id, kg_uv); return " + encoded + "; }\n"
                 + "    return texture(" + sampler + ", kg_uv);\n}\n" + overloads;
     }
 
