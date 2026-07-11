@@ -1,5 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.runtime;
 
+import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
+import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.AddressMode;
 import com.mojang.blaze3d.textures.FilterMode;
@@ -84,8 +86,7 @@ public final class SceneCaptureManager {
         // re-fetched every frame, never cached — they go stale on pack reload/resize/dimension change).
         // Depth stays on the vanilla copy either way: Iris's depthtex0 wraps MC's main depth attachment.
         // Any Iris-path failure falls back to the vanilla copy (worst case: stale colour, never a crash).
-        int[] iris = com.lowdragmc.kilagraph.rendertype.iris.IrisCompat.isShaderPackInUse()
-                ? com.lowdragmc.kilagraph.rendertype.iris.IrisCompat.irisColorTargetInfo() : null;
+        int[] iris = IrisCompat.isShaderPackInUse() ? IrisCompat.irisColorTargetInfo() : null;
         boolean irisColorDone = iris != null && blitIrisColor(iris[0], iris[1], iris[2]);
         var encoder = RenderSystem.getDevice().createCommandEncoder();
         if (!irisColorDone) {
@@ -108,7 +109,7 @@ public final class SceneCaptureManager {
         if (srcTex == 0 || w <= 0 || h <= 0) return false;
         try {
             ensureColor(w, h, TextureFormat.RGBA8);
-            int dstTex = ((com.mojang.blaze3d.opengl.GlTexture) colorTexture).glId();
+            int dstTex = ((GlTexture) colorTexture).glId();
             if (blitReadFbo == 0) blitReadFbo = GL30.glGenFramebuffers();
             if (blitDrawFbo == 0) blitDrawFbo = GL30.glGenFramebuffers();
             int prevRead = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);

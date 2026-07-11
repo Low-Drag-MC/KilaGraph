@@ -117,7 +117,7 @@ public final class IrisShaderInjector {
 
     /** The {@link IrisSurfaceRegistry#generation()} baked into the most recently compiled programs. When the
      *  live registry advances past this (a new world graph appeared), the programs are stale and a shaderpack
-     *  reload is needed to re-inject — see {@code IrisCompat.requestReloadIfStale}. */
+     *  reload is needed to re-inject — see {@code IrisCompat.reloadShadersIfStale}. */
     private static volatile int lastInjectedGeneration = -1;
 
     private IrisShaderInjector() {}

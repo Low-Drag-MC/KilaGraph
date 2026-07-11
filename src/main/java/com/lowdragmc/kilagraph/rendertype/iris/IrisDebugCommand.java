@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
@@ -20,9 +21,13 @@ import static net.minecraft.commands.Commands.literal;
  *   <li>{@code /kgiris tint} — toggles {@link IrisShaderInjector#DEBUG_FORCE_TINT} (seam test: all our
  *       geometry tinted red, ignoring the per-draw discriminator). Takes effect on the next shader reload
  *       (press <b>F3+T</b>), since the injection happens when Iris compiles the shaderpack programs.</li>
+ *   <li>{@code /kgiris surfaces} — dumps the live surface registry (ids, hashes, generation) and the
+ *       generation baked into the current programs (mismatch = reload pending).</li>
+ *   <li>{@code /kgiris draw} / {@code drawvanilla} — toggles an in-world test cube drawn with a default
+ *       KilaGraph material / vanilla {@code entitySolid} (the injection bisection tool).</li>
  * </ul>
  */
-@EventBusSubscriber(modid = "kilagraph", value = net.neoforged.api.distmarker.Dist.CLIENT)
+@EventBusSubscriber(modid = "kilagraph", value = Dist.CLIENT)
 public final class IrisDebugCommand {
 
     private IrisDebugCommand() {}

@@ -6,6 +6,7 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.runtime.KGEngineUniforms;
+import com.lowdragmc.kilagraph.rendertype.runtime.KGFogUniforms;
 import com.lowdragmc.kilagraph.rendertype.runtime.KGTransformUniforms;
 import com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IVariableNode;
@@ -219,7 +220,10 @@ public class ShaderGraphCompiler {
         // material drawn under a shaderpack can run its real surface shading inside the pack's gbuffers
         // program. Skipped for the editor whole-graph preview (rendered in GUI/PIP, which Iris never
         // overrides — so it must not register / trigger Iris reloads). Optional: a failure here never
-        // breaks the (non-Iris) material.
+        // breaks the (non-Iris) material. Deliberately built even when Iris is absent: it is pure string
+        // work (no GL, no Iris classes) on the rare compile path, keeps the compiled artifact identical
+        // across environments, and stays assertable in headless GameTests — every Iris RUNTIME effect
+        // (surface registration, pack reloads, per-draw binds) is gated on IrisCompat.ENABLED instead.
         InjectionSnippet injectionSnippet = null;
         if (!editorPreview) {
             try {
@@ -342,8 +346,7 @@ public class ShaderGraphCompiler {
         if (!blockLayout.isEmpty()) decls.add(blockLayout.blockGlsl());
         for (String s : layout.samplers()) decls.add("uniform sampler2D " + s + ";");
         uniformBlocks.stream()
-                .sorted(java.util.Comparator.comparing(
-                        com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock::uboName))
+                .sorted(java.util.Comparator.comparing(ShaderUniformBlock::uboName))
                 .forEach(b -> decls.add(b.declareGlsl()));
 
         StringBuilder body = new StringBuilder(fragment.body);
@@ -683,8 +686,8 @@ public class ShaderGraphCompiler {
      *  {@code KG_Fog} slice-view of Minecraft's own Fog buffer (see {@code KGFogUniforms} — identical
      *  values, no {@code #moj_import}, so fog-reading graphs stay injectable under a shaderpack). */
     ShaderExpr fogField(String name, GlslType type) {
-        useUniformBlock(com.lowdragmc.kilagraph.rendertype.runtime.KGFogUniforms.BLOCK);
-        return new ShaderExpr(com.lowdragmc.kilagraph.rendertype.runtime.KGFogUniforms.accessor(name), type);
+        useUniformBlock(KGFogUniforms.BLOCK);
+        return new ShaderExpr(KGFogUniforms.accessor(name), type);
     }
 
     /**
@@ -1510,8 +1513,7 @@ public class ShaderGraphCompiler {
      *  therefore the content hash) is stable regardless of node-traversal order. */
     private void appendUniformBlocks(StringBuilder sb, boolean leadingNewline) {
         uniformBlocks.stream()
-                .sorted(java.util.Comparator.comparing(
-                        com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock::uboName))
+                .sorted(java.util.Comparator.comparing(ShaderUniformBlock::uboName))
                 .forEach(b -> {
                     if (leadingNewline) sb.append('\n');
                     sb.append(b.declareGlsl());

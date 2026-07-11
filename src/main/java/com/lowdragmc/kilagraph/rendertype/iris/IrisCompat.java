@@ -1,7 +1,9 @@
 package com.lowdragmc.kilagraph.rendertype.iris;
 
+import com.lowdragmc.kilagraph.mixin.iris.IrisMixinPlugin;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.logging.LogUtils;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.lang.ref.WeakReference;
@@ -240,7 +242,7 @@ public final class IrisCompat {
      *
      * @return {@code {glTextureId, width, height}} or {@code null}
      */
-    @org.jetbrains.annotations.Nullable
+    @Nullable
     public static int[] irisColorTargetInfo() {
         if (!ENABLED) return null;
         try {
@@ -263,7 +265,7 @@ public final class IrisCompat {
         if (IrisShaderInjector.lastInjectedGeneration() < 0) return; // no pack compile seen yet
         seamCheckDone = true;
         try {
-            if (!com.lowdragmc.kilagraph.mixin.iris.IrisMixinPlugin.wasApplied("MixinGlCommandEncoderSurface")) {
+            if (!IrisMixinPlugin.wasApplied("MixinGlCommandEncoderSurface")) {
                 mixinsMissing = true;
                 LOGGER.error("[KilaGraph][Iris] MixinGlCommandEncoderSurface did not apply (MC/Iris internals "
                         + "changed?) — integration degraded: KilaGraph materials render as shaderpack "

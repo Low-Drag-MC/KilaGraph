@@ -1,6 +1,8 @@
 package com.lowdragmc.kilagraph.rendertype.iris;
 
+import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
+import com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureManager;
 import com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
@@ -173,12 +175,11 @@ public final class IrisSurfaceUniform {
         // missing texture so the sampler never dangles on unit 0 (the pack's own albedo atlas). Scene DEPTH
         // needs nothing here: under injection it reads Iris's own depthtex1 (auto-bound by name).
         if (m.usesSceneColor()) {
-            int location = samplerLocation(program,
-                    com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler.SCENE_COLOR_SAMPLER);
+            int location = samplerLocation(program, ShaderGraphCompiler.SCENE_COLOR_SAMPLER);
             if (location >= 0) {
-                var view = com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureManager.INSTANCE.colorView();
+                var view = SceneCaptureManager.INSTANCE.colorView();
                 if (view == null) view = RenderTypeGraphMaterial.missingView();
-                var sceneSampler = com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureManager.INSTANCE.sampler();
+                var sceneSampler = SceneCaptureManager.INSTANCE.sampler();
                 int unit = base + next[0]++;
                 GL13.glActiveTexture(GL13.GL_TEXTURE0 + unit);
                 GL11.glBindTexture(GL11.GL_TEXTURE_2D, ((GlTexture) view.texture()).glId());

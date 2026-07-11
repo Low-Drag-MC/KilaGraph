@@ -7,6 +7,7 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
+import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.texture.AbstractTexture;
@@ -91,8 +92,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
                                    boolean usesSceneColor, boolean usesSceneDepth) {
         this.renderType = renderType;
         this.uniforms = new MaterialUniformBuffer(layout);
-        this.uniformBlocks = java.util.List.copyOf(uniformBlocks);
-        this.injectionOnlyBlocks = java.util.List.copyOf(injectionOnlyBlocks);
+        this.uniformBlocks = List.copyOf(uniformBlocks);
+        this.injectionOnlyBlocks = List.copyOf(injectionOnlyBlocks);
         this.contentHash = contentHash;
         this.uniformFields = new HashMap<>(uniformFields);
         this.variableSamplers = new HashMap<>(variableSamplers);
@@ -350,12 +351,12 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         // "every declared sampler must be bound" check passes.
         if (usesSceneColor) {
             GpuTextureView view = SceneCaptureManager.INSTANCE.colorView();
-            renderPass.bindTexture(com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler.SCENE_COLOR_SAMPLER,
+            renderPass.bindTexture(ShaderGraphCompiler.SCENE_COLOR_SAMPLER,
                     view != null ? view : missingView(), SceneCaptureManager.INSTANCE.sampler());
         }
         if (usesSceneDepth) {
             GpuTextureView view = SceneCaptureManager.INSTANCE.depthView();
-            renderPass.bindTexture(com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler.SCENE_DEPTH_SAMPLER,
+            renderPass.bindTexture(ShaderGraphCompiler.SCENE_DEPTH_SAMPLER,
                     view != null ? view : missingView(), SceneCaptureManager.INSTANCE.sampler());
         }
     }

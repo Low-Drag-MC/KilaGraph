@@ -1,13 +1,16 @@
 package com.lowdragmc.kilagraph.rendertype.compiler;
 
+import com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock;
+
 import java.util.List;
+import java.util.Map;
 
 /**
  * The GLSL pieces needed to run a graph's fragment surface shading <em>inside an Iris shaderpack's shared
  * gbuffers program</em> (see {@code IrisShaderInjector}). Produced by
  * {@link ShaderGraphCompiler#buildInjectionSnippet()} in <em>injection mode</em>: the fragment graph is
- * compiled into the body of a {@code vec4 kg_surface(vec2 kg_uv)} function — mesh uv becomes the function
- * parameter and the vertex varyings degrade to preview defaults (vertexColor/color → white, normal → +Y,
+ * compiled into the body of a {@code kg_Surface kg_surface_<id>(vec2 kg_uv)} function — mesh uv becomes the
+ * function parameter and the vertex varyings degrade to preview defaults (vertexColor/color → white, normal → +Y,
  * viewDir → +Z, position → 0), so the snippet is self-contained except for the {@code KG_Material} UBO, the
  * graph's own samplers, and KilaGraph-managed UBOs ({@code KG_Globals}/{@code KG_Transforms}), which the
  * runtime binds onto the shaderpack program at draw.
@@ -58,6 +61,6 @@ public record InjectionSnippet(
         String surfaceArgs,
         boolean usesGeometry,
         boolean usesSceneDepth,
-        List<com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock> uniformBlocks,
-        java.util.Map<String, SamplerDefault> samplerDefaults
+        List<ShaderUniformBlock> uniformBlocks,
+        Map<String, SamplerDefault> samplerDefaults
 ) {}

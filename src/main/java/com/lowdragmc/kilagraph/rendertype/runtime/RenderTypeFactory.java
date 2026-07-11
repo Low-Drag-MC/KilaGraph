@@ -32,7 +32,9 @@ import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -158,8 +160,8 @@ public final class RenderTypeFactory {
         // UBOs only the injection snippet needs (fragment reconstructions — e.g. Fresnel's viewDir pulls
         // KG_Globals.ScreenSize only under injection): uploaded + Iris-bound by the material, but kept out
         // of the vanilla render-pass binding (the vanilla pipeline doesn't declare them).
-        java.util.List<ShaderUniformBlock> injectionOnly = new java.util.ArrayList<>();
-        Map<String, SamplerDefault> injectionOnlyTextures = new java.util.LinkedHashMap<>();
+        List<ShaderUniformBlock> injectionOnly = new ArrayList<>();
+        Map<String, SamplerDefault> injectionOnlyTextures = new LinkedHashMap<>();
         if (compiled.injectionSnippet() != null) {
             for (ShaderUniformBlock block : compiled.injectionSnippet().uniformBlocks()) {
                 boolean inMain = compiled.uniformBlocks().stream()
