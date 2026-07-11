@@ -331,6 +331,16 @@ public final class ShaderCompileContext {
     }
 
     /**
+     * The <b>object-space</b> mesh normal as a stage-agnostic input: the model normal (raw {@code Normal}
+     * attribute, or a driven Normal block's value) in the vertex stage, the interpolated
+     * {@code kg_objectNormal} varying in the fragment stage, {@code vNormal} in previews. The single
+     * source the Normal node builds its spaces from — so a Normal block modifies them all.
+     */
+    public ShaderExpr objectNormal() {
+        return compiler.objectNormal();
+    }
+
+    /**
      * The interpolated world-space view direction, surface&rarr;camera (vec3) — the default fallback for an
      * unconnected {@code viewDir} port (Unity's View Direction node defaults to world space). Renormalize
      * before use. In a per-node preview this is {@code +Z} (looking straight at the quad).

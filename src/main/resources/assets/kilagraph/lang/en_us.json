@@ -58,6 +58,8 @@
 
   "rt_vertex_stage": "Vertex Stage",
   "rt_fragment_stage": "Fragment Stage",
+  "rt_vertex_model_position": "Position",
+  "rt_vertex_model_normal": "Normal",
   "rt_vertex_position": "glPosition",
   "rt_vertex_custom_float": "Custom Float",
   "rt_vertex_custom_vec2": "Custom Vec2",
@@ -521,7 +523,9 @@
 
   "kg.node.rt_vertex_stage.tooltip": "Container for vertex-stage output blocks.",
   "kg.node.rt_fragment_stage.tooltip": "Container for fragment-stage output blocks.",
-  "kg.node.rt_vertex_position.tooltip": "Writes the final clip-space vertex position.",
+  "kg.node.rt_vertex_model_position.tooltip": "The model-space vertex position; the standard Minecraft transform (ProjMat · ModelViewMat) is applied after, so it stays shaderpack-compatible. Unconnected = the mesh position, untouched.",
+  "kg.node.rt_vertex_model_normal.tooltip": "The model-space normal, replacing the mesh Normal for lighting, Fresnel defaults and the Normal node. Shaderpack-compatible. Unconnected = the mesh normal, untouched.",
+  "kg.node.rt_vertex_position.tooltip": "Advanced: writes the final clip-space vertex position directly. Vanilla-only — under an Iris shaderpack this block is ignored (the pack's standard transform is used; fragment shading still applies).",
   "kg.node.rt_vertex_custom_float.tooltip": "Passes a custom float varying from vertex to fragment.",
   "kg.node.rt_vertex_custom_vec2.tooltip": "Passes a custom vec2 varying from vertex to fragment.",
   "kg.node.rt_vertex_custom_vec3.tooltip": "Passes a custom vec3 varying from vertex to fragment.",

@@ -21,7 +21,7 @@ import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingStageNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphLogger;
@@ -121,9 +121,11 @@ public class RenderTypeGraph extends Graph {
     /**
      * The vertex-position block class the default shader places in the vertex stage. Subclasses with their
      * own fixed transform override this so the default graph — and nothing else — uses their block.
+     * Default: the Unity-like model-space Position block (unconnected = identity, and — unlike the advanced
+     * glPosition block — a driven one stays injectable under an Iris shaderpack).
      */
     protected Class<? extends BlockNode> defaultVertexPositionBlockClass() {
-        return VertexPositionBlock.class;
+        return VertexModelPositionBlock.class;
     }
 
     /** Set a node option's value (mirrors the editor's option-constant write). */

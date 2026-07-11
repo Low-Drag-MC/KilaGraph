@@ -20,6 +20,10 @@ import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogUboNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.scene.GlobalsUboNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomFloatBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.CombineNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.FlipNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.SwizzleNode;
@@ -194,6 +198,9 @@ public final class ShaderCompilerGameTest {
     private static final String CURVE_NODES = "rendertype_compile_curve_nodes";
     private static final String CURVE_VARIABLE = "rendertype_compile_curve_variable";
     private static final String CURVE_VALUE_CODEC = "rendertype_compile_curve_value_codec";
+    private static final String VERTEX_MODEL_IDENTITY = "rendertype_compile_vertex_model_identity";
+    private static final String VERTEX_MODEL_BLOCKS = "rendertype_compile_vertex_model_blocks";
+    private static final String VERTEX_MODEL_LEGACY = "rendertype_compile_vertex_model_legacy";
     private static final String INJECTION_GEOMETRY = "rendertype_injection_geometry_nodes";
     private static final String INJECTION_UNIVERSAL = "rendertype_injection_all_nodes";
     private static final String INJECTION_GATE = "rendertype_injection_blacklist_gate";
@@ -269,6 +276,9 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunction(CURVE_NODES, ShaderCompilerGameTest::curveNodesEmitGlsl);
         KGGameTests.registerFunction(CURVE_VARIABLE, ShaderCompilerGameTest::curveVariableBecomesUboStruct);
         KGGameTests.registerFunction(CURVE_VALUE_CODEC, ShaderCompilerGameTest::curveValueCodecRoundTrips);
+        KGGameTests.registerFunction(VERTEX_MODEL_IDENTITY, ShaderCompilerGameTest::vertexModelIdentityParity);
+        KGGameTests.registerFunction(VERTEX_MODEL_BLOCKS, ShaderCompilerGameTest::vertexModelBlocksDisplace);
+        KGGameTests.registerFunction(VERTEX_MODEL_LEGACY, ShaderCompilerGameTest::vertexModelLegacyGlPosition);
         KGGameTests.registerFunction(INJECTION_GEOMETRY, ShaderCompilerGameTest::injectionGeometryNodes);
         KGGameTests.registerFunction(INJECTION_UNIVERSAL, ShaderCompilerGameTest::injectionAllNodesCompatible);
         KGGameTests.registerFunction(INJECTION_GATE, ShaderCompilerGameTest::injectionBlacklistGate);
@@ -344,6 +354,9 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunctionTest(event, CURVE_NODES, KGGameTests.functionKey(CURVE_NODES), d);
         KGGameTests.registerFunctionTest(event, CURVE_VARIABLE, KGGameTests.functionKey(CURVE_VARIABLE), d);
         KGGameTests.registerFunctionTest(event, CURVE_VALUE_CODEC, KGGameTests.functionKey(CURVE_VALUE_CODEC), d);
+        KGGameTests.registerFunctionTest(event, VERTEX_MODEL_IDENTITY, KGGameTests.functionKey(VERTEX_MODEL_IDENTITY), d);
+        KGGameTests.registerFunctionTest(event, VERTEX_MODEL_BLOCKS, KGGameTests.functionKey(VERTEX_MODEL_BLOCKS), d);
+        KGGameTests.registerFunctionTest(event, VERTEX_MODEL_LEGACY, KGGameTests.functionKey(VERTEX_MODEL_LEGACY), d);
         KGGameTests.registerFunctionTest(event, INJECTION_GEOMETRY, KGGameTests.functionKey(INJECTION_GEOMETRY), d);
         KGGameTests.registerFunctionTest(event, INJECTION_UNIVERSAL, KGGameTests.functionKey(INJECTION_UNIVERSAL), d);
         KGGameTests.registerFunctionTest(event, INJECTION_GATE, KGGameTests.functionKey(INJECTION_GATE), d);
@@ -608,6 +621,107 @@ public final class ShaderCompilerGameTest {
         if (option != null) setOption(node, option, value);
         wire(graph, emission.getInputsById().get("color"), node.getOutputsById().get("out"));
         return graph;
+    }
+
+    /**
+     * The Unity-like vertex-block refactor's byte-parity pin: the new default graph (an unconnected
+     * model-space Position block) must emit GLSL byte-identical to the old default (the advanced
+     * glPosition block) - so the block swap changes no existing pipeline hash and no vanilla visuals.
+     */
+    public static void vertexModelIdentityParity(GameTestHelper helper) {
+        RenderTypeGraph current = new RenderTypeGraph();
+        RenderTypeGraph legacy = new RenderTypeGraph() {
+            @Override
+            protected Class<? extends BlockNode> defaultVertexPositionBlockClass() {
+                return VertexPositionBlock.class;
+            }
+        };
+        CompiledShaderGraph a = compile(current);
+        CompiledShaderGraph b = compile(legacy);
+        // Byte-identical modulo per-graph-instance node uids (the default texture sampler's name carries
+        // its node's uid, so two separately-built graphs can never be raw-equal — normalize just that).
+        assertEq(helper, "identity Position block: byte-identical vsh",
+                normalizeUids(b.vertexSource()), normalizeUids(a.vertexSource()));
+        assertEq(helper, "identity Position block: byte-identical fsh",
+                normalizeUids(b.fragmentSource()), normalizeUids(a.fragmentSource()));
+        assertFalse(helper, "identity emits no displaced temp", a.vertexSource().contains("kg_vertexPos"));
+        assertTrue(helper, "identity keeps the standard MVP chain", a.vertexSource()
+                .contains("gl_Position = ProjMat * ModelViewMat * vec4((Position + ModelOffset), 1.0);"));
+        helper.succeed();
+    }
+
+    /** Replace per-graph-instance uid-bearing identifiers ({@code kg_tex_<uid>}) with a fixed token. */
+    private static String normalizeUids(String glsl) {
+        return glsl.replaceAll("kg_tex_[0-9a-f_]+", "kg_tex");
+    }
+
+    /**
+     * Driven Position/Normal blocks displace through the single seams: gl_Position, the fog distances
+     * and kg_modelPos all read {@code kg_vertexPos}; the lit vertex colour ({@code minecraft_mix_light}),
+     * the world-normal varying and the Normal node's object source all read {@code kg_vertexNormal}.
+     */
+    public static void vertexModelBlocksDisplace(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        // Position block <- Add(Position(object), Vec3): a position-dependent offset.
+        NodeModel posBlock = addBlock(graph, graph.getVertexStageModel(), VertexModelPositionBlock.class);
+        NodeModel pos = addNode(graph, PositionNode.class);
+        setOption(pos, "space", "object");
+        NodeModel offset = addNode(graph, Vec3Node.class);
+        NodeModel add = addNode(graph, AddNode.class);
+        wire(graph, add.getInputsById().get("a"), pos.getOutputsById().get("out"));
+        wire(graph, add.getInputsById().get("b"), offset.getOutputsById().get("out"));
+        wire(graph, posBlock.getInputsById().get("position"), add.getOutputsById().get("out"));
+        // Normal block <- Vec3.
+        NodeModel nrmBlock = addBlock(graph, graph.getVertexStageModel(), VertexModelNormalBlock.class);
+        NodeModel nrm = addNode(graph, Vec3Node.class);
+        wire(graph, nrmBlock.getInputsById().get("normal"), nrm.getOutputsById().get("out"));
+        // A fragment Normal node (object space), so the kg_objectNormal varying is built.
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel normalNode = addNode(graph, NormalNode.class);
+        setOption(normalNode, "space", "object");
+        wire(graph, emission.getInputsById().get("color"), normalNode.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "displacement graph has no stage errors", compiled.hasStageErrors());
+        String vsh = compiled.vertexSource();
+        assertTrue(helper, "vsh hoists the displaced position", vsh.contains("vec3 kg_vertexPos = "));
+        assertTrue(helper, "gl_Position transforms the displaced position",
+                vsh.contains("gl_Position = ProjMat * ModelViewMat * vec4(kg_vertexPos, 1.0);"));
+        assertTrue(helper, "fog distance follows the displaced position",
+                vsh.contains("fog_spherical_distance(kg_vertexPos)"));
+        assertTrue(helper, "vsh hoists the displaced normal", vsh.contains("vec3 kg_vertexNormal = "));
+        assertTrue(helper, "default lighting re-lights with the displaced normal",
+                vsh.contains("minecraft_mix_light(Light0_Direction, Light1_Direction, kg_vertexNormal"));
+        assertTrue(helper, "Normal node's object source reads the displaced normal",
+                vsh.contains("kg_objectNormal = kg_vertexNormal;"));
+        helper.succeed();
+    }
+
+    /**
+     * The advanced glPosition block owns the vertex stage: when present, the model-space blocks are
+     * ignored (no displaced temp), and its unconnected fallback is the standard chain. Also: a
+     * FRAGMENT_ONLY node wired into a Position block is a stage-affinity error (the block pass runs
+     * in the vertex scope).
+     */
+    public static void vertexModelLegacyGlPosition(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel posBlock = addBlock(graph, graph.getVertexStageModel(), VertexModelPositionBlock.class);
+        NodeModel vec = addNode(graph, Vec3Node.class);
+        wire(graph, posBlock.getInputsById().get("position"), vec.getOutputsById().get("out"));
+        addBlock(graph, graph.getVertexStageModel(), VertexPositionBlock.class); // legacy joins -> wins
+        String vsh = compile(graph).vertexSource();
+        assertFalse(helper, "legacy glPosition block suppresses the model blocks",
+                vsh.contains("kg_vertexPos"));
+        assertTrue(helper, "legacy unconnected fallback is the standard chain", vsh
+                .contains("gl_Position = ProjMat * ModelViewMat * vec4((Position + ModelOffset), 1.0);"));
+
+        RenderTypeGraph bad = new RenderTypeGraph();
+        NodeModel badBlock = addBlock(bad, bad.getVertexStageModel(), VertexModelPositionBlock.class);
+        NodeModel primId = addNode(bad, PrimitiveIdNode.class);
+        wire(bad, badBlock.getInputsById().get("position"), primId.getOutputsById().get("out"));
+        assertTrue(helper, "FRAGMENT_ONLY node feeding a Position block is a stage error",
+                compile(bad).hasStageErrors());
+        helper.succeed();
     }
 
     /** The graph's Iris-injection snippet via the REAL production path ({@code compile()} passes the main

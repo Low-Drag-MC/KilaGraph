@@ -346,6 +346,10 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "does not support render type output node",
                 nodes.stream().noneMatch(node -> node.getSimpleName().equals("RenderTypeOutputNode")));
         assertTrue(helper, "supports vertex position output slot block", nodes.contains(VertexPositionBlock.class));
+        assertTrue(helper, "supports model-space vertex Position block",
+                nodes.contains(com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock.class));
+        assertTrue(helper, "supports model-space vertex Normal block",
+                nodes.contains(com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock.class));
         assertTrue(helper, "supports the UV source node", nodes.contains(UVNode.class));
         assertTrue(helper, "supports the Vertex Color source node", nodes.contains(VertexColorNode.class));
         assertTrue(helper, "supports custom float interpolator", nodes.contains(VaryingCustomFloatBlock.class));
@@ -402,6 +406,10 @@ public final class RenderTypeGraphGameTest {
 
         assertTrue(helper, "vertex stage supports position output slot",
                 vertex.getSupportBlocks().contains(VertexPositionBlock.class));
+        assertTrue(helper, "vertex stage supports the model-space Position block",
+                vertex.getSupportBlocks().contains(com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock.class));
+        assertTrue(helper, "vertex stage supports the model-space Normal block",
+                vertex.getSupportBlocks().contains(com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock.class));
         assertTrue(helper, "vertex stage supports custom float interpolator",
                 vertex.getSupportBlocks().contains(VaryingCustomFloatBlock.class));
         assertFalse(helper, "vertex stage no longer has a specialized color block",

@@ -9,7 +9,6 @@ import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
-import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
@@ -77,12 +76,9 @@ public class NormalNode extends ShaderNode {
             ctx.output("out", new ShaderExpr("normalize(vNormal)", GlslType.VEC3));
             return;
         }
-        // Object-space normal source: raw Normal attribute in the vsh, kg_objectNormal varying in the fsh.
-        // Matrices come from KG_Transforms (same values as Minecraft's blocks, no #moj_import).
-        ShaderExpr objN = ctx.varyingInput("kg_objectNormal", GlslType.VEC3,
-                () -> ctx.attribute(KGVertexElements.NORMAL, GlslType.VEC3,
-                        new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3)),
-                new ShaderExpr("vNormal", GlslType.VEC3));
+        // Object-space normal source (raw Normal attribute / a driven Normal block in the vsh, the
+        // kg_objectNormal varying in the fsh). Matrices come from KG_Transforms (no #moj_import).
+        ShaderExpr objN = ctx.objectNormal();
         String out = switch (space) {
             case "object" -> "normalize(" + objN.code() + ")";
             case "view" -> "normalize(mat3(" + ctx.transformField("ModelViewMat", GlslType.MAT4).code()

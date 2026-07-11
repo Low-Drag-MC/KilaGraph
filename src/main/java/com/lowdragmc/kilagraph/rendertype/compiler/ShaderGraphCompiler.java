@@ -128,6 +128,20 @@ public class ShaderGraphCompiler {
      *  helpers around {@code reconstructedViewPos()}); the pack's vertex stage is never touched
      *  (see {@link InjectionSnippet#usesGeometry()}). */
     private boolean usesGeometryVarying;
+    /** Vertex-injection mode (inside {@link #buildInjectionSnippet()}): compiling the vertex blocks'
+     *  Position/Normal expressions into the body of a {@code kg_vpos_<id>(vec3 kg_pos, vec3 kg_n)} /
+     *  {@code kg_vnormal_<id>(...)} function for an Iris shaderpack's <b>vertex</b> shader. The mesh
+     *  position/normal resolve to the function parameters ({@code kg_pos}/{@code kg_n} — the pack's own
+     *  {@code iris_Position}/{@code iris_Normal}); fragment-only reconstructions ({@code gl_FragCoord})
+     *  are never legal here and the injection-mode helpers branch accordingly. */
+    private boolean injectionVertex;
+    /** GLSL name of the vertex stage's displaced model position ({@code kg_vertexPos}) when a driven
+     *  Position block replaced the mesh position — {@link #modelPosition()} then returns it, so
+     *  gl_Position, the fog distances, {@code kg_modelPos} and the view direction all follow. Null =
+     *  identity (the block is absent/unconnected) and the emitted GLSL is byte-identical to before. */
+    @Nullable private String displacedPosition;
+    /** GLSL name of the displaced model normal ({@code kg_vertexNormal}); see {@link #modelNormal()}. */
+    @Nullable private String displacedNormal;
     /** KilaGraph-managed UBOs any node referenced (engine globals, transforms, or a mod's own block).
      *  Each is declared in the GLSL + bound on the pipeline + uploaded each frame — the single, generic
      *  extension point that replaced per-block {@code usesX} flags. */
@@ -183,6 +197,37 @@ public class ShaderGraphCompiler {
         ContextNodeModel vertexStage = asContext(graph.getVertexStageModel(), "vertex");
         ContextNodeModel fragmentStage = asContext(graph.getFragmentStageModel(), "fragment");
 
+        // 0) Vertex model outputs (the Unity-like Position/Normal blocks) — MUST run before the fragment
+        //    pass: it sets displacedPosition/displacedNormal, and the fragment pass lazily emits varying
+        //    assignments (kg_modelPos, kg_worldViewDir, fog distances, kg_objectNormal/kg_worldNormal)
+        //    whose vsh defaults go through modelPosition()/modelNormal() and must see the displaced refs.
+        //    The refs are set only AFTER both blocks emitted, so f_position and f_normal both read the
+        //    ORIGINAL mesh inputs. Skipped entirely when the advanced glPosition block is present (its
+        //    clip-space output owns the vertex stage; model-space blocks would be ambiguous under it).
+        current = vertex;
+        boolean legacyVertexBlock = vertexStage.getBlocks().stream()
+                .anyMatch(b -> nodeOf(b) instanceof IVertexPositionBlock);
+        if (!legacyVertexBlock) {
+            VertexOutputs vout = new VertexOutputs();
+            for (BlockNodeModel block : vertexStage.getBlocks()) {
+                Node node = nodeOf(block);
+                if (node instanceof IVertexOutputBlock vb) {
+                    vb.emitVertex(new ShaderCompileContext(this, block), vout);
+                }
+            }
+            if (vout.position != null) {
+                line("vec3 kg_vertexPos = " + convert(vout.position, GlslType.VEC3).code() + ";");
+                displacedPosition = "kg_vertexPos";
+            }
+            if (vout.normal != null) {
+                line("vec3 kg_vertexNormal = " + convert(vout.normal, GlslType.VEC3).code() + ";");
+                displacedNormal = "kg_vertexNormal";
+            }
+        } else if (vertexStage.getBlocks().stream().anyMatch(b -> nodeOf(b) instanceof IVertexOutputBlock)) {
+            Kilagraph.LOGGER.warn("[KilaGraph] graph has both the advanced glPosition block and the "
+                    + "model-space Position/Normal blocks — glPosition wins; Position/Normal are ignored.");
+        }
+
         // 1) Fragment stage: pull from each fragment semantic block. This lazily builds the
         //    varyings it depends on in the vertex scope.
         current = fragment;
@@ -207,9 +252,12 @@ public class ShaderGraphCompiler {
             }
         }
         if (position == null) {
-            // No explicit position block — fall back to the standard MVP transform (matching block.vsh,
-            // which transforms Position + ModelOffset).
+            // No explicit glPosition block — the standard MVP transform (matching block.vsh, which
+            // transforms Position + ModelOffset), of the DISPLACED model position when a driven Position
+            // block set one (see modelPosition()). This is the normal path since the Unity-like blocks
+            // replaced glPosition as the default. Register the Projection UBO like the old block did.
             addInclude("minecraft:projection.glsl");
+            useBuiltinUbo("Projection");
             position = new ShaderExpr("ProjMat * ModelViewMat * vec4(" + modelPosition().code() + ", 1.0)", GlslType.VEC4);
         }
         line("gl_Position = " + position.code() + ";");
@@ -421,7 +469,11 @@ public class ShaderGraphCompiler {
 
     /** Default value for a vertex varying when previewing without a vertex stage. */
     private ShaderExpr previewVaryingDefault(String varyingName, GlslType type) {
-        if ("uv0".equals(varyingName)) return new ShaderExpr(injection ? "kg_uv" : "vUv", GlslType.VEC2);
+        // Vertex-injection: kg_uv is the FRAGMENT kg_surface parameter and must never leak into the
+        // vertex snippet (a pack vsh has no such name) — a uv-driven value degrades to a constant there.
+        if ("uv0".equals(varyingName)) {
+            return new ShaderExpr(injectionVertex ? "vec2(0.0)" : injection ? "kg_uv" : "vUv", GlslType.VEC2);
+        }
         if ("vertexColor".equals(varyingName)) return new ShaderExpr("vec4(1.0)", GlslType.VEC4);
         return zero(type);
     }
@@ -455,8 +507,10 @@ public class ShaderGraphCompiler {
      * not a misleading gradient). Shared first-writer-wins with the matching varying block / fragment input.
      */
     protected ShaderExpr meshUv(RenderTypeGraphTypes.UvChannel channel) {
-        // Injection: UV0 is the kg_surface() function parameter; preview: the quad's gradient uv.
-        ShaderExpr quadUv = new ShaderExpr(injection ? "kg_uv" : "vUv", GlslType.VEC2);
+        // Injection: UV0 is the FRAGMENT kg_surface() function parameter (kg_uv) — in the VERTEX snippet
+        // that name doesn't exist, so a uv-driven displacement degrades to a constant (like preview UV1/2).
+        // Preview: the quad's gradient uv.
+        ShaderExpr quadUv = new ShaderExpr(injectionVertex ? "vec2(0.0)" : injection ? "kg_uv" : "vUv", GlslType.VEC2);
         ShaderExpr flatUv = new ShaderExpr("vec2(0.0)", GlslType.VEC2);
         return switch (channel) {
             case UV0 -> varyingInput("uv0", GlslType.VEC2, () -> uvAttr(KGVertexElements.UV0, false), quadUv);
@@ -476,8 +530,8 @@ public class ShaderGraphCompiler {
                 () -> {
                     addInclude("minecraft:light.glsl");
                     useBuiltinUbo("Lighting");
-                    ShaderExpr normal = attribute(KGVertexElements.NORMAL, GlslType.VEC3,
-                            new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+                    // modelNormal(): a driven Normal block re-lights the default shading too.
+                    ShaderExpr normal = modelNormal();
                     ShaderExpr color = attribute(KGVertexElements.COLOR, GlslType.VEC4,
                             new ShaderExpr("vec4(1.0)", GlslType.VEC4));
                     return new ShaderExpr("minecraft_mix_light(Light0_Direction, Light1_Direction, "
@@ -547,8 +601,8 @@ public class ShaderGraphCompiler {
         return varyingInput("kg_worldNormal", GlslType.VEC3,
                 () -> {
                     addInclude("minecraft:dynamictransforms.glsl"); // ModelViewMat
-                    ShaderExpr n = attribute(KGVertexElements.NORMAL, GlslType.VEC3,
-                            new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+                    // modelNormal(): a driven Normal block feeds the world normal (Fresnel etc.) too.
+                    ShaderExpr n = modelNormal();
                     ShaderExpr iView = transformField("IViewMat", GlslType.MAT4); // view -> world (rotation)
                     return new ShaderExpr("normalize(mat3(" + iView.code() + ") * mat3(ModelViewMat) * "
                             + n.code() + ")", GlslType.VEC3);
@@ -614,8 +668,15 @@ public class ShaderGraphCompiler {
         return injectionViewPos();
     }
 
-    /** View-space position of this fragment from {@code gl_FragCoord} + {@code IProjMat} + {@code ScreenSize}. */
+    /** View-space position of this fragment from {@code gl_FragCoord} + {@code IProjMat} + {@code ScreenSize}.
+     *  Vertex-injection: the vertex's own view position from the {@code kg_pos} parameter instead —
+     *  {@code gl_FragCoord} doesn't exist (and reconstruction isn't needed) in a vertex shader. */
     private ShaderExpr injectionViewPos() {
+        if (injectionVertex) {
+            useUniformBlock(KGTransformUniforms.BLOCK);
+            return new ShaderExpr("(" + KGTransformUniforms.accessor("ModelViewMat")
+                    + " * vec4(kg_pos, 1.0)).xyz", GlslType.VEC3);
+        }
         useUniformBlock(KGEngineUniforms.BLOCK);      // ScreenSize
         useUniformBlock(KGTransformUniforms.BLOCK);   // IProjMat (clip -> view)
         addFunction("kg_recon_viewPos",
@@ -630,6 +691,14 @@ public class ShaderGraphCompiler {
     /** World-space surface normal: the pack's own view-space normal ({@code kg_normalView}, filled by the
      *  injector) rotated into world via {@code IViewMat}. */
     private ShaderExpr injectionNormal() {
+        if (injectionVertex) {
+            // Vertex-injection: the pack vsh's own normal attribute (the kg_n parameter), rotated
+            // object->world with our KG_Transforms mirrors — the same math as the vanilla kg_worldNormal
+            // varying, so previews / vanilla / injected all agree. No kg_normalView machinery needed.
+            useUniformBlock(KGTransformUniforms.BLOCK);
+            return new ShaderExpr("normalize(mat3(" + KGTransformUniforms.accessor("IViewMat")
+                    + ") * mat3(" + KGTransformUniforms.accessor("ModelViewMat") + ") * kg_n)", GlslType.VEC3);
+        }
         usesGeometryVarying = true; // the injector must declare + fill the kg_normalView global
         useUniformBlock(KGTransformUniforms.BLOCK);
         addFunction("kg_recon_normal",
@@ -640,6 +709,11 @@ public class ShaderGraphCompiler {
 
     /** World-space surface&rarr;camera view direction from the reconstructed view position. */
     private ShaderExpr injectionViewDir() {
+        if (injectionVertex) {
+            ShaderExpr viewPos = injectionViewPos(); // kg_pos-based; registers KG_Transforms
+            return new ShaderExpr("normalize(mat3(" + KGTransformUniforms.accessor("IViewMat")
+                    + ") * (-" + viewPos.code() + "))", GlslType.VEC3);
+        }
         injectionViewPos();
         addFunction("kg_recon_viewDir",
                 "vec3 kg_recon_viewDir() { return normalize(mat3("
@@ -650,6 +724,11 @@ public class ShaderGraphCompiler {
     /** Camera-relative world position from the reconstructed view position ({@code IViewMat} is rotation-only,
      *  so this is world-space relative to the camera — good enough for world-ish position effects). */
     private ShaderExpr injectionWorldPos() {
+        if (injectionVertex) {
+            // The vertex's own model position (matching meshPosition()'s model-space semantics better
+            // than the fragment path's camera-relative reconstruction can).
+            return new ShaderExpr("kg_pos", GlslType.VEC3);
+        }
         injectionViewPos();
         addFunction("kg_recon_worldPos",
                 "vec3 kg_recon_worldPos() { return mat3("
@@ -698,8 +777,39 @@ public class ShaderGraphCompiler {
      * {@code dynamictransforms.glsl} import to the current (vertex) stage.
      */
     protected ShaderExpr modelPosition() {
+        // Vertex-injection: the position is the kg_vpos/kg_vnormal function parameter — the pack's own
+        // iris_Position attribute (its ModelOffset equivalent stays outside f, added by the pack's chain).
+        if (injectionVertex) return new ShaderExpr("kg_pos", GlslType.VEC3);
         addInclude("minecraft:dynamictransforms.glsl");
+        // A driven Position block replaces the mesh position for the WHOLE vsh — gl_Position, the fog
+        // distances, kg_modelPos and the view direction all read this single seam.
+        if (displacedPosition != null) return new ShaderExpr(displacedPosition, GlslType.VEC3);
         return new ShaderExpr("(" + attributeRef(KGVertexElements.POSITION) + " + ModelOffset)", GlslType.VEC3);
+    }
+
+    /**
+     * The model-space normal every consumer reads (the lit vertex colour, the world-normal varying, the
+     * Normal node's object-space source): the displaced {@code kg_vertexNormal} when a driven Normal
+     * block set one, else the raw {@code Normal} attribute (missing element degrades to object +Y).
+     * Vertex-injection: the {@code kg_n} function parameter (the pack's own {@code iris_Normal}).
+     */
+    protected ShaderExpr modelNormal() {
+        if (injectionVertex) return new ShaderExpr("kg_n", GlslType.VEC3);
+        if (displacedNormal != null) return new ShaderExpr(displacedNormal, GlslType.VEC3);
+        return attribute(KGVertexElements.NORMAL, GlslType.VEC3,
+                new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+    }
+
+    /**
+     * The object-space mesh normal as a stage-agnostic input (the Normal node's source): the raw
+     * {@link #modelNormal()} in the vertex stage, the interpolated {@code kg_objectNormal} varying in the
+     * fragment stage, the preview quad's {@code vNormal} in previews. Injection-mode callers branch to
+     * the reconstruction path before reaching this (see {@code NormalNode}).
+     */
+    protected ShaderExpr objectNormal() {
+        if (injectionVertex) return new ShaderExpr("kg_n", GlslType.VEC3);
+        return varyingInput("kg_objectNormal", GlslType.VEC3, this::modelNormal,
+                new ShaderExpr("vNormal", GlslType.VEC3));
     }
 
     /** The element keys actually declared as {@code in} attributes in the current compile: the graph's
@@ -719,6 +829,12 @@ public class ShaderGraphCompiler {
      *  its composite pass) should degrade to a no-op/pass-through here so the graph stays injectable. */
     boolean isInjection() {
         return injection;
+    }
+
+    /** Whether this is the <b>vertex</b> half of an injection compile (the Position/Normal block
+     *  expressions for the pack vsh's {@code kg_vpos}/{@code kg_vnormal}) — see {@link #injectionVertex}. */
+    boolean isInjectionVertex() {
+        return injectionVertex;
     }
 
     /** Whether the given vertex element is declared in the active vertex format (so its raw {@code in}
