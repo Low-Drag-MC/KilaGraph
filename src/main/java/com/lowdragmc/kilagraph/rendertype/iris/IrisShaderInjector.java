@@ -368,8 +368,9 @@ public final class IrisShaderInjector {
         //    declaration per hijacked sampler helper.
         StringBuilder decls = new StringBuilder("\n// " + MARKER + "\nuniform int kg_surface_id;\n");
         decls.append(KG_SURFACE_STRUCT);
-        // A surface that reads the mesh normal (Fresnel etc.) needs a smooth view-space normal. We never touch
-        // the vsh, so we take the pack's OWN view-space normal varying when it declares one named `normal`
+        // A surface that reads the mesh normal (Fresnel etc.) needs a smooth view-space normal. The vsh
+        // injection only hijacks attribute reads (it adds no varyings), so we take the pack's OWN
+        // view-space normal varying when it declares one named `normal`
         // (Complementary/BSL/Solas do; photon doesn't → constant fallback), filled per hijacked sampler below
         // into this global — the compiler's kg_recon_normal() rotates it to world. viewDir/position/screen need
         // nothing from the pack (reconstructed from gl_FragCoord + our UBOs).

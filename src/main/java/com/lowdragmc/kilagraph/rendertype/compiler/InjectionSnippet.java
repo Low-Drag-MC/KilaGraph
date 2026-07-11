@@ -39,7 +39,8 @@ import java.util.Map;
  *                         to declare the {@code vec3 kg_normalView} global and fill it from the pack's own
  *                         {@code normal} varying (constant fallback when the pack has none). View direction,
  *                         position, and screen inputs are reconstructed in the fragment from
- *                         {@code gl_FragCoord} + KilaGraph UBOs; the vertex stage is never touched.
+ *                         {@code gl_FragCoord} + KilaGraph UBOs (the vsh injection is only the attribute
+ *                         read-hijack; it adds no varyings).
  * @param usesSceneDepth   whether the surface samples the scene depth — under injection that reads Iris's
  *                         own {@code depthtex1} (the opaque-depth snapshot Iris auto-binds by name on every
  *                         gbuffers program), so the injector must declare the sampler iff the pack's

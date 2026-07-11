@@ -125,8 +125,8 @@ public class ShaderGraphCompiler {
     /** Set in injection mode when a node read the mesh normal ({@link #meshNormal()} → the
      *  {@code kg_normalView} global {@code IrisShaderInjector} fills from the pack's own {@code normal}
      *  varying). viewDir/position/screen need only {@code gl_FragCoord} + our UBOs (see the reconstruction
-     *  helpers around {@code reconstructedViewPos()}); the pack's vertex stage is never touched
-     *  (see {@link InjectionSnippet#usesGeometry()}). */
+     *  helpers around {@code reconstructedViewPos()}); the vsh injection is limited to the
+     *  attribute read-hijack and adds no varyings (see {@link InjectionSnippet#usesGeometry()}). */
     private boolean usesGeometryVarying;
     /** Vertex-injection mode (inside {@link #buildInjectionSnippet()}): compiling the vertex blocks'
      *  Position/Normal expressions into the body of a {@code kg_vpos_<id>(vec3 kg_pos, vec3 kg_n)} /
@@ -745,8 +745,9 @@ public class ShaderGraphCompiler {
     }
 
     // ---- Injection-mode fragment reconstruction (see IrisShaderInjector) --------------------------------
-    // Under a shaderpack we never touch the pack's vertex shader (any undefined reference there disables the
-    // whole pack). Instead the geometry/screen inputs are reconstructed in the fragment from gl_FragCoord and
+    // Under a shaderpack the fragment side never relies on the pack's vertex shader (the vsh injection is
+    // limited to the iris_Position/iris_Normal read-hijack — it adds no varyings, and any undefined
+    // reference there would disable the whole pack). The geometry/screen inputs are reconstructed in the fragment from gl_FragCoord and
     // KilaGraph's own bound UBOs (KG_Globals.ScreenSize + KG_Transforms.IProjMat/IViewMat) — names we control,
     // so this can never break a pack. Only the smooth surface normal needs the pack: the injector fills a
     // kg_normalView global from the pack's own view-space normal varying when it can detect one. All outputs
