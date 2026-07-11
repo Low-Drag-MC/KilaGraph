@@ -186,11 +186,11 @@ class IrisShaderInjectorTest {
     void registryNamespacesCollisionProneIdentifiers() {
         // Two distinct graphs both mint KG_Material/kg_material and a kg_grad_0 builder — they must not
         // collide once the registry suffixes them with the surface id.
-        var raw = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
+        var raw = snippet(
                 List.of("layout(std140) uniform KG_Material {\n    vec4 kg_c;\n} kg_material;\n"),
                 List.of("vec4 kg_grad_0() { return vec4(0.0); }\n"),
                 "    vec4 f_0 = kg_material.kg_c * kg_grad_0();\n",
-                "f_0.rgb, f_0.a, vec3(0.0,0.0,1.0), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false, List.of(), java.util.Map.of());
+                "f_0.rgb, f_0.a, vec3(0.0,0.0,1.0), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false);
         var one = IrisSurfaceRegistry.build(1, raw);
         var two = IrisSurfaceRegistry.build(2, raw);
 
@@ -331,11 +331,11 @@ class IrisShaderInjectorTest {
 
     @Test
     void registryBuildCarriesUsesGeometry() {
-        var geom = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
-                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", true, false, List.of(), java.util.Map.of());
+        var geom = snippet(
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", true, false);
         assertTrue(IrisSurfaceRegistry.build(1, geom).usesGeometry(), "build propagates usesGeometry=true");
-        var plain = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
-                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false, List.of(), java.util.Map.of());
+        var plain = snippet(
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false);
         assertFalse(IrisSurfaceRegistry.build(2, plain).usesGeometry(), "build propagates usesGeometry=false");
     }
 
@@ -377,11 +377,11 @@ class IrisShaderInjectorTest {
 
     @Test
     void registryBuildCarriesUsesSceneDepth() {
-        var depth = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
-                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, true, List.of(), java.util.Map.of());
+        var depth = snippet(
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, true);
         assertTrue(IrisSurfaceRegistry.build(1, depth).usesSceneDepth(), "build propagates usesSceneDepth=true");
-        var plain = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
-                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false, List.of(), java.util.Map.of());
+        var plain = snippet(
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false);
         assertFalse(IrisSurfaceRegistry.build(2, plain).usesSceneDepth(), "build propagates usesSceneDepth=false");
     }
 
@@ -390,6 +390,17 @@ class IrisShaderInjectorTest {
         String harness = IrisSurfaceRegistry.validationHarness(depthSurface(1));
         assertTrue(harness.contains("uniform sampler2D depthtex1;"),
                 "a scene-depth surface's helpers reference depthtex1 — the harness must declare it");
+    }
+
+    /** An {@link com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet} with the fragment pieces
+     *  under test and empty/absent runtime deps + vertex parts — new record components default here so
+     *  ctor growth stops rippling through every test. */
+    private static com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet snippet(
+            List<String> decls, List<String> fns, String body, String args,
+            boolean usesGeometry, boolean usesSceneDepth) {
+        return new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(decls, fns, body, args,
+                usesGeometry, usesSceneDepth, List.of(), java.util.Map.of(),
+                null, null, null, null, List.of(), false);
     }
 
     private static int countOccurrences(String haystack, String needle) {

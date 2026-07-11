@@ -694,6 +694,26 @@ public final class ShaderCompilerGameTest {
                 vsh.contains("minecraft_mix_light(Light0_Direction, Light1_Direction, kg_vertexNormal"));
         assertTrue(helper, "Normal node's object source reads the displaced normal",
                 vsh.contains("kg_objectNormal = kg_vertexNormal;"));
+
+        // The Iris side: the same driven blocks compile into vertex snippet parts — the mesh position
+        // resolves to the kg_pos function parameter, never to raw attributes / fragment-only identifiers,
+        // and the KG_Transforms dependency (PositionNode's object-space math) rides the snippet.
+        var snippet = compiled.injectionSnippet();
+        assertTrue(helper, "displacement graph has a snippet", snippet != null);
+        assertTrue(helper, "snippet carries the position displacement", snippet.vertexPositionExpr() != null);
+        assertTrue(helper, "snippet carries the normal modification", snippet.vertexNormalExpr() != null);
+        assertFalse(helper, "snippet is not legacy", snippet.legacyVertexBlock());
+        String vtext = (snippet.vertexPositionBody() != null ? snippet.vertexPositionBody() : "")
+                + "\n" + snippet.vertexPositionExpr()
+                + "\n" + (snippet.vertexNormalBody() != null ? snippet.vertexNormalBody() : "")
+                + "\n" + snippet.vertexNormalExpr()
+                + "\n" + String.join("\n", snippet.vertexFunctions());
+        assertTrue(helper, "vertex snippet reads the kg_pos parameter", vtext.contains("kg_pos"));
+        for (String banned : new String[]{"kg_vertexPos", "ModelOffset", "kg_uv", "gl_FragCoord", "vUv", "vPos"}) {
+            assertFalse(helper, "vertex snippet must not reference '" + banned + "'", vtext.contains(banned));
+        }
+        assertTrue(helper, "vertex snippet depends on KG_Transforms",
+                snippet.uniformBlocks().stream().anyMatch(b -> b.uboName().equals("KG_Transforms")));
         helper.succeed();
     }
 
@@ -715,12 +735,30 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "legacy unconnected fallback is the standard chain", vsh
                 .contains("gl_Position = ProjMat * ModelViewMat * vec4((Position + ModelOffset), 1.0);"));
 
+        // Iris side of the legacy block: vanilla-only — the snippet still exists (fragment shading keeps
+        // injecting) but carries no vertex parts and flags legacyVertexBlock for the registry's log.
+        var legacySnippet = compile(graph).injectionSnippet();
+        assertTrue(helper, "legacy graph still has a fragment snippet", legacySnippet != null);
+        assertTrue(helper, "legacy graph has no vertex parts", !legacySnippet.hasVertex());
+        assertTrue(helper, "legacy graph is flagged", legacySnippet.legacyVertexBlock());
+
         RenderTypeGraph bad = new RenderTypeGraph();
         NodeModel badBlock = addBlock(bad, bad.getVertexStageModel(), VertexModelPositionBlock.class);
         NodeModel primId = addNode(bad, PrimitiveIdNode.class);
         wire(bad, badBlock.getInputsById().get("position"), primId.getOutputsById().get("out"));
         assertTrue(helper, "FRAGMENT_ONLY node feeding a Position block is a stage error",
                 compile(bad).hasStageErrors());
+
+        // Rejection granularity: a displacement that leaks a fragment-only identifier (ScreenPosition ->
+        // gl_FragCoord) drops ONLY the vertex parts — the fragment snippet survives (shading kept,
+        // displacement dropped; the pack applies its standard transform).
+        RenderTypeGraph leak = new RenderTypeGraph();
+        NodeModel leakBlock = addBlock(leak, leak.getVertexStageModel(), VertexModelPositionBlock.class);
+        NodeModel screenPos = addNode(leak, ScreenPositionNode.class);
+        wire(leak, leakBlock.getInputsById().get("position"), screenPos.getOutputsById().get("out"));
+        var leakSnippet = compile(leak).injectionSnippet();
+        assertTrue(helper, "gl_FragCoord-leaking displacement keeps the fragment snippet", leakSnippet != null);
+        assertTrue(helper, "gl_FragCoord-leaking displacement drops the vertex parts", !leakSnippet.hasVertex());
         helper.succeed();
     }
 

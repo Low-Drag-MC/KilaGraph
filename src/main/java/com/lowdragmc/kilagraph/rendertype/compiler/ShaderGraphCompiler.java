@@ -385,6 +385,15 @@ public class ShaderGraphCompiler {
             return null;
         }
 
+        // Vertex sub-compile: the Position/Normal blocks' expressions for the pack vsh's kg_vpos_<id>/
+        // kg_vnormal_<id> functions (mesh position/normal -> the kg_pos/kg_n parameters, see the
+        // injectionVertex branches). Runs on THIS compiler instance and BEFORE the decls assembly below,
+        // so vertex-registered UBOs/samplers/EXPOSED fields flow into the one shared snippet — the
+        // material's injection-only binding then covers them with zero extra plumbing. A rejected vertex
+        // part degrades to fragment-only (shading survives, displacement dropped) and rolls its
+        // registrations back.
+        VertexSnippetParts vparts = buildVertexSnippetParts();
+
         // The block declaration must mirror the buffer that will actually be bound — the MAIN compile's
         // full layout (see the fullLayout javadoc). Sampler declarations stay the snippet's own set (a
         // main-only sampler would just be inactive, and Sampler1/2 must never leak into the snippet).
@@ -438,7 +447,86 @@ public class ShaderGraphCompiler {
         }
         return new InjectionSnippet(decls, new ArrayList<>(fragment.functions.values()),
                 body.toString(), args, usesGeometryVarying, usesSceneDepth,
-                new ArrayList<>(uniformBlocks), new LinkedHashMap<>(samplerDefaults));
+                new ArrayList<>(uniformBlocks), new LinkedHashMap<>(samplerDefaults),
+                vparts.positionBody, vparts.positionExpr, vparts.normalBody, vparts.normalExpr,
+                vparts.functions, vparts.legacy);
+    }
+
+    /** The vertex half of an injection snippet (see {@link #buildVertexSnippetParts()}). */
+    private record VertexSnippetParts(@Nullable String positionBody, @Nullable String positionExpr,
+                                      @Nullable String normalBody, @Nullable String normalExpr,
+                                      List<String> functions, boolean legacy) {
+        static final VertexSnippetParts NONE = new VertexSnippetParts(null, null, null, null, List.of(), false);
+    }
+
+    /**
+     * Compile the driven Position/Normal blocks in <em>vertex-injection</em> mode into the pieces of the
+     * pack-vsh functions {@code kg_vpos_<id>(vec3 kg_pos, vec3 kg_n)} / {@code kg_vnormal_<id>(...)}.
+     * Unconnected blocks (the default graph) produce nothing — the injector then leaves pack vertex
+     * sources completely untouched. The advanced glPosition block is vanilla-only: no vertex parts, the
+     * registry logs the degrade. Rejection (an include or a fragment-only identifier leaking in) drops
+     * only the vertex parts and rolls back their UBO/sampler registrations — fragment shading survives.
+     */
+    private VertexSnippetParts buildVertexSnippetParts() {
+        ContextNodeModel vertexStage = asContext(graph.getVertexStageModel(), "vertex");
+        boolean legacy = vertexStage.getBlocks().stream()
+                .anyMatch(b -> nodeOf(b) instanceof IVertexPositionBlock);
+        if (legacy) return new VertexSnippetParts(null, null, null, null, List.of(), true);
+
+        var blocksBefore = new LinkedHashSet<>(uniformBlocks);
+        var samplersBefore = new LinkedHashMap<>(samplerDefaults);
+        String positionBody = null, positionExpr = null, normalBody = null, normalExpr = null;
+        injectionVertex = true;
+        StageScope saved = current;
+        current = vertex;
+        try {
+            for (BlockNodeModel block : vertexStage.getBlocks()) {
+                Node node = nodeOf(block);
+                if (!(node instanceof IVertexOutputBlock vb)) continue;
+                // Each block compiles into its own function body: memoized temps must not leak across
+                // (they live in different GLSL functions), so the cache resets per block.
+                vertex.cache.clear();
+                int mark = vertex.body.length();
+                VertexOutputs vout = new VertexOutputs();
+                vb.emitVertex(new ShaderCompileContext(this, block), vout);
+                if (vout.position != null) {
+                    positionExpr = convert(vout.position, GlslType.VEC3).code();
+                    positionBody = vertex.body.substring(mark);
+                }
+                if (vout.normal != null) {
+                    normalExpr = convert(vout.normal, GlslType.VEC3).code();
+                    normalBody = vertex.body.substring(mark);
+                }
+            }
+        } finally {
+            injectionVertex = false;
+            current = saved;
+        }
+        if (positionExpr == null && normalExpr == null) return VertexSnippetParts.NONE;
+
+        List<String> functions = new ArrayList<>(vertex.functions.values());
+        String assembled = String.join("\n", functions) + "\n"
+                + (positionBody != null ? positionBody : "") + "\n" + (positionExpr != null ? positionExpr : "")
+                + "\n" + (normalBody != null ? normalBody : "") + "\n" + (normalExpr != null ? normalExpr : "");
+        String reason = null;
+        if (!vertex.includes.isEmpty()) {
+            reason = "vertex includes=" + vertex.includes;
+        } else {
+            var leak = VERTEX_INJECTION_BLACKLIST.matcher(assembled);
+            if (leak.find()) reason = "fragment/preview-only identifier '" + leak.group() + "'";
+        }
+        if (reason != null) {
+            // Degrade to fragment-only: the pack renders the surface undisplaced. Roll back UBO/sampler
+            // registrations the dropped vertex part made, so the material doesn't bind dead dependencies.
+            Kilagraph.LOGGER.info("[KilaGraph][Iris] vertex displacement not injectable ({}) — "
+                    + "fragment shading keeps working; the shaderpack applies its standard transform.", reason);
+            uniformBlocks.clear();
+            uniformBlocks.addAll(blocksBefore);
+            samplerDefaults.clear();
+            samplerDefaults.putAll(samplersBefore);
+            return VertexSnippetParts.NONE;
+        }
+        return new VertexSnippetParts(positionBody, positionExpr, normalBody, normalExpr, functions, false);
     }
 
     /** Identifiers that exist only in the preview quad vsh ({@code vNormal/vPos/vUv}) or the vanilla
@@ -446,6 +534,16 @@ public class ShaderGraphCompiler {
      *  program. Word-bounded so GLSL's lowercase {@code sampler2D} type never matches. */
     private static final java.util.regex.Pattern INJECTION_BLACKLIST =
             java.util.regex.Pattern.compile("\\b(?:vNormal|vPos|vUv|Sampler1|Sampler2)\\b");
+
+    /** The vertex-snippet variant of {@link #INJECTION_BLACKLIST}: additionally, nothing of the FRAGMENT
+     *  injection machinery may leak into a pack vsh — {@code kg_uv} (the kg_surface parameter),
+     *  {@code gl_FragCoord}, the {@code kg_recon_*} reconstruction helpers, the {@code kg_normalView}
+     *  global — nor bare Minecraft attribute/uniform names (undefined in the pack's flattened vsh; the
+     *  lookbehind spares our own {@code kg_transforms.ModelViewMat}-style accessors). */
+    private static final java.util.regex.Pattern VERTEX_INJECTION_BLACKLIST =
+            java.util.regex.Pattern.compile("\\b(?:vNormal|vPos|vUv|kg_uv|gl_FragCoord|kg_recon_\\w+|kg_normalView"
+                    + "|Sampler1|Sampler2)\\b"
+                    + "|(?<![\\w.])(?:Position|Normal|Color|UV0|UV1|UV2|ModelOffset|ProjMat|ModelViewMat)\\b");
 
     /**
      * Resolve a port's value for preview. A varying-block output (e.g. TexCoord) has no ShaderNode to
