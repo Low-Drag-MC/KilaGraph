@@ -81,6 +81,14 @@ class IrisVertexInjectorTest {
         String out2 = IrisShaderInjector.injectVertex(layout, List.of(positionSurface(1)));
         assertTrue(out2.contains("layout(location = 0) in vec3 iris_Position;"),
                 "layout-qualified declarations are skipped too");
+
+        // CRLF line endings / a trailing comment must not turn the declaration into a rewrite target.
+        String crlf = PACK_VSH.replace("in vec3 iris_Position;", "in vec3 iris_Position; // vertex position")
+                .replace("\n", "\r\n");
+        String out3 = IrisShaderInjector.injectVertex(crlf, List.of(positionSurface(1)));
+        assertTrue(out3.contains("in vec3 iris_Position; // vertex position"),
+                "commented CRLF declaration stays raw");
+        assertFalse(out3.contains("in vec3 kg_vpos(iris_Position);"), "no hijack on the CRLF declaration line");
     }
 
     @Test

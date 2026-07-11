@@ -242,8 +242,7 @@ public final class IrisCompat {
      *
      * @return {@code {glTextureId, width, height}} or {@code null}
      */
-    @Nullable
-    public static int[] irisColorTargetInfo() {
+    public static int @Nullable [] irisColorTargetInfo() {
         if (!ENABLED) return null;
         try {
             return Api.colorTargetInfo();

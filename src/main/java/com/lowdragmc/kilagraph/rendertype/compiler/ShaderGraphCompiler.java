@@ -930,12 +930,6 @@ public class ShaderGraphCompiler {
         return injection;
     }
 
-    /** Whether this is the <b>vertex</b> half of an injection compile (the Position/Normal block
-     *  expressions for the pack vsh's {@code kg_vpos}/{@code kg_vnormal}) — see {@link #injectionVertex}. */
-    boolean isInjectionVertex() {
-        return injectionVertex;
-    }
-
     /** Whether the given vertex element is declared in the active vertex format (so its raw {@code in}
      *  attribute can be referenced without producing an undefined-variable shader). */
     protected boolean hasAttribute(KGVertexElement element) {

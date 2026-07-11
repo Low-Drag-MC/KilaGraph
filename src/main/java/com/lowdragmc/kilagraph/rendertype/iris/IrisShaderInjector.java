@@ -324,14 +324,16 @@ public final class IrisShaderInjector {
     }
 
     /** Rewrite every read of {@code attr} into {@code fn(attr)}, skipping its declaration line(s); the
-     *  replacement count accumulates into {@code count[0]}. */
+     *  replacement count accumulates into {@code count[0]}. The declaration check is a line-start prefix
+     *  match ({@code find}, not {@code matches}) so trailing comments or a stray {@code \r} (CRLF sources)
+     *  can never turn a declaration back into a rewrite target. */
     private static String rewriteAttributeReads(String src, String attr, String fn, int[] count) {
         Pattern declLine = Pattern.compile("^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:in|attribute)\\s+\\w+\\s+"
-                + attr + "\\s*;.*$");
+                + attr + "\\s*;");
         Pattern read = Pattern.compile("\\b" + attr + "\\b");
         String[] lines = src.split("\n", -1);
         for (int i = 0; i < lines.length; i++) {
-            if (declLine.matcher(lines[i]).matches()) continue;
+            if (declLine.matcher(lines[i]).find()) continue;
             Matcher m = read.matcher(lines[i]);
             if (!m.find()) continue;
             StringBuilder sb = new StringBuilder();
