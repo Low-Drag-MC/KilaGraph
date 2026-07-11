@@ -53,6 +53,13 @@ public enum GlslType {
         return this == FLOAT || this == VEC2 || this == VEC3 || this == VEC4;
     }
 
+    /** Whether a varying of this type must be {@code flat}-interpolated. Integer/bool types cannot be
+     *  smoothly interpolated in GLSL, so a vsh {@code out}/fsh {@code in} of one requires the {@code flat}
+     *  qualifier (else the shader fails to link). */
+    public boolean requiresFlat() {
+        return this == INT || this == BOOL;
+    }
+
     /** The float-vector type for a given component count (1&rarr;FLOAT, 2&rarr;VEC2, ...). */
     public static GlslType floatVector(int components) {
         return switch (components) {

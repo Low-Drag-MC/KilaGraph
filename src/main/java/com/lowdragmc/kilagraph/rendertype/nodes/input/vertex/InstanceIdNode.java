@@ -7,16 +7,16 @@ import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
-import com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
 /**
  * The GLSL built-in {@code gl_InstanceID} — the index of the current instance within an instanced draw
- * (an {@code int}; {@code 0} for non-instanced draws). Vertex-only (the built-in exists only in the vsh):
- * to use it in fragment shading, route it through a vertex varying block; pulling it straight into a
- * fragment block is a stage error by design.
+ * (an {@code int}; {@code 0} for non-instanced draws). Stage-agnostic (default
+ * {@link com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity#ANY}): the built-in itself only exists in
+ * the vsh, so the vertex stage reads it directly while the fragment stage reads it through an auto-forwarded
+ * {@code flat int} varying ({@code kg_instanceId}).
  *
  * <p>The per-node preview has no real vertex stage, so it substitutes a constant {@code 0} instead of
  * emitting the undefined built-in.</p>
@@ -29,21 +29,15 @@ public class InstanceIdNode extends ShaderNode {
     }
 
     @Override
-    public StageAffinity stageAffinity() {
-        return StageAffinity.VERTEX_ONLY;
-    }
-
-    @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         context.addOutputPort("out", TypeHandles.INT);
     }
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        if (ctx.isPreview()) {
-            ctx.output("out", new ShaderExpr("0", GlslType.INT));
-            return;
-        }
-        ctx.output("out", new ShaderExpr("gl_InstanceID", GlslType.INT));
+        // vsh: gl_InstanceID directly. fsh: a `flat in int kg_instanceId` fed by the vsh. preview: constant 0.
+        ctx.output("out", ctx.varyingInput("kg_instanceId", GlslType.INT,
+                () -> new ShaderExpr("gl_InstanceID", GlslType.INT),
+                new ShaderExpr("0", GlslType.INT)));
     }
 }
