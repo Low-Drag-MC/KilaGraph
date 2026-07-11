@@ -223,7 +223,9 @@ public class ShaderGraphCompiler {
         InjectionSnippet injectionSnippet = null;
         if (!editorPreview) {
             try {
-                injectionSnippet = new ShaderGraphCompiler(graph).buildInjectionSnippet();
+                // Pass THIS compile's finished layout so the snippet's KG_Material declaration matches the
+                // buffer the material will bind (full field list — see buildInjectionSnippet's javadoc).
+                injectionSnippet = new ShaderGraphCompiler(graph).buildInjectionSnippet(layout);
             } catch (RuntimeException e) {
                 // Not injection-compatible (or a transient model issue) — fall back to passthrough under Iris.
                 Kilagraph.LOGGER.warn("[KilaGraph][Iris] injection snippet compile failed -> passthrough", e);
@@ -293,6 +295,20 @@ public class ShaderGraphCompiler {
      */
     @Nullable
     public InjectionSnippet buildInjectionSnippet() {
+        return buildInjectionSnippet(null);
+    }
+
+    /**
+     * @param fullLayout the MAIN compile's complete material layout, when available. The snippet's
+     *                   {@code KG_Material} declaration must use the <b>full</b> field list: the material
+     *                   binds the main compile's buffer, and an injection-neutralized branch (e.g. ApplyFog's
+     *                   passthrough) may skip pulls of EXPOSED fields the vanilla fragment registers — a
+     *                   fields-subset declaration would then read the wrong bytes (offset mismatch). A field
+     *                   the injection path pulls that the main layout somehow lacks would reference an
+     *                   undeclared name and be caught by the GL validation (→ passthrough), never corrupt.
+     */
+    @Nullable
+    public InjectionSnippet buildInjectionSnippet(@Nullable MaterialUniformLayout fullLayout) {
         injection = true;
         preview = true; // reuse varying substitution (vertexColor->white, normal->+Y, viewDir->+Z, ...)
         current = fragment;
@@ -317,9 +333,13 @@ public class ShaderGraphCompiler {
             return null;
         }
 
+        // The block declaration must mirror the buffer that will actually be bound — the MAIN compile's
+        // full layout (see the fullLayout javadoc). Sampler declarations stay the snippet's own set (a
+        // main-only sampler would just be inactive, and Sampler1/2 must never leak into the snippet).
+        MaterialUniformLayout blockLayout = fullLayout != null ? fullLayout : layout;
         List<String> decls = new ArrayList<>();
-        if (layout.hasGradientField() || fragment.usesGradient) decls.add(GradientGlsl.STRUCT);
-        if (!layout.isEmpty()) decls.add(layout.blockGlsl());
+        if (blockLayout.hasGradientField() || fragment.usesGradient) decls.add(GradientGlsl.STRUCT);
+        if (!blockLayout.isEmpty()) decls.add(blockLayout.blockGlsl());
         for (String s : layout.samplers()) decls.add("uniform sampler2D " + s + ";");
         uniformBlocks.stream()
                 .sorted(java.util.Comparator.comparing(
@@ -366,7 +386,8 @@ public class ShaderGraphCompiler {
             return null;
         }
         return new InjectionSnippet(decls, new ArrayList<>(fragment.functions.values()),
-                body.toString(), args, usesGeometryVarying, usesSceneDepth);
+                body.toString(), args, usesGeometryVarying, usesSceneDepth,
+                new ArrayList<>(uniformBlocks), new LinkedHashMap<>(samplerDefaults));
     }
 
     /** Identifiers that exist only in the preview quad vsh ({@code vNormal/vPos/vUv}) or the vanilla

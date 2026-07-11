@@ -190,7 +190,7 @@ class IrisShaderInjectorTest {
                 List.of("layout(std140) uniform KG_Material {\n    vec4 kg_c;\n} kg_material;\n"),
                 List.of("vec4 kg_grad_0() { return vec4(0.0); }\n"),
                 "    vec4 f_0 = kg_material.kg_c * kg_grad_0();\n",
-                "f_0.rgb, f_0.a, vec3(0.0,0.0,1.0), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false);
+                "f_0.rgb, f_0.a, vec3(0.0,0.0,1.0), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false, List.of(), java.util.Map.of());
         var one = IrisSurfaceRegistry.build(1, raw);
         var two = IrisSurfaceRegistry.build(2, raw);
 
@@ -332,10 +332,10 @@ class IrisShaderInjectorTest {
     @Test
     void registryBuildCarriesUsesGeometry() {
         var geom = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
-                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", true, false);
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", true, false, List.of(), java.util.Map.of());
         assertTrue(IrisSurfaceRegistry.build(1, geom).usesGeometry(), "build propagates usesGeometry=true");
         var plain = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
-                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false);
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false, List.of(), java.util.Map.of());
         assertFalse(IrisSurfaceRegistry.build(2, plain).usesGeometry(), "build propagates usesGeometry=false");
     }
 
@@ -378,10 +378,10 @@ class IrisShaderInjectorTest {
     @Test
     void registryBuildCarriesUsesSceneDepth() {
         var depth = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
-                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, true);
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, true, List.of(), java.util.Map.of());
         assertTrue(IrisSurfaceRegistry.build(1, depth).usesSceneDepth(), "build propagates usesSceneDepth=true");
         var plain = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
-                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false);
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false, List.of(), java.util.Map.of());
         assertFalse(IrisSurfaceRegistry.build(2, plain).usesSceneDepth(), "build propagates usesSceneDepth=false");
     }
 

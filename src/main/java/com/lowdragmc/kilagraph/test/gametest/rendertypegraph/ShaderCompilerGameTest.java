@@ -610,9 +610,10 @@ public final class ShaderCompilerGameTest {
         return graph;
     }
 
-    /** Build the Iris-injection snippet on a fresh compiler (its contract — {@code compile()} mutates state). */
+    /** The graph's Iris-injection snippet via the REAL production path ({@code compile()} passes the main
+     *  layout so the snippet's KG_Material declaration matches the bound buffer). */
     private static com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet injectionSnippet(RenderTypeGraph graph) {
-        return new ShaderGraphCompiler(graph).buildInjectionSnippet();
+        return compile(graph).injectionSnippet();
     }
 
     /** Every GLSL piece of a snippet joined, for contains-assertions. */
@@ -647,6 +648,17 @@ public final class ShaderCompilerGameTest {
                     pText.contains("kg_recon_viewPos"));
             assertFalse(helper, "position " + space + " does not need the pack normal", position.usesGeometry());
         }
+
+        // Fresnel regression pin ("pure white sphere"): the snippet's OWN UBO dependencies must include
+        // KG_Globals — the viewDir reconstruction needs ScreenSize, which the vanilla compile of the same
+        // graph never registers. The material binds snippet.uniformBlocks() extras onto the injected
+        // program; without them kg_recon_viewPos divides by an unbound (zero) ScreenSize -> NaN viewDir.
+        var fresnel = injectionSnippet(inputNodeGraph(FresnelNode.class, null, null));
+        assertTrue(helper, "fresnel snippet exists", fresnel != null);
+        assertTrue(helper, "fresnel snippet depends on KG_Globals (ScreenSize for viewDir reconstruction)",
+                fresnel.uniformBlocks().stream().anyMatch(b -> b.uboName().equals("KG_Globals")));
+        assertTrue(helper, "fresnel snippet depends on KG_Transforms",
+                fresnel.uniformBlocks().stream().anyMatch(b -> b.uboName().equals("KG_Transforms")));
         helper.succeed();
     }
 
@@ -746,6 +758,10 @@ public final class ShaderCompilerGameTest {
                     text.contains(ShaderGraphCompiler.NEUTRAL_WHITE_SAMPLER));
             assertFalse(helper, nodeClass.getSimpleName() + " references no pipeline sampler",
                     text.contains("Sampler1") || text.contains("Sampler2"));
+            // Regression pin (same class as the Fresnel/KG_Globals gap): the neutral sampler is baked ONLY
+            // by the injection compile, so the snippet must carry its default for the material to bind it.
+            assertTrue(helper, nodeClass.getSimpleName() + " snippet carries the neutral sampler default",
+                    snippet.samplerDefaults().containsKey(ShaderGraphCompiler.NEUTRAL_WHITE_SAMPLER));
         }
         helper.succeed();
     }

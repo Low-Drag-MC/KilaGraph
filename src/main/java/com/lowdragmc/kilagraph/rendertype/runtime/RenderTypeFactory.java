@@ -155,10 +155,30 @@ public final class RenderTypeFactory {
         }
         String name = Kilagraph.MODID + ":graph/" + hash;
         RenderType renderType = RenderType.create(name, setup.createRenderSetup());
+        // UBOs only the injection snippet needs (fragment reconstructions — e.g. Fresnel's viewDir pulls
+        // KG_Globals.ScreenSize only under injection): uploaded + Iris-bound by the material, but kept out
+        // of the vanilla render-pass binding (the vanilla pipeline doesn't declare them).
+        java.util.List<ShaderUniformBlock> injectionOnly = new java.util.ArrayList<>();
+        Map<String, SamplerDefault> injectionOnlyTextures = new java.util.LinkedHashMap<>();
+        if (compiled.injectionSnippet() != null) {
+            for (ShaderUniformBlock block : compiled.injectionSnippet().uniformBlocks()) {
+                boolean inMain = compiled.uniformBlocks().stream()
+                        .anyMatch(b -> b.uboName().equals(block.uboName()));
+                if (!inMain) injectionOnly.add(block);
+            }
+            // Samplers only the snippet bakes (the kg_NeutralWhite degrade) — same gap as the blocks:
+            // without these the injected program's sampler uniform stays on unit 0 (the pack's atlas).
+            Map<String, SamplerDefault> mainTextures = buildMaterialTextures(compiled);
+            for (Map.Entry<String, SamplerDefault> e : compiled.injectionSnippet().samplerDefaults().entrySet()) {
+                if (!mainTextures.containsKey(e.getKey()) && !isSceneSampler(e.getKey())) {
+                    injectionOnlyTextures.put(e.getKey(), e.getValue());
+                }
+            }
+        }
         RenderTypeGraphMaterial material = new RenderTypeGraphMaterial(
-                renderType, compiled.layout(), compiled.uniformBlocks(), hash,
+                renderType, compiled.layout(), compiled.uniformBlocks(), injectionOnly, hash,
                 compiled.uniformFields(), compiled.variableSamplers(), buildMaterialTextures(compiled),
-                compiled.usesSceneColor(), compiled.usesSceneDepth());
+                injectionOnlyTextures, compiled.usesSceneColor(), compiled.usesSceneDepth());
         // Bake EXPOSED-variable defaults into the material UBO; callers may override later via setUniform.
         for (Map.Entry<String, float[]> e : compiled.uniformDefaults().entrySet()) {
             material.setUniformField(e.getKey(), e.getValue());

@@ -40,6 +40,16 @@ import java.util.List;
  *                         own {@code depthtex1} (the opaque-depth snapshot Iris auto-binds by name on every
  *                         gbuffers program), so the injector must declare the sampler iff the pack's
  *                         flattened source doesn't already
+ * @param uniformBlocks    the KilaGraph-managed UBOs the <b>snippet</b> references. Can be a superset of
+ *                         the main compile's list: injection-only reconstructions pull blocks the vanilla
+ *                         path never needs (e.g. Fresnel's view-direction needs {@code KG_Globals.ScreenSize}
+ *                         only under injection) — the material must upload + bind these too, or the injected
+ *                         program reads zeros (the "pure white Fresnel" failure)
+ * @param samplerDefaults  baked defaults for the samplers the <b>snippet</b> references. Like
+ *                         {@code uniformBlocks} this can exceed the main compile's set (the injection-only
+ *                         {@code kg_NeutralWhite} degrade sampler) — the material must resolve + bind the
+ *                         extras onto the injected program, or their uniforms stay on unit 0 (the pack's
+ *                         atlas)
  */
 public record InjectionSnippet(
         List<String> declarationUnits,
@@ -47,5 +57,7 @@ public record InjectionSnippet(
         String body,
         String surfaceArgs,
         boolean usesGeometry,
-        boolean usesSceneDepth
+        boolean usesSceneDepth,
+        List<com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock> uniformBlocks,
+        java.util.Map<String, SamplerDefault> samplerDefaults
 ) {}
