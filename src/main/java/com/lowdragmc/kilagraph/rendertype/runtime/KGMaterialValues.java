@@ -6,7 +6,9 @@ import com.lowdragmc.kilagraph.rendertype.compiler.CurveGlsl;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.GradientGlsl;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
+import com.lowdragmc.kilagraph.rendertype.compiler.KGSamplerGl;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
+import com.lowdragmc.lowdraglib2.client.shader.ILDShaderInstance;
 import com.mojang.blaze3d.shaders.Uniform;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ShaderInstance;
@@ -42,8 +44,9 @@ public final class KGMaterialValues {
     private final Map<String, String> variableSamplers;
     /** uniform name -> current components. */
     private final Map<String, float[]> values = new HashMap<>();
-    /** sampler uniform name -> bound texture, resolved to an AbstractTexture at {@link #apply}. */
-    private final Map<String, ResourceLocation> samplerTextures = new HashMap<>();
+    /** sampler uniform name -> bound texture + GPU sampler params (filter/address/mipmap): the texture is
+     *  resolved to an AbstractTexture and the params staged for a GL sampler object at {@link #apply}. */
+    private final Map<String, SamplerDefault> samplerBindings = new HashMap<>();
 
     public KGMaterialValues(CompiledShaderGraph compiled) {
         this.materialFields = compiled.layout().fields();
@@ -52,12 +55,10 @@ public final class KGMaterialValues {
         bakeDefaults(compiled);
     }
 
-    /** (Re-)bake the EXPOSED-variable default values + default sampler textures (a value-only graph edit). */
+    /** (Re-)bake the EXPOSED-variable default values + default sampler textures/params (a value-only graph edit). */
     public void bakeDefaults(CompiledShaderGraph compiled) {
         values.putAll(compiled.uniformDefaults());
-        for (Map.Entry<String, SamplerDefault> e : compiled.samplerDefaults().entrySet()) {
-            samplerTextures.put(e.getKey(), e.getValue().texture());
-        }
+        samplerBindings.putAll(compiled.samplerDefaults());
     }
 
     /** The EXPOSED variable display name -> uniform field mapping (for building editor surfaces). */
@@ -110,10 +111,15 @@ public final class KGMaterialValues {
         return true;
     }
 
-    /** Bind a texture to a Sampler2D variable by display name (or raw sampler name). */
+    /** Bind a texture to a Sampler2D variable by display name (or raw sampler name), keeping its sampler params. */
     public boolean setTexture(String name, ResourceLocation texture) {
         String sampler = variableSamplers.getOrDefault(name, name);
-        samplerTextures.put(sampler, texture);
+        SamplerDefault current = samplerBindings.get(sampler);
+        // Swap the texture, keep the filter/address/mipmap the graph configured for this sampler.
+        samplerBindings.put(sampler, current != null
+                ? new SamplerDefault(texture, current.filter(), current.address(), current.mipmap())
+                : new SamplerDefault(texture, RenderTypeGraphTypes.SamplerFilter.NEAREST,
+                        RenderTypeGraphTypes.SamplerAddress.CLAMP, false));
         return true;
     }
 
@@ -129,7 +135,15 @@ public final class KGMaterialValues {
             setUniform(shader, f.name(), f.type(), values.get(f.name()));
         }
         var textureManager = Minecraft.getInstance().getTextureManager();
-        samplerTextures.forEach((name, loc) -> shader.setSampler(name, textureManager.getTexture(loc)));
+        samplerBindings.forEach((name, def) -> shader.setSampler(name, textureManager.getTexture(def.texture())));
+        // Stage this material's sampler params (filter/wrap); ShaderInstanceMixin binds a GL sampler object onto
+        // each sampler's texture unit in the shader's apply() and unbinds it in clear(), so the override rides the
+        // draw lifecycle and never leaks to a later draw. Only an LDShaderInstance exposes the sampler-name list
+        // (via LDLib2's accessor) that maps a sampler to its unit — which is always what a KG material uses.
+        if (shader instanceof ILDShaderInstance ld) {
+            KGSamplerBinder.stage(shader,
+                    KGSamplerGl.resolveBindings(ld.getShaderInstanceAccessor().getSamplerNames(), samplerBindings));
+        }
     }
 
     private void setUniform(ShaderInstance shader, String name, GlslType type, float[] v) {

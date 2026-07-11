@@ -559,6 +559,47 @@ public final class ShaderCompilerGameTest {
     }
 
     /**
+     * The graph-configured sampler filter/address must translate into concrete GL sampler params bound to the
+     * right texture unit — the step that was missing, so setting filter/wrap made no visual difference. A managed
+     * sampler present in the shader's sampler-name list resolves to its unit (= its index, per
+     * {@code ShaderInstance.apply}) with the mapped GL min/mag filter + wrap; one absent from that list is skipped.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void samplerParamsResolveToGlBindings(GameTestHelper helper) {
+        var loc = net.minecraft.resources.ResourceLocation.withDefaultNamespace("dummy");
+        java.util.List<String> samplerNames = java.util.List.of("Sampler0", "kg_tex_a", "Sampler2", "kg_tex_b");
+        java.util.Map<String, SamplerDefault> bindings = new java.util.LinkedHashMap<>();
+        bindings.put("kg_tex_a", new SamplerDefault(loc, RenderTypeGraphTypes.SamplerFilter.LINEAR,
+                RenderTypeGraphTypes.SamplerAddress.REPEAT, false));
+        bindings.put("kg_tex_b", new SamplerDefault(loc, RenderTypeGraphTypes.SamplerFilter.NEAREST,
+                RenderTypeGraphTypes.SamplerAddress.CLAMP, false));
+        bindings.put("kg_absent", new SamplerDefault(loc, RenderTypeGraphTypes.SamplerFilter.LINEAR,
+                RenderTypeGraphTypes.SamplerAddress.REPEAT, false)); // not in samplerNames -> not bound
+
+        var resolved = com.lowdragmc.kilagraph.rendertype.compiler.KGSamplerGl.resolveBindings(samplerNames, bindings);
+
+        assertTrue(helper, "absent sampler is skipped", resolved.size() == 2);
+        var a = resolved.stream().filter(b -> b.unit() == 1).findFirst().orElse(null);
+        var b = resolved.stream().filter(bd -> bd.unit() == 3).findFirst().orElse(null);
+        assertTrue(helper, "kg_tex_a binds texture unit 1", a != null);
+        assertTrue(helper, "kg_tex_a min/mag = GL_LINEAR",
+                a != null && a.sampler().minFilter() == org.lwjgl.opengl.GL11.GL_LINEAR
+                        && a.sampler().magFilter() == org.lwjgl.opengl.GL11.GL_LINEAR);
+        assertTrue(helper, "kg_tex_a wrap S/T = GL_REPEAT",
+                a != null && a.sampler().wrapS() == org.lwjgl.opengl.GL11.GL_REPEAT
+                        && a.sampler().wrapT() == org.lwjgl.opengl.GL11.GL_REPEAT);
+        assertTrue(helper, "kg_tex_b binds texture unit 3", b != null);
+        assertTrue(helper, "kg_tex_b min/mag = GL_NEAREST",
+                b != null && b.sampler().minFilter() == org.lwjgl.opengl.GL11.GL_NEAREST
+                        && b.sampler().magFilter() == org.lwjgl.opengl.GL11.GL_NEAREST);
+        assertTrue(helper, "kg_tex_b wrap S/T = GL_CLAMP_TO_EDGE",
+                b != null && b.sampler().wrapS() == org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
+                        && b.sampler().wrapT() == org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE);
+        helper.succeed();
+    }
+
+    /**
      * A constant Gradient node + Sample Gradient: the {@code KG_Gradient} struct + {@code kg_sampleGradient}
      * helper are declared (the struct before {@code main()}), a per-gradient builder is baked with the keys
      * (Fixed mode → {@code header.x == 1}), and the fragment samples it. GRADIENT is opaque (no temp copy).

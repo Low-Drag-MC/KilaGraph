@@ -4,6 +4,7 @@
   "package": "com.lowdragmc.kilagraph.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "ShaderInstanceMixin"
   ],
   "mixins": [],
   "injectors": {
