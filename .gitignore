@@ -37,3 +37,6 @@ CLAUDE.md
 .narrafork/
 /.kotlin
 AGENTS.md
+
+# local dev-only jars (e.g. the kilagraphdemo companion mod)
+libs/
