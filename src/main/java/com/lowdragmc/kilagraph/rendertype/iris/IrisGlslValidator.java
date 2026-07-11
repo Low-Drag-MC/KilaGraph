@@ -26,12 +26,24 @@ final class IrisGlslValidator {
      */
     @Nullable
     static String compileFragmentError(String source) {
+        return compileError(source, GL20.GL_FRAGMENT_SHADER);
+    }
+
+    /** {@link #compileFragmentError} for the vertex stage (the injected pack vsh / a surface's
+     *  {@code kg_vpos}/{@code kg_vnormal} validation harness). */
+    @Nullable
+    static String compileVertexError(String source) {
+        return compileError(source, GL20.GL_VERTEX_SHADER);
+    }
+
+    @Nullable
+    private static String compileError(String source, int glShaderType) {
         try {
             GL.getCapabilities();
         } catch (Throwable noContext) {
             return null; // headless / no context on this thread — cannot validate, accept
         }
-        int shader = GL20.glCreateShader(GL20.GL_FRAGMENT_SHADER);
+        int shader = GL20.glCreateShader(glShaderType);
         if (shader == 0) return null; // driver refused a shader object — can't validate, accept
         try {
             GL20.glShaderSource(shader, source);

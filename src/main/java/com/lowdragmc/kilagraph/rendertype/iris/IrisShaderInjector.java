@@ -130,9 +130,13 @@ public final class IrisShaderInjector {
     /**
      * Mixin entry point: inject into {@code source} and log (once per program {@code name}) whether the
      * injection landed — ground truth that our {@code ShaderCreator} mixin is actually rewriting the
-     * shaderpack's programs. {@code name} is the Iris program name (e.g. {@code gbuffers_entities}).
+     * shaderpack's programs. {@code name} is the Iris program name (e.g. {@code gbuffers_entities});
+     * {@code typeName} is the Iris {@code ShaderType} enum name ({@code VERTEX}/{@code FRAGMENT}/...) — a
+     * String so this class stays free of Iris types (unit-testable, soft-dep). Fragment sources get the
+     * surface-shading injection, vertex sources the displacement read-hijack (see {@link #injectVertex});
+     * every other stage (GEOMETRY/COMPUTE/TESSELATION_*) passes through untouched.
      */
-    public static String inject(String name, String source) {
+    public static String inject(String name, String typeName, String source) {
         if (!IrisCompat.ENABLED) return source; // kill-switch (defense in depth if the mixin still applied)
         IrisCompat.seamAlive(); // the ShaderCreator seam demonstrably works — clear any dead-seam latch
         try {
@@ -142,7 +146,11 @@ public final class IrisShaderInjector {
         } catch (Throwable ignored) {
             // cache invalidation must never break the pack compile
         }
-        return injectGuarded(name, source, IrisSurfaceRegistry.snapshot());
+        return switch (typeName) {
+            case "FRAGMENT" -> injectGuarded(name, source, IrisSurfaceRegistry.snapshot());
+            case "VERTEX" -> injectVertexGuarded(name, source, IrisSurfaceRegistry.snapshot());
+            default -> source;
+        };
     }
 
     /**
@@ -155,17 +163,10 @@ public final class IrisShaderInjector {
             // Every program in one pack compile is injected from the same registry state; record it so the
             // runtime can detect when a later-registered surface needs a reload to be picked up.
             lastInjectedGeneration = IrisSurfaceRegistry.generation();
-            // We only ever transform the FRAGMENT (hijack the gbuffers samplers). We deliberately never touch
-            // the vertex shader: any undefined reference there disables the whole pack, and the pack programs
-            // each declare a different name subset. Geometry/screen inputs are reconstructed in the fragment
-            // from gl_FragCoord + our own bound UBOs (see ShaderGraphCompiler.injection*), which can't break a pack.
             String out = injectFragment(source, surfaces);
             if (out != source) {
                 // Whole-source GL self-check: if the injected result doesn't compile, hand Iris the original —
-                // the pack can never be broken by us. Deliberately compiled AS A FRAGMENT with no stage info:
-                // we only rewrite sources that sample the gbuffers samplers (in practice the fragment stage),
-                // and if a pack's VERTEX shader ever sampled them, the injected result fails fragment
-                // compilation here and falls back untouched — so we can't corrupt a vsh either.
+                // the pack can never be broken by us.
                 String err = null;
                 boolean validated = false;
                 try {
@@ -201,6 +202,147 @@ public final class IrisShaderInjector {
             }
             return source;
         }
+    }
+
+    /** {@link #injectGuarded}'s vertex twin: any throw or a failed whole-source <b>vertex</b>-stage GL
+     *  self-check returns the untouched source — the pack can never be broken; KilaGraph geometry then
+     *  renders undisplaced in this program (fragment shading is a separate source and survives). */
+    static String injectVertexGuarded(String name, String source, List<IrisSurfaceRegistry.Surface> surfaces) {
+        try {
+            String out = injectVertex(source, surfaces);
+            if (out != source) {
+                String err = null;
+                boolean validated = false;
+                try {
+                    err = IrisGlslValidator.compileVertexError(out);
+                    validated = true;
+                } catch (Throwable ignored) {
+                    // no LWJGL/GL in this environment (unit tests) — validation unavailable, accept
+                }
+                if (validated && err != null) {
+                    if (GUARD_LOGGED.add(name + "#vsh")) {
+                        LOGGER.error("[KilaGraph][Iris] injected vertex source for '{}' fails GL compilation — "
+                                + "leaving the shaderpack source untouched. Driver log:\n{}", name, err);
+                    }
+                    return source;
+                }
+                if (LOGGED.add(name + "#vsh#" + (source == null ? 0 : source.length()) + "#" + surfaces.size())) {
+                    LOGGER.info("[KilaGraph][Iris] injected vertex displacement into '{}' ({} displacing surface(s))",
+                            name, surfaces.stream().filter(IrisSurfaceRegistry.Surface::hasVertex).count());
+                }
+            }
+            return out;
+        } catch (Throwable t) {
+            if (GUARD_LOGGED.add(name + "#vsh")) {
+                LOGGER.error("[KilaGraph][Iris] vertex injection into '{}' threw — leaving the shaderpack source "
+                        + "untouched (KilaGraph geometry renders undisplaced in this program)", name, t);
+            }
+            return source;
+        }
+    }
+
+    /**
+     * Transform a <b>vertex</b>-stage shaderpack source: hijack every READ of the {@code iris_Position}
+     * (and, when needed, {@code iris_Normal}) attribute into {@code kg_vpos(iris_Position)} /
+     * {@code kg_vnormal(iris_Normal)}, dispatching on the per-draw {@code kg_surface_id} exactly like the
+     * fragment side — id 0 / an unclaimed id returns the input unchanged, so non-KilaGraph draws are
+     * bit-identical. Iris's transformer renders {@code gl_Vertex} reads as {@code vec4(iris_Position, 1.0)}
+     * (or {@code vec4(iris_Position + iris_vertex_offset, 1.0)}), so hijacking the bare token composes with
+     * every downstream use (ftransform/world-curvature/TAA jitter/shadow distortion all see the displaced
+     * position). Attribute <em>declaration</em> lines are skipped. Returns {@code source} unchanged (not
+     * even a marker) when no surface displaces, the source is already injected, or it never reads the
+     * attributes — packs stay untouched unless a displacement genuinely exists.
+     */
+    public static String injectVertex(String source, List<IrisSurfaceRegistry.Surface> surfaces) {
+        if (source == null || source.contains(MARKER)) return source;
+        List<IrisSurfaceRegistry.Surface> displacing =
+                surfaces.stream().filter(IrisSurfaceRegistry.Surface::hasVertex).toList();
+        if (displacing.isEmpty()) return source;
+        boolean anyPos = displacing.stream().anyMatch(s -> s.vertexPositionFunction() != null);
+        boolean anyNorm = displacing.stream().anyMatch(s -> s.vertexNormalFunction() != null);
+        boolean hasPositionAttr = attrDecl("iris_Position").matcher(source).find();
+        boolean hasNormalAttr = attrDecl("iris_Normal").matcher(source).find();
+
+        int[] count = {0};
+        String body = source;
+        if (anyPos) body = rewriteAttributeReads(body, "iris_Position", "kg_vpos", count);
+        int posReads = count[0];
+        if (anyNorm && hasNormalAttr) body = rewriteAttributeReads(body, "iris_Normal", "kg_vnormal", count);
+        if (count[0] == 0) return source; // reads nothing we hijack (composite/final passes) — untouched
+        boolean emitNormalFn = anyNorm && hasNormalAttr && count[0] > posReads;
+
+        // Declarations after the leading preprocessor block: the discriminator + every displacing surface's
+        // declaration units (BYTE-IDENTICAL strings to the fragment injection — the same namespaced units —
+        // so the program's cross-stage UBO/block definitions match at link) + dispatcher forward decls.
+        StringBuilder decls = new StringBuilder("\n// " + MARKER + "\nuniform int kg_surface_id;\n");
+        LinkedHashSet<String> declUnits = new LinkedHashSet<>();
+        for (var s : displacing) declUnits.addAll(s.declarationUnits());
+        for (String unit : declUnits) decls.append(unit);
+        if (posReads > 0) decls.append("vec3 kg_vpos(vec3 kg_p);\n");
+        if (emitNormalFn) decls.append("vec3 kg_vnormal(vec3 kg_n);\n");
+        body = insertAtFirstCodeLine(body, decls.toString());
+
+        // Definitions at the end (appended AFTER the rewrite, so their own attribute references are never
+        // re-hijacked): deduped helpers, the per-surface functions, then the id dispatchers. The RAW
+        // attributes are passed through (matching vanilla, where both block expressions read the original
+        // mesh inputs); a missing iris_Normal declaration degrades to object +Y — never reference a name
+        // the pack didn't declare.
+        String rawNormal = hasNormalAttr ? "iris_Normal" : "vec3(0.0, 1.0, 0.0)";
+        String rawPosition = hasPositionAttr ? "iris_Position" : "vec3(0.0)";
+        StringBuilder defs = new StringBuilder();
+        LinkedHashSet<String> fns = new LinkedHashSet<>();
+        for (var s : displacing) fns.addAll(s.vertexFunctions());
+        for (String fn : fns) defs.append('\n').append(fn);
+        for (var s : displacing) {
+            if (s.vertexPositionFunction() != null) defs.append('\n').append(s.vertexPositionFunction());
+            if (s.vertexNormalFunction() != null) defs.append('\n').append(s.vertexNormalFunction());
+        }
+        if (posReads > 0) {
+            defs.append("\nvec3 kg_vpos(vec3 kg_p) {\n");
+            for (var s : displacing) {
+                if (s.vertexPositionFunction() == null) continue;
+                defs.append("    if (kg_surface_id == ").append(s.id()).append(") return kg_vpos_")
+                        .append(s.id()).append("(kg_p, ").append(rawNormal).append(");\n");
+            }
+            defs.append("    return kg_p;\n}\n");
+        }
+        if (emitNormalFn) {
+            defs.append("\nvec3 kg_vnormal(vec3 kg_n) {\n");
+            for (var s : displacing) {
+                if (s.vertexNormalFunction() == null) continue;
+                defs.append("    if (kg_surface_id == ").append(s.id()).append(") return kg_vnormal_")
+                        .append(s.id()).append("(").append(rawPosition).append(", kg_n);\n");
+            }
+            defs.append("    return kg_n;\n}\n");
+        }
+        return body + defs;
+    }
+
+    /** An {@code in}/{@code attribute} declaration of {@code attr} (any type, optional layout qualifier). */
+    private static Pattern attrDecl(String attr) {
+        return Pattern.compile("(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:in|attribute)\\s+\\w+\\s+" + attr + "\\s*;");
+    }
+
+    /** Rewrite every read of {@code attr} into {@code fn(attr)}, skipping its declaration line(s); the
+     *  replacement count accumulates into {@code count[0]}. */
+    private static String rewriteAttributeReads(String src, String attr, String fn, int[] count) {
+        Pattern declLine = Pattern.compile("^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?(?:in|attribute)\\s+\\w+\\s+"
+                + attr + "\\s*;.*$");
+        Pattern read = Pattern.compile("\\b" + attr + "\\b");
+        String[] lines = src.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            if (declLine.matcher(lines[i]).matches()) continue;
+            Matcher m = read.matcher(lines[i]);
+            if (!m.find()) continue;
+            StringBuilder sb = new StringBuilder();
+            do {
+                m.appendReplacement(sb, fn + "(" + attr + ")");
+                count[0]++;
+            } while (m.find());
+            m.appendTail(sb);
+            lines[i] = sb.toString();
+        }
+        return String.join("\n", lines);
     }
 
     /**

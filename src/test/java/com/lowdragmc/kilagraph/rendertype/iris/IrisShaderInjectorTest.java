@@ -117,7 +117,7 @@ class IrisShaderInjectorTest {
     void dispatchesToRegisteredSurfacesAsStruct() {
         var s1 = new IrisSurfaceRegistry.Surface(1,
                 List.of("uniform sampler2D kg_tex_a;\n"), List.of(),
-                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(texture(kg_tex_a, kg_uv).rgb, 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false);
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(texture(kg_tex_a, kg_uv).rgb, 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false, null, null, List.of());
         String out = IrisShaderInjector.injectFragment(PBR_PACK_FSH, List.of(s1));
 
         assertTrue(out.contains("struct kg_Surface {"), "shared struct declared");
@@ -153,7 +153,7 @@ class IrisShaderInjectorTest {
                 }
                 """;
         var s1 = new IrisSurfaceRegistry.Surface(1, List.of(), List.of(),
-                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.5, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false);
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.5, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false, null, null, List.of());
         String out = IrisShaderInjector.injectFragment(pack, List.of(s1));
 
         assertTrue(out.contains("kg_sample_gtexture(texcoord, vec2(0.0), vec2(0.0))"),
@@ -171,9 +171,9 @@ class IrisShaderInjectorTest {
         String sharedDecl = "uniform sampler2D kg_MissingSampler;\n";
         String sharedFn = "float kg_noise(vec2 p) { return 0.0; }\n";
         var a = new IrisSurfaceRegistry.Surface(1, List.of(sharedDecl), List.of(sharedFn),
-                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(kg_noise(kg_uv)), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false);
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(kg_noise(kg_uv)), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false, null, null, List.of());
         var b = new IrisSurfaceRegistry.Surface(2, List.of(sharedDecl), List.of(sharedFn),
-                "kg_Surface kg_surface_2(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false);
+                "kg_Surface kg_surface_2(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false, null, null, List.of());
         String out = IrisShaderInjector.injectFragment(PACK_FSH, List.of(a, b));
 
         assertEquals(1, countOccurrences(out, "uniform sampler2D kg_MissingSampler;"),
@@ -228,7 +228,7 @@ class IrisShaderInjectorTest {
             + "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n";
 
     private static IrisSurfaceRegistry.Surface surface(int id, boolean usesGeometry) {
-        return new IrisSurfaceRegistry.Surface(id, List.of(), List.of(), GEOM_FN, usesGeometry, false);
+        return new IrisSurfaceRegistry.Surface(id, List.of(), List.of(), GEOM_FN, usesGeometry, false, null, null, List.of());
     }
 
     /** A surface whose graph samples the scene depth — carries the injection-only depthtex1 helper the
@@ -236,7 +236,7 @@ class IrisShaderInjectorTest {
     private static IrisSurfaceRegistry.Surface depthSurface(int id) {
         return new IrisSurfaceRegistry.Surface(id, List.of(),
                 List.of("float kg_scene_depth_raw(vec2 kg_uv) {\n    return texture(depthtex1, kg_uv).r;\n}\n"),
-                GEOM_FN, false, true);
+                GEOM_FN, false, true, null, null, List.of());
     }
 
     /** A gbuffers fragment that declares a smooth view-space `normal` varying (Complementary/BSL/Solas). */
@@ -295,7 +295,7 @@ class IrisShaderInjectorTest {
         // A poisoned surface (null functions list) makes injectFragment throw. The guarded entry the mixin
         // uses must swallow ANY Throwable and hand Iris the untouched source — a KilaGraph bug may cost us
         // our shading, but it must never break the shaderpack's own program compilation.
-        var poisoned = new IrisSurfaceRegistry.Surface(1, List.of(), null, GEOM_FN, false, false);
+        var poisoned = new IrisSurfaceRegistry.Surface(1, List.of(), null, GEOM_FN, false, false, null, null, List.of());
         String out = IrisShaderInjector.injectGuarded("entities_solid", PACK_FSH, List.of(poisoned));
         assertEquals(PACK_FSH, out, "a throwing injection must fall back to the original source");
     }
@@ -310,7 +310,7 @@ class IrisShaderInjectorTest {
                 List.of("uniform sampler2D kg_tex_a;\n"),
                 List.of("float kg_noise(vec2 p) { return 0.0; }\n"),
                 "kg_Surface kg_surface_3(vec2 kg_uv) {\n    return kg_Surface(texture(kg_tex_a, kg_uv).rgb, 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n",
-                false, false);
+                false, false, null, null, List.of());
         String harness = IrisSurfaceRegistry.validationHarness(s);
         assertTrue(harness.startsWith("#version 330 core"), "harness compiles as the same version Iris emits");
         assertTrue(harness.contains("struct kg_Surface {"), "harness declares the shared struct");

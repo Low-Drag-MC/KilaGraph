@@ -40,16 +40,38 @@ public final class IrisSurfaceRegistry {
      *  that the surface reads the mesh normal (Fresnel etc.) — the injector then declares the
      *  {@code vec3 kg_normalView} global and fills it from the pack's own {@code normal} varying (or a
      *  constant); viewDir/position/screen are reconstructed in the fragment from {@code gl_FragCoord} + our
-     *  UBOs and need nothing from the pack. The vertex stage is never touched. {@code usesSceneDepth} marks
-     *  that the surface samples Iris's {@code depthtex1} — the injector declares that sampler iff the pack
-     *  doesn't already (Iris auto-binds it by name). */
+     *  UBOs. {@code usesSceneDepth} marks that the surface samples Iris's {@code depthtex1} — the injector
+     *  declares that sampler iff the pack doesn't already (Iris auto-binds it by name).
+     *
+     *  <p>{@code vertexPositionFunction}/{@code vertexNormalFunction} are the ready-to-emit (namespaced)
+     *  {@code vec3 kg_vpos_<id>(vec3 kg_pos, vec3 kg_n)} / {@code kg_vnormal_<id>(...)} definitions for the
+     *  pack's <b>vertex</b> source, dispatched by the same per-draw {@code kg_surface_id} — null when the
+     *  graph doesn't displace that output (the injector then leaves the corresponding attribute reads
+     *  untouched). {@code vertexFunctions} are their helper definitions (noise etc.).</p> */
     public record Surface(int id, List<String> declarationUnits, List<String> functions, String surfaceFunction,
-                          boolean usesGeometry, boolean usesSceneDepth) {}
+                          boolean usesGeometry, boolean usesSceneDepth,
+                          @Nullable String vertexPositionFunction, @Nullable String vertexNormalFunction,
+                          List<String> vertexFunctions) {
+
+        /** Whether this surface modifies the vertex stage at all (the injector's cue to touch a pack vsh). */
+        public boolean hasVertex() {
+            return vertexPositionFunction != null || vertexNormalFunction != null;
+        }
+
+        /** This surface with the vertex parts stripped — the fragment-only degrade when the vertex half
+         *  fails standalone GL validation (shading survives, displacement dropped). */
+        Surface withoutVertex() {
+            return new Surface(id, declarationUnits, functions, surfaceFunction,
+                    usesGeometry, usesSceneDepth, null, null, List.of());
+        }
+    }
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Object LOCK = new Object();
     /** Content hashes we've already logged a not-injection-compatible warning for (avoid spam). */
     private static final Set<String> LOGGED_INCOMPATIBLE = new LinkedHashSet<>();
+    /** Content hashes we've already logged the glPosition-block vanilla-only note for (avoid spam). */
+    private static final Set<String> LOGGED_LEGACY_VERTEX = new LinkedHashSet<>();
     /** Content hashes whose surface failed standalone GL validation — permanently passthrough (id 0) this
      *  session, never re-validated (the graph source is content-hashed, so the failure is deterministic). */
     private static final Set<String> FAILED_HASHES = new LinkedHashSet<>();
@@ -91,6 +113,11 @@ public final class IrisSurfaceRegistry {
             Surface surface = BY_HASH.get(hash);
             if (surface == null) {
                 if (FAILED_HASHES.contains(hash)) return 0; // known-bad — permanently passthrough
+                if (snippet.legacyVertexBlock() && LOGGED_LEGACY_VERTEX.add(hash)) {
+                    LOGGER.info("[KilaGraph][Iris] graph {} uses the advanced glPosition block — vanilla-only: "
+                            + "under a shaderpack the vertex stage falls back to the pack's standard "
+                            + "transform; fragment shading still injects.", hash);
+                }
                 Surface candidate = build(nextId, snippet);
                 // Standalone GL validation BEFORE the surface enters the registry: a surface that can't
                 // compile would otherwise poison every program (the whole-source fallback in injectGuarded
@@ -102,13 +129,24 @@ public final class IrisSurfaceRegistry {
                             + "passthrough (id 0). Driver log:\n{}", hash, err);
                     return 0;
                 }
+                // The vertex half validates separately, and a failure degrades to fragment-only (never
+                // FAILED_HASHES): shading keeps working, geometry renders undisplaced.
+                if (candidate.hasVertex()) {
+                    String verr = validateVertexStandalone(candidate);
+                    if (verr != null) {
+                        LOGGER.error("[KilaGraph][Iris] vertex displacement for graph {} fails standalone GL "
+                                + "validation -> fragment-only (undisplaced). Driver log:\n{}", hash, verr);
+                        candidate = candidate.withoutVertex();
+                    }
+                }
                 nextId++;
                 surface = candidate;
                 BY_HASH.put(hash, surface);
                 generation++;
                 lastChangeNanos = System.nanoTime();
-                LOGGER.info("[KilaGraph][Iris] registered surface id={} for graph {} (decls={}, fns={}, total={})",
-                        surface.id(), hash, surface.declarationUnits().size(), surface.functions().size(), BY_HASH.size());
+                LOGGER.info("[KilaGraph][Iris] registered surface id={} for graph {} (decls={}, fns={}, vertex={}, total={})",
+                        surface.id(), hash, surface.declarationUnits().size(), surface.functions().size(),
+                        surface.hasVertex(), BY_HASH.size());
             }
             return surface.id();
         }
@@ -123,6 +161,42 @@ public final class IrisSurfaceRegistry {
         } catch (Throwable ignored) {
             return null; // no LWJGL/GL in this environment — validation unavailable, accept
         }
+    }
+
+    /** GL-compile the surface's vertex half wrapped in {@link #vertexValidationHarness}; {@code null} = valid
+     *  (or validation unavailable — accept). */
+    @Nullable
+    private static String validateVertexStandalone(Surface surface) {
+        try {
+            return IrisGlslValidator.compileVertexError(vertexValidationHarness(surface));
+        } catch (Throwable ignored) {
+            return null; // no LWJGL/GL in this environment — validation unavailable, accept
+        }
+    }
+
+    /**
+     * Wrap a surface's vertex half as a complete standalone {@code #version 330 core} vertex shader whose
+     * {@code main} <em>calls</em> the {@code kg_vpos_<id>}/{@code kg_vnormal_<id>} functions (so nothing is
+     * stripped and a compile error means the displacement itself is bad). Uses the same declaration units
+     * the injector will emit. Package-private for unit tests.
+     */
+    static String vertexValidationHarness(Surface surface) {
+        StringBuilder sb = new StringBuilder("#version 330 core\n");
+        for (String unit : surface.declarationUnits()) sb.append(unit);
+        for (String fn : surface.vertexFunctions()) sb.append(fn);
+        if (surface.vertexPositionFunction() != null) sb.append(surface.vertexPositionFunction());
+        if (surface.vertexNormalFunction() != null) sb.append(surface.vertexNormalFunction());
+        sb.append("void main() {\n")
+          .append("    vec3 kg_p = vec3(0.5);\n")
+          .append("    vec3 kg_nrm = vec3(0.0, 1.0, 0.0);\n");
+        if (surface.vertexPositionFunction() != null) {
+            sb.append("    kg_p = kg_vpos_").append(surface.id()).append("(kg_p, kg_nrm);\n");
+        }
+        if (surface.vertexNormalFunction() != null) {
+            sb.append("    kg_nrm = kg_vnormal_").append(surface.id()).append("(kg_p, kg_nrm);\n");
+        }
+        sb.append("    gl_Position = vec4(kg_p + kg_nrm, 1.0);\n}\n");
+        return sb.toString();
     }
 
     /**
@@ -191,7 +265,8 @@ public final class IrisSurfaceRegistry {
         }
     }
 
-    /** Apply per-id namespacing to a snippet's pieces and assemble its {@code kg_surface_<id>} function.
+    /** Apply per-id namespacing to a snippet's pieces and assemble its {@code kg_surface_<id>} function
+     *  (+ the {@code kg_vpos_<id>}/{@code kg_vnormal_<id>} vertex functions when the graph displaces).
      *  Package-private for unit testing the namespacing/assembly without a full {@link CompiledShaderGraph}. */
     static Surface build(int id, InjectionSnippet snippet) {
         List<String> decls = new ArrayList<>(snippet.declarationUnits().size());
@@ -201,7 +276,21 @@ public final class IrisSurfaceRegistry {
         String fn = "kg_Surface kg_surface_" + id + "(vec2 kg_uv) {\n"
                 + namespace(snippet.body(), id)
                 + "    return kg_Surface(" + namespace(snippet.surfaceArgs(), id) + ");\n}\n";
-        return new Surface(id, decls, fns, fn, snippet.usesGeometry(), snippet.usesSceneDepth());
+        // Both vertex functions take (position, normal) so displace-along-normal and normal-from-position
+        // both work; the dispatchers pass the pack's RAW attributes (matching the vanilla compile, where
+        // both block expressions read the ORIGINAL mesh inputs).
+        String vpos = snippet.vertexPositionExpr() == null ? null
+                : "vec3 kg_vpos_" + id + "(vec3 kg_pos, vec3 kg_n) {\n"
+                + namespace(snippet.vertexPositionBody() == null ? "" : snippet.vertexPositionBody(), id)
+                + "    return " + namespace(snippet.vertexPositionExpr(), id) + ";\n}\n";
+        String vnormal = snippet.vertexNormalExpr() == null ? null
+                : "vec3 kg_vnormal_" + id + "(vec3 kg_pos, vec3 kg_n) {\n"
+                + namespace(snippet.vertexNormalBody() == null ? "" : snippet.vertexNormalBody(), id)
+                + "    return " + namespace(snippet.vertexNormalExpr(), id) + ";\n}\n";
+        List<String> vfns = new ArrayList<>(snippet.vertexFunctions().size());
+        for (String vf : snippet.vertexFunctions()) vfns.add(namespace(vf, id));
+        return new Surface(id, decls, fns, fn, snippet.usesGeometry(), snippet.usesSceneDepth(),
+                vpos, vnormal, vfns);
     }
 
     /**
