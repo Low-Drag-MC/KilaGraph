@@ -68,6 +68,8 @@ public final class RenderTypeFactory {
     /** Hashes that failed to compile on the GPU. Content hash is deterministic, so a failed hash
      *  stays failed — skip re-precompiling it every frame (and dump its GLSL only once). */
     private static final Set<String> FAILED = ConcurrentHashMap.newKeySet();
+    /** Graph hashes already warned about Scene Color/Depth on an opaque material (self-sampling feedback). */
+    private static final Set<String> SCENE_ON_OPAQUE_WARNED = ConcurrentHashMap.newKeySet();
 
     private RenderTypeFactory() {}
 
@@ -138,7 +140,19 @@ public final class RenderTypeFactory {
 
         REFCOUNTS.merge(hash, 1, Integer::sum);
         // The graph samples the captured opaque scene — start (and refcount) the capture while this material lives.
-        if (compiled.usesSceneColor() || compiled.usesSceneDepth()) SceneCaptureManager.INSTANCE.acquire();
+        if (compiled.usesSceneColor() || compiled.usesSceneDepth()) {
+            SceneCaptureManager.INSTANCE.acquire();
+            // Scene Color/Depth sample the capture taken AFTER opaque geometry. An opaque material draws
+            // BEFORE that point, so at its own screen position the capture contains... itself (last frame):
+            // a self-sampling feedback loop that renders black with view-dependent fringes (identical in
+            // vanilla and under shaderpacks; same constraint as Unity's Scene Color). Warn once per graph.
+            if (compiled.settings().blend() == RenderTypeGraph.Settings.BlendMode.OPAQUE
+                    && SCENE_ON_OPAQUE_WARNED.add(hash)) {
+                Kilagraph.LOGGER.warn("[KilaGraph] graph {} uses Scene Color/Depth on an OPAQUE material: "
+                        + "it draws before the scene capture and will sample ITSELF (black feedback). "
+                        + "Use a translucent BlendMode and draw it in the translucent phase.", hash);
+            }
+        }
         String name = Kilagraph.MODID + ":graph/" + hash;
         RenderType renderType = RenderType.create(name, setup.createRenderSetup());
         RenderTypeGraphMaterial material = new RenderTypeGraphMaterial(
@@ -154,10 +168,10 @@ public final class RenderTypeFactory {
         // non-zero kg_surface_id when the graph is injection-compatible (the injected kg_surface(id,...)
         // dispatch then shades our geometry), or 0 when it isn't — id 0 still assigns to entities so the
         // geometry renders, falling back to the shaderpack's own albedo (passthrough). No-op without Iris.
-        if (IrisCompat.LOADED) {
+        if (IrisCompat.ENABLED) {
             material.setIrisSurfaceId(IrisSurfaceRegistry.register(compiled));
             boolean translucent = compiled.settings().blend() != RenderTypeGraph.Settings.BlendMode.OPAQUE;
-            IrisCompat.assignToEntities(pipeline, translucent);
+            IrisCompat.assignToEntities(pipeline, translucent, compiled.alphaDiscards());
             // A reload to inject this new surface (if the programs are now stale) is driven from the client
             // tick (IrisCompat.reloadShadersIfStale via IrisDebugCommand), NOT here — reloading mid-frame
             // crashes the world pipeline.

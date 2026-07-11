@@ -36,7 +36,7 @@ public final class IrisDebugCommand {
      */
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
-        if (IrisCompat.LOADED) IrisCompat.reloadShadersIfStale();
+        if (IrisCompat.LOADED) IrisCompat.clientTick();
     }
 
     @SubscribeEvent

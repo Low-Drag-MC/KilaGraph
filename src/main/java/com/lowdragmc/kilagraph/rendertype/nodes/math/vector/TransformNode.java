@@ -151,11 +151,19 @@ public class TransformNode extends ShaderNode {
     // ---- matrix accessors (register the owning UBO) -----------------------------------------
 
     private String modelViewMat(ShaderCompileContext ctx) {
+        if (ctx.isInjection()) {
+            // A #moj_import-backed Minecraft uniform would reject the whole graph under a shaderpack;
+            // KG_Transforms carries the same forward matrices (see KGTransformUniforms.declareGlsl).
+            return ctx.transformField("ModelViewMat", GlslType.MAT4).code();
+        }
         ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl");
         return "ModelViewMat";
     }
 
     private String projMat(ShaderCompileContext ctx) {
+        if (ctx.isInjection()) {
+            return ctx.transformField("ProjMat", GlslType.MAT4).code();
+        }
         ctx.useMinecraftUniform("Projection", "minecraft:projection.glsl");
         return "ProjMat";
     }
@@ -177,9 +185,15 @@ public class TransformNode extends ShaderNode {
         return ctx.transformField("IProjMat", GlslType.MAT4).code();
     }
 
-    /** Absolute world camera position from MC's {@code globals.glsl}. MC stores CameraBlockPos =
-     *  floor(camPos) and CameraOffset = floor(camPos) - camPos, so camPos = block - offset. */
+    /** Absolute world camera position. MC stores CameraBlockPos = floor(camPos) and CameraOffset =
+     *  floor(camPos) - camPos, so camPos = block - offset — precise arbitrarily far from the origin.
+     *  Under injection the identical split pair comes from KG_Transforms (MC's Globals block isn't
+     *  reachable inside a pack program). */
     private String cameraPos(ShaderCompileContext ctx) {
+        if (ctx.isInjection()) {
+            return "(vec3(" + ctx.transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "
+                    + ctx.transformField("CameraOffset", GlslType.VEC3).code() + ")";
+        }
         ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl");
         return "(vec3(CameraBlockPos) - CameraOffset)";
     }

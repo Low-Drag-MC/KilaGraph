@@ -3,6 +3,7 @@ package com.lowdragmc.kilagraph.rendertype.iris;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet;
 import com.mojang.logging.LogUtils;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -36,14 +37,22 @@ import java.util.Set;
 public final class IrisSurfaceRegistry {
 
     /** A live surface, with all collision-prone identifiers already id-namespaced. {@code usesGeometry} marks
-     *  that the surface reads the mesh normal/viewDir/position varyings (the injector then adds a vertex stage). */
+     *  that the surface reads the mesh normal (Fresnel etc.) — the injector then declares the
+     *  {@code vec3 kg_normalView} global and fills it from the pack's own {@code normal} varying (or a
+     *  constant); viewDir/position/screen are reconstructed in the fragment from {@code gl_FragCoord} + our
+     *  UBOs and need nothing from the pack. The vertex stage is never touched. {@code usesSceneDepth} marks
+     *  that the surface samples Iris's {@code depthtex1} — the injector declares that sampler iff the pack
+     *  doesn't already (Iris auto-binds it by name). */
     public record Surface(int id, List<String> declarationUnits, List<String> functions, String surfaceFunction,
-                          boolean usesGeometry) {}
+                          boolean usesGeometry, boolean usesSceneDepth) {}
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Object LOCK = new Object();
     /** Content hashes we've already logged a not-injection-compatible warning for (avoid spam). */
     private static final Set<String> LOGGED_INCOMPATIBLE = new LinkedHashSet<>();
+    /** Content hashes whose surface failed standalone GL validation — permanently passthrough (id 0) this
+     *  session, never re-validated (the graph source is content-hashed, so the failure is deterministic). */
+    private static final Set<String> FAILED_HASHES = new LinkedHashSet<>();
     /** content hash -> injected surface (insertion order = id order). Cached for the whole session — see
      *  {@link #release} — so a material recreated with the same graph reuses its id without a reload. */
     private static final Map<String, Surface> BY_HASH = new LinkedHashMap<>();
@@ -81,7 +90,20 @@ public final class IrisSurfaceRegistry {
         synchronized (LOCK) {
             Surface surface = BY_HASH.get(hash);
             if (surface == null) {
-                surface = build(nextId++, snippet);
+                if (FAILED_HASHES.contains(hash)) return 0; // known-bad — permanently passthrough
+                Surface candidate = build(nextId, snippet);
+                // Standalone GL validation BEFORE the surface enters the registry: a surface that can't
+                // compile would otherwise poison every program (the whole-source fallback in injectGuarded
+                // would then degrade ALL surfaces to passthrough). Rejecting here degrades only this graph.
+                String err = validateStandalone(candidate);
+                if (err != null) {
+                    FAILED_HASHES.add(hash);
+                    LOGGER.error("[KilaGraph][Iris] surface for graph {} fails standalone GL validation -> "
+                            + "passthrough (id 0). Driver log:\n{}", hash, err);
+                    return 0;
+                }
+                nextId++;
+                surface = candidate;
                 BY_HASH.put(hash, surface);
                 generation++;
                 lastChangeNanos = System.nanoTime();
@@ -90,6 +112,39 @@ public final class IrisSurfaceRegistry {
             }
             return surface.id();
         }
+    }
+
+    /** GL-compile {@code surface} wrapped in {@link #validationHarness}; {@code null} = valid (or validation
+     *  unavailable — no GL context/LWJGL — in which case we accept, matching pre-hardening behaviour). */
+    @Nullable
+    private static String validateStandalone(Surface surface) {
+        try {
+            return IrisGlslValidator.compileFragmentError(validationHarness(surface));
+        } catch (Throwable ignored) {
+            return null; // no LWJGL/GL in this environment — validation unavailable, accept
+        }
+    }
+
+    /**
+     * Wrap a surface as a complete standalone {@code #version 330 core} fragment shader (the version Iris
+     * emits) whose {@code main} <em>calls</em> the surface function — so the compiler can't strip anything
+     * and a compile error means the surface itself is bad. Mirrors exactly what {@code IrisShaderInjector}
+     * will emit for this surface (same struct constant, same globals). Package-private for unit tests.
+     */
+    static String validationHarness(Surface surface) {
+        StringBuilder sb = new StringBuilder("#version 330 core\n");
+        sb.append(IrisShaderInjector.KG_SURFACE_STRUCT);
+        if (surface.usesGeometry()) sb.append("vec3 kg_normalView;\n");
+        if (surface.usesSceneDepth()) sb.append("uniform sampler2D depthtex1;\n");
+        for (String unit : surface.declarationUnits()) sb.append(unit);
+        for (String fn : surface.functions()) sb.append(fn);
+        sb.append(surface.surfaceFunction());
+        sb.append("out vec4 kg_out;\n")
+          .append("void main() {\n")
+          .append("    kg_Surface s = kg_surface_").append(surface.id()).append("(vec2(0.5));\n")
+          .append("    kg_out = vec4(s.albedo, s.alpha);\n")
+          .append("}\n");
+        return sb.toString();
     }
 
     /** A human-readable dump of the live surfaces + generation state for the {@code /kgiris surfaces} command. */
@@ -146,7 +201,7 @@ public final class IrisSurfaceRegistry {
         String fn = "kg_Surface kg_surface_" + id + "(vec2 kg_uv) {\n"
                 + namespace(snippet.body(), id)
                 + "    return kg_Surface(" + namespace(snippet.surfaceArgs(), id) + ");\n}\n";
-        return new Surface(id, decls, fns, fn, snippet.usesGeometry());
+        return new Surface(id, decls, fns, fn, snippet.usesGeometry(), snippet.usesSceneDepth());
     }
 
     /**

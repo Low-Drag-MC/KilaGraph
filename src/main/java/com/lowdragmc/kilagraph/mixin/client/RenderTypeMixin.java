@@ -26,10 +26,19 @@ public class RenderTypeMixin {
      * Upload the material's custom UBO before the render pass opens — {@code writeToBuffer} is illegal
      * inside an active pass (vanilla likewise writes {@code DynamicTransforms} before {@code createRenderPass}).
      */
-    @Inject(method = "draw", at = @At("HEAD"))
+    @Inject(method = "draw", at = @At("HEAD"), cancellable = true)
     private void kilagraph$prepareMaterialUniforms(MeshData mesh, CallbackInfo ci) {
         var material = RenderTypeGraphMaterial.of((RenderType) (Object) this);
         if (material != null) {
+            // Iris shadow-pass safety net: when the shadow-pass program mapping could not be registered
+            // (IrisCompat.shouldSkipShadowDraw), drawing here would run OUR program inside Iris's shadow
+            // framebuffer and corrupt the shadow map for everything nearby. Skip the draw (no shadow cast);
+            // the mesh must still be closed — vanilla draw() consumes it.
+            if (IrisCompat.shouldSkipShadowDraw()) {
+                mesh.close();
+                ci.cancel();
+                return;
+            }
             material.prepareUniforms();
         }
     }

@@ -54,6 +54,11 @@ public record CompiledShaderGraph(
         // TextureManager texture. Like usesOverlay/usesLightmap, drives runtime binding, not the GLSL.
         boolean usesSceneColor,
         boolean usesSceneDepth,
+        // Whether the fragment stage has an Alpha Discard block (a `discard` below its cutoff). Drives the
+        // Iris ShaderKey choice (ENTITIES_CUTOUT vs ENTITIES_SOLID) so the pack's alpha-tested program
+        // renders our cutout geometry. Derived from the fragment source (which IS hashed), so it's
+        // consistent across materials sharing a pipeline; not separately part of contentHash().
+        boolean alphaDiscards,
         // Attribute names a node/block default referenced that aren't in the vertex format (a safe constant
         // was substituted in the GLSL). Diagnostics only — surfaced as editor warnings; the GLSL already
         // reflects the substitution, so this is NOT part of contentHash().

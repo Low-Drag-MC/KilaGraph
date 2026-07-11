@@ -64,27 +64,40 @@ public final class KGTransformUniforms {
         @Override public GpuBufferSlice slice() { return KGTransformUniforms.slice(); }
     };
 
-    /** std140 size: four mat4. */
+    /** std140 size: six mat4 + ivec3 + vec3 (the camera-position split pair). */
     private static final int UBO_SIZE = new Std140SizeCalculator()
-            .putMat4f().putMat4f().putMat4f().putMat4f().get();
+            .putMat4f().putMat4f().putMat4f().putMat4f().putMat4f().putMat4f().putIVec3().putVec3().get();
 
     @Nullable private static GpuBuffer buffer;
 
+    private static final Matrix4f modelView = new Matrix4f();
     private static final Matrix4f iModelView = new Matrix4f();
     private static final Matrix4f viewMat = new Matrix4f();
     private static final Matrix4f iViewMat = new Matrix4f();
+    private static final Matrix4f projMat = new Matrix4f();
     private static final Matrix4f iProjMat = new Matrix4f();
-    private static final Matrix4f projTmp = new Matrix4f();
+    private static int camBlockX, camBlockY, camBlockZ;
+    private static float camOffX, camOffY, camOffZ;
 
     private KGTransformUniforms() {}
 
-    /** GLSL declaration of the transforms block (must match the buffer layout exactly). */
+    /** GLSL declaration of the transforms block (must match the buffer layout exactly).
+     *  The forward {@code ModelViewMat}/{@code ProjMat} and the camera-position pair duplicate values
+     *  Minecraft's own UBOs carry — they exist so the Transform node works <em>under an Iris shaderpack</em>,
+     *  where a {@code #moj_import}-backed Minecraft uniform would reject the whole graph from injection.
+     *  The vanilla pipeline keeps reading Minecraft's blocks (identical values). The camera position uses
+     *  Minecraft's exact precision-split form: {@code camPos = vec3(CameraBlockPos) - CameraOffset}, so
+     *  world-position math stays precise arbitrarily far from the origin. */
     public static String declareGlsl() {
         return "layout(std140) uniform " + UBO_NAME + " {\n"
                 + "    mat4 IModelViewMat;\n"
                 + "    mat4 ViewMat;\n"
                 + "    mat4 IViewMat;\n"
                 + "    mat4 IProjMat;\n"
+                + "    mat4 ModelViewMat;\n"
+                + "    mat4 ProjMat;\n"
+                + "    ivec3 CameraBlockPos;\n"
+                + "    vec3 CameraOffset;\n"
                 + "} " + UBO_INSTANCE + ";\n";
     }
 
@@ -116,7 +129,8 @@ public final class KGTransformUniforms {
     private static void compute() {
         // Object<->view always comes from RenderSystem, which is set correctly by whatever is rendering
         // (the main pipeline OR an off-screen scene), so this is context-independent.
-        iModelView.set(RenderSystem.getModelViewMatrix()).invert();
+        modelView.set(RenderSystem.getModelViewMatrix());
+        iModelView.set(modelView).invert();
 
         // The camera rotation + projection are NOT on RenderSystem in a usable CPU form. The main pipeline
         // reads them off the game camera; but an off-screen renderer (e.g. an LDLib2 WorldSceneRenderer
@@ -124,17 +138,27 @@ public final class KGTransformUniforms {
         // a custom renderer publishes via SceneCameraContext, falling back to the main world camera.
         if (SceneCameraContext.isActive()) {
             viewMat.set(SceneCameraContext.viewRotation());
-            iProjMat.set(SceneCameraContext.projection()).invert();
+            projMat.set(SceneCameraContext.projection());
         } else {
             Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
             camera.getViewRotationMatrix(viewMat);
             // Recover ProjMat (no direct CPU getter): getViewRotationProjectionMatrix = ProjMat * ViewRotMatrix,
-            // so ProjMat = that * inverse(ViewRotMatrix); then invert for clip->view.
-            camera.getViewRotationProjectionMatrix(projTmp);
-            projTmp.mul(new Matrix4f(viewMat).invert());
-            projTmp.invert(iProjMat);
+            // so ProjMat = that * inverse(ViewRotMatrix).
+            camera.getViewRotationProjectionMatrix(projMat);
+            projMat.mul(new Matrix4f(viewMat).invert());
         }
+        projMat.invert(iProjMat);
         viewMat.invert(iViewMat);
+        // Camera position: consumed only by INJECTED fragments (previews never inject and keep reading
+        // Minecraft's Globals form), so the main world camera is always the right source. Same split as MC:
+        // CameraBlockPos = floor(camPos), CameraOffset = floor(camPos) - camPos (exact in double, tiny in float).
+        var camPos = Minecraft.getInstance().gameRenderer.getMainCamera().position();
+        camBlockX = (int) Math.floor(camPos.x);
+        camBlockY = (int) Math.floor(camPos.y);
+        camBlockZ = (int) Math.floor(camPos.z);
+        camOffX = (float) (camBlockX - camPos.x);
+        camOffY = (float) (camBlockY - camPos.y);
+        camOffZ = (float) (camBlockZ - camPos.z);
     }
 
     private static void upload() {
@@ -144,7 +168,11 @@ public final class KGTransformUniforms {
                     .putMat4f(iModelView)
                     .putMat4f(viewMat)
                     .putMat4f(iViewMat)
-                    .putMat4f(iProjMat);
+                    .putMat4f(iProjMat)
+                    .putMat4f(modelView)
+                    .putMat4f(projMat)
+                    .putIVec3(camBlockX, camBlockY, camBlockZ)
+                    .putVec3(camOffX, camOffY, camOffZ);
             bb.rewind();
             RenderSystem.getDevice().createCommandEncoder().writeToBuffer(buffer.slice(), bb);
         } finally {

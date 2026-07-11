@@ -121,10 +121,11 @@ public class ShaderGraphCompiler {
      *  defaults (see {@link #screenUv()}) map the whole capture onto the preview geometry rather than the
      *  panel's screen sub-rect, so the preview shows the entire scene. In-world rendering is unaffected. */
     private boolean editorPreview;
-    /** Set in injection mode when a node read the mesh normal / view direction / position
-     *  ({@link #meshNormal()}/{@link #meshViewDir()}/{@link #meshPosition()}), so the surface references the
-     *  {@code kg_normal}/{@code kg_viewDir}/{@code kg_localPos} varyings. {@code IrisShaderInjector} then
-     *  injects a tiny vertex stage that computes them (see {@link InjectionSnippet#usesGeometry()}). */
+    /** Set in injection mode when a node read the mesh normal ({@link #meshNormal()} → the
+     *  {@code kg_normalView} global {@code IrisShaderInjector} fills from the pack's own {@code normal}
+     *  varying). viewDir/position/screen need only {@code gl_FragCoord} + our UBOs (see the reconstruction
+     *  helpers around {@code reconstructedViewPos()}); the pack's vertex stage is never touched
+     *  (see {@link InjectionSnippet#usesGeometry()}). */
     private boolean usesGeometryVarying;
     /** KilaGraph-managed UBOs any node referenced (engine globals, transforms, or a mod's own block).
      *  Each is declared in the GLSL + bound on the pipeline + uploaded each frame — the single, generic
@@ -232,7 +233,8 @@ public class ShaderGraphCompiler {
                 new ArrayList<>(stageErrors.values()), graph.getSettings(),
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes),
+                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth,
+                out.alphaDiscardCutoff != null, new ArrayList<>(missingAttributes),
                 injectionSnippet);
     }
 
@@ -272,7 +274,8 @@ public class ShaderGraphCompiler {
                 new ArrayList<>(stageErrors.values()), PREVIEW_SETTINGS,
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes),
+                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth,
+                false, new ArrayList<>(missingAttributes),
                 null);
     }
 
@@ -302,9 +305,15 @@ public class ShaderGraphCompiler {
                 fb.emitFragment(ctx, out);
             }
         }
-        // Unsupported subset: a Minecraft engine include (Fog/Lighting/...) or the captured scene can't be
-        // satisfied inside the shaderpack program; a stage error means the GLSL references unavailable data.
-        if (!fragment.includes.isEmpty() || usesSceneColor || usesSceneDepth || !stageErrors.isEmpty()) {
+        // Unsupported subset: a Minecraft engine include (Fog/Lighting/...) can't be satisfied inside the
+        // shaderpack program; a stage error means the GLSL references unavailable data. (Scene Color/Depth
+        // ARE supported: depth reads Iris's depthtex1, colour reads the KG_SceneColor capture bound at draw.)
+        if (!fragment.includes.isEmpty() || !stageErrors.isEmpty()) {
+            // Name the culprit — pairs with IrisSurfaceRegistry's "no injection snippet -> passthrough" line
+            // (which only knows the hash). An include here means some node used a #moj_import-backed
+            // Minecraft uniform in the fragment; the include id tells WHICH node family to make injectable.
+            Kilagraph.LOGGER.info("[KilaGraph][Iris] injection snippet rejected: fragment includes={}, stageErrors={}",
+                    fragment.includes, stageErrors.values());
             return null;
         }
 
@@ -343,7 +352,7 @@ public class ShaderGraphCompiler {
                 out.porosity != null ? out.porosity.code() : "0.0",                         // porosity
                 out.sss != null ? out.sss.code() : "0.0");                                  // sss
         return new InjectionSnippet(decls, new ArrayList<>(fragment.functions.values()),
-                body.toString(), args, usesGeometryVarying);
+                body.toString(), args, usesGeometryVarying, usesSceneDepth);
     }
 
     /**
@@ -758,6 +767,13 @@ public class ShaderGraphCompiler {
 
     /** Minecraft's builtin {@code Globals.GameTime} (day fraction). Bound by {@code bindDefaultUniforms}. */
     ShaderExpr mcGameTime() {
+        if (injection) {
+            // The #moj_import include would reject the whole graph under a shaderpack; KG_Globals carries
+            // the same day-fraction value (see KGEngineUniforms.gameTimeAccessor), already bound on the
+            // injected program.
+            useUniformBlock(KGEngineUniforms.BLOCK);
+            return new ShaderExpr(KGEngineUniforms.gameTimeAccessor(), GlslType.FLOAT);
+        }
         addInclude("minecraft:globals.glsl");
         return new ShaderExpr("GameTime", GlslType.FLOAT);
     }
@@ -880,7 +896,11 @@ public class ShaderGraphCompiler {
      *  would sample just that corner of the full-screen capture; there we map the whole captured frame across
      *  the preview geometry's uv (mesh/quad uv) so the preview shows the entire scene.</p> */
     protected ShaderExpr screenUv() {
-        if (preview || editorPreview) return meshUv();
+        // Injection wins over the preview flag it implies: buildInjectionSnippet sets preview=true (to reuse
+        // varying substitution), but injected code runs in-world inside the pack's gbuffers program, where
+        // true screen space is what a ScreenPosition node means — the preview branch would silently return
+        // the mesh uv there.
+        if (!injection && (preview || editorPreview)) return meshUv();
         // Framebuffer size from our own KG_Globals UBO (bound on both the vanilla pipeline and — crucially —
         // the injected shaderpack program), so screen-space nodes need no Minecraft include and stay injectable.
         useUniformBlock(KGEngineUniforms.BLOCK);
@@ -893,15 +913,37 @@ public class ShaderGraphCompiler {
         return new ShaderExpr("texture(" + s.code() + ", " + convert(uv, GlslType.VEC2).code() + ").rgb", GlslType.VEC3);
     }
 
-    /** Raw hardware depth in {@code [0,1]} (Unity's Scene Depth "Raw"). */
+    /** Raw hardware depth in {@code [0,1]} (Unity's Scene Depth "Raw"). Under injection the read goes
+     *  through Iris's own {@code depthtex1} (the opaque-depth snapshot, semantically ≡ our capture; Iris
+     *  auto-binds it by name) instead of the {@code KG_SceneDepth} capture sampler — which must then NOT be
+     *  registered in the layout, or the snippet would declare a sampler nothing binds. */
     ShaderExpr sampleSceneDepthRaw(ShaderExpr uv) {
+        if (injection) {
+            usesSceneDepth = true; // → InjectionSnippet.usesSceneDepth → the injector declares depthtex1
+            addFunction("kg_scene_depth_raw", SceneGlsl.FN_SCENE_DEPTH_RAW);
+            return new ShaderExpr("kg_scene_depth_raw(" + convert(uv, GlslType.VEC2).code() + ")", GlslType.FLOAT);
+        }
         ShaderExpr s = sceneDepthSampler();
         return new ShaderExpr("texture(" + s.code() + ", " + convert(uv, GlslType.VEC2).code() + ").r", GlslType.FLOAT);
     }
 
+    /** Register the shared depth-linearisation helpers: the {@code kg_scene.glsl} include normally; under
+     *  injection the same bodies inline via {@code addFunction} (an injected pack program can't resolve
+     *  {@code #moj_import}, and a non-empty include set rejects the snippet). Identical GLSL either way —
+     *  {@code SceneGlslTest} pins the two copies together. */
+    private void sceneDepthHelpers() {
+        if (injection) {
+            addFunction("kg_eye_from_ndcz", SceneGlsl.FN_EYE_FROM_NDCZ);
+            addFunction("kg_eye_depth", SceneGlsl.FN_EYE_DEPTH);
+            addFunction("kg_linear01_depth", SceneGlsl.FN_LINEAR01_DEPTH);
+        } else {
+            addInclude("kilagraph:kg_scene.glsl");
+        }
+    }
+
     /** Eye-space distance from the camera in world units (Unity's Scene Depth "Eye"), reconstructed via {@code IProjMat}. */
     ShaderExpr sampleSceneDepthEye(ShaderExpr uv) {
-        addInclude("kilagraph:kg_scene.glsl");
+        sceneDepthHelpers();
         ShaderExpr raw = sampleSceneDepthRaw(uv);
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
         return new ShaderExpr("kg_eye_depth(" + raw.code() + ", " + iproj.code() + ")", GlslType.FLOAT);
@@ -909,10 +951,32 @@ public class ShaderGraphCompiler {
 
     /** Linearised depth {@code 0}(near)..{@code 1}(far) (Unity's Scene Depth "Linear 01"), reconstructed via {@code IProjMat}. */
     ShaderExpr sampleSceneDepthLinear01(ShaderExpr uv) {
-        addInclude("kilagraph:kg_scene.glsl");
+        sceneDepthHelpers();
         ShaderExpr raw = sampleSceneDepthRaw(uv);
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
         return new ShaderExpr("kg_linear01_depth(" + raw.code() + ", " + iproj.code() + ")", GlslType.FLOAT);
+    }
+
+    /** The default (unconnected-uv) screen-space UV for Scene Depth. Under injection the lookup targets
+     *  Iris's {@code depthtex1}, whose size can differ from the window ({@code ScreenSize}) under Iris
+     *  render-quality scaling — {@code textureSize} is exact by construction (the source is always
+     *  glsl-transformer {@code #version 330 core}, so it's available). Elsewhere it's {@link #screenUv()}
+     *  (which also handles the preview/editor-preview mapping). */
+    ShaderExpr sceneDepthDefaultUv() {
+        if (injection) {
+            return new ShaderExpr("(gl_FragCoord.xy / vec2(textureSize(depthtex1, 0)))", GlslType.VEC2);
+        }
+        return screenUv();
+    }
+
+    /** The default (unconnected-uv) screen-space UV for Scene Color — see {@link #sceneDepthDefaultUv()};
+     *  the injected lookup targets the {@code KG_SceneColor} capture, sized to the Iris render target. */
+    ShaderExpr sceneColorDefaultUv() {
+        if (injection) {
+            return new ShaderExpr("(gl_FragCoord.xy / vec2(textureSize(" + sceneColorSamplerName() + ", 0)))",
+                    GlslType.VEC2);
+        }
+        return screenUv();
     }
 
     /** Eye-space distance of THIS fragment from the camera (world units), reconstructed from
@@ -920,21 +984,36 @@ public class ShaderGraphCompiler {
      *  {@code sampleSceneDepthEye(uv) - fragmentEyeDepth()} cancels the camera (Unity's ScreenPosition raw
      *  {@code .w} / soft-particle depth fade). Fragment-only. */
     ShaderExpr fragmentEyeDepth() {
-        addInclude("kilagraph:kg_scene.glsl");
+        if (injection) {
+            addFunction("kg_eye_from_ndcz", SceneGlsl.FN_EYE_FROM_NDCZ);
+            addFunction("kg_eye_depth", SceneGlsl.FN_EYE_DEPTH);
+        } else {
+            addInclude("kilagraph:kg_scene.glsl");
+        }
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
         return new ShaderExpr("kg_eye_depth(gl_FragCoord.z, " + iproj.code() + ")", GlslType.FLOAT);
     }
 
     /** Camera near-plane distance (world units), reconstructed from {@code IProjMat}. */
     ShaderExpr cameraNear() {
-        addInclude("kilagraph:kg_scene.glsl");
+        if (injection) {
+            addFunction("kg_eye_from_ndcz", SceneGlsl.FN_EYE_FROM_NDCZ);
+            addFunction("kg_camera_near", SceneGlsl.FN_CAMERA_NEAR);
+        } else {
+            addInclude("kilagraph:kg_scene.glsl");
+        }
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
         return new ShaderExpr("kg_camera_near(" + iproj.code() + ")", GlslType.FLOAT);
     }
 
     /** Camera far-plane distance (world units), reconstructed from {@code IProjMat}. */
     ShaderExpr cameraFar() {
-        addInclude("kilagraph:kg_scene.glsl");
+        if (injection) {
+            addFunction("kg_eye_from_ndcz", SceneGlsl.FN_EYE_FROM_NDCZ);
+            addFunction("kg_camera_far", SceneGlsl.FN_CAMERA_FAR);
+        } else {
+            addInclude("kilagraph:kg_scene.glsl");
+        }
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
         return new ShaderExpr("kg_camera_far(" + iproj.code() + ")", GlslType.FLOAT);
     }

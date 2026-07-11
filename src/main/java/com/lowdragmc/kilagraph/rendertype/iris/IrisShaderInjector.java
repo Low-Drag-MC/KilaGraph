@@ -72,9 +72,19 @@ public final class IrisShaderInjector {
     private static final Pattern PACK_NORMAL_VARYING =
             Pattern.compile("(?m)^\\s*(?:flat\\s+)?(?:in|varying)\\s+vec3\\s+normal\\s*;");
 
+    /** An existing {@code depthtex1} sampler declaration in the pack's (flattened) source. Some packs declare
+     *  every sampler globally (Complementary's {@code lib/uniforms.glsl}), so a scene-depth surface must only
+     *  add the declaration when it's genuinely absent — a redeclaration is a compile error (which the
+     *  whole-source self-check would turn into a full passthrough fallback). Tolerates layout/precision
+     *  qualifiers. */
+    private static final Pattern DEPTHTEX1_DECL = Pattern.compile(
+            "(?m)^\\s*(?:layout\\s*\\([^)]*\\)\\s*)?uniform\\s+(?:highp\\s+|mediump\\s+|lowp\\s+)?sampler2D\\s+depthtex1\\s*;");
+
     /** Shared GLSL: the surface struct, emitted once when any surface is injected. Field order is the
-     *  canonical one used by {@code buildInjectionSnippet} / {@code IrisSurfaceRegistry} / the encoders. */
-    private static final String KG_SURFACE_STRUCT =
+     *  canonical one used by {@code buildInjectionSnippet} / {@code IrisSurfaceRegistry} / the encoders.
+     *  Package-visible so {@code IrisSurfaceRegistry.validationHarness} wraps surfaces with the exact same
+     *  struct the injector will emit. */
+    static final String KG_SURFACE_STRUCT =
             "struct kg_Surface {\n" +
             "    vec3 albedo; float alpha;\n" +
             "    vec3 normalTS; float smoothness; float metallic; float emission;\n" +
@@ -102,6 +112,8 @@ public final class IrisShaderInjector {
     private static final Logger LOGGER = LogUtils.getLogger();
     /** Program names we've already logged an injection for (avoid per-recompile log spam). */
     private static final Set<String> LOGGED = ConcurrentHashMap.newKeySet();
+    /** Program names we've already logged an injection FAILURE for (see {@link #injectGuarded}). */
+    private static final Set<String> GUARD_LOGGED = ConcurrentHashMap.newKeySet();
 
     /** The {@link IrisSurfaceRegistry#generation()} baked into the most recently compiled programs. When the
      *  live registry advances past this (a new world graph appeared), the programs are stale and a shaderpack
@@ -121,24 +133,74 @@ public final class IrisShaderInjector {
      * shaderpack's programs. {@code name} is the Iris program name (e.g. {@code gbuffers_entities}).
      */
     public static String inject(String name, String source) {
-        // Every program in one pack compile is injected from the same registry state; record it so the
-        // runtime can detect when a later-registered surface needs a reload to be picked up.
-        lastInjectedGeneration = IrisSurfaceRegistry.generation();
-        var surfaces = IrisSurfaceRegistry.snapshot();
-        // We only ever transform the FRAGMENT (hijack the gbuffers samplers). We deliberately never touch the
-        // vertex shader: any undefined reference there disables the whole pack, and the pack programs each
-        // declare a different name subset. Geometry/screen inputs are reconstructed in the fragment from
-        // gl_FragCoord + our own bound UBOs (see ShaderGraphCompiler.injection*), which can't break a pack.
-        String out = injectFragment(source, surfaces);
-        if (out != source && LOGGED.add(name + "#" + (source == null ? 0 : source.length()))) {
-            // Report which sampler families the injected fragment reads — the ground truth for "does this pack
-            // program do albedo/normal/specular PBR for our geometry". Key by name + source length so a
-            // DIFFERENT pack's same-named program (different source) re-logs.
-            LOGGER.info("[KilaGraph][Iris] injected {} surface(s) into '{}' — fragment reads albedo={} normals={} specular={}",
-                    surfaces.size(), name, detectReads(source, ALBEDO_SAMPLERS),
-                    detectReads(source, NORMAL_SAMPLERS), detectReads(source, SPECULAR_SAMPLERS));
+        if (!IrisCompat.ENABLED) return source; // kill-switch (defense in depth if the mixin still applied)
+        IrisCompat.seamAlive(); // the ShaderCreator seam demonstrably works — clear any dead-seam latch
+        try {
+            // Iris is rebuilding its programs; GL may reuse the deleted programs' integer ids, so every
+            // program-id-keyed cache is now unsafe (see IrisCompat.pollPipelineChange for the full story).
+            IrisSurfaceUniform.invalidateCaches();
+        } catch (Throwable ignored) {
+            // cache invalidation must never break the pack compile
         }
-        return out;
+        return injectGuarded(name, source, IrisSurfaceRegistry.snapshot());
+    }
+
+    /**
+     * The guarded transform behind {@link #inject}: <b>any</b> failure returns the untouched {@code source},
+     * so a KilaGraph bug can cost us our own shading but can never break the shaderpack's program
+     * compilation. Package-private so the guarantee is unit-testable with a poisoned surface list.
+     */
+    static String injectGuarded(String name, String source, List<IrisSurfaceRegistry.Surface> surfaces) {
+        try {
+            // Every program in one pack compile is injected from the same registry state; record it so the
+            // runtime can detect when a later-registered surface needs a reload to be picked up.
+            lastInjectedGeneration = IrisSurfaceRegistry.generation();
+            // We only ever transform the FRAGMENT (hijack the gbuffers samplers). We deliberately never touch
+            // the vertex shader: any undefined reference there disables the whole pack, and the pack programs
+            // each declare a different name subset. Geometry/screen inputs are reconstructed in the fragment
+            // from gl_FragCoord + our own bound UBOs (see ShaderGraphCompiler.injection*), which can't break a pack.
+            String out = injectFragment(source, surfaces);
+            if (out != source) {
+                // Whole-source GL self-check: if the injected result doesn't compile, hand Iris the original —
+                // the pack can never be broken by us. Deliberately compiled AS A FRAGMENT with no stage info:
+                // we only rewrite sources that sample the gbuffers samplers (in practice the fragment stage),
+                // and if a pack's VERTEX shader ever sampled them, the injected result fails fragment
+                // compilation here and falls back untouched — so we can't corrupt a vsh either.
+                String err = null;
+                boolean validated = false;
+                try {
+                    err = IrisGlslValidator.compileFragmentError(out);
+                    validated = true;
+                } catch (Throwable ignored) {
+                    // no LWJGL/GL in this environment (unit tests) — validation unavailable, accept
+                }
+                if (validated && err != null) {
+                    if (GUARD_LOGGED.add(name)) {
+                        LOGGER.error("[KilaGraph][Iris] injected source for '{}' fails GL compilation — leaving "
+                                + "the shaderpack source untouched. Driver log:\n{}", name, err);
+                    }
+                    return source;
+                }
+            }
+            // Key by name + source length + surface count: a DIFFERENT pack's same-named program re-logs,
+            // and so does a reload that bakes a different surface set (the original source length alone is
+            // identical across reloads and would silently swallow the "injected N surface(s)" evidence).
+            if (out != source && LOGGED.add(name + "#" + (source == null ? 0 : source.length()) + "#" + surfaces.size())) {
+                // Report which sampler families the injected fragment reads — the ground truth for "does this pack
+                // program do albedo/normal/specular PBR for our geometry". Key by name + source length so a
+                // DIFFERENT pack's same-named program (different source) re-logs.
+                LOGGER.info("[KilaGraph][Iris] injected {} surface(s) into '{}' — fragment reads albedo={} normals={} specular={}",
+                        surfaces.size(), name, detectReads(source, ALBEDO_SAMPLERS),
+                        detectReads(source, NORMAL_SAMPLERS), detectReads(source, SPECULAR_SAMPLERS));
+            }
+            return out;
+        } catch (Throwable t) {
+            if (GUARD_LOGGED.add(name)) {
+                LOGGER.error("[KilaGraph][Iris] injection into '{}' threw — leaving the shaderpack source untouched "
+                        + "(KilaGraph materials render passthrough in this program)", name, t);
+            }
+            return source;
+        }
     }
 
     /**
@@ -173,6 +235,13 @@ public final class IrisShaderInjector {
         String normalFill = !anyGeometry ? null
                 : (PACK_NORMAL_VARYING.matcher(source).find() ? "normal" : "vec3(0.0, 0.0, 1.0)");
         if (anyGeometry) decls.append("vec3 kg_normalView;\n");
+        // Scene depth reads Iris's depthtex1 (auto-bound by name on every gbuffers program, so declaring +
+        // sampling it is all that's needed) — a GLOBAL shared declaration, emitted once and only when the
+        // pack's flattened source doesn't already declare it.
+        boolean anySceneDepth = surfaces.stream().anyMatch(IrisSurfaceRegistry.Surface::usesSceneDepth);
+        if (anySceneDepth && !DEPTHTEX1_DECL.matcher(source).find()) {
+            decls.append("uniform sampler2D depthtex1;\n");
+        }
         LinkedHashSet<String> declUnits = new LinkedHashSet<>();
         for (var s : surfaces) declUnits.addAll(s.declarationUnits());
         for (String unit : declUnits) decls.append(unit);

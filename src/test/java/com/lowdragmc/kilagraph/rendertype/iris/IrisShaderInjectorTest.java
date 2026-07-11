@@ -117,7 +117,7 @@ class IrisShaderInjectorTest {
     void dispatchesToRegisteredSurfacesAsStruct() {
         var s1 = new IrisSurfaceRegistry.Surface(1,
                 List.of("uniform sampler2D kg_tex_a;\n"), List.of(),
-                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(texture(kg_tex_a, kg_uv).rgb, 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false);
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(texture(kg_tex_a, kg_uv).rgb, 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false);
         String out = IrisShaderInjector.injectFragment(PBR_PACK_FSH, List.of(s1));
 
         assertTrue(out.contains("struct kg_Surface {"), "shared struct declared");
@@ -153,7 +153,7 @@ class IrisShaderInjectorTest {
                 }
                 """;
         var s1 = new IrisSurfaceRegistry.Surface(1, List.of(), List.of(),
-                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.5, 1.0, 1.0, 0.0, 0.0);\n}\n", false);
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.5, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false);
         String out = IrisShaderInjector.injectFragment(pack, List.of(s1));
 
         assertTrue(out.contains("kg_sample_gtexture(texcoord, vec2(0.0), vec2(0.0))"),
@@ -171,9 +171,9 @@ class IrisShaderInjectorTest {
         String sharedDecl = "uniform sampler2D kg_MissingSampler;\n";
         String sharedFn = "float kg_noise(vec2 p) { return 0.0; }\n";
         var a = new IrisSurfaceRegistry.Surface(1, List.of(sharedDecl), List.of(sharedFn),
-                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(kg_noise(kg_uv)), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false);
+                "kg_Surface kg_surface_1(vec2 kg_uv) {\n    return kg_Surface(vec3(kg_noise(kg_uv)), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false);
         var b = new IrisSurfaceRegistry.Surface(2, List.of(sharedDecl), List.of(sharedFn),
-                "kg_Surface kg_surface_2(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false);
+                "kg_Surface kg_surface_2(vec2 kg_uv) {\n    return kg_Surface(vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n", false, false);
         String out = IrisShaderInjector.injectFragment(PACK_FSH, List.of(a, b));
 
         assertEquals(1, countOccurrences(out, "uniform sampler2D kg_MissingSampler;"),
@@ -190,7 +190,7 @@ class IrisShaderInjectorTest {
                 List.of("layout(std140) uniform KG_Material {\n    vec4 kg_c;\n} kg_material;\n"),
                 List.of("vec4 kg_grad_0() { return vec4(0.0); }\n"),
                 "    vec4 f_0 = kg_material.kg_c * kg_grad_0();\n",
-                "f_0.rgb, f_0.a, vec3(0.0,0.0,1.0), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false);
+                "f_0.rgb, f_0.a, vec3(0.0,0.0,1.0), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false);
         var one = IrisSurfaceRegistry.build(1, raw);
         var two = IrisSurfaceRegistry.build(2, raw);
 
@@ -228,7 +228,15 @@ class IrisShaderInjectorTest {
             + "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n";
 
     private static IrisSurfaceRegistry.Surface surface(int id, boolean usesGeometry) {
-        return new IrisSurfaceRegistry.Surface(id, List.of(), List.of(), GEOM_FN, usesGeometry);
+        return new IrisSurfaceRegistry.Surface(id, List.of(), List.of(), GEOM_FN, usesGeometry, false);
+    }
+
+    /** A surface whose graph samples the scene depth — carries the injection-only depthtex1 helper the
+     *  compiler emits, and the usesSceneDepth flag that drives the injector's conditional declaration. */
+    private static IrisSurfaceRegistry.Surface depthSurface(int id) {
+        return new IrisSurfaceRegistry.Surface(id, List.of(),
+                List.of("float kg_scene_depth_raw(vec2 kg_uv) {\n    return texture(depthtex1, kg_uv).r;\n}\n"),
+                GEOM_FN, false, true);
     }
 
     /** A gbuffers fragment that declares a smooth view-space `normal` varying (Complementary/BSL/Solas). */
@@ -280,14 +288,108 @@ class IrisShaderInjectorTest {
         assertFalse(out.contains("out vec3 kg_"), "no vertex out-varyings are emitted");
     }
 
+    // ---- hardening: the injection seam must never break the shaderpack ---------------------------------
+
+    @Test
+    void injectGuardedReturnsOriginalSourceOnThrow() {
+        // A poisoned surface (null functions list) makes injectFragment throw. The guarded entry the mixin
+        // uses must swallow ANY Throwable and hand Iris the untouched source — a KilaGraph bug may cost us
+        // our shading, but it must never break the shaderpack's own program compilation.
+        var poisoned = new IrisSurfaceRegistry.Surface(1, List.of(), null, GEOM_FN, false, false);
+        String out = IrisShaderInjector.injectGuarded("entities_solid", PACK_FSH, List.of(poisoned));
+        assertEquals(PACK_FSH, out, "a throwing injection must fall back to the original source");
+    }
+
+    @Test
+    void validationHarnessWrapsASurfaceCompilably() {
+        // The registry GL-validates each NEW surface standalone (reject -> passthrough id 0) so one bad
+        // graph can't force every program through the whole-source fallback. The harness must contain
+        // everything the surface function needs: the struct, its decls/helpers, and a main() that calls it
+        // (so the linker can't strip anything).
+        var s = new IrisSurfaceRegistry.Surface(3,
+                List.of("uniform sampler2D kg_tex_a;\n"),
+                List.of("float kg_noise(vec2 p) { return 0.0; }\n"),
+                "kg_Surface kg_surface_3(vec2 kg_uv) {\n    return kg_Surface(texture(kg_tex_a, kg_uv).rgb, 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);\n}\n",
+                false, false);
+        String harness = IrisSurfaceRegistry.validationHarness(s);
+        assertTrue(harness.startsWith("#version 330 core"), "harness compiles as the same version Iris emits");
+        assertTrue(harness.contains("struct kg_Surface {"), "harness declares the shared struct");
+        assertTrue(harness.contains("uniform sampler2D kg_tex_a;"), "harness carries the surface's declarations");
+        assertTrue(harness.contains("float kg_noise(vec2 p)"), "harness carries the surface's helper functions");
+        assertTrue(harness.contains("kg_Surface kg_surface_3(vec2 kg_uv)"), "harness carries the surface function");
+        assertTrue(harness.contains("kg_surface_3(vec2(0.5))"), "main() must CALL the surface so nothing is stripped");
+        assertTrue(harness.contains("void main()"), "harness is a complete fragment shader");
+        assertFalse(harness.contains("kg_normalView"), "no geometry global for a non-geometry surface");
+    }
+
+    @Test
+    void validationHarnessDeclaresNormalGlobalForGeometrySurfaces() {
+        String harness = IrisSurfaceRegistry.validationHarness(surface(1, true));
+        assertTrue(harness.contains("vec3 kg_normalView;"),
+                "a geometry surface references kg_normalView — the harness must declare it");
+    }
+
     @Test
     void registryBuildCarriesUsesGeometry() {
         var geom = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
-                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", true);
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", true, false);
         assertTrue(IrisSurfaceRegistry.build(1, geom).usesGeometry(), "build propagates usesGeometry=true");
         var plain = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
-                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false);
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false);
         assertFalse(IrisSurfaceRegistry.build(2, plain).usesGeometry(), "build propagates usesGeometry=false");
+    }
+
+    // ---- Scene Depth under shaderpacks: injected depthtex1 (auto-bound by Iris) --------------------------
+
+    @Test
+    void declaresDepthtex1WhenAbsentAndSurfaceNeedsIt() {
+        String out = IrisShaderInjector.injectFragment(PACK_FSH, List.of(depthSurface(1)));
+        assertEquals(1, countOccurrences(out, "uniform sampler2D depthtex1;"),
+                "a scene-depth surface needs depthtex1 declared (Iris auto-binds it by name)");
+        assertTrue(out.contains("float kg_scene_depth_raw(vec2 kg_uv)"), "the depth helper is emitted");
+    }
+
+    @Test
+    void doesNotRedeclareDepthtex1WhenPackDeclaresIt() {
+        // Complementary's glsl-transformer-flattened source already declares EVERY sampler (lib/uniforms.glsl)
+        // — a second declaration is a compile error that would trip the whole-source fallback.
+        String pack = PACK_FSH.replace("uniform sampler2D gtexture;",
+                "uniform sampler2D gtexture;\nuniform sampler2D depthtex1;");
+        String out = IrisShaderInjector.injectFragment(pack, List.of(depthSurface(1)));
+        assertEquals(1, countOccurrences(out, "uniform sampler2D depthtex1;"),
+                "must not redeclare a sampler the pack already declares");
+    }
+
+    @Test
+    void depthtex1EmittedOnceForMultipleDepthSurfaces() {
+        String out = IrisShaderInjector.injectFragment(PACK_FSH, List.of(depthSurface(1), depthSurface(2)));
+        assertEquals(1, countOccurrences(out, "uniform sampler2D depthtex1;"),
+                "depthtex1 is a GLOBAL shared declaration — once, not per surface");
+        assertEquals(1, countOccurrences(out, "float kg_scene_depth_raw(vec2 kg_uv)"),
+                "the identical depth helper dedups across surfaces");
+    }
+
+    @Test
+    void noDepthtex1WhenNoSurfaceUsesDepth() {
+        String out = IrisShaderInjector.injectFragment(PACK_FSH, List.of(surface(1, false)));
+        assertFalse(out.contains("depthtex1"), "no depth declaration when no surface samples the scene depth");
+    }
+
+    @Test
+    void registryBuildCarriesUsesSceneDepth() {
+        var depth = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, true);
+        assertTrue(IrisSurfaceRegistry.build(1, depth).usesSceneDepth(), "build propagates usesSceneDepth=true");
+        var plain = new com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet(
+                List.of(), List.of(), "", "vec3(1.0), 1.0, vec3(0,0,1), 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0", false, false);
+        assertFalse(IrisSurfaceRegistry.build(2, plain).usesSceneDepth(), "build propagates usesSceneDepth=false");
+    }
+
+    @Test
+    void validationHarnessDeclaresDepthtex1ForSceneDepthSurfaces() {
+        String harness = IrisSurfaceRegistry.validationHarness(depthSurface(1));
+        assertTrue(harness.contains("uniform sampler2D depthtex1;"),
+                "a scene-depth surface's helpers reference depthtex1 — the harness must declare it");
     }
 
     private static int countOccurrences(String haystack, String needle) {

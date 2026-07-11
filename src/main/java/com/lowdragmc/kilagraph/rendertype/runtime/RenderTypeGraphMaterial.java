@@ -112,6 +112,12 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         this.irisSurfaceId = id;
     }
 
+    /** Whether the graph samples the captured scene colour ({@code KG_SceneColor}) — under a shaderpack the
+     *  injected program's sampler is bound from {@code SceneCaptureManager} by {@code IrisSurfaceUniform}. */
+    public boolean usesSceneColor() {
+        return usesSceneColor;
+    }
+
     /** The uploaded {@code KG_Material} buffer slice, for binding onto an Iris shaderpack program at draw
      *  (see {@code IrisSurfaceUniform}); null when this material has no uniform fields or before upload. */
     @Nullable
@@ -314,8 +320,9 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         }
     }
 
-    /** The MC missing-texture view, a safe placeholder for a scene sampler before the first capture. */
-    private static GpuTextureView missingView() {
+    /** The MC missing-texture view, a safe placeholder for a scene sampler before the first capture.
+     *  Public so {@code IrisSurfaceUniform} binds the same placeholder on injected shaderpack programs. */
+    public static GpuTextureView missingView() {
         return Minecraft.getInstance().getTextureManager()
                 .getTexture(net.minecraft.client.renderer.texture.MissingTextureAtlasSprite.getLocation())
                 .getTextureView();

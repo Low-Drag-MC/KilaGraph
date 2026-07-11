@@ -1,5 +1,5 @@
 {
-  "required": true,
+  "required": false,
   "minVersion": "0.8.5",
   "package": "com.lowdragmc.kilagraph.mixin.iris",
   "plugin": "com.lowdragmc.kilagraph.mixin.iris.IrisMixinPlugin",
@@ -11,6 +11,6 @@
   ],
   "mixins": [],
   "injectors": {
-    "defaultRequire": 1
+    "defaultRequire": 0
   }
 }

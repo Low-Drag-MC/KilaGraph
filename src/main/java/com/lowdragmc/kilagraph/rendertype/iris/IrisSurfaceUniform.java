@@ -55,12 +55,27 @@ public final class IrisSurfaceUniform {
 
     /** Highest legal UBO binding point + 1, queried once; our high binding points sit just below it. */
     private static int maxUboBindings = -1;
-    /** Fragment texture-image-unit count, queried once; our sampler units sit just below it. */
-    private static int maxTexImageUnits = -1;
+    /** {@code GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS}, queried once; our sampler units sit just below it. */
+    private static int maxCombinedTexUnits = -1;
     /** Reflected {@code GlBuffer.handle} (protected) — read once, then per buffer. */
     @Nullable private static Field handleField;
 
     private IrisSurfaceUniform() {}
+
+    /**
+     * Drop every GL-program-id-keyed cache. <b>Must</b> be called whenever Iris (re)builds its programs
+     * (pack reload/toggle, dimension change — see {@code IrisCompat.pollPipelineChange} and
+     * {@code IrisShaderInjector.inject}): the old programs are deleted and GL is free to <em>reuse their
+     * integer ids</em> for new, unrelated programs, so a stale cached location would make
+     * {@code glProgramUniform1i}/block/sampler binding write into a program that isn't ours — corrupting the
+     * shaderpack's own rendering, not just wasting work. The device constants and the reflected
+     * {@code GlBuffer.handle} field are stable and deliberately kept.
+     */
+    public static void invalidateCaches() {
+        LOCATION.clear();
+        BLOCK_INDEX.clear();
+        SAMPLER_LOCATION.clear();
+    }
 
     /** Record the material of the draw we're about to issue (set before {@code drawIndexed}). */
     public static void setCurrent(@Nullable RenderTypeGraphMaterial material) {
@@ -152,6 +167,25 @@ public final class IrisSurfaceUniform {
             GL33.glBindSampler(unit, ((GlSampler) sampler).getId());
             GL41.glProgramUniform1i(program, location, unit);
         });
+        // The scene-colour capture is NOT in the dynamic sampler map (it's bound from SceneCaptureManager,
+        // not TextureManager — see RenderTypeFactory's isSceneSampler exclusion), and Iris won't auto-bind a
+        // name it doesn't know — so bind KG_SceneColor here explicitly. Before the first capture, bind the
+        // missing texture so the sampler never dangles on unit 0 (the pack's own albedo atlas). Scene DEPTH
+        // needs nothing here: under injection it reads Iris's own depthtex1 (auto-bound by name).
+        if (m.usesSceneColor()) {
+            int location = samplerLocation(program,
+                    com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler.SCENE_COLOR_SAMPLER);
+            if (location >= 0) {
+                var view = com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureManager.INSTANCE.colorView();
+                if (view == null) view = RenderTypeGraphMaterial.missingView();
+                var sceneSampler = com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureManager.INSTANCE.sampler();
+                int unit = base + next[0]++;
+                GL13.glActiveTexture(GL13.GL_TEXTURE0 + unit);
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, ((GlTexture) view.texture()).glId());
+                GL33.glBindSampler(unit, ((GlSampler) sceneSampler).getId());
+                GL41.glProgramUniform1i(program, location, unit);
+            }
+        }
         if (next[0] > 0) GL13.glActiveTexture(prevActiveUnit); // keep real GL == GlStateManager's cached unit
     }
 
@@ -164,10 +198,19 @@ public final class IrisSurfaceUniform {
         return loc;
     }
 
-    /** First texture unit for our samplers; kept high to dodge the shaderpack's own (low-indexed) samplers. */
+    /** First texture unit for our samplers — the top of the <b>COMBINED</b> unit space, NOT the fragment
+     *  per-stage count. Iris's {@code ProgramSamplers} allocates units sequentially from 0 (skipping its
+     *  reserved 0..~8), and a heavy pack's shared gbuffers program legitimately reaches the high 20s
+     *  (colortex0..15 + depthtex0..2 + shadowtex/shadowcolor + noisetex + …) — a base derived from
+     *  {@code GL_MAX_TEXTURE_IMAGE_UNITS} (32 → unit 24+) LANDED INSIDE that range, so after Iris rebound
+     *  its samplers our {@code KG_SceneColor} uniform pointed at <em>shadowtex0</em> (symptom: a red-only
+     *  shadow-projection image), and our bind stomped the pack's shadow sampling for our draws. Unit
+     *  <em>indices</em> up to {@code GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS-1} (≥48 on GL3.3, typically 192)
+     *  are legal for any stage — the per-stage 32 limits how many samplers a stage uses, not their unit
+     *  indices — and Iris's allocation can never reach this high. */
     private static int textureUnitBase() {
-        if (maxTexImageUnits < 0) maxTexImageUnits = GL11.glGetInteger(GL20.GL_MAX_TEXTURE_IMAGE_UNITS);
-        return Math.max(0, maxTexImageUnits - 4);
+        if (maxCombinedTexUnits < 0) maxCombinedTexUnits = GL11.glGetInteger(GL20.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
+        return Math.max(0, maxCombinedTexUnits - 8);
     }
 
     private static int location(int program) {

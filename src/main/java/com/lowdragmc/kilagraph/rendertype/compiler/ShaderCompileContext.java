@@ -245,6 +245,18 @@ public final class ShaderCompileContext {
         return compiler.sampleSceneColor(uv);
     }
 
+    /** The default (unconnected-uv) screen-space UV for Scene Depth — {@link #screenUv()} normally; under
+     *  injection an exact {@code textureSize}-based lookup into Iris's {@code depthtex1} (whose size can
+     *  differ from the window under Iris render-quality scaling). */
+    public ShaderExpr sceneDepthDefaultUv() {
+        return compiler.sceneDepthDefaultUv();
+    }
+
+    /** The default (unconnected-uv) screen-space UV for Scene Color — see {@link #sceneDepthDefaultUv()}. */
+    public ShaderExpr sceneColorDefaultUv() {
+        return compiler.sceneColorDefaultUv();
+    }
+
     /** Raw hardware scene depth {@code [0,1]} at {@code uv} (Unity Scene Depth "Raw"). */
     public ShaderExpr sampleSceneDepthRaw(ShaderExpr uv) {
         return compiler.sampleSceneDepthRaw(uv);

@@ -64,7 +64,7 @@ public class SceneDepthNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ShaderExpr uv = ctx.isConnected("uv") ? ctx.input("uv") : ctx.screenUv();
+        ShaderExpr uv = ctx.isConnected("uv") ? ctx.input("uv") : ctx.sceneDepthDefaultUv();
         ShaderExpr depth = switch (ctx.option("sampling", String.class, "linear01")) {
             case "raw" -> ctx.sampleSceneDepthRaw(uv);
             case "eye" -> ctx.sampleSceneDepthEye(uv);

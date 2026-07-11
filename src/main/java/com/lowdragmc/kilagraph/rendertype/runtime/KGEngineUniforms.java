@@ -38,8 +38,8 @@ public final class KGEngineUniforms {
         @Override public GpuBufferSlice slice() { return KGEngineUniforms.slice(); }
     };
 
-    /** std140 size: float (Time) + vec2 (ScreenSize). Grows as engine fields are added (camera, ...). */
-    private static final int UBO_SIZE = new Std140SizeCalculator().putFloat().putVec2().get();
+    /** std140 size: float (Time) + vec2 (ScreenSize) + float (GameTime). Grows as engine fields are added. */
+    private static final int UBO_SIZE = new Std140SizeCalculator().putFloat().putVec2().putFloat().get();
 
     @Nullable private static GpuBuffer buffer;
     private static float currentTimeSeconds;
@@ -53,7 +53,15 @@ public final class KGEngineUniforms {
         return "layout(std140) uniform " + UBO_NAME + " {\n"
                 + "    float Time;\n"
                 + "    vec2 ScreenSize;\n"
+                + "    float GameTime;\n"
                 + "} " + UBO_INSTANCE + ";\n";
+    }
+
+    /** GLSL accessor for the normalised day fraction — same value as Minecraft's {@code Globals.GameTime}
+     *  ({@code (gameTime % 24000 + partialTick) / 24000}), carried in OUR block so the Game Time node stays
+     *  injectable under an Iris shaderpack (a {@code #moj_import} include would reject the whole graph). */
+    public static String gameTimeAccessor() {
+        return UBO_INSTANCE + ".GameTime";
     }
 
     /** GLSL accessor for the world time in seconds. */
@@ -107,7 +115,10 @@ public final class KGEngineUniforms {
     private static void upload() {
         ByteBuffer bb = MemoryUtil.memAlloc(UBO_SIZE);
         try {
-            Std140Builder.intoBuffer(bb).putFloat(currentTimeSeconds).putVec2(screenWidth, screenHeight);
+            // GameTime = day fraction; currentTimeSeconds already wraps at one day (1200 s), so /1200
+            // reproduces Minecraft's ((gameTime % 24000) + partial) / 24000 exactly.
+            Std140Builder.intoBuffer(bb).putFloat(currentTimeSeconds).putVec2(screenWidth, screenHeight)
+                    .putFloat(currentTimeSeconds / 1200.0f);
             bb.rewind();
             RenderSystem.getDevice().createCommandEncoder().writeToBuffer(buffer.slice(), bb);
         } finally {
