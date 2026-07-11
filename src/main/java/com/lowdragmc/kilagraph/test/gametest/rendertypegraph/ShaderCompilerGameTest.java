@@ -63,6 +63,8 @@ import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.PositionNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.NormalNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexIdNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceIdNode;
@@ -181,6 +183,8 @@ public final class ShaderCompilerGameTest {
     private static final String EXPORT_FUNCTION = "rendertype_compile_export_function";
     private static final String BUILTIN_FRAG_KEYWORDS = "rendertype_compile_builtin_frag_keywords";
     private static final String BUILTIN_VERTEX_IDS = "rendertype_compile_builtin_vertex_ids";
+    private static final String POSITION_NORMAL_SPACES = "rendertype_compile_position_normal_spaces";
+    private static final String INPUT_NODES_VERTEX_STAGE = "rendertype_compile_input_nodes_vertex_stage";
     private static final String GRADIENT_NODES = "rendertype_compile_gradient_nodes";
     private static final String GRADIENT_VARIABLE = "rendertype_compile_gradient_variable";
     private static final String GRADIENT_VALUE_CODEC = "rendertype_compile_gradient_value_codec";
@@ -250,7 +254,9 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunction(EXPRESSION_VALIDATION, ShaderCompilerGameTest::expressionNodeValidationFlagsBadNames);
         KGGameTests.registerFunction(EXPORT_FUNCTION, ShaderCompilerGameTest::exportBuildsFunctionGraph);
         KGGameTests.registerFunction(BUILTIN_FRAG_KEYWORDS, ShaderCompilerGameTest::builtinFragmentKeywordsEmitGlsl);
-        KGGameTests.registerFunction(BUILTIN_VERTEX_IDS, ShaderCompilerGameTest::vertexIdNodesAreVertexOnly);
+        KGGameTests.registerFunction(BUILTIN_VERTEX_IDS, ShaderCompilerGameTest::idNodesWorkInBothStages);
+        KGGameTests.registerFunction(POSITION_NORMAL_SPACES, ShaderCompilerGameTest::positionNormalNodesEmitSpaceGlsl);
+        KGGameTests.registerFunction(INPUT_NODES_VERTEX_STAGE, ShaderCompilerGameTest::uvAndVertexColorUsableInVertexStage);
         KGGameTests.registerFunction(GRADIENT_NODES, ShaderCompilerGameTest::gradientNodesEmitGlsl);
         KGGameTests.registerFunction(GRADIENT_VARIABLE, ShaderCompilerGameTest::gradientVariableBecomesUboStruct);
         KGGameTests.registerFunction(GRADIENT_VALUE_CODEC, ShaderCompilerGameTest::gradientValueCodecRoundTrips);
@@ -321,6 +327,8 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunctionTest(event, EXPORT_FUNCTION, KGGameTests.functionKey(EXPORT_FUNCTION), d);
         KGGameTests.registerFunctionTest(event, BUILTIN_FRAG_KEYWORDS, KGGameTests.functionKey(BUILTIN_FRAG_KEYWORDS), d);
         KGGameTests.registerFunctionTest(event, BUILTIN_VERTEX_IDS, KGGameTests.functionKey(BUILTIN_VERTEX_IDS), d);
+        KGGameTests.registerFunctionTest(event, POSITION_NORMAL_SPACES, KGGameTests.functionKey(POSITION_NORMAL_SPACES), d);
+        KGGameTests.registerFunctionTest(event, INPUT_NODES_VERTEX_STAGE, KGGameTests.functionKey(INPUT_NODES_VERTEX_STAGE), d);
         KGGameTests.registerFunctionTest(event, GRADIENT_NODES, KGGameTests.functionKey(GRADIENT_NODES), d);
         KGGameTests.registerFunctionTest(event, GRADIENT_VARIABLE, KGGameTests.functionKey(GRADIENT_VARIABLE), d);
         KGGameTests.registerFunctionTest(event, GRADIENT_VALUE_CODEC, KGGameTests.functionKey(GRADIENT_VALUE_CODEC), d);
@@ -515,27 +523,99 @@ public final class ShaderCompilerGameTest {
         helper.succeed();
     }
 
-    /** The vertex-stage ID nodes are VERTEX_ONLY: pulled straight into a fragment block they're a stage
-     *  error, but routed through a vertex varying block (consumed in fragment) they compile and the vsh
-     *  references {@code gl_VertexID} / {@code gl_InstanceID}. */
-    public static void vertexIdNodesAreVertexOnly(GameTestHelper helper) {
-        // Misuse: Vertex ID → fragment emission (fragment stage) → stage error.
-        RenderTypeGraph bad = new RenderTypeGraph();
-        NodeModel badEmission = addBlock(bad, bad.getFragmentStageModel(), FragmentEmissionBlock.class);
-        NodeModel badId = addNode(bad, VertexIdNode.class);
-        wire(bad, badEmission.getInputsById().get("color"), badId.getOutputsById().get("out"));
-        assertTrue(helper, "vertex id in fragment stage is a stage error", compile(bad).hasStageErrors());
+    /** The ID nodes are now stage-agnostic ({@code ANY}): the vsh reads {@code gl_VertexID}/{@code gl_InstanceID}
+     *  directly, and the fragment stage receives them through an auto-forwarded {@code flat int} varying (int
+     *  varyings must be {@code flat}). */
+    public static void idNodesWorkInBothStages(GameTestHelper helper) {
+        // Fragment stage: Vertex ID → fragment emission. No longer a stage error — it's forwarded as a flat
+        // int varying, so the fsh declares `flat in int kg_vertexId` and the vsh writes it from gl_VertexID.
+        RenderTypeGraph frag = new RenderTypeGraph();
+        NodeModel fragEmission = addBlock(frag, frag.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel vId = addNode(frag, VertexIdNode.class);
+        wire(frag, fragEmission.getInputsById().get("color"), vId.getOutputsById().get("out"));
+        CompiledShaderGraph fragCompiled = compile(frag);
+        assertFalse(helper, "vertex id in the fragment stage is no longer a stage error", fragCompiled.hasStageErrors());
+        assertTrue(helper, "fsh declares a flat int varying", fragCompiled.fragmentSource().contains("flat in int kg_vertexId"));
+        assertTrue(helper, "vsh forwards gl_VertexID into the varying", fragCompiled.vertexSource().contains("kg_vertexId = gl_VertexID"));
 
-        // Correct: Instance ID → vertex varying block (vsh) → consumed in fragment → no error.
-        RenderTypeGraph good = new RenderTypeGraph();
-        NodeModel varying = addBlock(good, good.getVertexStageModel(), VaryingCustomFloatBlock.class);
-        NodeModel instanceId = addNode(good, InstanceIdNode.class);
-        wire(good, varying.getInputsById().get("value"), instanceId.getOutputsById().get("out"));
-        NodeModel goodEmission = addBlock(good, good.getFragmentStageModel(), FragmentEmissionBlock.class);
-        wire(good, goodEmission.getInputsById().get("color"), varying.getOutputsById().get("value"));
-        CompiledShaderGraph goodCompiled = new ShaderGraphCompiler(good).compile();
-        assertFalse(helper, "instance id feeding a vertex varying is not a stage error", goodCompiled.hasStageErrors());
-        assertTrue(helper, "vsh references gl_InstanceID", goodCompiled.vertexSource().contains("gl_InstanceID"));
+        // Vertex stage: Instance ID → vertex varying block → consumed in fragment. The vsh reads the built-in
+        // directly (no kg_instanceId forwarding varying is created), so gl_InstanceID appears in the vsh.
+        RenderTypeGraph vert = new RenderTypeGraph();
+        NodeModel varying = addBlock(vert, vert.getVertexStageModel(), VaryingCustomFloatBlock.class);
+        NodeModel instanceId = addNode(vert, InstanceIdNode.class);
+        wire(vert, varying.getInputsById().get("value"), instanceId.getOutputsById().get("out"));
+        NodeModel vertEmission = addBlock(vert, vert.getFragmentStageModel(), FragmentEmissionBlock.class);
+        wire(vert, vertEmission.getInputsById().get("color"), varying.getOutputsById().get("value"));
+        CompiledShaderGraph vertCompiled = compile(vert);
+        assertFalse(helper, "instance id in the vertex stage is not a stage error", vertCompiled.hasStageErrors());
+        assertTrue(helper, "vsh references gl_InstanceID directly", vertCompiled.vertexSource().contains("gl_InstanceID"));
+        assertFalse(helper, "no forwarding varying created for a vertex-only read", vertCompiled.fragmentSource().contains("kg_instanceId"));
+        helper.succeed();
+    }
+
+    /** The Position/Normal nodes emit the chosen coordinate space's matrix math and are usable in both stages.
+     *  World uses the camera-relative→absolute chain (ModelViewMat, kg_transforms.IViewMat, CameraBlockPos);
+     *  View uses ModelViewMat; Object reads the interpolated object-space source. */
+    public static void positionNormalNodesEmitSpaceGlsl(GameTestHelper helper) {
+        // Position, world space: absolute world = un-rotate view→world (kg_transforms.IViewMat) + camera position.
+        String posWorld = inputNodeFsh(PositionNode.class, "space", "world");
+        assertTrue(helper, "position world uses ModelViewMat", posWorld.contains("ModelViewMat"));
+        assertTrue(helper, "position world un-rotates via IViewMat", posWorld.contains("kg_transforms.IViewMat"));
+        assertTrue(helper, "position world adds the camera position", posWorld.contains("CameraBlockPos"));
+
+        // Position, object space: the interpolated model-space position varying (kg_modelPos).
+        assertTrue(helper, "position object reads the interpolated model position",
+                inputNodeFsh(PositionNode.class, "space", "object").contains("kg_modelPos"));
+
+        // Normal, world space: object normal (kg_objectNormal varying) rotated object→world, normalized.
+        String nrmWorld = inputNodeFsh(NormalNode.class, "space", "world");
+        assertTrue(helper, "normal world reads the object-normal varying", nrmWorld.contains("kg_objectNormal"));
+        assertTrue(helper, "normal world rotates via ModelViewMat + IViewMat",
+                nrmWorld.contains("ModelViewMat") && nrmWorld.contains("kg_transforms.IViewMat"));
+        assertTrue(helper, "normal is normalized", nrmWorld.contains("normalize("));
+
+        // Normal, view space: object normal rotated by ModelViewMat only.
+        assertTrue(helper, "normal view uses ModelViewMat",
+                inputNodeFsh(NormalNode.class, "space", "view").contains("ModelViewMat"));
+        helper.succeed();
+    }
+
+    /** Compile an input node with one option set, wired into fragment emission, and return the fragment GLSL. */
+    private static String inputNodeFsh(Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node> nodeClass,
+                                       String option, String value) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel node = addNode(graph, nodeClass);
+        setOption(node, option, value);
+        wire(graph, emission.getInputsById().get("color"), node.getOutputsById().get("out"));
+        return compile(graph).fragmentSource();
+    }
+
+    /** The formerly fragment-only UV and Vertex Color nodes are now stage-agnostic: pulled into a vertex
+     *  varying block they compile (no stage error) and read their raw vertex attributes in the vsh. */
+    public static void uvAndVertexColorUsableInVertexStage(GameTestHelper helper) {
+        // UV node → vertex varying block (vsh) → consumed in fragment. Previously FRAGMENT_ONLY = a stage error.
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel varying = addBlock(graph, graph.getVertexStageModel(), VaryingCustomVec3Block.class);
+        NodeModel uv = addNode(graph, UVNode.class); // default channel uv0
+        wire(graph, varying.getInputsById().get("value"), uv.getOutputsById().get("out"));
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), varying.getOutputsById().get("value"));
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "UV node in the vertex stage is not a stage error", compiled.hasStageErrors());
+        assertTrue(helper, "vsh reads the raw UV0 attribute", compiled.vertexSource().contains("UV0"));
+
+        // Vertex Color node (raw color mode) → vertex varying block → no stage error, vsh reads the Color attribute.
+        RenderTypeGraph graph2 = new RenderTypeGraph();
+        NodeModel varying2 = addBlock(graph2, graph2.getVertexStageModel(), VaryingCustomVec3Block.class);
+        NodeModel vc = addNode(graph2, VertexColorNode.class);
+        setOption(vc, "mode", VertexColorNode.MODE_COLOR);
+        wire(graph2, varying2.getInputsById().get("value"), vc.getOutputsById().get("out"));
+        NodeModel emission2 = addBlock(graph2, graph2.getFragmentStageModel(), FragmentEmissionBlock.class);
+        wire(graph2, emission2.getInputsById().get("color"), varying2.getOutputsById().get("value"));
+        CompiledShaderGraph compiled2 = compile(graph2);
+        assertFalse(helper, "Vertex Color node in the vertex stage is not a stage error", compiled2.hasStageErrors());
+        assertTrue(helper, "vsh reads the raw Color attribute", compiled2.vertexSource().contains("Color"));
         helper.succeed();
     }
 
