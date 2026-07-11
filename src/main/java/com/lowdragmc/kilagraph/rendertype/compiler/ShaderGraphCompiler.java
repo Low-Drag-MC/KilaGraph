@@ -703,14 +703,18 @@ public class ShaderGraphCompiler {
     }
 
     /**
-     * Read a fixed interpolated varying in the fragment stage, ensuring the vsh writes it. In preview
-     * (no vertex stage) returns {@code previewDefault}; otherwise declares + assigns the varying with
-     * {@code vshDefault} (unless a vertex varying block already built it — first writer wins) and returns
-     * a reference to it. Used by {@code FragmentInputNode}s and {@link #meshUv()}.
+     * Read a fixed interpolated varying whose vsh source is {@code vshDefault}. In preview (no vertex stage)
+     * returns {@code previewDefault}. In the <b>vertex</b> stage the value is the raw source itself — this is
+     * what lets stage-agnostic input nodes (UV/Color/Position/Normal/…) read raw vertex attributes directly in
+     * the vsh instead of round-tripping through a varying, subsuming {@code VertexAttributeInputNode}. In the
+     * <b>fragment</b> stage it declares + assigns the varying with {@code vshDefault} (unless a vertex varying
+     * block already built it — first writer wins) and returns a reference to it. Used by
+     * {@code FragmentInputNode}s and {@link #meshUv()}.
      */
     protected ShaderExpr varyingInput(String name, GlslType type,
                             java.util.function.Supplier<ShaderExpr> vshDefault, ShaderExpr previewDefault) {
         if (preview) return previewDefault;
+        if (current == vertex) return convert(vshDefault.get(), type);
         ensureVaryingWithDefault(name, type, vshDefault);
         return new ShaderExpr(name, type);
     }
@@ -1465,6 +1469,7 @@ public class ShaderGraphCompiler {
         if (!varyings.isEmpty()) {
             sb.append('\n');
             for (var e : varyings.entrySet()) {
+                if (e.getValue().requiresFlat()) sb.append("flat ");
                 sb.append("out ").append(e.getValue().glsl()).append(' ').append(e.getKey()).append(";\n");
             }
         }
@@ -1534,6 +1539,7 @@ public class ShaderGraphCompiler {
         appendUniformBlocks(sb, false);
         if (!varyings.isEmpty()) {
             for (var e : varyings.entrySet()) {
+                if (e.getValue().requiresFlat()) sb.append("flat ");
                 sb.append("in ").append(e.getValue().glsl()).append(' ').append(e.getKey()).append(";\n");
             }
         }

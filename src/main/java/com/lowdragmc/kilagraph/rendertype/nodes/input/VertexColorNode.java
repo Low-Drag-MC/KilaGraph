@@ -19,8 +19,9 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 import java.util.List;
 
 /**
- * Outputs the mesh's interpolated vertex colour (vec4). {@link StageAffinity#FRAGMENT_ONLY} (reads an
- * interpolated varying). The {@code mode} dropdown picks how the colour is lit:
+ * Outputs the mesh's vertex colour (vec4). Stage-agnostic (default {@link StageAffinity#ANY}) — computed from
+ * the raw vertex attributes in the vertex shader, or read as an interpolated varying in the fragment shader.
+ * The {@code mode} dropdown picks how the colour is lit:
  * <ul>
  *   <li>{@code mix_light} — vanilla per-vertex diffuse ({@code minecraft_mix_light}); needs
  *       {@code Light0/1_Direction}, {@code Normal}, {@code Color} (the entity default).</li>
@@ -41,11 +42,6 @@ public class VertexColorNode extends ShaderNode {
     public static final String MODE_COLOR = "color";
     public static final String MODE_BLOCK = "block";
     private static final List<String> MODES = List.of(MODE_MIX_LIGHT, MODE_COLOR, MODE_BLOCK);
-
-    @Override
-    public StageAffinity stageAffinity() {
-        return StageAffinity.FRAGMENT_ONLY;
-    }
 
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
