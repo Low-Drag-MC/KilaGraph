@@ -43,19 +43,21 @@ public class CameraNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl");
-        // Absolute world camera position. MC stores CameraBlockPos = floor(camPos) and
-        // CameraOffset = floor(camPos) - camPos (the negative fractional part), so camPos = block - offset.
-        ctx.output("Position", new ShaderExpr("(vec3(CameraBlockPos) - CameraOffset)", GlslType.VEC3));
-        ctx.output("ScreenSize", new ShaderExpr("ScreenSize", GlslType.VEC2));
+        // All camera data from KilaGraph's own KG_Transforms block (same values as Minecraft's
+        // Globals/Projection, no #moj_import) — keeps camera-reading graphs injectable under a shaderpack.
+        // Absolute world camera position, MC's exact precision-split form: camPos = block - offset.
+        ctx.output("Position", new ShaderExpr("(vec3("
+                + ctx.transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "
+                + ctx.transformField("CameraOffset", GlslType.VEC3).code() + ")", GlslType.VEC3));
+        ctx.output("ScreenSize", ctx.screenSize());
 
         // Camera forward in world space: view-space -Z transformed by the inverse view matrix (view->world).
         ShaderExpr iView = ctx.transformField("IViewMat", GlslType.MAT4);
         ctx.output("Direction", new ShaderExpr("normalize((" + iView.code() + " * vec4(0.0, 0.0, -1.0, 0.0)).xyz)", GlslType.VEC3));
 
         // Orthographic flag straight from the projection matrix's [3][3] (1 for ortho, 0 for perspective).
-        ctx.useMinecraftUniform("Projection", "minecraft:projection.glsl");
-        ctx.output("Orthographic", new ShaderExpr("ProjMat[3][3]", GlslType.FLOAT));
+        ctx.output("Orthographic", new ShaderExpr(
+                ctx.transformField("ProjMat", GlslType.MAT4).code() + "[3][3]", GlslType.FLOAT));
 
         ctx.output("NearPlane", ctx.cameraNear());
         ctx.output("FarPlane", ctx.cameraFar());

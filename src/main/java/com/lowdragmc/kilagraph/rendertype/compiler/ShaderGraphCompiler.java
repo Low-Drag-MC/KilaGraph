@@ -351,9 +351,29 @@ public class ShaderGraphCompiler {
                 out.height != null ? out.height.code() : "1.0",                             // height
                 out.porosity != null ? out.porosity.code() : "0.0",                         // porosity
                 out.sss != null ? out.sss.code() : "0.0");                                  // sss
+        // Structural gate against "broken but accepted" snippets: injection implies preview, so a node
+        // that hand-rolls an isPreview() branch (instead of the injection-aware helpers) can leak a
+        // preview-quad varying (vNormal/vPos/vUv) or a pipeline-only sampler (Sampler1/Sampler2) into the
+        // snippet WITHOUT tripping the include/stage-error guard — undefined identifiers in the pack
+        // program. Catch them here (works headless too); the GL whole-source self-check stays the last line.
+        String assembled = String.join("\n", decls) + "\n"
+                + String.join("\n", fragment.functions.values()) + "\n" + body + "\n" + args;
+        var leak = INJECTION_BLACKLIST.matcher(assembled);
+        if (leak.find()) {
+            Kilagraph.LOGGER.warn("[KilaGraph][Iris] injection snippet rejected: references the "
+                    + "pipeline/preview-only identifier '{}' — some node's compile() must branch on "
+                    + "isInjection() before isPreview() (or use the injection-aware ctx helpers).", leak.group());
+            return null;
+        }
         return new InjectionSnippet(decls, new ArrayList<>(fragment.functions.values()),
                 body.toString(), args, usesGeometryVarying, usesSceneDepth);
     }
+
+    /** Identifiers that exist only in the preview quad vsh ({@code vNormal/vPos/vUv}) or the vanilla
+     *  pipeline's special samplers ({@code Sampler1/Sampler2}) — never valid inside an injected shaderpack
+     *  program. Word-bounded so GLSL's lowercase {@code sampler2D} type never matches. */
+    private static final java.util.regex.Pattern INJECTION_BLACKLIST =
+            java.util.regex.Pattern.compile("\\b(?:vNormal|vPos|vUv|Sampler1|Sampler2)\\b");
 
     /**
      * Resolve a port's value for preview. A varying-block output (e.g. TexCoord) has no ShaderNode to
@@ -638,12 +658,12 @@ public class ShaderGraphCompiler {
                 new ShaderExpr("0.0", GlslType.FLOAT));
     }
 
-    /** A raw Minecraft {@code Fog} UBO field accessor (e.g. {@code FogColor}, {@code FogEnvironmentalStart}),
-     *  registering the fog include + builtin UBO so the field resolves. Mirrors {@code FogUboNode}. */
+    /** A vanilla fog parameter (e.g. {@code FogColor}, {@code FogEnvironmentalStart}) from the
+     *  {@code KG_Fog} slice-view of Minecraft's own Fog buffer (see {@code KGFogUniforms} — identical
+     *  values, no {@code #moj_import}, so fog-reading graphs stay injectable under a shaderpack). */
     ShaderExpr fogField(String name, GlslType type) {
-        addInclude("minecraft:fog.glsl");
-        useBuiltinUbo("Fog");
-        return new ShaderExpr(name, type);
+        useUniformBlock(com.lowdragmc.kilagraph.rendertype.runtime.KGFogUniforms.BLOCK);
+        return new ShaderExpr(com.lowdragmc.kilagraph.rendertype.runtime.KGFogUniforms.accessor(name), type);
     }
 
     /**
@@ -767,15 +787,11 @@ public class ShaderGraphCompiler {
 
     /** Minecraft's builtin {@code Globals.GameTime} (day fraction). Bound by {@code bindDefaultUniforms}. */
     ShaderExpr mcGameTime() {
-        if (injection) {
-            // The #moj_import include would reject the whole graph under a shaderpack; KG_Globals carries
-            // the same day-fraction value (see KGEngineUniforms.gameTimeAccessor), already bound on the
-            // injected program.
-            useUniformBlock(KGEngineUniforms.BLOCK);
-            return new ShaderExpr(KGEngineUniforms.gameTimeAccessor(), GlslType.FLOAT);
-        }
-        addInclude("minecraft:globals.glsl");
-        return new ShaderExpr("GameTime", GlslType.FLOAT);
+        // Always KG_Globals (same day-fraction value as Minecraft's Globals.GameTime): a #moj_import include
+        // would reject the whole graph under a shaderpack, and one unconditional source keeps every compile
+        // mode identical (the unified-UBO policy — nodes never read Minecraft blocks in the fragment path).
+        useUniformBlock(KGEngineUniforms.BLOCK);
+        return new ShaderExpr(KGEngineUniforms.gameTimeAccessor(), GlslType.FLOAT);
     }
 
     /** The fallback sampler for an unconnected Sampler2D — declares it + bakes the MC missing-texture. */
@@ -839,16 +855,36 @@ public class ShaderGraphCompiler {
         return new ShaderExpr(fn + "()", GlslType.CURVE);
     }
 
-    /** Vanilla overlay sampler ({@code Sampler1}); flags the pipeline to enable overlay binding. */
+    /** Sampler name for the injection-neutral all-white texture (overlay/lightmap degrade under a pack). */
+    public static final String NEUTRAL_WHITE_SAMPLER = "kg_NeutralWhite";
+
+    /** Vanilla overlay sampler ({@code Sampler1}); flags the pipeline to enable overlay binding. Under
+     *  injection {@code Sampler1} isn't bound on the pack program (and the vanilla overlay has no pack
+     *  equivalent) — degrade to the all-white neutral: sampling white = no overlay tint. */
     ShaderExpr overlaySampler() {
+        if (injection) return neutralWhiteSampler();
         usesOverlay = true;
         return new ShaderExpr("Sampler1", GlslType.SAMPLER2D);
     }
 
-    /** Vanilla lightmap sampler ({@code Sampler2}); flags the pipeline to enable lightmap binding. */
+    /** Vanilla lightmap sampler ({@code Sampler2}); flags the pipeline to enable lightmap binding. Under
+     *  injection the pack owns lighting — degrade to the all-white neutral (fullbright). */
     ShaderExpr lightmapSampler() {
+        if (injection) return neutralWhiteSampler();
         usesLightmap = true;
         return new ShaderExpr("Sampler2", GlslType.SAMPLER2D);
+    }
+
+    /** A declared sampler baked to KilaGraph's 1×1 white texture — any lookup returns {@code vec4(1.0)}.
+     *  Rides the normal dynamic-sampler path (declared in the snippet decls, bound by
+     *  {@code IrisSurfaceUniform} at a high unit), so it is always well-defined on the injected program. */
+    private ShaderExpr neutralWhiteSampler() {
+        layout.addSampler(NEUTRAL_WHITE_SAMPLER);
+        samplerDefaults.putIfAbsent(NEUTRAL_WHITE_SAMPLER, new SamplerDefault(
+                net.minecraft.resources.Identifier.tryParse("kilagraph:textures/misc/white.png"),
+                com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerFilter.NEAREST,
+                com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerAddress.CLAMP, false));
+        return new ShaderExpr(NEUTRAL_WHITE_SAMPLER, GlslType.SAMPLER2D);
     }
 
     /** Sampler name for the captured opaque scene colour (bound at draw from {@code SceneCaptureManager}). */

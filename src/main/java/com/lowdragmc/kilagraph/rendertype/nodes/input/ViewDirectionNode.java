@@ -59,12 +59,14 @@ public class ViewDirectionNode extends ShaderNode {
         // view->object rotations below preserve that length across spaces.
         ShaderExpr vd;
         if (ctx.isInjection()) {
-            // Under a shaderpack we can't read ModelViewMat; reconstruct the view-space position from
-            // gl_FragCoord + our own UBOs (pack-independent — see ShaderGraphCompiler.injection*).
+            // Under a shaderpack the surface position isn't a varying we control; reconstruct the
+            // view-space position from gl_FragCoord + our own UBOs (structural injection branch —
+            // reconstruction needs gl_FragCoord, which doesn't exist in the vertex stage).
             vd = ctx.temp(GlslType.VEC3, "-" + ctx.reconstructedViewPos().code());
         } else {
-            ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl");
-            vd = ctx.temp(GlslType.VEC3, "-(ModelViewMat * vec4(" + ctx.meshPosition().code() + ", 1.0)).xyz");
+            // KG_Transforms.ModelViewMat — same value as Minecraft's DynamicTransforms, no #moj_import.
+            vd = ctx.temp(GlslType.VEC3, "-(" + ctx.transformField("ModelViewMat", GlslType.MAT4).code()
+                    + " * vec4(" + ctx.meshPosition().code() + ", 1.0)).xyz");
         }
         String out = switch (space) {
             case "object" -> "mat3(" + ctx.transformField("IModelViewMat", GlslType.MAT4).code() + ") * " + vd.code();

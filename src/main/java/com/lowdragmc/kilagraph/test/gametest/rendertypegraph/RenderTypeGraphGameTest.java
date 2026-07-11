@@ -614,7 +614,11 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "fsh samples the texture constant", fsh.contains("texture(kg_tex"));
         assertTrue(helper, "fsh declares the texture-constant sampler uniform", fsh.contains("uniform sampler2D kg_tex"));
         assertTrue(helper, "fsh applies fog", fsh.contains("apply_fog("));
-        assertTrue(helper, "fsh imports fog", fsh.contains("#moj_import <minecraft:fog.glsl>"));
+        // Unified-UBO policy: the fog functions are inlined (FogGlsl) and the parameters come from the
+        // KG_Fog slice-view of Minecraft's Fog buffer — no fog #moj_import in the fragment anymore.
+        assertTrue(helper, "fsh inlines the fog functions", fsh.contains("vec4 apply_fog("));
+        assertTrue(helper, "fsh reads the KG_Fog slice-view", fsh.contains("kg_fog."));
+        assertFalse(helper, "fsh no longer imports fog", fsh.contains("#moj_import <minecraft:fog.glsl>"));
         assertTrue(helper, "fsh imports dynamictransforms", fsh.contains("#moj_import <minecraft:dynamictransforms.glsl>"));
         assertTrue(helper, "fsh writes fragColor", fsh.contains("fragColor = vec4("));
 

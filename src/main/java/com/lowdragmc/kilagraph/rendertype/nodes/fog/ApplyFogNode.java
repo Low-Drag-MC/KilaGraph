@@ -45,7 +45,11 @@ public class ApplyFogNode extends ShaderNode {
             ctx.output("out", ctx.input("inColor"));
             return;
         }
-        ctx.include("minecraft:fog.glsl");
+        // Inline mirrors of fog.glsl's functions (FogGlsl) + the KG_Fog slice-view for the parameter
+        // defaults — no #moj_import anywhere in the fragment path (unified-UBO policy).
+        ctx.function("linear_fog_value", com.lowdragmc.kilagraph.rendertype.compiler.FogGlsl.FN_LINEAR_FOG_VALUE);
+        ctx.function("total_fog_value", com.lowdragmc.kilagraph.rendertype.compiler.FogGlsl.FN_TOTAL_FOG_VALUE);
+        ctx.function("apply_fog", com.lowdragmc.kilagraph.rendertype.compiler.FogGlsl.FN_APPLY_FOG);
         String code = "apply_fog("
                 + ctx.input("inColor").code() + ", "
                 + fog(ctx, "sphericalVertexDistance", ctx.sphericalVertexDistance()) + ", "

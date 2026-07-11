@@ -42,7 +42,12 @@ public class MixLightNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Lighting", "minecraft:light.glsl");
+        // KG_Lighting slice-view + inline mirrors of light.glsl's functions (LightGlsl) — no #moj_import,
+        // so a graph pulling this stays injectable under an Iris shaderpack (unified-UBO policy).
+        ctx.useUniformBlock(com.lowdragmc.kilagraph.rendertype.runtime.KGLightingUniforms.BLOCK);
+        ctx.function("minecraft_compute_light", com.lowdragmc.kilagraph.rendertype.compiler.LightGlsl.FN_COMPUTE_LIGHT);
+        ctx.function("minecraft_mix_light_separate", com.lowdragmc.kilagraph.rendertype.compiler.LightGlsl.FN_MIX_LIGHT_SEPARATE);
+        ctx.function("minecraft_mix_light", com.lowdragmc.kilagraph.rendertype.compiler.LightGlsl.FN_MIX_LIGHT);
         // Unconnected normal/color fall back to the Normal/Color attributes — via ctx.attribute so removing
         // those elements degrades to safe constants (up / white) instead of undefined-variable GLSL.
         ShaderExpr normal = ctx.isConnected("normal") ? ctx.input("normal")
@@ -51,7 +56,9 @@ public class MixLightNode extends ShaderNode {
         ShaderExpr color = ctx.isConnected("color") ? ctx.input("color")
                 : ctx.attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.COLOR,
                         GlslType.VEC4, new ShaderExpr("vec4(1.0)", GlslType.VEC4));
-        String code = "minecraft_mix_light(Light0_Direction, Light1_Direction, "
+        String code = "minecraft_mix_light("
+                + com.lowdragmc.kilagraph.rendertype.runtime.KGLightingUniforms.accessor("Light0_Direction") + ", "
+                + com.lowdragmc.kilagraph.rendertype.runtime.KGLightingUniforms.accessor("Light1_Direction") + ", "
                 + normal.code() + ", " + color.code() + ")";
         ctx.output("litColor", new ShaderExpr(code, GlslType.VEC4));
     }

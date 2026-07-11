@@ -28,7 +28,9 @@ public class LinearFogValueNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.include("minecraft:fog.glsl");
+        // Inline mirror of fog.glsl's function (FogGlsl) instead of the #moj_import — pure math, and an
+        // include in the fragment path would reject the whole graph from Iris injection.
+        ctx.function("linear_fog_value", com.lowdragmc.kilagraph.rendertype.compiler.FogGlsl.FN_LINEAR_FOG_VALUE);
         String code = "linear_fog_value(" + ctx.input("vertexDistance").code() + ", "
                 + ctx.input("fogStart").code() + ", " + ctx.input("fogEnd").code() + ")";
         ctx.output("out", new ShaderExpr(code, GlslType.FLOAT));

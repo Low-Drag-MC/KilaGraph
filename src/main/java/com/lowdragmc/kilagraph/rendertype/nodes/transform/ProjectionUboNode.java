@@ -25,7 +25,8 @@ public class ProjectionUboNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Projection", "minecraft:projection.glsl");
-        ctx.output("ProjMat", new ShaderExpr("ProjMat", GlslType.MAT4));
+        // KG_Transforms carries the same forward projection (recovered CPU-side each frame) — identical
+        // value, no #moj_import, so the graph stays injectable under an Iris shaderpack.
+        ctx.output("ProjMat", ctx.transformField("ProjMat", GlslType.MAT4));
     }
 }

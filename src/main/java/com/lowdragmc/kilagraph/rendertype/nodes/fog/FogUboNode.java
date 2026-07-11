@@ -32,13 +32,15 @@ public class FogUboNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Fog", "minecraft:fog.glsl");
-        ctx.output("FogColor", new ShaderExpr("FogColor", GlslType.VEC4));
-        ctx.output("FogEnvironmentalStart", new ShaderExpr("FogEnvironmentalStart", GlslType.FLOAT));
-        ctx.output("FogEnvironmentalEnd", new ShaderExpr("FogEnvironmentalEnd", GlslType.FLOAT));
-        ctx.output("FogRenderDistanceStart", new ShaderExpr("FogRenderDistanceStart", GlslType.FLOAT));
-        ctx.output("FogRenderDistanceEnd", new ShaderExpr("FogRenderDistanceEnd", GlslType.FLOAT));
-        ctx.output("FogSkyEnd", new ShaderExpr("FogSkyEnd", GlslType.FLOAT));
-        ctx.output("FogCloudsEnd", new ShaderExpr("FogCloudsEnd", GlslType.FLOAT));
+        // KG_Fog is a slice-view of Minecraft's own Fog buffer (identical values, no #moj_import) — keeps
+        // graphs reading fog parameters injectable under an Iris shaderpack. The values are VANILLA fog
+        // parameters; a shaderpack still applies its own fog in composite regardless.
+        ctx.output("FogColor", ctx.fogField("FogColor", GlslType.VEC4));
+        ctx.output("FogEnvironmentalStart", ctx.fogField("FogEnvironmentalStart", GlslType.FLOAT));
+        ctx.output("FogEnvironmentalEnd", ctx.fogField("FogEnvironmentalEnd", GlslType.FLOAT));
+        ctx.output("FogRenderDistanceStart", ctx.fogField("FogRenderDistanceStart", GlslType.FLOAT));
+        ctx.output("FogRenderDistanceEnd", ctx.fogField("FogRenderDistanceEnd", GlslType.FLOAT));
+        ctx.output("FogSkyEnd", ctx.fogField("FogSkyEnd", GlslType.FLOAT));
+        ctx.output("FogCloudsEnd", ctx.fogField("FogCloudsEnd", GlslType.FLOAT));
     }
 }

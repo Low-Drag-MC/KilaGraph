@@ -26,8 +26,12 @@ public class LightUboNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Lighting", "minecraft:light.glsl");
-        ctx.output("Light0_Direction", new ShaderExpr("Light0_Direction", GlslType.VEC3));
-        ctx.output("Light1_Direction", new ShaderExpr("Light1_Direction", GlslType.VEC3));
+        // KG_Lighting is a slice-view of Minecraft's own Lighting buffer (identical values, no #moj_import)
+        // — keeps graphs reading the vanilla light directions injectable under an Iris shaderpack.
+        ctx.useUniformBlock(com.lowdragmc.kilagraph.rendertype.runtime.KGLightingUniforms.BLOCK);
+        ctx.output("Light0_Direction", new ShaderExpr(
+                com.lowdragmc.kilagraph.rendertype.runtime.KGLightingUniforms.accessor("Light0_Direction"), GlslType.VEC3));
+        ctx.output("Light1_Direction", new ShaderExpr(
+                com.lowdragmc.kilagraph.rendertype.runtime.KGLightingUniforms.accessor("Light1_Direction"), GlslType.VEC3));
     }
 }

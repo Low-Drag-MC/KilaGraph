@@ -151,21 +151,14 @@ public class TransformNode extends ShaderNode {
     // ---- matrix accessors (register the owning UBO) -----------------------------------------
 
     private String modelViewMat(ShaderCompileContext ctx) {
-        if (ctx.isInjection()) {
-            // A #moj_import-backed Minecraft uniform would reject the whole graph under a shaderpack;
-            // KG_Transforms carries the same forward matrices (see KGTransformUniforms.declareGlsl).
-            return ctx.transformField("ModelViewMat", GlslType.MAT4).code();
-        }
-        ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl");
-        return "ModelViewMat";
+        // Always KG_Transforms (same value as Minecraft's DynamicTransforms.ModelViewMat, uploaded per
+        // draw) — one unconditional source keeps every compile mode identical and the graph injectable
+        // under a shaderpack (the unified-UBO policy).
+        return ctx.transformField("ModelViewMat", GlslType.MAT4).code();
     }
 
     private String projMat(ShaderCompileContext ctx) {
-        if (ctx.isInjection()) {
-            return ctx.transformField("ProjMat", GlslType.MAT4).code();
-        }
-        ctx.useMinecraftUniform("Projection", "minecraft:projection.glsl");
-        return "ProjMat";
+        return ctx.transformField("ProjMat", GlslType.MAT4).code();
     }
 
     private String iModelViewMat(ShaderCompileContext ctx) {
@@ -187,14 +180,10 @@ public class TransformNode extends ShaderNode {
 
     /** Absolute world camera position. MC stores CameraBlockPos = floor(camPos) and CameraOffset =
      *  floor(camPos) - camPos, so camPos = block - offset — precise arbitrarily far from the origin.
-     *  Under injection the identical split pair comes from KG_Transforms (MC's Globals block isn't
-     *  reachable inside a pack program). */
+     *  Always the KG_Transforms split pair (identical values; MC's Globals block isn't reachable inside a
+     *  pack program, and one unconditional source keeps all compile modes identical). */
     private String cameraPos(ShaderCompileContext ctx) {
-        if (ctx.isInjection()) {
-            return "(vec3(" + ctx.transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "
-                    + ctx.transformField("CameraOffset", GlslType.VEC3).code() + ")";
-        }
-        ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl");
-        return "(vec3(CameraBlockPos) - CameraOffset)";
+        return "(vec3(" + ctx.transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "
+                + ctx.transformField("CameraOffset", GlslType.VEC3).code() + ")";
     }
 }

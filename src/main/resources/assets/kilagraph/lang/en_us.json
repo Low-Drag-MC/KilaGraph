@@ -80,12 +80,8 @@
   "rt_uv": "UV",
   "rt_vertex_color": "Vertex Color",
   "rt_view_direction": "View Direction",
-<<<<<<< Updated upstream
   "rt_position": "Position",
   "rt_normal": "Normal",
-=======
-  "rt_normal_vector": "Normal Vector",
->>>>>>> Stashed changes
   "rt_frag_spherical_distance": "Frag Spherical Vertex Distance",
   "rt_frag_cylindrical_distance": "Frag Cylindrical Vertex Distance",
   "rt_vertex_id": "Vertex ID",
@@ -543,14 +539,8 @@
   "kg.node.rt_fragment_sss.tooltip": "Subsurface scattering 0..1 (LabPBR _s.b high range) — shaderpack only.",
   "kg.node.rt_fragment_emissiveness.tooltip": "Glow intensity 0..1 (LabPBR _s.a); glow color = albedo. The float emission control for shaderpacks — shaderpack only.",
   "kg.node.rt_in_vertex_attribute.tooltip": "Reads a raw vertex attribute from the current vertex format.",
-<<<<<<< Updated upstream
   "kg.node.rt_uv.tooltip": "Outputs a mesh UV channel. Usable in both the vertex and fragment stages.",
   "kg.node.rt_vertex_color.tooltip": "Outputs the mesh vertex color with the selected lighting mode. Usable in both the vertex and fragment stages.",
-=======
-  "kg.node.rt_uv.tooltip": "Outputs an interpolated mesh UV channel.",
-  "kg.node.rt_vertex_color.tooltip": "Outputs the mesh vertex color with the selected lighting mode.",
-  "kg.node.rt_normal_vector.tooltip": "Outputs the mesh's normalized surface normal in the selected space. Under a shaderpack the normal comes from the pack's own varying (packs without one fall back to a constant).",
->>>>>>> Stashed changes
   "kg.node.rt_view_direction.tooltip": "Outputs the unnormalized direction from the surface to the camera (length = distance to camera) in the selected space.",
   "kg.node.rt_position.tooltip": "Outputs the mesh surface position in the selected space (Object/World/View). Usable in both the vertex and fragment stages.",
   "kg.node.rt_normal.tooltip": "Outputs the mesh surface normal in the selected space (Object/World/View). Usable in both the vertex and fragment stages.",
@@ -645,7 +635,6 @@
   "kg.node.rt_colorspace_conversion.option.from.tooltip": "Input color space.",
   "kg.node.rt_colorspace_conversion.option.to.tooltip": "Output color space.",
   "kg.node.rt_uv.option.channel.tooltip": "UV0 is texture UV; UV1 and UV2 are Minecraft overlay and lightmap coordinates.",
-  "kg.node.rt_normal_vector.option.space.tooltip": "Coordinate space of the normal: World, Object, or View. Tangent is unavailable (Minecraft meshes have no per-vertex tangent basis).",
   "kg.node.rt_view_direction.option.space.tooltip": "Coordinate space of the view direction: World, Object, or View. Tangent is unavailable (Minecraft meshes have no per-vertex tangent basis).",
   "kg.node.rt_position.option.space.tooltip": "Coordinate space of the position: World (absolute), Object, or View. Tangent is unavailable (Minecraft meshes have no per-vertex tangent basis).",
   "kg.node.rt_normal.option.space.tooltip": "Coordinate space of the normal: World, Object, or View. Tangent is unavailable (Minecraft meshes have no per-vertex tangent basis).",
