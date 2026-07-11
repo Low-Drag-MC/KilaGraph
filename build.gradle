@@ -145,9 +145,6 @@ dependencies {
     localImplementation("net.caffeinemc:sodium-neoforge:${sodium_version}")
     localImplementation("maven.modrinth:iris:${iris_version}")
 
-    // demo
-    localImplementation(files("./libs/kilagraphdemo-neoforge-26.1-26.1.0.1.jar"))
-
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.0'
