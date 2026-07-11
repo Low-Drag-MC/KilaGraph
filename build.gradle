@@ -23,6 +23,18 @@ repositories {
     mavenLocal()
     // LDLib2
     maven { url = "https://maven.firstdark.dev/snapshots" }
+    // Modrinth File
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
+    maven {
+        name "CaffeineMC"
+        url "https://maven.caffeinemc.net/releases" // or /snapshots
+    }
 }
 
 base {
@@ -33,6 +45,16 @@ java {
     toolchain.languageVersion = JavaLanguageVersion.of(25)
     withSourcesJar()
 }
+
+configurations {
+    libraries
+    api.extendsFrom libraries
+
+    localImplementation
+    runtimeClasspath.extendsFrom localImplementation
+    compileOnly.extendsFrom localImplementation
+}
+
 
 neoForge {
     // Specify the version of NeoForge to use.
@@ -118,6 +140,10 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 dependencies {
     implementation("com.lowdragmc.ldlib2:ldlib2-neoforge-${minecraft_version_vague}:${ldlib2_version}")
+
+    // Iris
+    localImplementation("net.caffeinemc:sodium-neoforge:${sodium_version}")
+    localImplementation("maven.modrinth:iris:${iris_version}")
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'

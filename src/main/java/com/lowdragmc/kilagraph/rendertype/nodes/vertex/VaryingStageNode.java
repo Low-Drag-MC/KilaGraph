@@ -30,11 +30,14 @@ public class VaryingStageNode extends ContextNode {
 
     @Override
     public List<Class<? extends BlockNode>> getSupportBlocks() {
-        // Only Position + the generic Custom varying blocks. The old specialized blocks (uv0 / vertex
-        // colour / fog distances) are gone — their values come from compiler defaults (meshUv /
-        // litVertexColor / sphericalVertexDistance / cylindricalVertexDistance), and a user who wants to
-        // override a varying adds a Custom block.
+        // The Unity-like model-space Position/Normal blocks (the defaults; shaderpack-injectable), the
+        // advanced clip-space glPosition block (vanilla-only under a shaderpack), and the generic Custom
+        // varying blocks. The old specialized blocks (uv0 / vertex colour / fog distances) are gone —
+        // their values come from compiler defaults (meshUv / litVertexColor / the fog-distance varyings),
+        // and a user who wants to override a varying adds a Custom block.
         return List.of(
+                VertexModelPositionBlock.class,
+                VertexModelNormalBlock.class,
                 VertexPositionBlock.class,
                 VaryingCustomFloatBlock.class,
                 VaryingCustomVec2Block.class,

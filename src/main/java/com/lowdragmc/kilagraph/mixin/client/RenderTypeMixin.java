@@ -1,6 +1,8 @@
 package com.lowdragmc.kilagraph.mixin.client;
 
 import com.llamalad7.mixinextras.sugar.Local;
+import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
+import com.lowdragmc.kilagraph.rendertype.iris.IrisSurfaceUniform;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.vertex.MeshData;
@@ -24,10 +26,19 @@ public class RenderTypeMixin {
      * Upload the material's custom UBO before the render pass opens — {@code writeToBuffer} is illegal
      * inside an active pass (vanilla likewise writes {@code DynamicTransforms} before {@code createRenderPass}).
      */
-    @Inject(method = "draw", at = @At("HEAD"))
+    @Inject(method = "draw", at = @At("HEAD"), cancellable = true)
     private void kilagraph$prepareMaterialUniforms(MeshData mesh, CallbackInfo ci) {
         var material = RenderTypeGraphMaterial.of((RenderType) (Object) this);
         if (material != null) {
+            // Iris shadow-pass safety net: when the shadow-pass program mapping could not be registered
+            // (IrisCompat.shouldSkipShadowDraw), drawing here would run OUR program inside Iris's shadow
+            // framebuffer and corrupt the shadow map for everything nearby. Skip the draw (no shadow cast);
+            // the mesh must still be closed — vanilla draw() consumes it.
+            if (IrisCompat.shouldSkipShadowDraw()) {
+                mesh.close();
+                ci.cancel();
+                return;
+            }
             material.prepareUniforms();
         }
     }
@@ -49,6 +60,30 @@ public class RenderTypeMixin {
         var material = RenderTypeGraphMaterial.of((RenderType) (Object) this);
         if (material != null) {
             material.bindCustomUniforms(renderPass);
+            // Iris: record the active material so the trySetup hook can flag this draw (kg_surface_id) AND
+            // bind the material's KG_Material/managed UBOs onto the shaderpack's shared gbuffers program once
+            // it's actually bound (the program isn't bound at this hook). Reset after. id 0 = passthrough
+            // (graph not injection-compatible) — left unflagged so it shows the pack's own albedo.
+            if (material.irisSurfaceId() != 0 && IrisCompat.isShaderPackInUse()) {
+                IrisSurfaceUniform.setCurrent(material);
+            }
+        }
+    }
+
+    /** Clear the discriminator after our draw so the next, unrelated draw sharing this program is not
+     *  flagged as ours (the program is still bound here, so the reset reaches it). */
+    @Inject(
+            method = "draw",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lcom/mojang/blaze3d/systems/RenderPass;drawIndexed(IIII)V",
+                    shift = At.Shift.AFTER
+            )
+    )
+    private void kilagraph$resetSurfaceId(MeshData mesh, CallbackInfo ci) {
+        var material = RenderTypeGraphMaterial.of((RenderType) (Object) this);
+        if (material != null && material.irisSurfaceId() != 0 && IrisCompat.isShaderPackInUse()) {
+            IrisSurfaceUniform.clearBoundProgram();
         }
     }
 }

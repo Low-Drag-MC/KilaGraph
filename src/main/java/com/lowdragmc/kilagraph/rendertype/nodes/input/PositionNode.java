@@ -56,28 +56,45 @@ public class PositionNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         String space = choice("space", "world", SPACES);
+        // Injection FIRST — injection implies isPreview(), and the preview branch's vPos is a preview-quad
+        // varying that does NOT exist in an injected shaderpack fragment. The view-space position is
+        // reconstructed from gl_FragCoord (reconstructedViewPos); object/world derive via KG_Transforms —
+        // all three spaces are exact under a shaderpack.
+        if (ctx.isInjection()) {
+            ShaderExpr view = ctx.temp(GlslType.VEC3, ctx.reconstructedViewPos().code());
+            String out = switch (space) {
+                case "view" -> view.code();
+                case "object" -> "(" + ctx.transformField("IModelViewMat", GlslType.MAT4).code()
+                        + " * vec4(" + view.code() + ", 1.0)).xyz";
+                default /* world */ -> "(mat3(" + ctx.transformField("IViewMat", GlslType.MAT4).code()
+                        + ") * " + view.code() + " + (vec3("
+                        + ctx.transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "
+                        + ctx.transformField("CameraOffset", GlslType.VEC3).code() + "))";
+            };
+            ctx.output("out", new ShaderExpr(out, GlslType.VEC3));
+            return;
+        }
         // No real vertex stage in the per-node preview: show the forwarded object position for every space.
         if (ctx.isPreview()) {
             ctx.output("out", new ShaderExpr("vPos", GlslType.VEC3));
             return;
         }
         // Object/model-space source: raw (Position + ModelOffset) in the vsh, kg_modelPos varying in the fsh.
+        // Matrices/camera come from KG_Transforms (same values as Minecraft's blocks, no #moj_import).
         ShaderExpr pos = ctx.meshPosition();
         String out = switch (space) {
             case "object" -> pos.code();
-            case "view" -> {
-                ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl"); // ModelViewMat
-                yield "(ModelViewMat * vec4(" + pos.code() + ", 1.0)).xyz";
-            }
+            case "view" -> "(" + ctx.transformField("ModelViewMat", GlslType.MAT4).code()
+                    + " * vec4(" + pos.code() + ", 1.0)).xyz";
             default /* world */ -> {
                 // object -> view (ModelViewMat), un-rotate view -> camera-relative world (IViewMat), then add
                 // the camera's absolute world position back — MC renders camera-relative, so this recovers
                 // absolute world exactly like TransformNode's object->world for a position.
-                ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl"); // ModelViewMat
-                ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl");                     // CameraBlockPos/Offset
                 String iView = ctx.transformField("IViewMat", GlslType.MAT4).code();
-                yield "((" + iView + " * ModelViewMat * vec4(" + pos.code() + ", 1.0)).xyz"
-                        + " + (vec3(CameraBlockPos) - CameraOffset))";
+                yield "((" + iView + " * " + ctx.transformField("ModelViewMat", GlslType.MAT4).code()
+                        + " * vec4(" + pos.code() + ", 1.0)).xyz"
+                        + " + (vec3(" + ctx.transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "
+                        + ctx.transformField("CameraOffset", GlslType.VEC3).code() + "))";
             }
         };
         ctx.output("out", new ShaderExpr(out, GlslType.VEC3));

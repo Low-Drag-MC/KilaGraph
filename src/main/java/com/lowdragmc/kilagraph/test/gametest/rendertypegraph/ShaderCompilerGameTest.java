@@ -16,7 +16,14 @@ import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.SphereMaskNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.ApplyFogNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.TotalFogValueNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogSphericalDistanceNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogUboNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.scene.GlobalsUboNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomFloatBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.CombineNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.FlipNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.SwizzleNode;
@@ -191,6 +198,12 @@ public final class ShaderCompilerGameTest {
     private static final String CURVE_NODES = "rendertype_compile_curve_nodes";
     private static final String CURVE_VARIABLE = "rendertype_compile_curve_variable";
     private static final String CURVE_VALUE_CODEC = "rendertype_compile_curve_value_codec";
+    private static final String VERTEX_MODEL_IDENTITY = "rendertype_compile_vertex_model_identity";
+    private static final String VERTEX_MODEL_BLOCKS = "rendertype_compile_vertex_model_blocks";
+    private static final String VERTEX_MODEL_LEGACY = "rendertype_compile_vertex_model_legacy";
+    private static final String INJECTION_GEOMETRY = "rendertype_injection_geometry_nodes";
+    private static final String INJECTION_UNIVERSAL = "rendertype_injection_all_nodes";
+    private static final String INJECTION_GATE = "rendertype_injection_blacklist_gate";
 
     private ShaderCompilerGameTest() {}
 
@@ -263,6 +276,12 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunction(CURVE_NODES, ShaderCompilerGameTest::curveNodesEmitGlsl);
         KGGameTests.registerFunction(CURVE_VARIABLE, ShaderCompilerGameTest::curveVariableBecomesUboStruct);
         KGGameTests.registerFunction(CURVE_VALUE_CODEC, ShaderCompilerGameTest::curveValueCodecRoundTrips);
+        KGGameTests.registerFunction(VERTEX_MODEL_IDENTITY, ShaderCompilerGameTest::vertexModelIdentityParity);
+        KGGameTests.registerFunction(VERTEX_MODEL_BLOCKS, ShaderCompilerGameTest::vertexModelBlocksDisplace);
+        KGGameTests.registerFunction(VERTEX_MODEL_LEGACY, ShaderCompilerGameTest::vertexModelLegacyGlPosition);
+        KGGameTests.registerFunction(INJECTION_GEOMETRY, ShaderCompilerGameTest::injectionGeometryNodes);
+        KGGameTests.registerFunction(INJECTION_UNIVERSAL, ShaderCompilerGameTest::injectionAllNodesCompatible);
+        KGGameTests.registerFunction(INJECTION_GATE, ShaderCompilerGameTest::injectionBlacklistGate);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -335,6 +354,12 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunctionTest(event, CURVE_NODES, KGGameTests.functionKey(CURVE_NODES), d);
         KGGameTests.registerFunctionTest(event, CURVE_VARIABLE, KGGameTests.functionKey(CURVE_VARIABLE), d);
         KGGameTests.registerFunctionTest(event, CURVE_VALUE_CODEC, KGGameTests.functionKey(CURVE_VALUE_CODEC), d);
+        KGGameTests.registerFunctionTest(event, VERTEX_MODEL_IDENTITY, KGGameTests.functionKey(VERTEX_MODEL_IDENTITY), d);
+        KGGameTests.registerFunctionTest(event, VERTEX_MODEL_BLOCKS, KGGameTests.functionKey(VERTEX_MODEL_BLOCKS), d);
+        KGGameTests.registerFunctionTest(event, VERTEX_MODEL_LEGACY, KGGameTests.functionKey(VERTEX_MODEL_LEGACY), d);
+        KGGameTests.registerFunctionTest(event, INJECTION_GEOMETRY, KGGameTests.functionKey(INJECTION_GEOMETRY), d);
+        KGGameTests.registerFunctionTest(event, INJECTION_UNIVERSAL, KGGameTests.functionKey(INJECTION_UNIVERSAL), d);
+        KGGameTests.registerFunctionTest(event, INJECTION_GATE, KGGameTests.functionKey(INJECTION_GATE), d);
     }
 
     private static CompiledShaderGraph compile(RenderTypeGraph graph) {
@@ -583,12 +608,329 @@ public final class ShaderCompilerGameTest {
     /** Compile an input node with one option set, wired into fragment emission, and return the fragment GLSL. */
     private static String inputNodeFsh(Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node> nodeClass,
                                        String option, String value) {
+        return compile(inputNodeGraph(nodeClass, option, value)).fragmentSource();
+    }
+
+    /** A minimal graph: one node (with an optional option set) wired into the fragment Emission block. */
+    private static RenderTypeGraph inputNodeGraph(Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node> nodeClass,
+                                                  @org.jetbrains.annotations.Nullable String option,
+                                                  @org.jetbrains.annotations.Nullable String value) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
         NodeModel node = addNode(graph, nodeClass);
-        setOption(node, option, value);
+        if (option != null) setOption(node, option, value);
         wire(graph, emission.getInputsById().get("color"), node.getOutputsById().get("out"));
-        return compile(graph).fragmentSource();
+        return graph;
+    }
+
+    /**
+     * The Unity-like vertex-block refactor's byte-parity pin: the new default graph (an unconnected
+     * model-space Position block) must emit GLSL byte-identical to the old default (the advanced
+     * glPosition block) - so the block swap changes no existing pipeline hash and no vanilla visuals.
+     */
+    public static void vertexModelIdentityParity(GameTestHelper helper) {
+        RenderTypeGraph current = new RenderTypeGraph();
+        RenderTypeGraph legacy = new RenderTypeGraph() {
+            @Override
+            protected Class<? extends BlockNode> defaultVertexPositionBlockClass() {
+                return VertexPositionBlock.class;
+            }
+        };
+        CompiledShaderGraph a = compile(current);
+        CompiledShaderGraph b = compile(legacy);
+        // Byte-identical modulo per-graph-instance node uids (the default texture sampler's name carries
+        // its node's uid, so two separately-built graphs can never be raw-equal — normalize just that).
+        assertEq(helper, "identity Position block: byte-identical vsh",
+                normalizeUids(b.vertexSource()), normalizeUids(a.vertexSource()));
+        assertEq(helper, "identity Position block: byte-identical fsh",
+                normalizeUids(b.fragmentSource()), normalizeUids(a.fragmentSource()));
+        assertFalse(helper, "identity emits no displaced temp", a.vertexSource().contains("kg_vertexPos"));
+        assertTrue(helper, "identity keeps the standard MVP chain", a.vertexSource()
+                .contains("gl_Position = ProjMat * ModelViewMat * vec4((Position + ModelOffset), 1.0);"));
+        helper.succeed();
+    }
+
+    /** Replace per-graph-instance uid-bearing identifiers ({@code kg_tex_<uid>}) with a fixed token. */
+    private static String normalizeUids(String glsl) {
+        return glsl.replaceAll("kg_tex_[0-9a-f_]+", "kg_tex");
+    }
+
+    /**
+     * Driven Position/Normal blocks displace through the single seams: gl_Position, the fog distances
+     * and kg_modelPos all read {@code kg_vertexPos}; the lit vertex colour ({@code minecraft_mix_light}),
+     * the world-normal varying and the Normal node's object source all read {@code kg_vertexNormal}.
+     */
+    public static void vertexModelBlocksDisplace(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        // Position block <- Add(Position(object), Vec3): a position-dependent offset.
+        NodeModel posBlock = addBlock(graph, graph.getVertexStageModel(), VertexModelPositionBlock.class);
+        NodeModel pos = addNode(graph, PositionNode.class);
+        setOption(pos, "space", "object");
+        NodeModel offset = addNode(graph, Vec3Node.class);
+        NodeModel add = addNode(graph, AddNode.class);
+        wire(graph, add.getInputsById().get("a"), pos.getOutputsById().get("out"));
+        wire(graph, add.getInputsById().get("b"), offset.getOutputsById().get("out"));
+        wire(graph, posBlock.getInputsById().get("position"), add.getOutputsById().get("out"));
+        // Normal block <- Vec3.
+        NodeModel nrmBlock = addBlock(graph, graph.getVertexStageModel(), VertexModelNormalBlock.class);
+        NodeModel nrm = addNode(graph, Vec3Node.class);
+        wire(graph, nrmBlock.getInputsById().get("normal"), nrm.getOutputsById().get("out"));
+        // A fragment Normal node (object space), so the kg_objectNormal varying is built.
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel normalNode = addNode(graph, NormalNode.class);
+        setOption(normalNode, "space", "object");
+        wire(graph, emission.getInputsById().get("color"), normalNode.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "displacement graph has no stage errors", compiled.hasStageErrors());
+        String vsh = compiled.vertexSource();
+        assertTrue(helper, "vsh hoists the displaced position", vsh.contains("vec3 kg_vertexPos = "));
+        assertTrue(helper, "gl_Position transforms the displaced position",
+                vsh.contains("gl_Position = ProjMat * ModelViewMat * vec4(kg_vertexPos, 1.0);"));
+        assertTrue(helper, "fog distance follows the displaced position",
+                vsh.contains("fog_spherical_distance(kg_vertexPos)"));
+        assertTrue(helper, "vsh hoists the displaced normal", vsh.contains("vec3 kg_vertexNormal = "));
+        assertTrue(helper, "default lighting re-lights with the displaced normal",
+                vsh.contains("minecraft_mix_light(Light0_Direction, Light1_Direction, kg_vertexNormal"));
+        assertTrue(helper, "Normal node's object source reads the displaced normal",
+                vsh.contains("kg_objectNormal = kg_vertexNormal;"));
+
+        // The Iris side: the same driven blocks compile into vertex snippet parts — the mesh position
+        // resolves to the kg_pos function parameter, never to raw attributes / fragment-only identifiers,
+        // and the KG_Transforms dependency (PositionNode's object-space math) rides the snippet.
+        var snippet = compiled.injectionSnippet();
+        assertTrue(helper, "displacement graph has a snippet", snippet != null);
+        assertTrue(helper, "snippet carries the position displacement", snippet.vertexPositionExpr() != null);
+        assertTrue(helper, "snippet carries the normal modification", snippet.vertexNormalExpr() != null);
+        assertFalse(helper, "snippet is not legacy", snippet.legacyVertexBlock());
+        String vtext = (snippet.vertexPositionBody() != null ? snippet.vertexPositionBody() : "")
+                + "\n" + snippet.vertexPositionExpr()
+                + "\n" + (snippet.vertexNormalBody() != null ? snippet.vertexNormalBody() : "")
+                + "\n" + snippet.vertexNormalExpr()
+                + "\n" + String.join("\n", snippet.vertexFunctions());
+        assertTrue(helper, "vertex snippet reads the kg_pos parameter", vtext.contains("kg_pos"));
+        for (String banned : new String[]{"kg_vertexPos", "ModelOffset", "kg_uv", "gl_FragCoord", "vUv", "vPos"}) {
+            assertFalse(helper, "vertex snippet must not reference '" + banned + "'", vtext.contains(banned));
+        }
+        assertTrue(helper, "vertex snippet depends on KG_Transforms",
+                snippet.uniformBlocks().stream().anyMatch(b -> b.uboName().equals("KG_Transforms")));
+        helper.succeed();
+    }
+
+    /**
+     * The advanced glPosition block owns the vertex stage: when present, the model-space blocks are
+     * ignored (no displaced temp), and its unconnected fallback is the standard chain. Also: a
+     * FRAGMENT_ONLY node wired into a Position block is a stage-affinity error (the block pass runs
+     * in the vertex scope).
+     */
+    public static void vertexModelLegacyGlPosition(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel posBlock = addBlock(graph, graph.getVertexStageModel(), VertexModelPositionBlock.class);
+        NodeModel vec = addNode(graph, Vec3Node.class);
+        wire(graph, posBlock.getInputsById().get("position"), vec.getOutputsById().get("out"));
+        addBlock(graph, graph.getVertexStageModel(), VertexPositionBlock.class); // legacy joins -> wins
+        String vsh = compile(graph).vertexSource();
+        assertFalse(helper, "legacy glPosition block suppresses the model blocks",
+                vsh.contains("kg_vertexPos"));
+        assertTrue(helper, "legacy unconnected fallback is the standard chain", vsh
+                .contains("gl_Position = ProjMat * ModelViewMat * vec4((Position + ModelOffset), 1.0);"));
+
+        // Iris side of the legacy block: vanilla-only — the snippet still exists (fragment shading keeps
+        // injecting) but carries no vertex parts and flags legacyVertexBlock for the registry's log.
+        var legacySnippet = compile(graph).injectionSnippet();
+        assertTrue(helper, "legacy graph still has a fragment snippet", legacySnippet != null);
+        assertTrue(helper, "legacy graph has no vertex parts", !legacySnippet.hasVertex());
+        assertTrue(helper, "legacy graph is flagged", legacySnippet.legacyVertexBlock());
+
+        RenderTypeGraph bad = new RenderTypeGraph();
+        NodeModel badBlock = addBlock(bad, bad.getVertexStageModel(), VertexModelPositionBlock.class);
+        NodeModel primId = addNode(bad, PrimitiveIdNode.class);
+        wire(bad, badBlock.getInputsById().get("position"), primId.getOutputsById().get("out"));
+        assertTrue(helper, "FRAGMENT_ONLY node feeding a Position block is a stage error",
+                compile(bad).hasStageErrors());
+
+        // Rejection granularity: a displacement that leaks a fragment-only identifier (ScreenPosition ->
+        // gl_FragCoord) drops ONLY the vertex parts — the fragment snippet survives (shading kept,
+        // displacement dropped; the pack applies its standard transform).
+        RenderTypeGraph leak = new RenderTypeGraph();
+        NodeModel leakBlock = addBlock(leak, leak.getVertexStageModel(), VertexModelPositionBlock.class);
+        NodeModel screenPos = addNode(leak, ScreenPositionNode.class);
+        wire(leak, leakBlock.getInputsById().get("position"), screenPos.getOutputsById().get("out"));
+        var leakSnippet = compile(leak).injectionSnippet();
+        assertTrue(helper, "gl_FragCoord-leaking displacement keeps the fragment snippet", leakSnippet != null);
+        assertTrue(helper, "gl_FragCoord-leaking displacement drops the vertex parts", !leakSnippet.hasVertex());
+        helper.succeed();
+    }
+
+    /** The graph's Iris-injection snippet via the REAL production path ({@code compile()} passes the main
+     *  layout so the snippet's KG_Material declaration matches the bound buffer). */
+    private static com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet injectionSnippet(RenderTypeGraph graph) {
+        return compile(graph).injectionSnippet();
+    }
+
+    /** Every GLSL piece of a snippet joined, for contains-assertions. */
+    private static String snippetText(com.lowdragmc.kilagraph.rendertype.compiler.InjectionSnippet s) {
+        return String.join("\n", s.declarationUnits()) + "\n" + String.join("\n", s.functions())
+                + "\n" + s.body() + "\n" + s.surfaceArgs();
+    }
+
+    /**
+     * The Normal/Position nodes are injectable in every space: the snippet exists (not rejected), never
+     * references the preview-quad varyings ({@code vNormal}/{@code vPos} — the bug where injection implies
+     * preview and a hand-rolled isPreview() branch leaked them), and reconstructs from {@code gl_FragCoord}
+     * + KG UBOs ({@code kg_recon_*}); only the normal needs the pack's varying ({@code usesGeometry}).
+     */
+    public static void injectionGeometryNodes(GameTestHelper helper) {
+        for (String space : new String[]{"world", "object", "view"}) {
+            var normal = injectionSnippet(inputNodeGraph(NormalNode.class, "space", space));
+            assertTrue(helper, "normal " + space + " snippet exists", normal != null);
+            String nText = snippetText(normal);
+            assertFalse(helper, "normal " + space + " has no preview varyings",
+                    nText.contains("vNormal") || nText.contains("vPos"));
+            assertTrue(helper, "normal " + space + " reconstructs via kg_recon_normal",
+                    nText.contains("kg_recon_normal"));
+            assertTrue(helper, "normal " + space + " flags usesGeometry", normal.usesGeometry());
+
+            var position = injectionSnippet(inputNodeGraph(PositionNode.class, "space", space));
+            assertTrue(helper, "position " + space + " snippet exists", position != null);
+            String pText = snippetText(position);
+            assertFalse(helper, "position " + space + " has no preview varyings",
+                    pText.contains("vNormal") || pText.contains("vPos"));
+            assertTrue(helper, "position " + space + " reconstructs via kg_recon_viewPos",
+                    pText.contains("kg_recon_viewPos"));
+            assertFalse(helper, "position " + space + " does not need the pack normal", position.usesGeometry());
+        }
+
+        // Fresnel regression pin ("pure white sphere"): the snippet's OWN UBO dependencies must include
+        // KG_Globals — the viewDir reconstruction needs ScreenSize, which the vanilla compile of the same
+        // graph never registers. The material binds snippet.uniformBlocks() extras onto the injected
+        // program; without them kg_recon_viewPos divides by an unbound (zero) ScreenSize -> NaN viewDir.
+        var fresnel = injectionSnippet(inputNodeGraph(FresnelNode.class, null, null));
+        assertTrue(helper, "fresnel snippet exists", fresnel != null);
+        assertTrue(helper, "fresnel snippet depends on KG_Globals (ScreenSize for viewDir reconstruction)",
+                fresnel.uniformBlocks().stream().anyMatch(b -> b.uboName().equals("KG_Globals")));
+        assertTrue(helper, "fresnel snippet depends on KG_Transforms",
+                fresnel.uniformBlocks().stream().anyMatch(b -> b.uboName().equals("KG_Transforms")));
+        helper.succeed();
+    }
+
+    /**
+     * The unified-UBO policy end-to-end: every formerly-rejecting node family (Fog UBO/values, Lighting,
+     * MC Globals, Camera, Projection, Transform, Game Time) now compiles an injection snippet — nodes read
+     * KilaGraph blocks (slice-views of Minecraft's buffers), never a fragment {@code #moj_import}. Also
+     * pins the vanilla fragment GLSL to be include-free for these graphs (single-source unification), and
+     * the Overlay/LightMap neutral degrade.
+     */
+    public static void injectionAllNodesCompatible(GameTestHelper helper) {
+        record Case(String name, RenderTypeGraph graph) {}
+        java.util.List<Case> cases = new java.util.ArrayList<>();
+
+        // Fog family: raw fields, total value with UBO defaults, apply_fog with defaults.
+        RenderTypeGraph fogUbo = new RenderTypeGraph();
+        NodeModel fogEmission = addBlock(fogUbo, fogUbo.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel fog = addNode(fogUbo, FogUboNode.class);
+        wire(fogUbo, fogEmission.getInputsById().get("color"), fog.getOutputsById().get("FogColor"));
+        cases.add(new Case("fog ubo", fogUbo));
+
+        RenderTypeGraph totalFog = new RenderTypeGraph();
+        NodeModel tfAlpha = addBlock(totalFog, totalFog.getFragmentStageModel(), FragmentAlphaBlock.class);
+        NodeModel total = addNode(totalFog, TotalFogValueNode.class);
+        wire(totalFog, tfAlpha.getInputsById().get("alpha"), total.getOutputsById().get("out"));
+        cases.add(new Case("total fog value", totalFog));
+
+        RenderTypeGraph applyFog = new RenderTypeGraph();
+        NodeModel afEmission = addBlock(applyFog, applyFog.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel apply = addNode(applyFog, ApplyFogNode.class);
+        wire(applyFog, afEmission.getInputsById().get("color"), apply.getOutputsById().get("out"));
+        cases.add(new Case("apply fog", applyFog));
+
+        // Lighting: raw light directions.
+        RenderTypeGraph lighting = new RenderTypeGraph();
+        NodeModel liEmission = addBlock(lighting, lighting.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel light = addNode(lighting, com.lowdragmc.kilagraph.rendertype.nodes.lighting.LightUboNode.class);
+        wire(lighting, liEmission.getInputsById().get("color"), light.getOutputsById().get("Light0_Direction"));
+        cases.add(new Case("lighting ubo", lighting));
+
+        // MC Globals fields (GlintAlpha has no other mirror).
+        RenderTypeGraph globals = new RenderTypeGraph();
+        NodeModel glAlpha = addBlock(globals, globals.getFragmentStageModel(), FragmentAlphaBlock.class);
+        NodeModel glob = addNode(globals, GlobalsUboNode.class);
+        wire(globals, glAlpha.getInputsById().get("alpha"), glob.getOutputsById().get("GlintAlpha"));
+        cases.add(new Case("mc globals", globals));
+
+        // Camera: Position (world camera) + Orthographic (ProjMat[3][3]).
+        RenderTypeGraph camera = new RenderTypeGraph();
+        NodeModel camEmission = addBlock(camera, camera.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel camAlpha = addBlock(camera, camera.getFragmentStageModel(), FragmentAlphaBlock.class);
+        NodeModel cam = addNode(camera, CameraNode.class);
+        wire(camera, camEmission.getInputsById().get("color"), cam.getOutputsById().get("Position"));
+        wire(camera, camAlpha.getInputsById().get("alpha"), cam.getOutputsById().get("Orthographic"));
+        cases.add(new Case("camera", camera));
+
+        // Game Time (was minecraft:globals.glsl).
+        cases.add(new Case("game time", inputNodeGraph(
+                com.lowdragmc.kilagraph.rendertype.nodes.constant.GameTimeNode.class, null, null)));
+
+        // Transform object->world for a position (ModelViewMat + IViewMat + camera pair).
+        RenderTypeGraph transform = new RenderTypeGraph();
+        NodeModel trEmission = addBlock(transform, transform.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel tr = addNode(transform, TransformNode.class);
+        setOption(tr, "from", "object");
+        setOption(tr, "to", "world");
+        NodeModel vec = addNode(transform, Vec3Node.class);
+        wire(transform, tr.getInputsById().get("in"), vec.getOutputsById().get("out"));
+        wire(transform, trEmission.getInputsById().get("color"), tr.getOutputsById().get("out"));
+        cases.add(new Case("transform", transform));
+
+        for (Case c : cases) {
+            var snippet = injectionSnippet(c.graph());
+            assertTrue(helper, c.name() + " snippet exists (no rejection)", snippet != null);
+            // Unified-UBO policy: the converted families never pull their old Minecraft includes into the
+            // fragment. (dynamictransforms can still appear via the default graph's ColorModulator node.)
+            String fsh = compile(c.graph()).fragmentSource();
+            for (String include : new String[]{"minecraft:fog.glsl", "minecraft:light.glsl",
+                    "minecraft:globals.glsl", "minecraft:projection.glsl"}) {
+                assertFalse(helper, c.name() + " vanilla fsh does not import " + include,
+                        fsh.contains("#moj_import <" + include + ">"));
+            }
+        }
+
+        // Overlay/LightMap degrade to the all-white neutral sampler under injection (no Sampler1/Sampler2).
+        for (var nodeClass : java.util.List.of(OverlayTextureNode.class, LightMapTextureNode.class)) {
+            RenderTypeGraph g = new RenderTypeGraph();
+            NodeModel emission = addBlock(g, g.getFragmentStageModel(), FragmentEmissionBlock.class);
+            NodeModel tex = addNode(g, nodeClass);
+            NodeModel sample = addNode(g, SamplerTexture2DNode.class);
+            wire(g, sample.getInputsById().get("sampler"), tex.getOutputsById().get("sampler"));
+            wire(g, emission.getInputsById().get("color"), sample.getOutputsById().get("color"));
+            var snippet = injectionSnippet(g);
+            assertTrue(helper, nodeClass.getSimpleName() + " snippet exists", snippet != null);
+            String text = snippetText(snippet);
+            assertTrue(helper, nodeClass.getSimpleName() + " degrades to the neutral white sampler",
+                    text.contains(ShaderGraphCompiler.NEUTRAL_WHITE_SAMPLER));
+            assertFalse(helper, nodeClass.getSimpleName() + " references no pipeline sampler",
+                    text.contains("Sampler1") || text.contains("Sampler2"));
+            // Regression pin (same class as the Fresnel/KG_Globals gap): the neutral sampler is baked ONLY
+            // by the injection compile, so the snippet must carry its default for the material to bind it.
+            assertTrue(helper, nodeClass.getSimpleName() + " snippet carries the neutral sampler default",
+                    snippet.samplerDefaults().containsKey(ShaderGraphCompiler.NEUTRAL_WHITE_SAMPLER));
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The injection blacklist gate: a node that leaks a preview-quad varying into the fragment (the
+     * VERTEX_ONLY attribute node's preview branch emits {@code vPos} — a latent leak, since injection
+     * skips stage errors) is caught structurally and the snippet is rejected (null) instead of shipping
+     * undefined GLSL into the shaderpack program.
+     */
+    public static void injectionBlacklistGate(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel attr = addNode(graph, VertexAttributeInputNode.class); // default = Position -> preview vPos
+        wire(graph, emission.getInputsById().get("color"), attr.getOutputsById().get("out"));
+        assertTrue(helper, "leaked preview varying rejects the snippet", injectionSnippet(graph) == null);
+        helper.succeed();
     }
 
     /** The formerly fragment-only UV and Vertex Color nodes are now stage-agnostic: pulled into a vertex
@@ -624,7 +966,9 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph compiled = compile(new RenderTypeGraph());
         String fsh = compiled.fragmentSource();
         assertEq(helper, "texture(...) emitted once", 1, count(fsh, "texture("));
-        assertEq(helper, "apply_fog(...) emitted once", 1, count(fsh, "apply_fog("));
+        // apply_fog is now an inline function (unified-UBO policy): one definition + exactly one call.
+        assertEq(helper, "apply_fog defined once", 1, count(fsh, "vec4 apply_fog("));
+        assertEq(helper, "apply_fog called once (definition + call)", 2, count(fsh, "apply_fog("));
         helper.succeed();
     }
 
@@ -2052,11 +2396,12 @@ public final class ShaderCompilerGameTest {
 
     /** Each Screen Position mode emits its distinctive GLSL formula. */
     public static void screenPositionModesEmitGlsl(GameTestHelper helper) {
-        assertTrue(helper, "pixel mode scales the screen uv to pixels", screenPosFsh("pixel").contains("* ScreenSize, 0.0, 0.0)"));
+        assertTrue(helper, "pixel mode scales the screen uv to pixels",
+                screenPosFsh("pixel").contains("* kg_globals.ScreenSize, 0.0, 0.0)"));
         assertTrue(helper, "center mode remaps to -1..1", screenPosFsh("center").contains("* 2.0 - 1.0"));
         assertTrue(helper, "tiled mode tiles with fract", screenPosFsh("tiled").contains("fract("));
         assertTrue(helper, "default mode normalises by ScreenSize",
-                screenPosFsh("default").contains("gl_FragCoord.xy / ScreenSize"));
+                screenPosFsh("default").contains("gl_FragCoord.xy / kg_globals.ScreenSize"));
         assertTrue(helper, "raw mode carries the fragment eye depth in W",
                 screenPosFsh("raw").contains("kg_eye_depth(gl_FragCoord.z"));
         helper.succeed();

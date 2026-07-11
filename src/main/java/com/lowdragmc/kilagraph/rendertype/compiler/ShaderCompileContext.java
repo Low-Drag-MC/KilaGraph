@@ -72,6 +72,14 @@ public final class ShaderCompileContext {
         return compiler.isPreview();
     }
 
+    /** Whether this is an Iris-injection compile (compiling the fragment into a {@code kg_surface} function
+     *  for a shaderpack program). Nodes needing Minecraft engine state the pack program can't provide — fog
+     *  especially (the shaderpack applies its own in composite) — should pass through here so the graph stays
+     *  injectable rather than pulling an unsupported {@code #moj_import} that rejects it. */
+    public boolean isInjection() {
+        return compiler.isInjection();
+    }
+
     // ---- vertex attributes -------------------------------------------------------------------
 
     /**
@@ -220,9 +228,33 @@ public final class ShaderCompileContext {
         return compiler.screenUv();
     }
 
+    /** The framebuffer size in pixels ({@code vec2}) from KilaGraph's own KG_Globals UBO — no Minecraft
+     *  include, so screen-space nodes stay injectable under a shaderpack. */
+    public ShaderExpr screenSize() {
+        return compiler.screenSize();
+    }
+
+    /** Injection-only: the reconstructed <b>view-space</b> position of this fragment ({@code vec3}); negate for
+     *  the surface&rarr;camera direction (length = distance). Only valid when {@link #isInjection()}. */
+    public ShaderExpr reconstructedViewPos() {
+        return compiler.reconstructedViewPos();
+    }
+
     /** Sample the captured opaque scene colour (vec3) at {@code uv} — Unity's Scene Color node. */
     public ShaderExpr sampleSceneColor(ShaderExpr uv) {
         return compiler.sampleSceneColor(uv);
+    }
+
+    /** The default (unconnected-uv) screen-space UV for Scene Depth — {@link #screenUv()} normally; under
+     *  injection an exact {@code textureSize}-based lookup into Iris's {@code depthtex1} (whose size can
+     *  differ from the window under Iris render-quality scaling). */
+    public ShaderExpr sceneDepthDefaultUv() {
+        return compiler.sceneDepthDefaultUv();
+    }
+
+    /** The default (unconnected-uv) screen-space UV for Scene Color — see {@link #sceneDepthDefaultUv()}. */
+    public ShaderExpr sceneColorDefaultUv() {
+        return compiler.sceneColorDefaultUv();
     }
 
     /** Raw hardware scene depth {@code [0,1]} at {@code uv} (Unity Scene Depth "Raw"). */
@@ -296,6 +328,16 @@ public final class ShaderCompileContext {
      */
     public ShaderExpr meshNormal() {
         return compiler.meshNormal();
+    }
+
+    /**
+     * The <b>object-space</b> mesh normal as a stage-agnostic input: the model normal (raw {@code Normal}
+     * attribute, or a driven Normal block's value) in the vertex stage, the interpolated
+     * {@code kg_objectNormal} varying in the fragment stage, {@code vNormal} in previews. The single
+     * source the Normal node builds its spaces from — so a Normal block modifies them all.
+     */
+    public ShaderExpr objectNormal() {
+        return compiler.objectNormal();
     }
 
     /**

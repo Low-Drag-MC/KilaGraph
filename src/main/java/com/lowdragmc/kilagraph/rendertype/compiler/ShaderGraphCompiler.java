@@ -1,10 +1,12 @@
 package com.lowdragmc.kilagraph.rendertype.compiler;
 
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.runtime.KGEngineUniforms;
+import com.lowdragmc.kilagraph.rendertype.runtime.KGFogUniforms;
 import com.lowdragmc.kilagraph.rendertype.runtime.KGTransformUniforms;
 import com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IVariableNode;
@@ -21,7 +23,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
-import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
@@ -112,10 +113,35 @@ public class ShaderGraphCompiler {
     private StageScope current;
     /** Preview mode: compile a single port onto a flat quad, substituting stage inputs with defaults. */
     private boolean preview;
+    /** Injection mode ({@link #buildInjectionSnippet()}): compile the fragment surface into a
+     *  {@code kg_surface(vec2 kg_uv)} function for an Iris shaderpack program. Implies {@link #preview}
+     *  (varyings degrade to preview defaults), but the primary mesh uv resolves to the function parameter
+     *  {@code kg_uv} rather than the preview quad's {@code vUv}. */
+    private boolean injection;
     /** Editor whole-graph preview ({@code ShaderPreviewTool}): compiles the real graph, but screen-space
      *  defaults (see {@link #screenUv()}) map the whole capture onto the preview geometry rather than the
      *  panel's screen sub-rect, so the preview shows the entire scene. In-world rendering is unaffected. */
     private boolean editorPreview;
+    /** Set in injection mode when a node read the mesh normal ({@link #meshNormal()} → the
+     *  {@code kg_normalView} global {@code IrisShaderInjector} fills from the pack's own {@code normal}
+     *  varying). viewDir/position/screen need only {@code gl_FragCoord} + our UBOs (see the reconstruction
+     *  helpers around {@code reconstructedViewPos()}); the vsh injection is limited to the
+     *  attribute read-hijack and adds no varyings (see {@link InjectionSnippet#usesGeometry()}). */
+    private boolean usesGeometryVarying;
+    /** Vertex-injection mode (inside {@link #buildInjectionSnippet()}): compiling the vertex blocks'
+     *  Position/Normal expressions into the body of a {@code kg_vpos_<id>(vec3 kg_pos, vec3 kg_n)} /
+     *  {@code kg_vnormal_<id>(...)} function for an Iris shaderpack's <b>vertex</b> shader. The mesh
+     *  position/normal resolve to the function parameters ({@code kg_pos}/{@code kg_n} — the pack's own
+     *  {@code iris_Position}/{@code iris_Normal}); fragment-only reconstructions ({@code gl_FragCoord})
+     *  are never legal here and the injection-mode helpers branch accordingly. */
+    private boolean injectionVertex;
+    /** GLSL name of the vertex stage's displaced model position ({@code kg_vertexPos}) when a driven
+     *  Position block replaced the mesh position — {@link #modelPosition()} then returns it, so
+     *  gl_Position, the fog distances, {@code kg_modelPos} and the view direction all follow. Null =
+     *  identity (the block is absent/unconnected) and the emitted GLSL is byte-identical to before. */
+    @Nullable private String displacedPosition;
+    /** GLSL name of the displaced model normal ({@code kg_vertexNormal}); see {@link #modelNormal()}. */
+    @Nullable private String displacedNormal;
     /** KilaGraph-managed UBOs any node referenced (engine globals, transforms, or a mod's own block).
      *  Each is declared in the GLSL + bound on the pipeline + uploaded each frame — the single, generic
      *  extension point that replaced per-block {@code usesX} flags. */
@@ -171,6 +197,37 @@ public class ShaderGraphCompiler {
         ContextNodeModel vertexStage = asContext(graph.getVertexStageModel(), "vertex");
         ContextNodeModel fragmentStage = asContext(graph.getFragmentStageModel(), "fragment");
 
+        // 0) Vertex model outputs (the Unity-like Position/Normal blocks) — MUST run before the fragment
+        //    pass: it sets displacedPosition/displacedNormal, and the fragment pass lazily emits varying
+        //    assignments (kg_modelPos, kg_worldViewDir, fog distances, kg_objectNormal/kg_worldNormal)
+        //    whose vsh defaults go through modelPosition()/modelNormal() and must see the displaced refs.
+        //    The refs are set only AFTER both blocks emitted, so f_position and f_normal both read the
+        //    ORIGINAL mesh inputs. Skipped entirely when the advanced glPosition block is present (its
+        //    clip-space output owns the vertex stage; model-space blocks would be ambiguous under it).
+        current = vertex;
+        boolean legacyVertexBlock = vertexStage.getBlocks().stream()
+                .anyMatch(b -> nodeOf(b) instanceof IVertexPositionBlock);
+        if (!legacyVertexBlock) {
+            VertexOutputs vout = new VertexOutputs();
+            for (BlockNodeModel block : vertexStage.getBlocks()) {
+                Node node = nodeOf(block);
+                if (node instanceof IVertexOutputBlock vb) {
+                    vb.emitVertex(new ShaderCompileContext(this, block), vout);
+                }
+            }
+            if (vout.position != null) {
+                line("vec3 kg_vertexPos = " + convert(vout.position, GlslType.VEC3).code() + ";");
+                displacedPosition = "kg_vertexPos";
+            }
+            if (vout.normal != null) {
+                line("vec3 kg_vertexNormal = " + convert(vout.normal, GlslType.VEC3).code() + ";");
+                displacedNormal = "kg_vertexNormal";
+            }
+        } else if (vertexStage.getBlocks().stream().anyMatch(b -> nodeOf(b) instanceof IVertexOutputBlock)) {
+            Kilagraph.LOGGER.warn("[KilaGraph] graph has both the advanced glPosition block and the "
+                    + "model-space Position/Normal blocks — glPosition wins; Position/Normal are ignored.");
+        }
+
         // 1) Fragment stage: pull from each fragment semantic block. This lazily builds the
         //    varyings it depends on in the vertex scope.
         current = fragment;
@@ -195,20 +252,44 @@ public class ShaderGraphCompiler {
             }
         }
         if (position == null) {
-            // No explicit position block — fall back to the standard MVP transform (matching block.vsh,
-            // which transforms Position + ModelOffset).
+            // No explicit glPosition block — the standard MVP transform (matching block.vsh, which
+            // transforms Position + ModelOffset), of the DISPLACED model position when a driven Position
+            // block set one (see modelPosition()). This is the normal path since the Unity-like blocks
+            // replaced glPosition as the default. Register the Projection UBO like the old block did.
             addInclude("minecraft:projection.glsl");
+            useBuiltinUbo("Projection");
             position = new ShaderExpr("ProjMat * ModelViewMat * vec4(" + modelPosition().code() + ", 1.0)", GlslType.VEC4);
         }
         line("gl_Position = " + position.code() + ";");
 
         String vsh = assembleVertex();
         String fsh = assembleFragment(out);
+        // Also compile an Iris-injection snippet (a fresh compiler, fragment-only, injection mode) so a
+        // material drawn under a shaderpack can run its real surface shading inside the pack's gbuffers
+        // program. Skipped for the editor whole-graph preview (rendered in GUI/PIP, which Iris never
+        // overrides — so it must not register / trigger Iris reloads). Optional: a failure here never
+        // breaks the (non-Iris) material. Deliberately built even when Iris is absent: it is pure string
+        // work (no GL, no Iris classes) on the rare compile path, keeps the compiled artifact identical
+        // across environments, and stays assertable in headless GameTests — every Iris RUNTIME effect
+        // (surface registration, pack reloads, per-draw binds) is gated on IrisCompat.ENABLED instead.
+        InjectionSnippet injectionSnippet = null;
+        if (!editorPreview) {
+            try {
+                // Pass THIS compile's finished layout so the snippet's KG_Material declaration matches the
+                // buffer the material will bind (full field list — see buildInjectionSnippet's javadoc).
+                injectionSnippet = new ShaderGraphCompiler(graph).buildInjectionSnippet(layout);
+            } catch (RuntimeException e) {
+                // Not injection-compatible (or a transient model issue) — fall back to passthrough under Iris.
+                Kilagraph.LOGGER.warn("[KilaGraph][Iris] injection snippet compile failed -> passthrough", e);
+            }
+        }
         return new CompiledShaderGraph(vsh, fsh, layout, new ArrayList<>(builtinUbos), new ArrayList<>(uniformBlocks),
                 new ArrayList<>(stageErrors.values()), graph.getSettings(),
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes));
+                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth,
+                out.alphaDiscardCutoff != null, new ArrayList<>(missingAttributes),
+                injectionSnippet);
     }
 
     /**
@@ -242,12 +323,227 @@ public class ShaderGraphCompiler {
 
         String vsh = assemblePreviewVertex();
         String fsh = assemblePreviewFragment(color);
+        // Node previews render in the editor GUI (offscreen PIP), which Iris never overrides — no injection.
         return new CompiledShaderGraph(vsh, fsh, layout, new ArrayList<>(builtinUbos), new ArrayList<>(uniformBlocks),
                 new ArrayList<>(stageErrors.values()), PREVIEW_SETTINGS,
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes));
+                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth,
+                false, new ArrayList<>(missingAttributes),
+                null);
     }
+
+    /**
+     * Compile the fragment surface into an {@link InjectionSnippet} for an Iris shaderpack's shared gbuffers
+     * program (see {@code IrisShaderInjector}). Runs only the fragment stage (no {@code gl_Position}) in
+     * injection mode: mesh uv resolves to the {@code kg_surface(vec2 kg_uv)} parameter and vertex varyings
+     * degrade to preview defaults, so the body references only the {@code KG_Material} UBO, the graph's own
+     * samplers, and KilaGraph-managed UBOs — all bound onto the shaderpack program at draw.
+     *
+     * <p>Returns {@code null} when the graph is not injection-compatible: its fragment needs a Minecraft
+     * engine include ({@code #moj_import}, i.e. Fog/Lighting/Projection) or the captured scene
+     * ({@code KG_SceneColor/Depth}), or a stage-affinity error was found. Such a material falls back to the
+     * M0 passthrough under Iris. Call on a fresh compiler instance (it mutates stage scope state).</p>
+     */
+    @Nullable
+    public InjectionSnippet buildInjectionSnippet() {
+        return buildInjectionSnippet(null);
+    }
+
+    /**
+     * @param fullLayout the MAIN compile's complete material layout, when available. The snippet's
+     *                   {@code KG_Material} declaration must use the <b>full</b> field list: the material
+     *                   binds the main compile's buffer, and an injection-neutralized branch (e.g. ApplyFog's
+     *                   passthrough) may skip pulls of EXPOSED fields the vanilla fragment registers — a
+     *                   fields-subset declaration would then read the wrong bytes (offset mismatch). A field
+     *                   the injection path pulls that the main layout somehow lacks would reference an
+     *                   undeclared name and be caught by the GL validation (→ passthrough), never corrupt.
+     */
+    @Nullable
+    public InjectionSnippet buildInjectionSnippet(@Nullable MaterialUniformLayout fullLayout) {
+        injection = true;
+        preview = true; // reuse varying substitution (vertexColor->white, normal->+Y, viewDir->+Z, ...)
+        current = fragment;
+        ContextNodeModel fragmentStage = asContext(graph.getFragmentStageModel(), "fragment");
+        FragmentOutputs out = new FragmentOutputs();
+        for (BlockNodeModel block : fragmentStage.getBlocks()) {
+            Node node = nodeOf(block);
+            if (node instanceof IFragmentOutputBlock fb) {
+                var ctx = new ShaderCompileContext(this, block);
+                fb.emitFragment(ctx, out);
+            }
+        }
+        // Unsupported subset: a Minecraft engine include (Fog/Lighting/...) can't be satisfied inside the
+        // shaderpack program; a stage error means the GLSL references unavailable data. (Scene Color/Depth
+        // ARE supported: depth reads Iris's depthtex1, colour reads the KG_SceneColor capture bound at draw.)
+        if (!fragment.includes.isEmpty() || !stageErrors.isEmpty()) {
+            // Name the culprit — pairs with IrisSurfaceRegistry's "no injection snippet -> passthrough" line
+            // (which only knows the hash). An include here means some node used a #moj_import-backed
+            // Minecraft uniform in the fragment; the include id tells WHICH node family to make injectable.
+            Kilagraph.LOGGER.info("[KilaGraph][Iris] injection snippet rejected: fragment includes={}, stageErrors={}",
+                    fragment.includes, stageErrors.values());
+            return null;
+        }
+
+        // Vertex sub-compile: the Position/Normal blocks' expressions for the pack vsh's kg_vpos_<id>/
+        // kg_vnormal_<id> functions (mesh position/normal -> the kg_pos/kg_n parameters, see the
+        // injectionVertex branches). Runs on THIS compiler instance and BEFORE the decls assembly below,
+        // so vertex-registered UBOs/samplers/EXPOSED fields flow into the one shared snippet — the
+        // material's injection-only binding then covers them with zero extra plumbing. A rejected vertex
+        // part degrades to fragment-only (shading survives, displacement dropped) and rolls its
+        // registrations back.
+        VertexSnippetParts vparts = buildVertexSnippetParts();
+
+        // The block declaration must mirror the buffer that will actually be bound — the MAIN compile's
+        // full layout (see the fullLayout javadoc). Sampler declarations stay the snippet's own set (a
+        // main-only sampler would just be inactive, and Sampler1/2 must never leak into the snippet).
+        MaterialUniformLayout blockLayout = fullLayout != null ? fullLayout : layout;
+        List<String> decls = new ArrayList<>();
+        if (blockLayout.hasGradientField() || fragment.usesGradient) decls.add(GradientGlsl.STRUCT);
+        if (!blockLayout.isEmpty()) decls.add(blockLayout.blockGlsl());
+        for (String s : layout.samplers()) decls.add("uniform sampler2D " + s + ";");
+        uniformBlocks.stream()
+                .sorted(java.util.Comparator.comparing(ShaderUniformBlock::uboName))
+                .forEach(b -> decls.add(b.declareGlsl()));
+
+        StringBuilder body = new StringBuilder(fragment.body);
+        // LabPBR emission (_s.a) is a scalar glow intensity (glow colour = albedo). The dedicated float
+        // Emissiveness block drives it directly; else we fall back to the max channel of the vec3 Emission
+        // colour block (hoisted so the struct arg references it once). (Under a shaderpack the pack does its
+        // own alpha test, so the M1 alpha-discard is intentionally dropped here.)
+        String emissionArg = "0.0";
+        if (out.emissiveness != null) {
+            emissionArg = out.emissiveness.code();
+        } else if (out.emission != null) {
+            String e = out.emission.code();
+            body.append("    float kg_emission_i = max(max((").append(e).append(").r, (")
+                    .append(e).append(").g), (").append(e).append(").b);\n");
+            emissionArg = "kg_emission_i";
+        }
+        String args = String.join(", ",
+                out.baseColor != null ? out.baseColor.code() : "vec3(1.0)",                 // albedo
+                out.alpha != null ? out.alpha.code() : "1.0",                               // alpha
+                out.normalTS != null ? out.normalTS.code() : "vec3(0.0, 0.0, 1.0)",         // normalTS
+                out.smoothness != null ? out.smoothness.code() : "0.0",                     // smoothness
+                out.metallic != null ? out.metallic.code() : "0.0",                         // metallic
+                emissionArg,                                                                // emission
+                out.ao != null ? out.ao.code() : "1.0",                                     // ao
+                out.height != null ? out.height.code() : "1.0",                             // height
+                out.porosity != null ? out.porosity.code() : "0.0",                         // porosity
+                out.sss != null ? out.sss.code() : "0.0");                                  // sss
+        // Structural gate against "broken but accepted" snippets: injection implies preview, so a node
+        // that hand-rolls an isPreview() branch (instead of the injection-aware helpers) can leak a
+        // preview-quad varying (vNormal/vPos/vUv) or a pipeline-only sampler (Sampler1/Sampler2) into the
+        // snippet WITHOUT tripping the include/stage-error guard — undefined identifiers in the pack
+        // program. Catch them here (works headless too); the GL whole-source self-check stays the last line.
+        String assembled = String.join("\n", decls) + "\n"
+                + String.join("\n", fragment.functions.values()) + "\n" + body + "\n" + args;
+        var leak = INJECTION_BLACKLIST.matcher(assembled);
+        if (leak.find()) {
+            Kilagraph.LOGGER.warn("[KilaGraph][Iris] injection snippet rejected: references the "
+                    + "pipeline/preview-only identifier '{}' — some node's compile() must branch on "
+                    + "isInjection() before isPreview() (or use the injection-aware ctx helpers).", leak.group());
+            return null;
+        }
+        return new InjectionSnippet(decls, new ArrayList<>(fragment.functions.values()),
+                body.toString(), args, usesGeometryVarying, usesSceneDepth,
+                new ArrayList<>(uniformBlocks), new LinkedHashMap<>(samplerDefaults),
+                vparts.positionBody, vparts.positionExpr, vparts.normalBody, vparts.normalExpr,
+                vparts.functions, vparts.legacy);
+    }
+
+    /** The vertex half of an injection snippet (see {@link #buildVertexSnippetParts()}). */
+    private record VertexSnippetParts(@Nullable String positionBody, @Nullable String positionExpr,
+                                      @Nullable String normalBody, @Nullable String normalExpr,
+                                      List<String> functions, boolean legacy) {
+        static final VertexSnippetParts NONE = new VertexSnippetParts(null, null, null, null, List.of(), false);
+    }
+
+    /**
+     * Compile the driven Position/Normal blocks in <em>vertex-injection</em> mode into the pieces of the
+     * pack-vsh functions {@code kg_vpos_<id>(vec3 kg_pos, vec3 kg_n)} / {@code kg_vnormal_<id>(...)}.
+     * Unconnected blocks (the default graph) produce nothing — the injector then leaves pack vertex
+     * sources completely untouched. The advanced glPosition block is vanilla-only: no vertex parts, the
+     * registry logs the degrade. Rejection (an include or a fragment-only identifier leaking in) drops
+     * only the vertex parts and rolls back their UBO/sampler registrations — fragment shading survives.
+     */
+    private VertexSnippetParts buildVertexSnippetParts() {
+        ContextNodeModel vertexStage = asContext(graph.getVertexStageModel(), "vertex");
+        boolean legacy = vertexStage.getBlocks().stream()
+                .anyMatch(b -> nodeOf(b) instanceof IVertexPositionBlock);
+        if (legacy) return new VertexSnippetParts(null, null, null, null, List.of(), true);
+
+        var blocksBefore = new LinkedHashSet<>(uniformBlocks);
+        var samplersBefore = new LinkedHashMap<>(samplerDefaults);
+        String positionBody = null, positionExpr = null, normalBody = null, normalExpr = null;
+        injectionVertex = true;
+        StageScope saved = current;
+        current = vertex;
+        try {
+            for (BlockNodeModel block : vertexStage.getBlocks()) {
+                Node node = nodeOf(block);
+                if (!(node instanceof IVertexOutputBlock vb)) continue;
+                // Each block compiles into its own function body: memoized temps must not leak across
+                // (they live in different GLSL functions), so the cache resets per block.
+                vertex.cache.clear();
+                int mark = vertex.body.length();
+                VertexOutputs vout = new VertexOutputs();
+                vb.emitVertex(new ShaderCompileContext(this, block), vout);
+                if (vout.position != null) {
+                    positionExpr = convert(vout.position, GlslType.VEC3).code();
+                    positionBody = vertex.body.substring(mark);
+                }
+                if (vout.normal != null) {
+                    normalExpr = convert(vout.normal, GlslType.VEC3).code();
+                    normalBody = vertex.body.substring(mark);
+                }
+            }
+        } finally {
+            injectionVertex = false;
+            current = saved;
+        }
+        if (positionExpr == null && normalExpr == null) return VertexSnippetParts.NONE;
+
+        List<String> functions = new ArrayList<>(vertex.functions.values());
+        String assembled = String.join("\n", functions) + "\n"
+                + (positionBody != null ? positionBody : "") + "\n" + (positionExpr != null ? positionExpr : "")
+                + "\n" + (normalBody != null ? normalBody : "") + "\n" + (normalExpr != null ? normalExpr : "");
+        String reason = null;
+        if (!vertex.includes.isEmpty()) {
+            reason = "vertex includes=" + vertex.includes;
+        } else {
+            var leak = VERTEX_INJECTION_BLACKLIST.matcher(assembled);
+            if (leak.find()) reason = "fragment/preview-only identifier '" + leak.group() + "'";
+        }
+        if (reason != null) {
+            // Degrade to fragment-only: the pack renders the surface undisplaced. Roll back UBO/sampler
+            // registrations the dropped vertex part made, so the material doesn't bind dead dependencies.
+            Kilagraph.LOGGER.info("[KilaGraph][Iris] vertex displacement not injectable ({}) — "
+                    + "fragment shading keeps working; the shaderpack applies its standard transform.", reason);
+            uniformBlocks.clear();
+            uniformBlocks.addAll(blocksBefore);
+            samplerDefaults.clear();
+            samplerDefaults.putAll(samplersBefore);
+            return VertexSnippetParts.NONE;
+        }
+        return new VertexSnippetParts(positionBody, positionExpr, normalBody, normalExpr, functions, false);
+    }
+
+    /** Identifiers that exist only in the preview quad vsh ({@code vNormal/vPos/vUv}) or the vanilla
+     *  pipeline's special samplers ({@code Sampler1/Sampler2}) — never valid inside an injected shaderpack
+     *  program. Word-bounded so GLSL's lowercase {@code sampler2D} type never matches. */
+    private static final java.util.regex.Pattern INJECTION_BLACKLIST =
+            java.util.regex.Pattern.compile("\\b(?:vNormal|vPos|vUv|Sampler1|Sampler2)\\b");
+
+    /** The vertex-snippet variant of {@link #INJECTION_BLACKLIST}: additionally, nothing of the FRAGMENT
+     *  injection machinery may leak into a pack vsh — {@code kg_uv} (the kg_surface parameter),
+     *  {@code gl_FragCoord}, the {@code kg_recon_*} reconstruction helpers, the {@code kg_normalView}
+     *  global — nor bare Minecraft attribute/uniform names (undefined in the pack's flattened vsh; the
+     *  lookbehind spares our own {@code kg_transforms.ModelViewMat}-style accessors). */
+    private static final java.util.regex.Pattern VERTEX_INJECTION_BLACKLIST =
+            java.util.regex.Pattern.compile("\\b(?:vNormal|vPos|vUv|kg_uv|gl_FragCoord|kg_recon_\\w+|kg_normalView"
+                    + "|Sampler1|Sampler2)\\b"
+                    + "|(?<![\\w.])(?:Position|Normal|Color|UV0|UV1|UV2|ModelOffset|ProjMat|ModelViewMat)\\b");
 
     /**
      * Resolve a port's value for preview. A varying-block output (e.g. TexCoord) has no ShaderNode to
@@ -271,7 +567,11 @@ public class ShaderGraphCompiler {
 
     /** Default value for a vertex varying when previewing without a vertex stage. */
     private ShaderExpr previewVaryingDefault(String varyingName, GlslType type) {
-        if ("uv0".equals(varyingName)) return new ShaderExpr("vUv", GlslType.VEC2);
+        // Vertex-injection: kg_uv is the FRAGMENT kg_surface parameter and must never leak into the
+        // vertex snippet (a pack vsh has no such name) — a uv-driven value degrades to a constant there.
+        if ("uv0".equals(varyingName)) {
+            return new ShaderExpr(injectionVertex ? "vec2(0.0)" : injection ? "kg_uv" : "vUv", GlslType.VEC2);
+        }
         if ("vertexColor".equals(varyingName)) return new ShaderExpr("vec4(1.0)", GlslType.VEC4);
         return zero(type);
     }
@@ -305,7 +605,10 @@ public class ShaderGraphCompiler {
      * not a misleading gradient). Shared first-writer-wins with the matching varying block / fragment input.
      */
     protected ShaderExpr meshUv(RenderTypeGraphTypes.UvChannel channel) {
-        ShaderExpr quadUv = new ShaderExpr("vUv", GlslType.VEC2);
+        // Injection: UV0 is the FRAGMENT kg_surface() function parameter (kg_uv) — in the VERTEX snippet
+        // that name doesn't exist, so a uv-driven displacement degrades to a constant (like preview UV1/2).
+        // Preview: the quad's gradient uv.
+        ShaderExpr quadUv = new ShaderExpr(injectionVertex ? "vec2(0.0)" : injection ? "kg_uv" : "vUv", GlslType.VEC2);
         ShaderExpr flatUv = new ShaderExpr("vec2(0.0)", GlslType.VEC2);
         return switch (channel) {
             case UV0 -> varyingInput("uv0", GlslType.VEC2, () -> uvAttr(KGVertexElements.UV0, false), quadUv);
@@ -325,8 +628,8 @@ public class ShaderGraphCompiler {
                 () -> {
                     addInclude("minecraft:light.glsl");
                     useBuiltinUbo("Lighting");
-                    ShaderExpr normal = attribute(KGVertexElements.NORMAL, GlslType.VEC3,
-                            new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+                    // modelNormal(): a driven Normal block re-lights the default shading too.
+                    ShaderExpr normal = modelNormal();
                     ShaderExpr color = attribute(KGVertexElements.COLOR, GlslType.VEC4,
                             new ShaderExpr("vec4(1.0)", GlslType.VEC4));
                     return new ShaderExpr("minecraft_mix_light(Light0_Direction, Light1_Direction, "
@@ -392,16 +695,17 @@ public class ShaderGraphCompiler {
      * preview. Registers DynamicTransforms + KG_Transforms.
      */
     protected ShaderExpr meshNormal() {
+        if (injection) return injectionNormal();
         return varyingInput("kg_worldNormal", GlslType.VEC3,
                 () -> {
                     addInclude("minecraft:dynamictransforms.glsl"); // ModelViewMat
-                    ShaderExpr n = attribute(KGVertexElements.NORMAL, GlslType.VEC3,
-                            new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+                    // modelNormal(): a driven Normal block feeds the world normal (Fresnel etc.) too.
+                    ShaderExpr n = modelNormal();
                     ShaderExpr iView = transformField("IViewMat", GlslType.MAT4); // view -> world (rotation)
                     return new ShaderExpr("normalize(mat3(" + iView.code() + ") * mat3(ModelViewMat) * "
                             + n.code() + ")", GlslType.VEC3);
                 },
-                // The preview mesh's own (object-space) normal, interpolated. The preview camera looks down
+                // The preview mesh's own (object-space) normal, interpolated — the preview camera looks down
                 // an axis so object space ≈ view space here, and meshViewDir's +Z preview default is the
                 // matching view direction — so dot(normal, viewDir) is correct on sphere/cube/custom alike.
                 new ShaderExpr("vNormal", GlslType.VEC3));
@@ -416,6 +720,7 @@ public class ShaderGraphCompiler {
      * (looking straight at the quad). Registers DynamicTransforms + KG_Transforms.
      */
     protected ShaderExpr meshViewDir() {
+        if (injection) return injectionViewDir();
         return varyingInput("kg_worldViewDir", GlslType.VEC3,
                 () -> {
                     ShaderExpr iView = transformField("IViewMat", GlslType.MAT4); // view -> world (rotation)
@@ -423,6 +728,7 @@ public class ShaderGraphCompiler {
                     return new ShaderExpr("normalize(mat3(" + iView.code() + ") * (-" + viewPos + "))",
                             GlslType.VEC3);
                 },
+                // Preview: +Z (looking straight at the quad).
                 new ShaderExpr("vec3(0.0, 0.0, 1.0)", GlslType.VEC3));
     }
 
@@ -433,8 +739,100 @@ public class ShaderGraphCompiler {
      * space. Preview: {@code vec3(0.0)}.
      */
     protected ShaderExpr meshPosition() {
+        if (injection) return injectionWorldPos();
         return varyingInput("kg_modelPos", GlslType.VEC3, this::modelPosition,
-                new ShaderExpr("vec3(0.0)", GlslType.VEC3));
+                new ShaderExpr("vec3(0.0)", GlslType.VEC3)); // preview: 0
+    }
+
+    // ---- Injection-mode fragment reconstruction (see IrisShaderInjector) --------------------------------
+    // Under a shaderpack the fragment side never relies on the pack's vertex shader (the vsh injection is
+    // limited to the iris_Position/iris_Normal read-hijack — it adds no varyings, and any undefined
+    // reference there would disable the whole pack). The geometry/screen inputs are reconstructed in the fragment from gl_FragCoord and
+    // KilaGraph's own bound UBOs (KG_Globals.ScreenSize + KG_Transforms.IProjMat/IViewMat) — names we control,
+    // so this can never break a pack. Only the smooth surface normal needs the pack: the injector fills a
+    // kg_normalView global from the pack's own view-space normal varying when it can detect one. All outputs
+    // are world-space, matching the non-injection meshNormal/meshViewDir so previews and in-world agree.
+
+    /** The framebuffer size ({@code kg_globals.ScreenSize}) from our own KG_Globals UBO — bound on both the
+     *  vanilla pipeline and the injected shaderpack program, so screen-space nodes work in both without a
+     *  Minecraft include (which would make a graph non-injectable). */
+    protected ShaderExpr screenSize() {
+        useUniformBlock(KGEngineUniforms.BLOCK);
+        return new ShaderExpr(KGEngineUniforms.screenSizeAccessor(), GlslType.VEC2);
+    }
+
+    /** Injection-only: the reconstructed <b>view-space</b> position of this fragment (see the private helper);
+     *  {@code -viewPos} is the surface&rarr;camera direction with length = distance. Used by ViewDirection. */
+    protected ShaderExpr reconstructedViewPos() {
+        return injectionViewPos();
+    }
+
+    /** View-space position of this fragment from {@code gl_FragCoord} + {@code IProjMat} + {@code ScreenSize}.
+     *  Vertex-injection: the vertex's own view position from the {@code kg_pos} parameter instead —
+     *  {@code gl_FragCoord} doesn't exist (and reconstruction isn't needed) in a vertex shader. */
+    private ShaderExpr injectionViewPos() {
+        if (injectionVertex) {
+            useUniformBlock(KGTransformUniforms.BLOCK);
+            return new ShaderExpr("(" + KGTransformUniforms.accessor("ModelViewMat")
+                    + " * vec4(kg_pos, 1.0)).xyz", GlslType.VEC3);
+        }
+        useUniformBlock(KGEngineUniforms.BLOCK);      // ScreenSize
+        useUniformBlock(KGTransformUniforms.BLOCK);   // IProjMat (clip -> view)
+        addFunction("kg_recon_viewPos",
+                "vec3 kg_recon_viewPos() {\n"
+              + "    vec2 kg_ndc = gl_FragCoord.xy / " + KGEngineUniforms.screenSizeAccessor() + " * 2.0 - 1.0;\n"
+              + "    vec4 kg_vp = " + KGTransformUniforms.accessor("IProjMat")
+                    + " * vec4(kg_ndc, gl_FragCoord.z * 2.0 - 1.0, 1.0);\n"
+              + "    return kg_vp.xyz / kg_vp.w;\n}\n");
+        return new ShaderExpr("kg_recon_viewPos()", GlslType.VEC3);
+    }
+
+    /** World-space surface normal: the pack's own view-space normal ({@code kg_normalView}, filled by the
+     *  injector) rotated into world via {@code IViewMat}. */
+    private ShaderExpr injectionNormal() {
+        if (injectionVertex) {
+            // Vertex-injection: the pack vsh's own normal attribute (the kg_n parameter), rotated
+            // object->world with our KG_Transforms mirrors — the same math as the vanilla kg_worldNormal
+            // varying, so previews / vanilla / injected all agree. No kg_normalView machinery needed.
+            useUniformBlock(KGTransformUniforms.BLOCK);
+            return new ShaderExpr("normalize(mat3(" + KGTransformUniforms.accessor("IViewMat")
+                    + ") * mat3(" + KGTransformUniforms.accessor("ModelViewMat") + ") * kg_n)", GlslType.VEC3);
+        }
+        usesGeometryVarying = true; // the injector must declare + fill the kg_normalView global
+        useUniformBlock(KGTransformUniforms.BLOCK);
+        addFunction("kg_recon_normal",
+                "vec3 kg_recon_normal() { return normalize(mat3("
+                        + KGTransformUniforms.accessor("IViewMat") + ") * kg_normalView); }\n");
+        return new ShaderExpr("kg_recon_normal()", GlslType.VEC3);
+    }
+
+    /** World-space surface&rarr;camera view direction from the reconstructed view position. */
+    private ShaderExpr injectionViewDir() {
+        if (injectionVertex) {
+            ShaderExpr viewPos = injectionViewPos(); // kg_pos-based; registers KG_Transforms
+            return new ShaderExpr("normalize(mat3(" + KGTransformUniforms.accessor("IViewMat")
+                    + ") * (-" + viewPos.code() + "))", GlslType.VEC3);
+        }
+        injectionViewPos();
+        addFunction("kg_recon_viewDir",
+                "vec3 kg_recon_viewDir() { return normalize(mat3("
+                        + KGTransformUniforms.accessor("IViewMat") + ") * (-kg_recon_viewPos())); }\n");
+        return new ShaderExpr("kg_recon_viewDir()", GlslType.VEC3);
+    }
+
+    /** Camera-relative world position from the reconstructed view position ({@code IViewMat} is rotation-only,
+     *  so this is world-space relative to the camera — good enough for world-ish position effects). */
+    private ShaderExpr injectionWorldPos() {
+        if (injectionVertex) {
+            // The vertex's own model position (matching meshPosition()'s model-space semantics better
+            // than the fragment path's camera-relative reconstruction can).
+            return new ShaderExpr("kg_pos", GlslType.VEC3);
+        }
+        injectionViewPos();
+        addFunction("kg_recon_worldPos",
+                "vec3 kg_recon_worldPos() { return mat3("
+                        + KGTransformUniforms.accessor("IViewMat") + ") * kg_recon_viewPos(); }\n");
+        return new ShaderExpr("kg_recon_worldPos()", GlslType.VEC3);
     }
 
     /**
@@ -462,12 +860,12 @@ public class ShaderGraphCompiler {
                 new ShaderExpr("0.0", GlslType.FLOAT));
     }
 
-    /** A raw Minecraft {@code Fog} UBO field accessor (e.g. {@code FogColor}, {@code FogEnvironmentalStart}),
-     *  registering the fog include + builtin UBO so the field resolves. Mirrors {@code FogUboNode}. */
+    /** A vanilla fog parameter (e.g. {@code FogColor}, {@code FogEnvironmentalStart}) from the
+     *  {@code KG_Fog} slice-view of Minecraft's own Fog buffer (see {@code KGFogUniforms} — identical
+     *  values, no {@code #moj_import}, so fog-reading graphs stay injectable under a shaderpack). */
     ShaderExpr fogField(String name, GlslType type) {
-        addInclude("minecraft:fog.glsl");
-        useBuiltinUbo("Fog");
-        return new ShaderExpr(name, type);
+        useUniformBlock(KGFogUniforms.BLOCK);
+        return new ShaderExpr(KGFogUniforms.accessor(name), type);
     }
 
     /**
@@ -478,8 +876,39 @@ public class ShaderGraphCompiler {
      * {@code dynamictransforms.glsl} import to the current (vertex) stage.
      */
     protected ShaderExpr modelPosition() {
+        // Vertex-injection: the position is the kg_vpos/kg_vnormal function parameter — the pack's own
+        // iris_Position attribute (its ModelOffset equivalent stays outside f, added by the pack's chain).
+        if (injectionVertex) return new ShaderExpr("kg_pos", GlslType.VEC3);
         addInclude("minecraft:dynamictransforms.glsl");
+        // A driven Position block replaces the mesh position for the WHOLE vsh — gl_Position, the fog
+        // distances, kg_modelPos and the view direction all read this single seam.
+        if (displacedPosition != null) return new ShaderExpr(displacedPosition, GlslType.VEC3);
         return new ShaderExpr("(" + attributeRef(KGVertexElements.POSITION) + " + ModelOffset)", GlslType.VEC3);
+    }
+
+    /**
+     * The model-space normal every consumer reads (the lit vertex colour, the world-normal varying, the
+     * Normal node's object-space source): the displaced {@code kg_vertexNormal} when a driven Normal
+     * block set one, else the raw {@code Normal} attribute (missing element degrades to object +Y).
+     * Vertex-injection: the {@code kg_n} function parameter (the pack's own {@code iris_Normal}).
+     */
+    protected ShaderExpr modelNormal() {
+        if (injectionVertex) return new ShaderExpr("kg_n", GlslType.VEC3);
+        if (displacedNormal != null) return new ShaderExpr(displacedNormal, GlslType.VEC3);
+        return attribute(KGVertexElements.NORMAL, GlslType.VEC3,
+                new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+    }
+
+    /**
+     * The object-space mesh normal as a stage-agnostic input (the Normal node's source): the raw
+     * {@link #modelNormal()} in the vertex stage, the interpolated {@code kg_objectNormal} varying in the
+     * fragment stage, the preview quad's {@code vNormal} in previews. Injection-mode callers branch to
+     * the reconstruction path before reaching this (see {@code NormalNode}).
+     */
+    protected ShaderExpr objectNormal() {
+        if (injectionVertex) return new ShaderExpr("kg_n", GlslType.VEC3);
+        return varyingInput("kg_objectNormal", GlslType.VEC3, this::modelNormal,
+                new ShaderExpr("vNormal", GlslType.VEC3));
     }
 
     /** The element keys actually declared as {@code in} attributes in the current compile: the graph's
@@ -492,6 +921,13 @@ public class ShaderGraphCompiler {
     /** Whether this is a per-node preview compile (single fragment quad; no real vertex stage). */
     protected boolean isPreview() {
         return preview;
+    }
+
+    /** Whether this is an Iris-injection compile ({@link #buildInjectionSnippet()}). Nodes that depend on
+     *  Minecraft engine state the shaderpack program can't provide (e.g. fog — the pack applies its own in
+     *  its composite pass) should degrade to a no-op/pass-through here so the graph stays injectable. */
+    boolean isInjection() {
+        return injection;
     }
 
     /** Whether the given vertex element is declared in the active vertex format (so its raw {@code in}
@@ -584,8 +1020,11 @@ public class ShaderGraphCompiler {
 
     /** Minecraft's builtin {@code Globals.GameTime} (day fraction). Bound by {@code bindDefaultUniforms}. */
     ShaderExpr mcGameTime() {
-        addInclude("minecraft:globals.glsl");
-        return new ShaderExpr("GameTime", GlslType.FLOAT);
+        // Always KG_Globals (same day-fraction value as Minecraft's Globals.GameTime): a #moj_import include
+        // would reject the whole graph under a shaderpack, and one unconditional source keeps every compile
+        // mode identical (the unified-UBO policy — nodes never read Minecraft blocks in the fragment path).
+        useUniformBlock(KGEngineUniforms.BLOCK);
+        return new ShaderExpr(KGEngineUniforms.gameTimeAccessor(), GlslType.FLOAT);
     }
 
     /** The fallback sampler for an unconnected Sampler2D — declares it + bakes the MC missing-texture. */
@@ -649,16 +1088,36 @@ public class ShaderGraphCompiler {
         return new ShaderExpr(fn + "()", GlslType.CURVE);
     }
 
-    /** Vanilla overlay sampler ({@code Sampler1}); flags the pipeline to enable overlay binding. */
+    /** Sampler name for the injection-neutral all-white texture (overlay/lightmap degrade under a pack). */
+    public static final String NEUTRAL_WHITE_SAMPLER = "kg_NeutralWhite";
+
+    /** Vanilla overlay sampler ({@code Sampler1}); flags the pipeline to enable overlay binding. Under
+     *  injection {@code Sampler1} isn't bound on the pack program (and the vanilla overlay has no pack
+     *  equivalent) — degrade to the all-white neutral: sampling white = no overlay tint. */
     ShaderExpr overlaySampler() {
+        if (injection) return neutralWhiteSampler();
         usesOverlay = true;
         return new ShaderExpr("Sampler1", GlslType.SAMPLER2D);
     }
 
-    /** Vanilla lightmap sampler ({@code Sampler2}); flags the pipeline to enable lightmap binding. */
+    /** Vanilla lightmap sampler ({@code Sampler2}); flags the pipeline to enable lightmap binding. Under
+     *  injection the pack owns lighting — degrade to the all-white neutral (fullbright). */
     ShaderExpr lightmapSampler() {
+        if (injection) return neutralWhiteSampler();
         usesLightmap = true;
         return new ShaderExpr("Sampler2", GlslType.SAMPLER2D);
+    }
+
+    /** A declared sampler baked to KilaGraph's 1×1 white texture — any lookup returns {@code vec4(1.0)}.
+     *  Rides the normal dynamic-sampler path (declared in the snippet decls, bound by
+     *  {@code IrisSurfaceUniform} at a high unit), so it is always well-defined on the injected program. */
+    private ShaderExpr neutralWhiteSampler() {
+        layout.addSampler(NEUTRAL_WHITE_SAMPLER);
+        samplerDefaults.putIfAbsent(NEUTRAL_WHITE_SAMPLER, new SamplerDefault(
+                net.minecraft.resources.Identifier.tryParse("kilagraph:textures/misc/white.png"),
+                com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerFilter.NEAREST,
+                com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerAddress.CLAMP, false));
+        return new ShaderExpr(NEUTRAL_WHITE_SAMPLER, GlslType.SAMPLER2D);
     }
 
     /** Sampler name for the captured opaque scene colour (bound at draw from {@code SceneCaptureManager}). */
@@ -706,10 +1165,15 @@ public class ShaderGraphCompiler {
      *  would sample just that corner of the full-screen capture; there we map the whole captured frame across
      *  the preview geometry's uv (mesh/quad uv) so the preview shows the entire scene.</p> */
     protected ShaderExpr screenUv() {
-        if (preview || editorPreview) return meshUv();
-        addInclude("minecraft:globals.glsl");
-        useBuiltinUbo("Globals");
-        return new ShaderExpr("(gl_FragCoord.xy / ScreenSize)", GlslType.VEC2);
+        // Injection wins over the preview flag it implies: buildInjectionSnippet sets preview=true (to reuse
+        // varying substitution), but injected code runs in-world inside the pack's gbuffers program, where
+        // true screen space is what a ScreenPosition node means — the preview branch would silently return
+        // the mesh uv there.
+        if (!injection && (preview || editorPreview)) return meshUv();
+        // Framebuffer size from our own KG_Globals UBO (bound on both the vanilla pipeline and — crucially —
+        // the injected shaderpack program), so screen-space nodes need no Minecraft include and stay injectable.
+        useUniformBlock(KGEngineUniforms.BLOCK);
+        return new ShaderExpr("(gl_FragCoord.xy / " + KGEngineUniforms.screenSizeAccessor() + ")", GlslType.VEC2);
     }
 
     /** Sample the captured opaque scene colour (vec3) at {@code uv} — Unity's Scene Color. */
@@ -718,15 +1182,37 @@ public class ShaderGraphCompiler {
         return new ShaderExpr("texture(" + s.code() + ", " + convert(uv, GlslType.VEC2).code() + ").rgb", GlslType.VEC3);
     }
 
-    /** Raw hardware depth in {@code [0,1]} (Unity's Scene Depth "Raw"). */
+    /** Raw hardware depth in {@code [0,1]} (Unity's Scene Depth "Raw"). Under injection the read goes
+     *  through Iris's own {@code depthtex1} (the opaque-depth snapshot, semantically ≡ our capture; Iris
+     *  auto-binds it by name) instead of the {@code KG_SceneDepth} capture sampler — which must then NOT be
+     *  registered in the layout, or the snippet would declare a sampler nothing binds. */
     ShaderExpr sampleSceneDepthRaw(ShaderExpr uv) {
+        if (injection) {
+            usesSceneDepth = true; // → InjectionSnippet.usesSceneDepth → the injector declares depthtex1
+            addFunction("kg_scene_depth_raw", SceneGlsl.FN_SCENE_DEPTH_RAW);
+            return new ShaderExpr("kg_scene_depth_raw(" + convert(uv, GlslType.VEC2).code() + ")", GlslType.FLOAT);
+        }
         ShaderExpr s = sceneDepthSampler();
         return new ShaderExpr("texture(" + s.code() + ", " + convert(uv, GlslType.VEC2).code() + ").r", GlslType.FLOAT);
     }
 
+    /** Register the shared depth-linearisation helpers: the {@code kg_scene.glsl} include normally; under
+     *  injection the same bodies inline via {@code addFunction} (an injected pack program can't resolve
+     *  {@code #moj_import}, and a non-empty include set rejects the snippet). Identical GLSL either way —
+     *  {@code SceneGlslTest} pins the two copies together. */
+    private void sceneDepthHelpers() {
+        if (injection) {
+            addFunction("kg_eye_from_ndcz", SceneGlsl.FN_EYE_FROM_NDCZ);
+            addFunction("kg_eye_depth", SceneGlsl.FN_EYE_DEPTH);
+            addFunction("kg_linear01_depth", SceneGlsl.FN_LINEAR01_DEPTH);
+        } else {
+            addInclude("kilagraph:kg_scene.glsl");
+        }
+    }
+
     /** Eye-space distance from the camera in world units (Unity's Scene Depth "Eye"), reconstructed via {@code IProjMat}. */
     ShaderExpr sampleSceneDepthEye(ShaderExpr uv) {
-        addInclude("kilagraph:kg_scene.glsl");
+        sceneDepthHelpers();
         ShaderExpr raw = sampleSceneDepthRaw(uv);
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
         return new ShaderExpr("kg_eye_depth(" + raw.code() + ", " + iproj.code() + ")", GlslType.FLOAT);
@@ -734,10 +1220,32 @@ public class ShaderGraphCompiler {
 
     /** Linearised depth {@code 0}(near)..{@code 1}(far) (Unity's Scene Depth "Linear 01"), reconstructed via {@code IProjMat}. */
     ShaderExpr sampleSceneDepthLinear01(ShaderExpr uv) {
-        addInclude("kilagraph:kg_scene.glsl");
+        sceneDepthHelpers();
         ShaderExpr raw = sampleSceneDepthRaw(uv);
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
         return new ShaderExpr("kg_linear01_depth(" + raw.code() + ", " + iproj.code() + ")", GlslType.FLOAT);
+    }
+
+    /** The default (unconnected-uv) screen-space UV for Scene Depth. Under injection the lookup targets
+     *  Iris's {@code depthtex1}, whose size can differ from the window ({@code ScreenSize}) under Iris
+     *  render-quality scaling — {@code textureSize} is exact by construction (the source is always
+     *  glsl-transformer {@code #version 330 core}, so it's available). Elsewhere it's {@link #screenUv()}
+     *  (which also handles the preview/editor-preview mapping). */
+    ShaderExpr sceneDepthDefaultUv() {
+        if (injection) {
+            return new ShaderExpr("(gl_FragCoord.xy / vec2(textureSize(depthtex1, 0)))", GlslType.VEC2);
+        }
+        return screenUv();
+    }
+
+    /** The default (unconnected-uv) screen-space UV for Scene Color — see {@link #sceneDepthDefaultUv()};
+     *  the injected lookup targets the {@code KG_SceneColor} capture, sized to the Iris render target. */
+    ShaderExpr sceneColorDefaultUv() {
+        if (injection) {
+            return new ShaderExpr("(gl_FragCoord.xy / vec2(textureSize(" + sceneColorSamplerName() + ", 0)))",
+                    GlslType.VEC2);
+        }
+        return screenUv();
     }
 
     /** Eye-space distance of THIS fragment from the camera (world units), reconstructed from
@@ -745,21 +1253,36 @@ public class ShaderGraphCompiler {
      *  {@code sampleSceneDepthEye(uv) - fragmentEyeDepth()} cancels the camera (Unity's ScreenPosition raw
      *  {@code .w} / soft-particle depth fade). Fragment-only. */
     ShaderExpr fragmentEyeDepth() {
-        addInclude("kilagraph:kg_scene.glsl");
+        if (injection) {
+            addFunction("kg_eye_from_ndcz", SceneGlsl.FN_EYE_FROM_NDCZ);
+            addFunction("kg_eye_depth", SceneGlsl.FN_EYE_DEPTH);
+        } else {
+            addInclude("kilagraph:kg_scene.glsl");
+        }
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
         return new ShaderExpr("kg_eye_depth(gl_FragCoord.z, " + iproj.code() + ")", GlslType.FLOAT);
     }
 
     /** Camera near-plane distance (world units), reconstructed from {@code IProjMat}. */
     ShaderExpr cameraNear() {
-        addInclude("kilagraph:kg_scene.glsl");
+        if (injection) {
+            addFunction("kg_eye_from_ndcz", SceneGlsl.FN_EYE_FROM_NDCZ);
+            addFunction("kg_camera_near", SceneGlsl.FN_CAMERA_NEAR);
+        } else {
+            addInclude("kilagraph:kg_scene.glsl");
+        }
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
         return new ShaderExpr("kg_camera_near(" + iproj.code() + ")", GlslType.FLOAT);
     }
 
     /** Camera far-plane distance (world units), reconstructed from {@code IProjMat}. */
     ShaderExpr cameraFar() {
-        addInclude("kilagraph:kg_scene.glsl");
+        if (injection) {
+            addFunction("kg_eye_from_ndcz", SceneGlsl.FN_EYE_FROM_NDCZ);
+            addFunction("kg_camera_far", SceneGlsl.FN_CAMERA_FAR);
+        } else {
+            addInclude("kilagraph:kg_scene.glsl");
+        }
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
         return new ShaderExpr("kg_camera_far(" + iproj.code() + ")", GlslType.FLOAT);
     }
@@ -1199,8 +1722,7 @@ public class ShaderGraphCompiler {
      *  therefore the content hash) is stable regardless of node-traversal order. */
     private void appendUniformBlocks(StringBuilder sb, boolean leadingNewline) {
         uniformBlocks.stream()
-                .sorted(java.util.Comparator.comparing(
-                        com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock::uboName))
+                .sorted(java.util.Comparator.comparing(ShaderUniformBlock::uboName))
                 .forEach(b -> {
                     if (leadingNewline) sb.append('\n');
                     sb.append(b.declareGlsl());

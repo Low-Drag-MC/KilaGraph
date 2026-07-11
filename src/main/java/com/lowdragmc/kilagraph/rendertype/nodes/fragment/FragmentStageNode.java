@@ -34,7 +34,16 @@ public class FragmentStageNode extends ContextNode {
                 FragmentBaseColorBlock.class,
                 FragmentAlphaBlock.class,
                 FragmentEmissionBlock.class,
-                FragmentAlphaDiscardBlock.class
+                FragmentAlphaDiscardBlock.class,
+                // LabPBR surface channels (M2) — only affect rendering under an Iris shaderpack.
+                FragmentNormalBlock.class,
+                FragmentSmoothnessBlock.class,
+                FragmentMetallicBlock.class,
+                FragmentAmbientOcclusionBlock.class,
+                FragmentHeightBlock.class,
+                FragmentPorosityBlock.class,
+                FragmentSubsurfaceBlock.class,
+                FragmentEmissivenessBlock.class
         );
     }
 }

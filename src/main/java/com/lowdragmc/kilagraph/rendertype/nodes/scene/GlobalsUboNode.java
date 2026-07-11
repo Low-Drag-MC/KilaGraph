@@ -32,14 +32,17 @@ public class GlobalsUboNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl");
+        // KG_McGlobals is a slice-view of Minecraft's own Globals buffer (identical values, no #moj_import)
+        // — keeps graphs reading these fields injectable under an Iris shaderpack.
+        ctx.useUniformBlock(com.lowdragmc.kilagraph.rendertype.runtime.KGMcGlobalsUniforms.BLOCK);
+        String g = com.lowdragmc.kilagraph.rendertype.runtime.KGMcGlobalsUniforms.UBO_INSTANCE;
         // CameraBlockPos is an ivec3 in the UBO; cast to vec3 for the float-vector port.
-        ctx.output("CameraBlockPos", new ShaderExpr("vec3(CameraBlockPos)", GlslType.VEC3));
-        ctx.output("CameraOffset", new ShaderExpr("CameraOffset", GlslType.VEC3));
-        ctx.output("ScreenSize", new ShaderExpr("ScreenSize", GlslType.VEC2));
-        ctx.output("GlintAlpha", new ShaderExpr("GlintAlpha", GlslType.FLOAT));
-        ctx.output("GameTime", new ShaderExpr("GameTime", GlslType.FLOAT));
-        ctx.output("MenuBlurRadius", new ShaderExpr("MenuBlurRadius", GlslType.INT));
-        ctx.output("UseRgss", new ShaderExpr("UseRgss", GlslType.INT));
+        ctx.output("CameraBlockPos", new ShaderExpr("vec3(" + g + ".CameraBlockPos)", GlslType.VEC3));
+        ctx.output("CameraOffset", new ShaderExpr(g + ".CameraOffset", GlslType.VEC3));
+        ctx.output("ScreenSize", new ShaderExpr(g + ".ScreenSize", GlslType.VEC2));
+        ctx.output("GlintAlpha", new ShaderExpr(g + ".GlintAlpha", GlslType.FLOAT));
+        ctx.output("GameTime", new ShaderExpr(g + ".GameTime", GlslType.FLOAT));
+        ctx.output("MenuBlurRadius", new ShaderExpr(g + ".MenuBlurRadius", GlslType.INT));
+        ctx.output("UseRgss", new ShaderExpr(g + ".UseRgss", GlslType.INT));
     }
 }

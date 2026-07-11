@@ -7,6 +7,7 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
+import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.texture.AbstractTexture;
@@ -48,6 +49,11 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     private final MaterialUniformBuffer uniforms;
     /** KilaGraph-managed UBOs this material's graph uses — uploaded each draw (HEAD) + bound in the pass. */
     private final java.util.List<ShaderUniformBlock> uniformBlocks;
+    /** UBOs only the Iris-injection snippet references (fragment reconstructions pull blocks the vanilla
+     *  path never needs, e.g. Fresnel's viewDir needs KG_Globals.ScreenSize only under injection). Uploaded
+     *  alongside {@link #uniformBlocks} and bound onto the injected program — but NOT bound on the vanilla
+     *  render pass (the vanilla pipeline doesn't declare them). */
+    private final java.util.List<ShaderUniformBlock> injectionOnlyBlocks;
     private final String contentHash;
     /** Variable display name -> KG_Material field (name + type), for set-by-name uniform updates. */
     private final Map<String, MaterialUniformLayout.Field> uniformFields;
@@ -55,8 +61,13 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     private final Map<String, String> variableSamplers;
     /** Sampler uniform name -> bound texture + params. (Re)bound each draw so setTexture is dynamic. */
     private final Map<String, SamplerDefault> textures;
+    /** Samplers only the Iris-injection snippet bakes (e.g. the {@code kg_NeutralWhite} degrade) — resolved
+     *  alongside {@link #textures} and offered to the Iris binder, but never bound on the vanilla pass. */
+    private final Map<String, SamplerDefault> injectionOnlyTextures;
     /** Sampler uniform name -> resolved view+sampler, refreshed in {@link #prepareUniforms} (pre-pass). */
     private final Map<String, ResolvedSampler> resolvedTextures = new HashMap<>();
+    /** Resolved injection-only samplers (see {@link #injectionOnlyTextures}). */
+    private final Map<String, ResolvedSampler> resolvedInjectionTextures = new HashMap<>();
     /** Sampler uniform name -> externally-supplied raw view+sampler (e.g. another mod's live {@code GpuTexture}),
      *  bound in preference to the Identifier/TextureManager binding. Lets a host feed a texture that has no
      *  registered {@link Identifier} (like SlideShow's decoded slide) straight into a graph sampler. */
@@ -64,22 +75,30 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     /** Whether the graph samples the captured scene colour/depth — bound from {@link SceneCaptureManager}. */
     private final boolean usesSceneColor;
     private final boolean usesSceneDepth;
+    /** Non-zero discriminator written to the shaderpack program's injected {@code kg_surface_id} uniform while
+     *  this material draws (see {@code IrisShaderInjector}). 0 = no Iris injection. Set by the factory when a
+     *  shaderpack-compatible variant is active. */
+    private int irisSurfaceId = 0;
 
     private record ResolvedSampler(GpuTextureView view, GpuSampler sampler) {}
 
     public RenderTypeGraphMaterial(RenderType renderType, MaterialUniformLayout layout,
-                                   java.util.List<ShaderUniformBlock> uniformBlocks, String contentHash,
+                                   java.util.List<ShaderUniformBlock> uniformBlocks,
+                                   java.util.List<ShaderUniformBlock> injectionOnlyBlocks, String contentHash,
                                    Map<String, MaterialUniformLayout.Field> uniformFields,
                                    Map<String, String> variableSamplers,
                                    Map<String, SamplerDefault> textures,
+                                   Map<String, SamplerDefault> injectionOnlyTextures,
                                    boolean usesSceneColor, boolean usesSceneDepth) {
         this.renderType = renderType;
         this.uniforms = new MaterialUniformBuffer(layout);
-        this.uniformBlocks = java.util.List.copyOf(uniformBlocks);
+        this.uniformBlocks = List.copyOf(uniformBlocks);
+        this.injectionOnlyBlocks = List.copyOf(injectionOnlyBlocks);
         this.contentHash = contentHash;
         this.uniformFields = new HashMap<>(uniformFields);
         this.variableSamplers = new HashMap<>(variableSamplers);
         this.textures = new HashMap<>(textures);
+        this.injectionOnlyTextures = new HashMap<>(injectionOnlyTextures);
         this.usesSceneColor = usesSceneColor;
         this.usesSceneDepth = usesSceneDepth;
         BY_RENDER_TYPE.put(renderType, this);
@@ -99,6 +118,58 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         return contentHash;
     }
 
+    /** The {@code kg_surface_id} written to the active shaderpack program while this material draws; 0 = none. */
+    public int irisSurfaceId() {
+        return irisSurfaceId;
+    }
+
+    public void setIrisSurfaceId(int id) {
+        this.irisSurfaceId = id;
+    }
+
+    /** Whether the graph samples the captured scene colour ({@code KG_SceneColor}) — under a shaderpack the
+     *  injected program's sampler is bound from {@code SceneCaptureManager} by {@code IrisSurfaceUniform}. */
+    public boolean usesSceneColor() {
+        return usesSceneColor;
+    }
+
+    /** The uploaded {@code KG_Material} buffer slice, for binding onto an Iris shaderpack program at draw
+     *  (see {@code IrisSurfaceUniform}); null when this material has no uniform fields or before upload. */
+    @Nullable
+    public GpuBufferSlice irisMaterialSlice() {
+        return uniforms.slice();
+    }
+
+    /** The KilaGraph-managed UBOs ({@code KG_Globals}/{@code KG_Transforms}/...) to bind onto an Iris
+     *  shaderpack program at draw — the vanilla list plus the injection-only reconstruction blocks. */
+    public java.util.List<ShaderUniformBlock> irisUniformBlocks() {
+        if (injectionOnlyBlocks.isEmpty()) return uniformBlocks;
+        var all = new java.util.ArrayList<ShaderUniformBlock>(uniformBlocks.size() + injectionOnlyBlocks.size());
+        all.addAll(uniformBlocks);
+        all.addAll(injectionOnlyBlocks);
+        return all;
+    }
+
+    /** Receives each of this material's dynamic samplers (uniform name + resolved view/params) for binding
+     *  onto an Iris shaderpack program at draw. */
+    public interface IrisSamplerBinder {
+        void bind(String samplerName, GpuTextureView view, GpuSampler sampler);
+    }
+
+    /** Feed each resolved dynamic sampler (with any external-view override applied) to {@code binder}, so
+     *  {@code IrisSurfaceUniform} can bind them onto the shaderpack program. Call after {@link #prepareUniforms}
+     *  (which fills {@link #resolvedTextures}). Excludes overlay/lightmap/scene (not in the dynamic map);
+     *  includes the injection-only samplers (e.g. {@code kg_NeutralWhite}). */
+    public void bindIrisSamplers(IrisSamplerBinder binder) {
+        for (Map.Entry<String, ResolvedSampler> e : resolvedTextures.entrySet()) {
+            ResolvedSampler r = externalViews.getOrDefault(e.getKey(), e.getValue());
+            binder.bind(e.getKey(), r.view(), r.sampler());
+        }
+        for (Map.Entry<String, ResolvedSampler> e : resolvedInjectionTextures.entrySet()) {
+            binder.bind(e.getKey(), e.getValue().view(), e.getValue().sampler());
+        }
+    }
+
     /**
      * Re-bake the per-instance baked defaults (EXPOSED uniform values + sampler textures/params) from a
      * freshly compiled graph with the <b>same content hash</b>. A value-only edit (a Color/uniform
@@ -112,6 +183,13 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         }
         textures.clear();
         textures.putAll(RenderTypeFactory.buildMaterialTextures(compiled));
+        // Keep the injection-only samplers in step too (same lifecycle as textures).
+        injectionOnlyTextures.clear();
+        if (compiled.injectionSnippet() != null) {
+            for (Map.Entry<String, SamplerDefault> e : compiled.injectionSnippet().samplerDefaults().entrySet()) {
+                if (!textures.containsKey(e.getKey())) injectionOnlyTextures.put(e.getKey(), e.getValue());
+            }
+        }
     }
 
     // ---- uniform value setters ---------------------------------------------------------------
@@ -226,6 +304,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     public void prepareUniforms() {
         uniforms.prepareUpload();
         for (ShaderUniformBlock block : uniformBlocks) block.prepareUpload();
+        // Injection-only blocks must upload too, or the injected program reads a stale/empty buffer.
+        for (ShaderUniformBlock block : injectionOnlyBlocks) block.prepareUpload();
         // Resolve (loading if needed) each bound texture now, and build its GpuSampler from the params —
         // the actual bindTexture in the pass then only reads the already-uploaded view/sampler.
         if (!textures.isEmpty()) {
@@ -235,6 +315,15 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
                 SamplerDefault def = e.getValue();
                 AbstractTexture tex = textureManager.getTexture(def.texture());
                 resolvedTextures.put(e.getKey(), new ResolvedSampler(tex.getTextureView(), RenderTypeFactory.gpuSampler(def)));
+            }
+        }
+        if (!injectionOnlyTextures.isEmpty()) {
+            var textureManager = Minecraft.getInstance().getTextureManager();
+            resolvedInjectionTextures.clear();
+            for (Map.Entry<String, SamplerDefault> e : injectionOnlyTextures.entrySet()) {
+                SamplerDefault def = e.getValue();
+                AbstractTexture tex = textureManager.getTexture(def.texture());
+                resolvedInjectionTextures.put(e.getKey(), new ResolvedSampler(tex.getTextureView(), RenderTypeFactory.gpuSampler(def)));
             }
         }
     }
@@ -262,18 +351,19 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         // "every declared sampler must be bound" check passes.
         if (usesSceneColor) {
             GpuTextureView view = SceneCaptureManager.INSTANCE.colorView();
-            renderPass.bindTexture(com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler.SCENE_COLOR_SAMPLER,
+            renderPass.bindTexture(ShaderGraphCompiler.SCENE_COLOR_SAMPLER,
                     view != null ? view : missingView(), SceneCaptureManager.INSTANCE.sampler());
         }
         if (usesSceneDepth) {
             GpuTextureView view = SceneCaptureManager.INSTANCE.depthView();
-            renderPass.bindTexture(com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler.SCENE_DEPTH_SAMPLER,
+            renderPass.bindTexture(ShaderGraphCompiler.SCENE_DEPTH_SAMPLER,
                     view != null ? view : missingView(), SceneCaptureManager.INSTANCE.sampler());
         }
     }
 
-    /** The MC missing-texture view, a safe placeholder for a scene sampler before the first capture. */
-    private static GpuTextureView missingView() {
+    /** The MC missing-texture view, a safe placeholder for a scene sampler before the first capture.
+     *  Public so {@code IrisSurfaceUniform} binds the same placeholder on injected shaderpack programs. */
+    public static GpuTextureView missingView() {
         return Minecraft.getInstance().getTextureManager()
                 .getTexture(net.minecraft.client.renderer.texture.MissingTextureAtlasSprite.getLocation())
                 .getTextureView();

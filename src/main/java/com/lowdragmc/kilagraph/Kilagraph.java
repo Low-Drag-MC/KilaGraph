@@ -19,7 +19,7 @@ import org.slf4j.Logger;
 @Mod(Kilagraph.MODID)
 public class Kilagraph {
     public static final String MODID = "kilagraph";
-    private static final Logger LOGGER = LogUtils.getLogger();
+    public static final Logger LOGGER = LogUtils.getLogger();
 
     public Kilagraph(IEventBus modEventBus, ModContainer modContainer) {
         // Custom TypeHandles (LIST etc.) must exist before any node class is scanned, because the

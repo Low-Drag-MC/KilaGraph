@@ -42,7 +42,7 @@ public class SceneColorNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ShaderExpr uv = ctx.isConnected("uv") ? ctx.input("uv") : ctx.screenUv();
+        ShaderExpr uv = ctx.isConnected("uv") ? ctx.input("uv") : ctx.sceneColorDefaultUv();
         ctx.output("out", ctx.sampleSceneColor(uv));
     }
 

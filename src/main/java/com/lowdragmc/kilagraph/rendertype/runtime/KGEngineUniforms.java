@@ -38,11 +38,12 @@ public final class KGEngineUniforms {
         @Override public GpuBufferSlice slice() { return KGEngineUniforms.slice(); }
     };
 
-    /** std140 size: one float (Time). Grows as engine fields are added (camera, screen size, ...). */
-    private static final int UBO_SIZE = new Std140SizeCalculator().putFloat().get();
+    /** std140 size: float (Time) + vec2 (ScreenSize) + float (GameTime). Grows as engine fields are added. */
+    private static final int UBO_SIZE = new Std140SizeCalculator().putFloat().putVec2().putFloat().get();
 
     @Nullable private static GpuBuffer buffer;
     private static float currentTimeSeconds;
+    private static float screenWidth, screenHeight;
     private static long lastUpdateKey = Long.MIN_VALUE;
 
     private KGEngineUniforms() {}
@@ -51,12 +52,27 @@ public final class KGEngineUniforms {
     public static String declareGlsl() {
         return "layout(std140) uniform " + UBO_NAME + " {\n"
                 + "    float Time;\n"
+                + "    vec2 ScreenSize;\n"
+                + "    float GameTime;\n"
                 + "} " + UBO_INSTANCE + ";\n";
+    }
+
+    /** GLSL accessor for the normalised day fraction — same value as Minecraft's {@code Globals.GameTime}
+     *  ({@code (gameTime % 24000 + partialTick) / 24000}), carried in OUR block so the Game Time node stays
+     *  injectable under an Iris shaderpack (a {@code #moj_import} include would reject the whole graph). */
+    public static String gameTimeAccessor() {
+        return UBO_INSTANCE + ".GameTime";
     }
 
     /** GLSL accessor for the world time in seconds. */
     public static String timeAccessor() {
         return UBO_INSTANCE + ".Time";
+    }
+
+    /** GLSL accessor for the framebuffer size in pixels ({@code gl_FragCoord} basis) — used to turn
+     *  {@code gl_FragCoord} into a screen UV or reconstruct view/world position inside a fragment. */
+    public static String screenSizeAccessor() {
+        return UBO_INSTANCE + ".ScreenSize";
     }
 
     /**
@@ -89,14 +105,20 @@ public final class KGEngineUniforms {
         float partial = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         // ticks -> seconds (20 ticks/s); wrap at one day (24000 ticks = 1200 s) for float precision.
         currentTimeSeconds = ((gameTime % 24000L) + partial) / 20.0f;
-        // Quantise to ~1ms so repeated calls in the same frame share a key.
-        return (long) (currentTimeSeconds * 1000.0f);
+        screenWidth = mc.getWindow().getWidth();
+        screenHeight = mc.getWindow().getHeight();
+        // Quantise time to ~1ms so repeated calls in the same frame share a key; fold in the framebuffer
+        // size so a resize re-uploads even within the same millisecond.
+        return (long) (currentTimeSeconds * 1000.0f) * 31L + (long) screenWidth * 7L + (long) screenHeight;
     }
 
     private static void upload() {
         ByteBuffer bb = MemoryUtil.memAlloc(UBO_SIZE);
         try {
-            Std140Builder.intoBuffer(bb).putFloat(currentTimeSeconds);
+            // GameTime = day fraction; currentTimeSeconds already wraps at one day (1200 s), so /1200
+            // reproduces Minecraft's ((gameTime % 24000) + partial) / 24000 exactly.
+            Std140Builder.intoBuffer(bb).putFloat(currentTimeSeconds).putVec2(screenWidth, screenHeight)
+                    .putFloat(currentTimeSeconds / 1200.0f);
             bb.rewind();
             RenderSystem.getDevice().createCommandEncoder().writeToBuffer(buffer.slice(), bb);
         } finally {

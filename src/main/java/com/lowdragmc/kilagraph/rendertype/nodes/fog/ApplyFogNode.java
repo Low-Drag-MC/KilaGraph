@@ -37,7 +37,19 @@ public class ApplyFogNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.include("minecraft:fog.glsl");
+        // Under an Iris shaderpack we run inside the pack's gbuffers program, which applies its OWN fog in a
+        // later composite pass — and can't satisfy Minecraft's fog.glsl/Fog UBO anyway. So fog is a no-op
+        // here: pass the colour straight through (this also keeps the graph injection-compatible, since we
+        // never pull the fog include / Fog UBO fields). Same intent as the vanilla deferred path.
+        if (ctx.isInjection()) {
+            ctx.output("out", ctx.input("inColor"));
+            return;
+        }
+        // Inline mirrors of fog.glsl's functions (FogGlsl) + the KG_Fog slice-view for the parameter
+        // defaults — no #moj_import anywhere in the fragment path (unified-UBO policy).
+        ctx.function("linear_fog_value", com.lowdragmc.kilagraph.rendertype.compiler.FogGlsl.FN_LINEAR_FOG_VALUE);
+        ctx.function("total_fog_value", com.lowdragmc.kilagraph.rendertype.compiler.FogGlsl.FN_TOTAL_FOG_VALUE);
+        ctx.function("apply_fog", com.lowdragmc.kilagraph.rendertype.compiler.FogGlsl.FN_APPLY_FOG);
         String code = "apply_fog("
                 + ctx.input("inColor").code() + ", "
                 + fog(ctx, "sphericalVertexDistance", ctx.sphericalVertexDistance()) + ", "

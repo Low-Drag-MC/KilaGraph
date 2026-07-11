@@ -9,7 +9,6 @@ import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
-import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
@@ -56,26 +55,38 @@ public class NormalNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         String space = choice("space", "world", SPACES);
+        // Injection FIRST — injection implies isPreview(), and the preview branch's vNormal is a
+        // preview-quad varying that does NOT exist in an injected shaderpack fragment. meshNormal()
+        // reconstructs the WORLD normal from the pack's own view-space varying (kg_recon_normal);
+        // spaces convert with the KG_Transforms rotations (pure rotations, so plain mat3 is exact).
+        if (ctx.isInjection()) {
+            ShaderExpr world = ctx.temp(GlslType.VEC3, "normalize(" + ctx.meshNormal().code() + ")");
+            String iView = ctx.transformField("IViewMat", GlslType.MAT4).code();
+            String out = switch (space) {
+                case "object" -> "mat3(" + ctx.transformField("IModelViewMat", GlslType.MAT4).code()
+                        + ") * (transpose(mat3(" + iView + ")) * " + world.code() + ")";
+                case "view" -> "transpose(mat3(" + iView + ")) * " + world.code();
+                default /* world */ -> world.code();
+            };
+            ctx.output("out", new ShaderExpr(out, GlslType.VEC3));
+            return;
+        }
         // No real vertex stage in the per-node preview: the preview mesh carries a real Normal (vNormal).
         if (ctx.isPreview()) {
             ctx.output("out", new ShaderExpr("normalize(vNormal)", GlslType.VEC3));
             return;
         }
-        // Object-space normal source: raw Normal attribute in the vsh, kg_objectNormal varying in the fsh.
-        ShaderExpr objN = ctx.varyingInput("kg_objectNormal", GlslType.VEC3,
-                () -> ctx.attribute(KGVertexElements.NORMAL, GlslType.VEC3,
-                        new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3)),
-                new ShaderExpr("vNormal", GlslType.VEC3));
+        // Object-space normal source (raw Normal attribute / a driven Normal block in the vsh, the
+        // kg_objectNormal varying in the fsh). Matrices come from KG_Transforms (no #moj_import).
+        ShaderExpr objN = ctx.objectNormal();
         String out = switch (space) {
             case "object" -> "normalize(" + objN.code() + ")";
-            case "view" -> {
-                ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl"); // ModelViewMat
-                yield "normalize(mat3(ModelViewMat) * " + objN.code() + ")";
-            }
+            case "view" -> "normalize(mat3(" + ctx.transformField("ModelViewMat", GlslType.MAT4).code()
+                    + ") * " + objN.code() + ")";
             default /* world */ -> {
-                ctx.useMinecraftUniform("DynamicTransforms", "minecraft:dynamictransforms.glsl"); // ModelViewMat
                 String iView = ctx.transformField("IViewMat", GlslType.MAT4).code(); // view -> world (rotation)
-                yield "normalize(mat3(" + iView + ") * mat3(ModelViewMat) * " + objN.code() + ")";
+                yield "normalize(mat3(" + iView + ") * mat3("
+                        + ctx.transformField("ModelViewMat", GlslType.MAT4).code() + ") * " + objN.code() + ")";
             }
         };
         ctx.output("out", new ShaderExpr(out, GlslType.VEC3));

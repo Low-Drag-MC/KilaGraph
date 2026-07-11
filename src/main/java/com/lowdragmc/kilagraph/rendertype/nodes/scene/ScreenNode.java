@@ -13,7 +13,9 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 
 /**
  * Unity's Screen node: the viewport dimensions in pixels ({@code Width} / {@code Height}), from
- * Minecraft's {@code Globals.ScreenSize}.
+ * KilaGraph's own {@code KG_Globals.ScreenSize} (same value as Minecraft's {@code Globals.ScreenSize},
+ * but no {@code #moj_import} — a Minecraft include would make any graph using this node
+ * non-injectable under an Iris shaderpack; see {@code ShaderGraphCompiler#buildInjectionSnippet}).
  */
 @NodeAttribute(name = "rt_screen", group = "rendertype_scene", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class ScreenNode extends ShaderNode {
@@ -30,8 +32,8 @@ public class ScreenNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        ctx.useMinecraftUniform("Globals", "minecraft:globals.glsl");
-        ctx.output("Width", new ShaderExpr("ScreenSize.x", GlslType.FLOAT));
-        ctx.output("Height", new ShaderExpr("ScreenSize.y", GlslType.FLOAT));
+        ShaderExpr size = ctx.screenSize();
+        ctx.output("Width", new ShaderExpr(size.code() + ".x", GlslType.FLOAT));
+        ctx.output("Height", new ShaderExpr(size.code() + ".y", GlslType.FLOAT));
     }
 }

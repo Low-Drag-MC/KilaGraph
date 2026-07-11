@@ -9,6 +9,8 @@ import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat;
+import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
+import com.lowdragmc.kilagraph.rendertype.iris.IrisSurfaceRegistry;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.ColorTargetState;
@@ -30,7 +32,9 @@ import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,6 +70,8 @@ public final class RenderTypeFactory {
     /** Hashes that failed to compile on the GPU. Content hash is deterministic, so a failed hash
      *  stays failed — skip re-precompiling it every frame (and dump its GLSL only once). */
     private static final Set<String> FAILED = ConcurrentHashMap.newKeySet();
+    /** Graph hashes already warned about Scene Color/Depth on an opaque material (self-sampling feedback). */
+    private static final Set<String> SCENE_ON_OPAQUE_WARNED = ConcurrentHashMap.newKeySet();
 
     private RenderTypeFactory() {}
 
@@ -136,22 +142,69 @@ public final class RenderTypeFactory {
 
         REFCOUNTS.merge(hash, 1, Integer::sum);
         // The graph samples the captured opaque scene — start (and refcount) the capture while this material lives.
-        if (compiled.usesSceneColor() || compiled.usesSceneDepth()) SceneCaptureManager.INSTANCE.acquire();
+        if (compiled.usesSceneColor() || compiled.usesSceneDepth()) {
+            SceneCaptureManager.INSTANCE.acquire();
+            // Scene Color/Depth sample the capture taken AFTER opaque geometry. An opaque material draws
+            // BEFORE that point, so at its own screen position the capture contains... itself (last frame):
+            // a self-sampling feedback loop that renders black with view-dependent fringes (identical in
+            // vanilla and under shaderpacks; same constraint as Unity's Scene Color). Warn once per graph.
+            if (compiled.settings().blend() == RenderTypeGraph.Settings.BlendMode.OPAQUE
+                    && SCENE_ON_OPAQUE_WARNED.add(hash)) {
+                Kilagraph.LOGGER.warn("[KilaGraph] graph {} uses Scene Color/Depth on an OPAQUE material: "
+                        + "it draws before the scene capture and will sample ITSELF (black feedback). "
+                        + "Use a translucent BlendMode and draw it in the translucent phase.", hash);
+            }
+        }
         String name = Kilagraph.MODID + ":graph/" + hash;
         RenderType renderType = RenderType.create(name, setup.createRenderSetup());
+        // UBOs only the injection snippet needs (fragment reconstructions — e.g. Fresnel's viewDir pulls
+        // KG_Globals.ScreenSize only under injection): uploaded + Iris-bound by the material, but kept out
+        // of the vanilla render-pass binding (the vanilla pipeline doesn't declare them).
+        List<ShaderUniformBlock> injectionOnly = new ArrayList<>();
+        Map<String, SamplerDefault> injectionOnlyTextures = new LinkedHashMap<>();
+        if (compiled.injectionSnippet() != null) {
+            for (ShaderUniformBlock block : compiled.injectionSnippet().uniformBlocks()) {
+                boolean inMain = compiled.uniformBlocks().stream()
+                        .anyMatch(b -> b.uboName().equals(block.uboName()));
+                if (!inMain) injectionOnly.add(block);
+            }
+            // Samplers only the snippet bakes (the kg_NeutralWhite degrade) — same gap as the blocks:
+            // without these the injected program's sampler uniform stays on unit 0 (the pack's atlas).
+            Map<String, SamplerDefault> mainTextures = buildMaterialTextures(compiled);
+            for (Map.Entry<String, SamplerDefault> e : compiled.injectionSnippet().samplerDefaults().entrySet()) {
+                if (!mainTextures.containsKey(e.getKey()) && !isSceneSampler(e.getKey())) {
+                    injectionOnlyTextures.put(e.getKey(), e.getValue());
+                }
+            }
+        }
         RenderTypeGraphMaterial material = new RenderTypeGraphMaterial(
-                renderType, compiled.layout(), compiled.uniformBlocks(), hash,
+                renderType, compiled.layout(), compiled.uniformBlocks(), injectionOnly, hash,
                 compiled.uniformFields(), compiled.variableSamplers(), buildMaterialTextures(compiled),
-                compiled.usesSceneColor(), compiled.usesSceneDepth());
+                injectionOnlyTextures, compiled.usesSceneColor(), compiled.usesSceneDepth());
         // Bake EXPOSED-variable defaults into the material UBO; callers may override later via setUniform.
         for (Map.Entry<String, float[]> e : compiled.uniformDefaults().entrySet()) {
             material.setUniformField(e.getKey(), e.getValue());
+        }
+        // Iris compatibility: register the graph's compiled surface so a shaderpack routes our geometry
+        // through its entities gbuffers program and runs our real shading there. register() returns a
+        // non-zero kg_surface_id when the graph is injection-compatible (the injected kg_surface(id,...)
+        // dispatch then shades our geometry), or 0 when it isn't — id 0 still assigns to entities so the
+        // geometry renders, falling back to the shaderpack's own albedo (passthrough). No-op without Iris.
+        if (IrisCompat.ENABLED) {
+            material.setIrisSurfaceId(IrisSurfaceRegistry.register(compiled));
+            boolean translucent = compiled.settings().blend() != RenderTypeGraph.Settings.BlendMode.OPAQUE;
+            IrisCompat.assignToEntities(pipeline, translucent, compiled.alphaDiscards());
+            // A reload to inject this new surface (if the programs are now stale) is driven from the client
+            // tick (IrisCompat.reloadShadersIfStale via IrisDebugCommand), NOT here — reloading mid-frame
+            // crashes the world pipeline.
         }
         return material;
     }
 
     /** Release a material's reference to its generated pipeline; evict when the last one drops. */
     static void release(String contentHash) {
+        // Mirror the release into the Iris surface registry (no-op if this graph wasn't injection-registered).
+        if (IrisCompat.LOADED) IrisSurfaceRegistry.release(contentHash);
         REFCOUNTS.compute(contentHash, (h, count) -> {
             if (count == null) return null;
             if (count <= 1) {
