@@ -223,6 +223,7 @@
   "kg.sampler.mode": "模式",
   "kg.sampler.atlas": "图集",
   "kg.sampler.texture": "纹理",
+  "kg.sampler.select": "选择...",
   "kg.sampler.filter": "过滤",
   "kg.sampler.address": "环绕",
   "kg.sampler.mipmap": "Mipmap",

@@ -175,9 +175,9 @@ public class TransformNode extends ShaderNode {
         return ctx.transformField("IProjMat", GlslType.MAT4).code();
     }
 
-    /** Absolute world camera position from MC's {@code globals.glsl}. MC stores CameraBlockPos =
-     *  floor(camPos) and CameraOffset = floor(camPos) - camPos, so camPos = block - offset. */
+    /** Absolute world camera position in the precision-split form {@code kg_CameraBlockPos - kg_CameraOffset}
+     *  (bound from the double camera position by KGBuiltinUniforms), so world translation stays jitter-free. */
     private String cameraPos(ShaderCompileContext ctx) {
-        return ctx.useBuiltinUniform("kg_CameraPos", GlslType.VEC3);
+        return ctx.cameraWorldPos().code();
     }
 }

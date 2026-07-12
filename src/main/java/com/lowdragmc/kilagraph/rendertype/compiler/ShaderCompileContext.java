@@ -267,6 +267,12 @@ public final class ShaderCompileContext {
         return compiler.cameraFar();
     }
 
+    /** Absolute world camera position ({@code kg_CameraBlockPos - kg_CameraOffset}) — Minecraft's precision-split
+     *  form, bound from the double camera position so world-position math stays jitter-free far from the origin. */
+    public ShaderExpr cameraWorldPos() {
+        return compiler.cameraWorldPos();
+    }
+
     /** Allocate a temp variable in the current stage holding {@code expr}, returning a reference. */
     public ShaderExpr temp(GlslType type, String code) {
         return compiler.hoist(type, code);

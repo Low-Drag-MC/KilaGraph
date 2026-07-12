@@ -366,7 +366,7 @@ public final class ShaderCompilerGameTest {
     }
 
     /** The Position/Normal nodes emit the chosen coordinate space's matrix math and are usable in both stages.
-     *  World uses the camera-relative→absolute chain (ModelViewMat, kg_IViewMat, kg_CameraPos); View uses
+     *  World uses the camera-relative→absolute chain (ModelViewMat, kg_IViewMat, kg_CameraBlockPos); View uses
      *  ModelViewMat; Object reads the interpolated object-space source. None are stage errors. */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
@@ -375,7 +375,7 @@ public final class ShaderCompilerGameTest {
         String posWorld = inputNodeFsh(PositionNode.class, "space", "world");
         assertTrue(helper, "position world uses ModelViewMat", posWorld.contains("ModelViewMat"));
         assertTrue(helper, "position world un-rotates via kg_IViewMat", posWorld.contains("kg_IViewMat"));
-        assertTrue(helper, "position world adds the camera position", posWorld.contains("kg_CameraPos"));
+        assertTrue(helper, "position world adds the camera position", posWorld.contains("kg_CameraBlockPos"));
 
         // Position, object space: the interpolated model-space position varying (kg_modelPos).
         assertTrue(helper, "position object reads the interpolated model position",
@@ -1332,9 +1332,9 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "fsh declares KG_Transforms", fsh.contains("uniform mat4 kg_"));
         assertTrue(helper, "fsh references ModelViewMat (object->view)", fsh.contains("ModelViewMat"));
         // object->world = ModelViewMat (to view) then IViewMat + camera position (view to absolute world);
-        // the camera position comes from MC's globals.glsl (precision-split), not our KG block.
+        // the camera position is KG's precision-split pair (kg_CameraBlockPos - kg_CameraOffset).
         assertTrue(helper, "fsh references the inverse camera view matrix", fsh.contains("kg_IViewMat"));
-        assertTrue(helper, "fsh reads the camera position (kg_CameraPos)", fsh.contains("kg_CameraPos"));
+        assertTrue(helper, "fsh reads the camera position (kg_CameraBlockPos)", fsh.contains("kg_CameraBlockPos"));
 
         // clip→view uses the precomputed inverse projection (kg_IProjMat), not a per-pixel inverse.
         RenderTypeGraph clipGraph = new RenderTypeGraph();
@@ -1362,7 +1362,7 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "clip→world inverse-projects via IProjMat", cwFsh.contains("kg_IProjMat"));
         assertTrue(helper, "clip→world does the perspective divide", cwFsh.contains(".xyz / ") && cwFsh.contains(".w"));
         assertTrue(helper, "clip→world un-rotates via IViewMat", cwFsh.contains("kg_IViewMat"));
-        assertTrue(helper, "clip→world adds the camera position", cwFsh.contains("kg_CameraPos"));
+        assertTrue(helper, "clip→world adds the camera position", cwFsh.contains("kg_CameraBlockPos"));
         helper.succeed();
     }
 
@@ -1621,8 +1621,18 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph compiled = compile(graph);
         assertFalse(helper, "camera graph has no stage errors", compiled.hasStageErrors());
         String fsh = compiled.fragmentSource();
-        assertTrue(helper, "camera node Position reads kg_CameraPos", fsh.contains("kg_CameraPos"));
-        assertTrue(helper, "camera node declares kg_CameraPos uniform", fsh.contains("uniform vec3 kg_CameraPos"));
+        assertTrue(helper, "camera node Position reads the precision-split block", fsh.contains("kg_CameraBlockPos"));
+        assertTrue(helper, "camera node declares kg_CameraBlockPos uniform", fsh.contains("uniform vec3 kg_CameraBlockPos"));
+        assertTrue(helper, "camera node declares kg_CameraOffset uniform", fsh.contains("uniform vec3 kg_CameraOffset"));
+
+        // The camera basis vectors (Up/Right) derive from the inverse view matrix, like Direction.
+        RenderTypeGraph upGraph = new RenderTypeGraph();
+        NodeModel upCam = addNode(upGraph, com.lowdragmc.kilagraph.rendertype.nodes.transform.CameraNode.class);
+        NodeModel upEmit = addBlock(upGraph, upGraph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        wire(upGraph, upEmit.getInputsById().get("color"), upCam.getOutputsById().get("Up"));
+        CompiledShaderGraph upCompiled = compile(upGraph);
+        assertFalse(helper, "camera Up has no stage errors", upCompiled.hasStageErrors());
+        assertTrue(helper, "camera Up derives from kg_IViewMat", upCompiled.fragmentSource().contains("kg_IViewMat"));
         helper.succeed();
     }
 

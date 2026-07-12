@@ -1,5 +1,9 @@
 package com.lowdragmc.kilagraph.rendertype;
 
+import com.lowdragmc.kilagraph.rendertype.gui.CurveConfigurator;
+import com.lowdragmc.kilagraph.rendertype.gui.GradientConfigurator;
+import com.lowdragmc.kilagraph.rendertype.gui.Sampler2DConfigurator;
+import com.lowdragmc.kilagraph.rendertype.gui.UvChannelConfigurator;
 import com.lowdragmc.lowdraglib2.math.GradientColor;
 import com.lowdragmc.lowdraglib2.math.curve.ExplicitCubicBezierCurve2;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
@@ -83,24 +87,24 @@ public final class RenderTypeGraphTypes {
         // The SAMPLER2D configurator (custom/atlas picker + sampler params + preview) is client-only;
         // the lambda references it lazily so the compiler/headless path never loads the UI class.
         TypeHandleHelpers.setCustomConfigurable(SAMPLER2D, (valueConfigurable, typeHandle) ->
-                com.lowdragmc.kilagraph.rendertype.gui.Sampler2DConfigurator.build(valueConfigurable));
+               Sampler2DConfigurator.build(valueConfigurable));
         // UV: default to channel UV0, a teal-ish port colour, and a client-only UV0/UV1/UV2 dropdown.
         TypeHandleHelpers.setCustomDefaultValue(UV, () -> UvChannel.UV0);
         TypeHandleHelpers.setCustomColor(UV, 0xFF2EB8A6);
         TypeHandleHelpers.setCustomConfigurable(UV, (valueConfigurable, typeHandle) ->
-                com.lowdragmc.kilagraph.rendertype.gui.UvChannelConfigurator.build(valueConfigurable));
+                UvChannelConfigurator.build(valueConfigurable));
         // GRADIENT: a fresh black->white gradient default, a magenta-ish port colour, and the client-only
         // gradient-bar editor (lazy reference so the compiler/headless path never loads the UI class).
         TypeHandleHelpers.setCustomDefaultValue(GRADIENT, GradientValue::defaultValue);
         TypeHandleHelpers.setCustomColor(GRADIENT, 0xFFE05CC0);
         TypeHandleHelpers.setCustomConfigurable(GRADIENT, (valueConfigurable, typeHandle) ->
-                com.lowdragmc.kilagraph.rendertype.gui.GradientConfigurator.build(valueConfigurable));
+                GradientConfigurator.build(valueConfigurable));
         // CURVE: a fresh linear 0->1 ramp default, an amber port colour, and the client-only curve-graph
         // editor (lazy reference so the compiler/headless path never loads the UI class).
         TypeHandleHelpers.setCustomDefaultValue(CURVE, CurveValue::defaultValue);
         TypeHandleHelpers.setCustomColor(CURVE, 0xFFE0A33C);
         TypeHandleHelpers.setCustomConfigurable(CURVE, (valueConfigurable, typeHandle) ->
-                com.lowdragmc.kilagraph.rendertype.gui.CurveConfigurator.build(valueConfigurable));
+                CurveConfigurator.build(valueConfigurable));
     }
 
     /** Node-palette type-picker handles shared by RenderTypeGraph and ShaderFunctionGraph. */

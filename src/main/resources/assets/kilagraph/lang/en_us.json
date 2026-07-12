@@ -223,6 +223,7 @@
   "kg.sampler.mode": "Mode",
   "kg.sampler.atlas": "Atlas",
   "kg.sampler.texture": "Texture",
+  "kg.sampler.select": "Select...",
   "kg.sampler.filter": "Filter",
   "kg.sampler.address": "Wrap",
   "kg.sampler.mipmap": "Mipmap",

@@ -15,7 +15,10 @@ import com.lowdragmc.lowdraglib2.gui.texture.DynamicTexture;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.texture.SpriteTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.Dialog;
 import com.lowdragmc.lowdraglib2.gui.ui.utils.UIElementProvider;
+import com.lowdragmc.lowdraglib2.LDLib2;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.IFieldValueConfigurable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -72,6 +75,19 @@ public final class Sampler2DConfigurator {
                                 () -> get.get().location(),
                                 loc -> vc.setValue(get.get().withLocation(loc)),
                                 "", true).setResourceLocation(true));
+                        // A "select" button that opens LDLib2's file dialog rooted at the assets dir (textures
+                        // only) and turns the picked file into a resource location — mirrors SpriteTexture's picker.
+                        var pick = new Configurator("kg.sampler.select");
+                        pick.inlineContainer.addChild(new Button()
+                                .setText("kg.sampler.select")
+                                .setOnClick(e -> Dialog.showFileDialog("kg.sampler.select", LDLib2.getAssetsDir(),
+                                        true, Dialog.suffixFilter(".png"), f -> {
+                                            if (f != null && f.isFile()) {
+                                                ResourceLocation loc = IGuiTexture.getTextureFromFile(f);
+                                                if (loc != null) vc.setValue(get.get().withLocation(loc.toString()));
+                                            }
+                                        }).show(e.currentElement.getModularUI())));
+                        group.addConfigurator(pick);
                     }
                 });
 

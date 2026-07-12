@@ -73,7 +73,7 @@ public class PositionNode extends ShaderNode {
                 // absolute world exactly like TransformNode's object->world for a position.
                 String modelView = ctx.useBuiltinUniform("ModelViewMat", GlslType.MAT4);
                 String iView = ctx.transformField("IViewMat", GlslType.MAT4).code();
-                String cameraPos = ctx.useBuiltinUniform("kg_CameraPos", GlslType.VEC3);
+                String cameraPos = ctx.cameraWorldPos().code();
                 yield "((" + iView + " * " + modelView + " * vec4(" + pos.code() + ", 1.0)).xyz + " + cameraPos + ")";
             }
         };

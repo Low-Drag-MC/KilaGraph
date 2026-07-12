@@ -757,6 +757,17 @@ public class ShaderGraphCompiler {
         return new ShaderExpr("kg_camera_far(" + iproj.code() + ")", GlslType.FLOAT);
     }
 
+    /** Absolute world camera position in Minecraft's precision-split form: {@code kg_CameraBlockPos -
+     *  kg_CameraOffset}. The block is a per-frame {@code floor(camPos)} and the offset a small fractional,
+     *  both bound from the DOUBLE camera position by {@code KGBuiltinUniforms} — so world-position math stays
+     *  jitter-free (only the absolute block value rounds far from the origin). Used by Camera / Transform /
+     *  Position / GlobalsUbo nodes. */
+    ShaderExpr cameraWorldPos() {
+        String block = useBuiltinUniform("kg_CameraBlockPos", GlslType.VEC3);
+        String offset = useBuiltinUniform("kg_CameraOffset", GlslType.VEC3);
+        return new ShaderExpr("(" + block + " - " + offset + ")", GlslType.VEC3);
+    }
+
     // ---- traversal ---------------------------------------------------------------------------
 
     /** Pull an input port's value as a GLSL expression converted to {@code expected}. */

@@ -43,11 +43,19 @@ public final class KGBuiltinUniforms {
                 // (was identity before, which wrongly left those nodes world==view).
                 case "kg_ViewMat" -> u.set(new Matrix4f(RenderSystem.getModelViewMatrix()));
                 case "kg_IModelViewMat", "kg_IViewMat" -> u.set(new Matrix4f(RenderSystem.getModelViewMatrix()).invert());
-                // KG-managed absolute world camera position (1.21.1 renders camera-relative; no vanilla camera
-                // uniform). Bound from the live render camera each frame — see CameraNode/GlobalsUboNode/Transform.
-                case "kg_CameraPos" -> {
+                // KG-managed absolute world camera position, in Minecraft's precision-split form (1.21.1 renders
+                // camera-relative; no vanilla camera uniform). The absolute position as a single float jitters
+                // past ~16M blocks (float32's exact-integer limit), so we split it CPU-side from the DOUBLE
+                // camera position into an integer block + a small fractional offset (the offset stays float-exact),
+                // and shaders reconstruct camPos = block - offset. Only the absolute block value still rounds far
+                // out; the per-frame jitter is gone. See CameraNode/GlobalsUboNode/Transform/Position.
+                case "kg_CameraBlockPos" -> {
                     var p = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
-                    u.set((float) p.x, (float) p.y, (float) p.z);
+                    u.set((float) Math.floor(p.x), (float) Math.floor(p.y), (float) Math.floor(p.z));
+                }
+                case "kg_CameraOffset" -> {
+                    var p = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+                    u.set((float) (Math.floor(p.x) - p.x), (float) (Math.floor(p.y) - p.y), (float) (Math.floor(p.z) - p.z));
                 }
                 default -> { /* vanilla builtin (setDefaultUniforms) or EXPOSED material uniform (material) — skip */ }
             }

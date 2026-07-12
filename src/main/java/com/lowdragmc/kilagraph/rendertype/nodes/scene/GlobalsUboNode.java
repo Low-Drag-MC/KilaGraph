@@ -33,11 +33,11 @@ public class GlobalsUboNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         // 1.21.1 has no globals.glsl. ScreenSize/GlintAlpha/GameTime are individual vanilla uniforms
-        // (setDefaultUniforms); camera world position is our KG-managed kg_CameraPos (camera-relative render),
-        // split into the block/offset pair the modern Globals UBO exposed. MenuBlurRadius/UseRgss: no 1.21.1 source.
-        String camPos = ctx.useBuiltinUniform("kg_CameraPos", GlslType.VEC3);
-        ctx.output("CameraBlockPos", new ShaderExpr("floor(" + camPos + ")", GlslType.VEC3));
-        ctx.output("CameraOffset", new ShaderExpr("(floor(" + camPos + ") - " + camPos + ")", GlslType.VEC3));
+        // (setDefaultUniforms); the camera world position is our KG-managed precision-split pair
+        // (kg_CameraBlockPos + kg_CameraOffset), bound from the double camera position by KGBuiltinUniforms —
+        // matching the modern Globals UBO's split. MenuBlurRadius/UseRgss: no 1.21.1 source.
+        ctx.output("CameraBlockPos", new ShaderExpr(ctx.useBuiltinUniform("kg_CameraBlockPos", GlslType.VEC3), GlslType.VEC3));
+        ctx.output("CameraOffset", new ShaderExpr(ctx.useBuiltinUniform("kg_CameraOffset", GlslType.VEC3), GlslType.VEC3));
         ctx.output("ScreenSize", new ShaderExpr(ctx.useBuiltinUniform("ScreenSize", GlslType.VEC2), GlslType.VEC2));
         ctx.output("GlintAlpha", new ShaderExpr(ctx.useBuiltinUniform("GlintAlpha", GlslType.FLOAT), GlslType.FLOAT));
         ctx.output("GameTime", new ShaderExpr(ctx.useBuiltinUniform("GameTime", GlslType.FLOAT), GlslType.FLOAT));
