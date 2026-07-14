@@ -64,6 +64,7 @@ import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.PositionNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.NormalNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.ViewDirectionNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexIdNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceIdNode;
@@ -90,6 +91,9 @@ import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec4Node;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec4Block;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec3Block;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
@@ -405,6 +409,27 @@ public final class ShaderCompilerGameTest {
         return compile(graph).fragmentSource();
     }
 
+    /** The View Direction node is unnormalized by default (its length is the camera distance); the
+     *  {@code normalize} option wraps the output in a {@code normalize()} for a unit-length direction. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void viewDirectionNormalizeOption(GameTestHelper helper) {
+        assertTrue(helper, "the normalize option adds a normalize() call around the view direction",
+                countOccurrences(viewDirectionFsh(true), "normalize(")
+                        > countOccurrences(viewDirectionFsh(false), "normalize("));
+        helper.succeed();
+    }
+
+    /** A View Direction node (given {@code normalize}) wired into fragment emission; returns the fragment GLSL. */
+    private static String viewDirectionFsh(boolean normalize) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel vd = addNode(graph, ViewDirectionNode.class);
+        setOption(vd, "normalize", normalize);
+        wire(graph, emission.getInputsById().get("color"), vd.getOutputsById().get("out"));
+        return compile(graph).fragmentSource();
+    }
+
     /** The formerly fragment-only UV and Vertex Color nodes are now stage-agnostic: pulled into a vertex
      *  varying block they compile (no stage error) and read their raw vertex attributes in the vsh. */
     @GameTest(template = "empty")
@@ -432,6 +457,79 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph compiled2 = compile(graph2);
         assertFalse(helper, "Vertex Color node in the vertex stage is not a stage error", compiled2.hasStageErrors());
         assertTrue(helper, "vsh reads the raw Color attribute", compiled2.vertexSource().contains("Color"));
+        helper.succeed();
+    }
+
+    /**
+     * Driven Position/Normal vertex blocks displace through the single seams: gl_Position, the fog distances
+     * and kg_modelPos all read {@code kg_vertexPos}; the lit vertex colour ({@code minecraft_mix_light}), the
+     * world-normal varying and the Normal node's object source all read {@code kg_vertexNormal}.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void vertexModelBlocksDisplace(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        // Position block <- Add(Position(object), Vec3): a position-dependent offset.
+        NodeModel posBlock = addBlock(graph, graph.getVertexStageModel(), VertexModelPositionBlock.class);
+        NodeModel pos = addNode(graph, PositionNode.class);
+        setOption(pos, "space", "object");
+        NodeModel offset = addNode(graph, Vec3Node.class);
+        NodeModel add = addNode(graph, AddNode.class);
+        wire(graph, add.getInputsById().get("a"), pos.getOutputsById().get("out"));
+        wire(graph, add.getInputsById().get("b"), offset.getOutputsById().get("out"));
+        wire(graph, posBlock.getInputsById().get("position"), add.getOutputsById().get("out"));
+        // Normal block <- Vec3.
+        NodeModel nrmBlock = addBlock(graph, graph.getVertexStageModel(), VertexModelNormalBlock.class);
+        NodeModel nrm = addNode(graph, Vec3Node.class);
+        wire(graph, nrmBlock.getInputsById().get("normal"), nrm.getOutputsById().get("out"));
+        // A fragment Normal node (object space), so the kg_objectNormal varying is built.
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel normalNode = addNode(graph, NormalNode.class);
+        setOption(normalNode, "space", "object");
+        wire(graph, emission.getInputsById().get("color"), normalNode.getOutputsById().get("out"));
+
+        CompiledShaderGraph compiled = compile(graph);
+        assertFalse(helper, "displacement graph has no stage errors", compiled.hasStageErrors());
+        String vsh = compiled.vertexSource();
+        assertTrue(helper, "vsh hoists the displaced position", vsh.contains("vec3 kg_vertexPos = "));
+        assertTrue(helper, "gl_Position transforms the displaced position",
+                vsh.contains("gl_Position = ProjMat * ModelViewMat * vec4(kg_vertexPos, 1.0);"));
+        assertTrue(helper, "fog distance follows the displaced position",
+                vsh.contains("fog_distance(kg_vertexPos, 0)"));
+        assertTrue(helper, "vsh hoists the displaced normal", vsh.contains("vec3 kg_vertexNormal = "));
+        assertTrue(helper, "default lighting re-lights with the displaced normal",
+                vsh.contains("minecraft_mix_light(Light0_Direction, Light1_Direction, kg_vertexNormal"));
+        assertTrue(helper, "Normal node's object source reads the displaced normal",
+                vsh.contains("kg_objectNormal = kg_vertexNormal;"));
+        helper.succeed();
+    }
+
+    /**
+     * The advanced glPosition block owns the vertex stage: when present, the model-space blocks are ignored
+     * (no displaced temp), and its unconnected fallback is the standard chain. Also: a FRAGMENT_ONLY node
+     * wired into a Position block is a stage error (the block pass runs in the vertex scope).
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void vertexModelLegacyGlPosition(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel posBlock = addBlock(graph, graph.getVertexStageModel(), VertexModelPositionBlock.class);
+        NodeModel vec = addNode(graph, Vec3Node.class);
+        wire(graph, posBlock.getInputsById().get("position"), vec.getOutputsById().get("out"));
+        addBlock(graph, graph.getVertexStageModel(), VertexPositionBlock.class); // legacy joins -> wins
+        String vsh = compile(graph).vertexSource();
+        assertFalse(helper, "legacy glPosition block suppresses the model blocks", vsh.contains("kg_vertexPos"));
+        assertTrue(helper, "legacy unconnected fallback is the standard chain", vsh
+                .contains("gl_Position = ProjMat * ModelViewMat * vec4((Position + ModelOffset), 1.0);"));
+
+        // A displacement that pulls a FRAGMENT_ONLY node (gl_PrimitiveID) is a stage error — the Position
+        // block's input compiles in the vertex scope.
+        RenderTypeGraph bad = new RenderTypeGraph();
+        NodeModel badBlock = addBlock(bad, bad.getVertexStageModel(), VertexModelPositionBlock.class);
+        NodeModel primId = addNode(bad, PrimitiveIdNode.class);
+        wire(bad, badBlock.getInputsById().get("position"), primId.getOutputsById().get("out"));
+        assertTrue(helper, "FRAGMENT_ONLY node feeding a Position block is a stage error",
+                compile(bad).hasStageErrors());
         helper.succeed();
     }
 

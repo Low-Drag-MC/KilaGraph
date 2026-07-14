@@ -58,6 +58,8 @@
 
   "rt_vertex_stage": "顶点阶段",
   "rt_fragment_stage": "片元阶段",
+  "rt_vertex_model_position": "位置",
+  "rt_vertex_model_normal": "法线",
   "rt_vertex_position": "glPosition",
   "rt_vertex_custom_float": "自定义 Float",
   "rt_vertex_custom_vec2": "自定义 Vec2",
@@ -513,7 +515,9 @@
   "kg.node.info_field.tooltip": "从父级信息目标读取一个选定属性。",
   "kg.node.rt_vertex_stage.tooltip": "顶点阶段输出块的容器。",
   "kg.node.rt_fragment_stage.tooltip": "片元阶段输出块的容器。",
-  "kg.node.rt_vertex_position.tooltip": "写入最终的裁剪空间顶点位置。",
+  "kg.node.rt_vertex_model_position.tooltip": "模型空间顶点位置；其后仍应用标准 Minecraft 变换（ProjMat · ModelViewMat）。未连线 = 网格原始位置。",
+  "kg.node.rt_vertex_model_normal.tooltip": "模型空间法线，替换网格法线参与光照、Fresnel 默认值与法线节点。未连线 = 网格原始法线。",
+  "kg.node.rt_vertex_position.tooltip": "高级：直接写入最终裁剪空间顶点位置。",
   "kg.node.rt_vertex_custom_float.tooltip": "将自定义 float varying 从顶点传到片元。",
   "kg.node.rt_vertex_custom_vec2.tooltip": "将自定义 vec2 varying 从顶点传到片元。",
   "kg.node.rt_vertex_custom_vec3.tooltip": "将自定义 vec3 varying 从顶点传到片元。",
@@ -526,8 +530,8 @@
   "kg.node.rt_uv.tooltip": "输出网格 UV 通道。可在顶点与片元两个阶段使用。",
   "kg.node.rt_vertex_color.tooltip": "按选定光照模式输出网格顶点颜色。可在顶点与片元两个阶段使用。",
   "kg.node.rt_view_direction.tooltip": "输出从表面指向相机的未归一化方向（长度等于到相机的距离），使用选定的坐标空间。",
-  "kg.node.rt_position.tooltip": "按选定坐标空间（Object/World/View）输出网格表面位置。可在顶点与片元两个阶段使用。",
-  "kg.node.rt_normal.tooltip": "按选定坐标空间（Object/World/View）输出网格表面法线。可在顶点与片元两个阶段使用。",
+  "kg.node.rt_position.tooltip": "按选定坐标空间（Object/World/View）输出网格表面位置。可在顶点与片元两个阶段使用。各空间的具体含义由渲染管线定义——顶点本身没有对象空间的管线会把 Object 映射为 World。",
+  "kg.node.rt_normal.tooltip": "按选定坐标空间（Object/World/View）输出网格表面法线。可在顶点与片元两个阶段使用。各空间的具体含义由渲染管线定义——顶点本身没有对象空间的管线会把 Object 映射为 World。",
   "kg.node.rt_vertex_id.tooltip": "输出 gl_VertexID。可在两个阶段使用——会以 flat 变量自动传递到片元阶段。",
   "kg.node.rt_instance_id.tooltip": "输出 gl_InstanceID。可在两个阶段使用——会以 flat 变量自动传递到片元阶段。",
   "kg.node.rt_front_facing.tooltip": "输出当前片元是否为正面。",
@@ -619,6 +623,7 @@
   "kg.node.rt_colorspace_conversion.option.to.tooltip": "输出色彩空间。",
   "kg.node.rt_uv.option.channel.tooltip": "UV0 是纹理 UV；UV1 和 UV2 是 Minecraft Overlay 与光照贴图坐标。",
   "kg.node.rt_view_direction.option.space.tooltip": "视线方向的坐标空间：World、Object 或 View。Tangent 不可用（Minecraft 网格没有逐顶点切线基）。",
+  "kg.node.rt_view_direction.option.normalize.tooltip": "将输出归一化为单位长度方向。默认关闭 —— 原始向量的长度即到相机的距离。",
   "kg.node.rt_position.option.space.tooltip": "位置的坐标空间：World（绝对世界）、Object 或 View。Tangent 不可用（Minecraft 网格没有逐顶点切线基）。",
   "kg.node.rt_normal.option.space.tooltip": "法线的坐标空间：World、Object 或 View。Tangent 不可用（Minecraft 网格没有逐顶点切线基）。",
   "kg.node.rt_in_vertex_attribute.option.attribute.tooltip": "要读取的顶点格式元素；如果当前格式不包含它，图会给出警告。",
@@ -631,5 +636,7 @@
   "rendertypegraph.preview.sphere": "球体",
   "rendertypegraph.error.missing_vertex_element": "顶点属性节点需要 '%s'，但它不在顶点格式中",
   "rendertypegraph.warn.vertex_element_defaulted": "默认值使用了顶点属性 '%s'（不在格式中），将使用常量",
-  "rendertypegraph.error.stage_affinity": "%s：%s 节点被用于 %s 阶段"
+  "rendertypegraph.error.stage_affinity": "%s：%s 节点被用于 %s 阶段",
+  "rendertypegraph.error.duplicate_vertex_block": "顶点阶段只能有一个 %s 块",
+  "rendertypegraph.error.position_block_conflict": "glPosition 与 Position 块不能同时使用 —— 二者都定义顶点位置，请只保留一个"
 }

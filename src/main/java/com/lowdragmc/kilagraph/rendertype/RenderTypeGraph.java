@@ -2,6 +2,7 @@ package com.lowdragmc.kilagraph.rendertype;
 
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.INodeValidator;
+import com.lowdragmc.kilagraph.rendertype.compiler.IVertexPositionBlock;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.IVertexFormatDependentNode;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
@@ -21,7 +22,8 @@ import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingStageNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphLogger;
@@ -36,6 +38,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.itemlibrary.GraphNodeCreati
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.SpawnFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ContextNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.BlockNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.CustomBlockNodeModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
@@ -119,11 +122,13 @@ public class RenderTypeGraph extends Graph {
     }
 
     /**
-     * The vertex-position block class the default shader places in the vertex stage. Subclasses with
-     * their own fixed transform override this so the default graph — and nothing else — uses their block.
+     * The vertex-position block class the default shader places in the vertex stage: the Unity-like
+     * object-space {@link VertexModelPositionBlock} (unconnected = the standard {@code ProjMat · ModelViewMat}
+     * transform, byte-identical to before), <b>not</b> the advanced clip-space glPosition block. Subclasses
+     * with their own fixed transform override this so the default graph — and nothing else — uses their block.
      */
     protected Class<? extends BlockNode> defaultVertexPositionBlockClass() {
-        return VertexPositionBlock.class;
+        return VertexModelPositionBlock.class;
     }
 
     /** Set a node option's value (mirrors the editor's option-constant write). */
@@ -368,6 +373,32 @@ public class RenderTypeGraph extends Graph {
             }
         }
 
+        // 1c) Vertex-stage block cardinality. glPosition / Position / Normal are each single-instance: the
+        //     Add-Block menu hides an already-present one (VaryingStageNode.getSupportBlocks), and this
+        //     backstops a pasted/loaded duplicate. glPosition + Position are also mutually exclusive — both
+        //     drive the vertex position, so having both is ambiguous (the compiler lets glPosition win).
+        //     Node-keyed ERRORs, surfaced in the editor GraphLogger.
+        if (vertexStageModel instanceof ContextNodeModel vertexStage) {
+            var glPositionBlocks = new java.util.ArrayList<BlockNodeModel>();
+            var modelPositionBlocks = new java.util.ArrayList<BlockNodeModel>();
+            var modelNormalBlocks = new java.util.ArrayList<BlockNodeModel>();
+            for (BlockNodeModel block : vertexStage.getBlocks()) {
+                if (!(block instanceof ICustomNodeModel custom) || custom.getNode() == null) continue;
+                var node = custom.getNode();
+                if (node instanceof IVertexPositionBlock) glPositionBlocks.add(block);
+                else if (node instanceof VertexModelPositionBlock) modelPositionBlocks.add(block);
+                else if (node instanceof VertexModelNormalBlock) modelNormalBlocks.add(block);
+            }
+            flagDuplicateVertexBlocks(logger, glPositionBlocks, "rt_vertex_position");
+            flagDuplicateVertexBlocks(logger, modelPositionBlocks, "rt_vertex_model_position");
+            flagDuplicateVertexBlocks(logger, modelNormalBlocks, "rt_vertex_model_normal");
+            if (!glPositionBlocks.isEmpty() && !modelPositionBlocks.isEmpty()) {
+                var conflict = Component.translatable("rendertypegraph.error.position_block_conflict");
+                java.util.stream.Stream.concat(glPositionBlocks.stream(), modelPositionBlocks.stream())
+                        .forEach(block -> reportVertexBlockIssue(logger, conflict, block));
+            }
+        }
+
         // 2) Default-behavior references (e.g. the vertex Color block defaulting to minecraft_mix_light with
         //    Color/Normal): caught by compiling once (CPU-only) and reading the substituted attributes. Only
         //    when an editor logger is present (a per-edit compile is cheap; skip it on the headless setSettings
@@ -389,6 +420,24 @@ public class RenderTypeGraph extends Graph {
             }
         } catch (RuntimeException ignored) {
             // A malformed graph throws during compile; the preview/material path reports that separately.
+        }
+    }
+
+    /** Flag each block of a single-instance vertex-block type (glPosition / Position / Normal) when more
+     *  than one is present — the Add-Block menu prevents adding a second, so this backstops paste/load. */
+    private void flagDuplicateVertexBlocks(@Nullable GraphLogger logger, List<BlockNodeModel> blocks, String nameKey) {
+        if (blocks.size() <= 1) return;
+        var message = Component.translatable("rendertypegraph.error.duplicate_vertex_block",
+                Component.translatable(nameKey));
+        for (var block : blocks) reportVertexBlockIssue(logger, message, block);
+    }
+
+    /** Route a vertex-block validation issue to the editor {@link GraphLogger} (node-keyed) or the console. */
+    private void reportVertexBlockIssue(@Nullable GraphLogger logger, Component message, BlockNodeModel block) {
+        if (logger != null) {
+            logger.error(message, block);
+        } else {
+            LOGGER.warn("[KilaGraph] {}", message.getString());
         }
     }
 

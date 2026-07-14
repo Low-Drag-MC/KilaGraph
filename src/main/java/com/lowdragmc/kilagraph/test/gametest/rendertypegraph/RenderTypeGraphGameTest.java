@@ -36,6 +36,8 @@ import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.TotalFogValueNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomFloatBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec4Block;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingStageNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
@@ -226,6 +228,62 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
+    /**
+     * The single-instance vertex blocks (glPosition / Position / Normal) drop out of the Add-Block menu
+     * ({@link VaryingStageNode#getSupportBlocks()}) once one is present, so at most one of each can be added;
+     * the unlimited custom-varying blocks are never filtered. A detached node reports the full list.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void uniqueVertexBlocksHiddenOncePresent(GameTestHelper helper) {
+        // In a real graph the default already holds one Position block, so it's no longer offered — while
+        // the still-absent Normal / glPosition and the unlimited Custom varyings still are.
+        RenderTypeGraph graph = new RenderTypeGraph();
+        VaryingStageNode stage = (VaryingStageNode) ((ICustomNodeModel) graph.getVertexStageModel()).getNode();
+        var support = stage.getSupportBlocks();
+        assertFalse(helper, "the already-present Position block is not offered again",
+                support.contains(VertexModelPositionBlock.class));
+        assertTrue(helper, "the absent Normal block is still offered", support.contains(VertexModelNormalBlock.class));
+        assertTrue(helper, "the absent glPosition block is still offered", support.contains(VertexPositionBlock.class));
+        assertTrue(helper, "custom varyings are never limited", support.contains(VaryingCustomFloatBlock.class));
+
+        // Add the Normal block: it too drops out; custom varyings stay.
+        addBlock(graph, graph.getVertexStageModel(), VertexModelNormalBlock.class);
+        var support2 = stage.getSupportBlocks();
+        assertFalse(helper, "the now-present Normal block is not offered again",
+                support2.contains(VertexModelNormalBlock.class));
+        assertTrue(helper, "custom varyings remain offered", support2.contains(VaryingCustomFloatBlock.class));
+        helper.succeed();
+    }
+
+    /**
+     * glPosition and Position drive the same output, so having both is a graph-validation ERROR (surfaced
+     * through the editor {@link GraphLogger}, keyed to the offending block); likewise a duplicate
+     * single-instance block (e.g. a pasted or loaded second Position) is flagged.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void vertexPositionBlockConflictFlagged(GameTestHelper helper) {
+        // The default graph already has a Position block; adding a glPosition makes them mutually exclusive.
+        RenderTypeGraph conflictGraph = new RenderTypeGraph();
+        NodeModel gl = addBlock(conflictGraph, conflictGraph.getVertexStageModel(), VertexPositionBlock.class);
+        GraphLogger conflict = new GraphLogger();
+        conflictGraph.onGraphChanged(conflict);
+        assertTrue(helper, "glPosition + Position is flagged as an ERROR keyed to the glPosition block",
+                conflict.getEntries().stream().anyMatch(e ->
+                        e.context() == gl && e.level() == GraphLogger.Level.ERROR));
+
+        // A second Position block (a duplicate of a single-instance type) is flagged, keyed to the extra block.
+        RenderTypeGraph dupGraph = new RenderTypeGraph();
+        NodeModel dup = addBlock(dupGraph, dupGraph.getVertexStageModel(), VertexModelPositionBlock.class);
+        GraphLogger dupLog = new GraphLogger();
+        dupGraph.onGraphChanged(dupLog);
+        assertTrue(helper, "a duplicate Position block is flagged as an ERROR keyed to the extra block",
+                dupLog.getEntries().stream().anyMatch(e ->
+                        e.context() == dup && e.level() == GraphLogger.Level.ERROR));
+        helper.succeed();
+    }
+
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void supportedTypesIncludeRenderTypeContracts(GameTestHelper helper) {
@@ -309,8 +367,12 @@ public final class RenderTypeGraphGameTest {
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void stageContextsAcceptExpectedBlocks(GameTestHelper helper) {
-        VaryingStageNode vertex = new VaryingStageNode();
-        FragmentStageNode fragment = new FragmentStageNode();
+        // Query the stage nodes as they exist in a real graph — block discovery is annotation-driven
+        // (@UseWithContext) and scans the backing graph model, so a detached `new VaryingStageNode()`
+        // (nothing to scan) is not a meaningful capability query.
+        RenderTypeGraph graph = new RenderTypeGraph();
+        VaryingStageNode vertex = (VaryingStageNode) ((ICustomNodeModel) graph.getVertexStageModel()).getNode();
+        FragmentStageNode fragment = (FragmentStageNode) ((ICustomNodeModel) graph.getFragmentStageModel()).getNode();
 
         assertTrue(helper, "vertex stage supports position output slot",
                 vertex.getSupportBlocks().contains(VertexPositionBlock.class));

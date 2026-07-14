@@ -58,6 +58,8 @@
 
   "rt_vertex_stage": "Vertex Stage",
   "rt_fragment_stage": "Fragment Stage",
+  "rt_vertex_model_position": "Position",
+  "rt_vertex_model_normal": "Normal",
   "rt_vertex_position": "glPosition",
   "rt_vertex_custom_float": "Custom Float",
   "rt_vertex_custom_vec2": "Custom Vec2",
@@ -514,7 +516,9 @@
 
   "kg.node.rt_vertex_stage.tooltip": "Container for vertex-stage output blocks.",
   "kg.node.rt_fragment_stage.tooltip": "Container for fragment-stage output blocks.",
-  "kg.node.rt_vertex_position.tooltip": "Writes the final clip-space vertex position.",
+  "kg.node.rt_vertex_model_position.tooltip": "The model-space vertex position; the standard Minecraft transform (ProjMat · ModelViewMat) is applied after. Unconnected = the mesh position, untouched.",
+  "kg.node.rt_vertex_model_normal.tooltip": "The model-space normal, replacing the mesh Normal for lighting, Fresnel defaults and the Normal node. Unconnected = the mesh normal, untouched.",
+  "kg.node.rt_vertex_position.tooltip": "Advanced: writes the final clip-space vertex position directly.",
   "kg.node.rt_vertex_custom_float.tooltip": "Passes a custom float varying from vertex to fragment.",
   "kg.node.rt_vertex_custom_vec2.tooltip": "Passes a custom vec2 varying from vertex to fragment.",
   "kg.node.rt_vertex_custom_vec3.tooltip": "Passes a custom vec3 varying from vertex to fragment.",
@@ -527,8 +531,8 @@
   "kg.node.rt_uv.tooltip": "Outputs a mesh UV channel. Usable in both the vertex and fragment stages.",
   "kg.node.rt_vertex_color.tooltip": "Outputs the mesh vertex color with the selected lighting mode. Usable in both the vertex and fragment stages.",
   "kg.node.rt_view_direction.tooltip": "Outputs the unnormalized direction from the surface to the camera (length = distance to camera) in the selected space.",
-  "kg.node.rt_position.tooltip": "Outputs the mesh surface position in the selected space (Object/World/View). Usable in both the vertex and fragment stages.",
-  "kg.node.rt_normal.tooltip": "Outputs the mesh surface normal in the selected space (Object/World/View). Usable in both the vertex and fragment stages.",
+  "kg.node.rt_position.tooltip": "Outputs the mesh surface position in the selected space (Object/World/View). Usable in both the vertex and fragment stages. Each space is defined by the render pipeline — a pipeline whose vertices carry no object space maps Object to World.",
+  "kg.node.rt_normal.tooltip": "Outputs the mesh surface normal in the selected space (Object/World/View). Usable in both the vertex and fragment stages. Each space is defined by the render pipeline — a pipeline whose vertices carry no object space maps Object to World.",
   "kg.node.rt_vertex_id.tooltip": "Outputs gl_VertexID. Usable in both stages — auto-forwarded to the fragment stage as a flat varying.",
   "kg.node.rt_instance_id.tooltip": "Outputs gl_InstanceID. Usable in both stages — auto-forwarded to the fragment stage as a flat varying.",
   "kg.node.rt_front_facing.tooltip": "Outputs whether the current fragment is front-facing.",
@@ -621,6 +625,7 @@
   "kg.node.rt_colorspace_conversion.option.to.tooltip": "Output color space.",
   "kg.node.rt_uv.option.channel.tooltip": "UV0 is texture UV; UV1 and UV2 are Minecraft overlay and lightmap coordinates.",
   "kg.node.rt_view_direction.option.space.tooltip": "Coordinate space of the view direction: World, Object, or View. Tangent is unavailable (Minecraft meshes have no per-vertex tangent basis).",
+  "kg.node.rt_view_direction.option.normalize.tooltip": "Normalize the output to a unit-length direction. Off by default — the raw vector's length is the distance to the camera.",
   "kg.node.rt_position.option.space.tooltip": "Coordinate space of the position: World (absolute), Object, or View. Tangent is unavailable (Minecraft meshes have no per-vertex tangent basis).",
   "kg.node.rt_normal.option.space.tooltip": "Coordinate space of the normal: World, Object, or View. Tangent is unavailable (Minecraft meshes have no per-vertex tangent basis).",
   "kg.node.rt_in_vertex_attribute.option.attribute.tooltip": "Vertex-format element to read; the graph warns if the format does not include it.",
@@ -633,5 +638,7 @@
   "rendertypegraph.preview.sphere": "Sphere",
   "rendertypegraph.error.missing_vertex_element": "Vertex attribute node needs '%s', not in the vertex format",
   "rendertypegraph.warn.vertex_element_defaulted": "A default uses vertex attribute '%s' (not in the format) — using a constant",
-  "rendertypegraph.error.stage_affinity": "%s: %s node used in the %s stage"
+  "rendertypegraph.error.stage_affinity": "%s: %s node used in the %s stage",
+  "rendertypegraph.error.duplicate_vertex_block": "Only one %s block is allowed in the vertex stage",
+  "rendertypegraph.error.position_block_conflict": "glPosition and Position blocks can't be used together — both drive the vertex position; keep only one"
 }

@@ -9,7 +9,6 @@ import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
-import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
@@ -61,22 +60,14 @@ public class NormalNode extends ShaderNode {
             ctx.output("out", new ShaderExpr("normalize(vNormal)", GlslType.VEC3));
             return;
         }
-        // Object-space normal source: raw Normal attribute in the vsh, kg_objectNormal varying in the fsh.
-        ShaderExpr objN = ctx.varyingInput("kg_objectNormal", GlslType.VEC3,
-                () -> ctx.attribute(KGVertexElements.NORMAL, GlslType.VEC3,
-                        new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3)),
-                new ShaderExpr("vNormal", GlslType.VEC3));
-        String out = switch (space) {
-            case "object" -> "normalize(" + objN.code() + ")";
-            case "view" -> "normalize(mat3(" + ctx.useBuiltinUniform("ModelViewMat", GlslType.MAT4)
-                    + ") * " + objN.code() + ")";
-            default /* world */ -> {
-                String modelView = ctx.useBuiltinUniform("ModelViewMat", GlslType.MAT4);
-                String iView = ctx.transformField("IViewMat", GlslType.MAT4).code(); // view -> world (rotation)
-                yield "normalize(mat3(" + iView + ") * mat3(" + modelView + ") * " + objN.code() + ")";
-            }
+        // The render pipeline owns the coordinate spaces (see ShaderGraphCompiler's *SpaceNormal seams);
+        // each seam returns the already-normalized normal for its space. This node just dispatches.
+        ShaderExpr out = switch (space) {
+            case "object" -> ctx.objectSpaceNormal();
+            case "view" -> ctx.viewSpaceNormal();
+            default /* world */ -> ctx.worldSpaceNormal();
         };
-        ctx.output("out", new ShaderExpr(out, GlslType.VEC3));
+        ctx.output("out", out);
     }
 
     @Override

@@ -61,23 +61,15 @@ public class PositionNode extends ShaderNode {
             ctx.output("out", new ShaderExpr("vPos", GlslType.VEC3));
             return;
         }
-        // Object/model-space source: raw (Position + ModelOffset) in the vsh, kg_modelPos varying in the fsh.
-        ShaderExpr pos = ctx.meshPosition();
-        String out = switch (space) {
-            case "object" -> pos.code();
-            case "view" -> "(" + ctx.useBuiltinUniform("ModelViewMat", GlslType.MAT4)
-                    + " * vec4(" + pos.code() + ", 1.0)).xyz";
-            default /* world */ -> {
-                // object -> view (ModelViewMat), un-rotate view -> camera-relative world (IViewMat), then add
-                // the camera's absolute world position back — MC renders camera-relative, so this recovers
-                // absolute world exactly like TransformNode's object->world for a position.
-                String modelView = ctx.useBuiltinUniform("ModelViewMat", GlslType.MAT4);
-                String iView = ctx.transformField("IViewMat", GlslType.MAT4).code();
-                String cameraPos = ctx.cameraWorldPos().code();
-                yield "((" + iView + " * " + modelView + " * vec4(" + pos.code() + ", 1.0)).xyz + " + cameraPos + ")";
-            }
+        // The render pipeline owns the coordinate spaces (see ShaderGraphCompiler's *SpacePosition seams):
+        // the vertex input is not necessarily object space (e.g. a subclass whose vertices are already world,
+        // and whose object->world is not a matrix). This node just dispatches to the chosen space.
+        ShaderExpr out = switch (space) {
+            case "object" -> ctx.objectSpacePosition();
+            case "view" -> ctx.viewSpacePosition();
+            default /* world */ -> ctx.worldSpacePosition();
         };
-        ctx.output("out", new ShaderExpr(out, GlslType.VEC3));
+        ctx.output("out", out);
     }
 
     @Override

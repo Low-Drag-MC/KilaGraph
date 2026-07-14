@@ -315,6 +315,61 @@ public final class ShaderCompileContext {
     }
 
     /**
+     * The <b>object-space</b> mesh normal (vec3) — the stage-agnostic source the Normal node reads: the raw
+     * {@code Normal} attribute (or a driven {@code VertexModelNormalBlock}) in the vsh, the interpolated
+     * {@code kg_objectNormal} varying in the fsh, the preview quad's {@code vNormal} in previews.
+     */
+    public ShaderExpr objectNormal() {
+        return compiler.objectNormal();
+    }
+
+    /** The vertex position in object/model space — the Position node's "Object" output. Pipeline-defined
+     *  (a subclass whose vertices arrive already in world space overrides this). */
+    public ShaderExpr objectSpacePosition() {
+        return compiler.objectSpacePosition();
+    }
+
+    /** The vertex position in eye/view space — the Position node's "View" output. */
+    public ShaderExpr viewSpacePosition() {
+        return compiler.viewSpacePosition();
+    }
+
+    /** The vertex position in absolute world space — the Position node's "World" output. */
+    public ShaderExpr worldSpacePosition() {
+        return compiler.worldSpacePosition();
+    }
+
+    /** The surface normal in object/model space (normalized) — the Normal node's "Object" output. */
+    public ShaderExpr objectSpaceNormal() {
+        return compiler.objectSpaceNormal();
+    }
+
+    /** The surface normal in eye/view space (normalized) — the Normal node's "View" output. */
+    public ShaderExpr viewSpaceNormal() {
+        return compiler.viewSpaceNormal();
+    }
+
+    /** The surface normal in world space (normalized) — the Normal node's "World" output. */
+    public ShaderExpr worldSpaceNormal() {
+        return compiler.worldSpaceNormal();
+    }
+
+    /** The surface&rarr;camera direction in object space (unnormalized) — the View Direction node's "Object" output. */
+    public ShaderExpr objectSpaceViewDir() {
+        return compiler.objectSpaceViewDir();
+    }
+
+    /** The surface&rarr;camera direction in eye/view space (unnormalized) — the View Direction node's "View" output. */
+    public ShaderExpr viewSpaceViewDir() {
+        return compiler.viewSpaceViewDir();
+    }
+
+    /** The surface&rarr;camera direction in world space (unnormalized) — the View Direction node's "World" output. */
+    public ShaderExpr worldSpaceViewDir() {
+        return compiler.worldSpaceViewDir();
+    }
+
+    /**
      * The interpolated world-space view direction, surface&rarr;camera (vec3) — the default fallback for an
      * unconnected {@code viewDir} port (Unity's View Direction node defaults to world space). Renormalize
      * before use. In a per-node preview this is {@code +Z} (looking straight at the quad).

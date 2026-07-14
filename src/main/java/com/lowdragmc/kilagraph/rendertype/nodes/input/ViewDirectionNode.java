@@ -28,7 +28,8 @@ import java.util.List;
  * <b>Tangent</b> space isn't offered — Minecraft meshes carry no per-vertex tangent basis (the same reason
  * {@link com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode} omits it). The surface position
  * is the interpolated model-space vertex position ({@link ShaderCompileContext#meshPosition()}), so the node
- * is fragment-safe and stage-agnostic. Consumers wanting a unit vector should feed this through a Normalize.</p>
+ * is fragment-safe and stage-agnostic. It is <b>unnormalized by default</b> (its length is the distance to the
+ * camera); enable the {@code normalize} option for a unit-length direction.</p>
  */
 @NodeAttribute(name = "rt_view_direction", group = "rendertype_input", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class ViewDirectionNode extends ShaderNode {
@@ -44,6 +45,10 @@ public class ViewDirectionNode extends ShaderNode {
         context.addOption("space", TypeHandles.STRING).withDefaultValue("world")
                 .withTooltips(Tooltips.of("kg.node.rt_view_direction.option.space.tooltip"))
                 .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES, ViewDirectionNode::label)).build();
+        // Off by default: the raw vector carries the surface->camera distance in its length; turn on only
+        // when a unit-length direction is wanted.
+        context.addOption("normalize", TypeHandles.BOOL).withDefaultValue(false)
+                .withTooltips(Tooltips.of("kg.node.rt_view_direction.option.normalize.tooltip")).build();
     }
 
     @Override
@@ -54,17 +59,19 @@ public class ViewDirectionNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         String space = choice("space", "world", SPACES);
-        // Camera is at the view-space origin, so the surface->camera direction is -viewPos; its length is the
-        // distance to the camera. MC's matrices are pure rotation (mat3) + translation, so the view->world /
-        // view->object rotations below preserve that length across spaces.
-        String modelView = ctx.useBuiltinUniform("ModelViewMat", GlslType.MAT4);
-        ShaderExpr vd = ctx.temp(GlslType.VEC3, "-(" + modelView + " * vec4(" + ctx.meshPosition().code() + ", 1.0)).xyz");
-        String out = switch (space) {
-            case "object" -> "mat3(" + ctx.transformField("IModelViewMat", GlslType.MAT4).code() + ") * " + vd.code();
-            case "view" -> vd.code();
-            default /* world */ -> "mat3(" + ctx.transformField("IViewMat", GlslType.MAT4).code() + ") * " + vd.code();
+        // The render pipeline owns the coordinate spaces (see ShaderGraphCompiler's *SpaceViewDir seams):
+        // the camera is at the view-space origin so the surface->camera direction is -viewPos, and each seam
+        // rotates that into the chosen space (unnormalized — its length is the distance to the camera). This
+        // node just dispatches to the chosen space.
+        ShaderExpr dir = switch (space) {
+            case "object" -> ctx.objectSpaceViewDir();
+            case "view" -> ctx.viewSpaceViewDir();
+            default /* world */ -> ctx.worldSpaceViewDir();
         };
-        ctx.output("out", new ShaderExpr(out, GlslType.VEC3));
+        // Normalize only when asked (default off) — the unnormalized vector's length is the camera distance.
+        ctx.output("out", flag("normalize")
+                ? new ShaderExpr("normalize(" + dir.code() + ")", GlslType.VEC3)
+                : dir);
     }
 
     @Override
@@ -84,5 +91,11 @@ public class ViewDirectionNode extends ShaderNode {
         INodeOption opt = getNodeOptionById(id);
         Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
         return raw instanceof String s && valid.contains(s) ? s : def;
+    }
+
+    private boolean flag(String id) {
+        INodeOption opt = getNodeOptionById(id);
+        Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
+        return raw instanceof Boolean b && b;
     }
 }

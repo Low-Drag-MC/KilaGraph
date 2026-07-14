@@ -115,6 +115,13 @@ public class ShaderGraphCompiler {
      *  defaults (see {@link #screenUv()}) map the whole capture onto the preview geometry rather than the
      *  panel's screen sub-rect, so the preview shows the entire scene. In-world rendering is unaffected. */
     private boolean editorPreview;
+    /** GLSL name of the vertex stage's displaced model position ({@code kg_vertexPos}) when a driven
+     *  Position block replaced the mesh position — {@link #modelPosition()} then returns it, so gl_Position,
+     *  the fog distances, {@code kg_modelPos} and the view direction all follow. Null = identity (the block
+     *  is absent/unconnected) and the emitted GLSL is byte-identical to before. */
+    @Nullable private String displacedPosition;
+    /** GLSL name of the displaced model normal ({@code kg_vertexNormal}); see {@link #modelNormal()}. */
+    @Nullable private String displacedNormal;
     /** Stage-affinity violations found during traversal, keyed by node uid (first conflict per node). */
     private final Map<UUID, StageError> stageErrors = new LinkedHashMap<>();
     /**
@@ -124,6 +131,8 @@ public class ShaderGraphCompiler {
      * argument instead of the top-level const/uniform path.
      */
     private final Deque<Map<UUID, ShaderExpr>> bindingStack = new ArrayDeque<>();
+
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
 
     /** Fixed render state for per-node previews: opaque, depth-tested, no cull (so the quad always shows). */
     public static final RenderTypeGraph.Settings PREVIEW_SETTINGS = new RenderTypeGraph.Settings(
@@ -163,6 +172,37 @@ public class ShaderGraphCompiler {
     public CompiledShaderGraph compile() {
         ContextNodeModel vertexStage = asContext(graph.getVertexStageModel(), "vertex");
         ContextNodeModel fragmentStage = asContext(graph.getFragmentStageModel(), "fragment");
+
+        // 0) Vertex model outputs (the Unity-like Position/Normal blocks) — MUST run before the fragment
+        //    pass: it sets displacedPosition/displacedNormal, and the fragment pass lazily emits varying
+        //    assignments (kg_modelPos, kg_worldViewDir, fog distances, kg_objectNormal/kg_worldNormal)
+        //    whose vsh defaults go through modelPosition()/modelNormal() and must see the displaced refs.
+        //    The refs are set only AFTER both blocks emitted, so the blocks' own inputs read the ORIGINAL
+        //    mesh values. Skipped entirely when the advanced glPosition block is present (its clip-space
+        //    output owns the vertex stage; model-space blocks would be ambiguous under it).
+        current = vertex;
+        boolean legacyVertexBlock = vertexStage.getBlocks().stream()
+                .anyMatch(b -> nodeOf(b) instanceof IVertexPositionBlock);
+        if (!legacyVertexBlock) {
+            VertexOutputs vout = new VertexOutputs();
+            for (BlockNodeModel block : vertexStage.getBlocks()) {
+                Node node = nodeOf(block);
+                if (node instanceof IVertexOutputBlock vb) {
+                    vb.emitVertex(new ShaderCompileContext(this, block), vout);
+                }
+            }
+            if (vout.position != null) {
+                line("vec3 kg_vertexPos = " + convert(vout.position, GlslType.VEC3).code() + ";");
+                displacedPosition = "kg_vertexPos";
+            }
+            if (vout.normal != null) {
+                line("vec3 kg_vertexNormal = " + convert(vout.normal, GlslType.VEC3).code() + ";");
+                displacedNormal = "kg_vertexNormal";
+            }
+        } else if (vertexStage.getBlocks().stream().anyMatch(b -> nodeOf(b) instanceof IVertexOutputBlock)) {
+            LOGGER.warn("[KilaGraph] graph has both the advanced glPosition block and the "
+                    + "model-space Position/Normal blocks — glPosition wins; Position/Normal are ignored.");
+        }
 
         // 1) Fragment stage: pull from each fragment semantic block. This lazily builds the
         //    varyings it depends on in the vertex scope.
@@ -324,8 +364,8 @@ public class ShaderGraphCompiler {
                     addInclude("minecraft:light.glsl");
                     useBuiltinUniform("Light0_Direction", GlslType.VEC3);
                     useBuiltinUniform("Light1_Direction", GlslType.VEC3);
-                    ShaderExpr normal = attribute(KGVertexElements.NORMAL, GlslType.VEC3,
-                            new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+                    // modelNormal(): a driven Normal block re-lights the default shading too.
+                    ShaderExpr normal = modelNormal();
                     ShaderExpr color = attribute(KGVertexElements.COLOR, GlslType.VEC4,
                             new ShaderExpr("vec4(1.0)", GlslType.VEC4));
                     return new ShaderExpr("minecraft_mix_light(Light0_Direction, Light1_Direction, "
@@ -394,8 +434,8 @@ public class ShaderGraphCompiler {
         return varyingInput("kg_worldNormal", GlslType.VEC3,
                 () -> {
                     useBuiltinUniform("ModelViewMat", GlslType.MAT4);
-                    ShaderExpr n = attribute(KGVertexElements.NORMAL, GlslType.VEC3,
-                            new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+                    // modelNormal(): a driven Normal block feeds the world normal (Fresnel etc.) too.
+                    ShaderExpr n = modelNormal();
                     ShaderExpr iView = transformField("IViewMat", GlslType.MAT4); // view -> world (rotation)
                     return new ShaderExpr("normalize(mat3(" + iView.code() + ") * mat3(ModelViewMat) * "
                             + n.code() + ")", GlslType.VEC3);
@@ -478,8 +518,110 @@ public class ShaderGraphCompiler {
      * {@code dynamictransforms.glsl} import to the current (vertex) stage.
      */
     protected ShaderExpr modelPosition() {
+        // A driven Position block replaces the mesh position for the WHOLE vsh — gl_Position, the fog
+        // distances, kg_modelPos and the view direction all read this single seam.
+        if (displacedPosition != null) return new ShaderExpr(displacedPosition, GlslType.VEC3);
         useBuiltinUniform("ModelOffset", GlslType.VEC3);
         return new ShaderExpr("(" + attributeRef(KGVertexElements.POSITION) + " + ModelOffset)", GlslType.VEC3);
+    }
+
+    /**
+     * The model-space normal every consumer reads (the lit vertex colour, the world-normal varying, the
+     * Normal node's object-space source): the displaced {@code kg_vertexNormal} when a driven Normal block
+     * set one, else the raw {@code Normal} attribute (a missing element degrades to object +Y).
+     */
+    protected ShaderExpr modelNormal() {
+        if (displacedNormal != null) return new ShaderExpr(displacedNormal, GlslType.VEC3);
+        return attribute(KGVertexElements.NORMAL, GlslType.VEC3,
+                new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
+    }
+
+    /**
+     * The object-space mesh normal as a stage-agnostic input (the Normal node's source): the raw
+     * {@link #modelNormal()} in the vertex stage, the interpolated {@code kg_objectNormal} varying in the
+     * fragment stage, the preview quad's {@code vNormal} in previews.
+     */
+    protected ShaderExpr objectNormal() {
+        return varyingInput("kg_objectNormal", GlslType.VEC3, this::modelNormal,
+                new ShaderExpr("vNormal", GlslType.VEC3));
+    }
+
+    // ---- coordinate-space seams (Position/Normal nodes dispatch to these) ---------------------
+    // The Position/Normal input nodes read a space through these seams instead of hardcoding
+    // "object->world is the ModelView/IView matrix". The base is the vanilla model: the vertex input IS
+    // object space, and world/view are derived by matrix. A pipeline whose vertices arrive in a different
+    // space (e.g. a subclass whose mesh position is already world, and whose object->world transform is not
+    // a matrix) overrides whichever seams it needs — see Photon's PhotonShaderCompiler.
+
+    /** Object/model-space vertex position (the space the vertices were authored in). Base: the interpolated
+     *  mesh position ({@link #meshPosition()}) — the Position node's "Object" output. */
+    protected ShaderExpr objectSpacePosition() {
+        return meshPosition();
+    }
+
+    /** Eye/view-space vertex position ({@code ModelViewMat · object}) — the Position node's "View" output. */
+    protected ShaderExpr viewSpacePosition() {
+        ShaderExpr obj = objectSpacePosition();
+        String mv = useBuiltinUniform("ModelViewMat", GlslType.MAT4);
+        return new ShaderExpr("(" + mv + " * vec4(" + obj.code() + ", 1.0)).xyz", GlslType.VEC3);
+    }
+
+    /** Absolute world-space vertex position: object→view, un-rotated view→world via {@code IViewMat}, plus the
+     *  camera's world position (MC renders camera-relative) — the Position node's "World" output. */
+    protected ShaderExpr worldSpacePosition() {
+        ShaderExpr obj = objectSpacePosition();
+        String mv = useBuiltinUniform("ModelViewMat", GlslType.MAT4);
+        String iView = transformField("IViewMat", GlslType.MAT4).code();
+        String cameraPos = cameraWorldPos().code();
+        return new ShaderExpr("((" + iView + " * " + mv + " * vec4(" + obj.code() + ", 1.0)).xyz + "
+                + cameraPos + ")", GlslType.VEC3);
+    }
+
+    /** Object/model-space surface normal (normalized). Base: the {@link #objectNormal()} varying — the Normal
+     *  node's "Object" output. */
+    protected ShaderExpr objectSpaceNormal() {
+        return new ShaderExpr("normalize(" + objectNormal().code() + ")", GlslType.VEC3);
+    }
+
+    /** Eye/view-space surface normal ({@code mat3(ModelViewMat) · object}, normalized) — the Normal node's
+     *  "View" output. */
+    protected ShaderExpr viewSpaceNormal() {
+        ShaderExpr obj = objectNormal();
+        String mv = useBuiltinUniform("ModelViewMat", GlslType.MAT4);
+        return new ShaderExpr("normalize(mat3(" + mv + ") * " + obj.code() + ")", GlslType.VEC3);
+    }
+
+    /** World-space surface normal ({@code mat3(IViewMat · ModelViewMat) · object}, normalized) — the Normal
+     *  node's "World" output. */
+    protected ShaderExpr worldSpaceNormal() {
+        ShaderExpr obj = objectNormal();
+        String mv = useBuiltinUniform("ModelViewMat", GlslType.MAT4);
+        String iView = transformField("IViewMat", GlslType.MAT4).code();
+        return new ShaderExpr("normalize(mat3(" + iView + ") * mat3(" + mv + ") * " + obj.code() + ")",
+                GlslType.VEC3);
+    }
+
+    /** View-space surface&rarr;camera direction (<b>unnormalized</b>; its length is the distance to the
+     *  camera): the camera sits at the view-space origin, so it is simply {@code -viewSpacePosition()} —
+     *  the View Direction node's "View" output. Derived from {@link #viewSpacePosition()} so a subclass that
+     *  overrides the position seams gets a consistent view direction for free. */
+    protected ShaderExpr viewSpaceViewDir() {
+        return new ShaderExpr("(-" + viewSpacePosition().code() + ")", GlslType.VEC3);
+    }
+
+    /** Object-space surface&rarr;camera direction: the view-space direction rotated view&rarr;object by
+     *  {@code IModelViewMat} (MC's matrices are pure rotations, so the {@code mat3} preserves length) — the
+     *  View Direction node's "Object" output. */
+    protected ShaderExpr objectSpaceViewDir() {
+        String iModelView = transformField("IModelViewMat", GlslType.MAT4).code();
+        return new ShaderExpr("(mat3(" + iModelView + ") * " + viewSpaceViewDir().code() + ")", GlslType.VEC3);
+    }
+
+    /** World-space surface&rarr;camera direction: the view-space direction rotated view&rarr;world by
+     *  {@code IViewMat} — the View Direction node's "World" output. */
+    protected ShaderExpr worldSpaceViewDir() {
+        String iView = transformField("IViewMat", GlslType.MAT4).code();
+        return new ShaderExpr("(mat3(" + iView + ") * " + viewSpaceViewDir().code() + ")", GlslType.VEC3);
     }
 
     /** The element keys actually declared as {@code in} attributes in the current compile: the graph's
@@ -761,8 +903,9 @@ public class ShaderGraphCompiler {
      *  kg_CameraOffset}. The block is a per-frame {@code floor(camPos)} and the offset a small fractional,
      *  both bound from the DOUBLE camera position by {@code KGBuiltinUniforms} — so world-position math stays
      *  jitter-free (only the absolute block value rounds far from the origin). Used by Camera / Transform /
-     *  Position / GlobalsUbo nodes. */
-    ShaderExpr cameraWorldPos() {
+     *  Position / GlobalsUbo nodes. Protected so a subclass building world space in a coordinate-space seam
+     *  can reuse the same jitter-free camera position. */
+    protected ShaderExpr cameraWorldPos() {
         String block = useBuiltinUniform("kg_CameraBlockPos", GlslType.VEC3);
         String offset = useBuiltinUniform("kg_CameraOffset", GlslType.VEC3);
         return new ShaderExpr("(" + block + " - " + offset + ")", GlslType.VEC3);
