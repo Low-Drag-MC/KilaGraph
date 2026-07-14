@@ -76,20 +76,14 @@ public class NormalNode extends ShaderNode {
             ctx.output("out", new ShaderExpr("normalize(vNormal)", GlslType.VEC3));
             return;
         }
-        // Object-space normal source (raw Normal attribute / a driven Normal block in the vsh, the
-        // kg_objectNormal varying in the fsh). Matrices come from KG_Transforms (no #moj_import).
-        ShaderExpr objN = ctx.objectNormal();
-        String out = switch (space) {
-            case "object" -> "normalize(" + objN.code() + ")";
-            case "view" -> "normalize(mat3(" + ctx.transformField("ModelViewMat", GlslType.MAT4).code()
-                    + ") * " + objN.code() + ")";
-            default /* world */ -> {
-                String iView = ctx.transformField("IViewMat", GlslType.MAT4).code(); // view -> world (rotation)
-                yield "normalize(mat3(" + iView + ") * mat3("
-                        + ctx.transformField("ModelViewMat", GlslType.MAT4).code() + ") * " + objN.code() + ")";
-            }
+        // The render pipeline owns the coordinate spaces (see ShaderGraphCompiler's *SpaceNormal seams);
+        // each seam returns the already-normalized normal for its space. This node just dispatches.
+        ShaderExpr out = switch (space) {
+            case "object" -> ctx.objectSpaceNormal();
+            case "view" -> ctx.viewSpaceNormal();
+            default /* world */ -> ctx.worldSpaceNormal();
         };
-        ctx.output("out", new ShaderExpr(out, GlslType.VEC3));
+        ctx.output("out", out);
     }
 
     @Override

@@ -17,6 +17,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  * <ul>
  *   <li>{@code Position} — absolute world camera position (from {@code Globals.CameraBlockPos} + {@code CameraOffset}).</li>
  *   <li>{@code Direction} — camera forward (world space), {@code IViewMat * (0,0,-1)}.</li>
+ *   <li>{@code Up} — camera up (world space), {@code IViewMat * (0,1,0)}.</li>
+ *   <li>{@code Right} — camera right (world space), {@code IViewMat * (1,0,0)}.</li>
  *   <li>{@code Orthographic} — {@code 1.0} if the projection is orthographic, {@code 0.0} if perspective.</li>
  *   <li>{@code NearPlane}/{@code FarPlane} — clip plane distances in world units (reconstructed from {@code IProjMat}).</li>
  *   <li>{@code ZBufferSign} — {@code 1.0} for our pipeline (depth increases away from the camera).</li>
@@ -34,6 +36,8 @@ public class CameraNode extends ShaderNode {
     public void onDefinePorts(IPortDefinitionContext context) {
         context.addOutputPort("Position", RenderTypeGraphTypes.VEC3);
         context.addOutputPort("Direction", RenderTypeGraphTypes.VEC3);
+        context.addOutputPort("Up", RenderTypeGraphTypes.VEC3);
+        context.addOutputPort("Right", RenderTypeGraphTypes.VEC3);
         context.addOutputPort("Orthographic", TypeHandles.FLOAT);
         context.addOutputPort("NearPlane", TypeHandles.FLOAT);
         context.addOutputPort("FarPlane", TypeHandles.FLOAT);
@@ -51,9 +55,11 @@ public class CameraNode extends ShaderNode {
                 + ctx.transformField("CameraOffset", GlslType.VEC3).code() + ")", GlslType.VEC3));
         ctx.output("ScreenSize", ctx.screenSize());
 
-        // Camera forward in world space: view-space -Z transformed by the inverse view matrix (view->world).
+        // Camera basis in world space: view-space axes transformed by the inverse view matrix (view->world).
         ShaderExpr iView = ctx.transformField("IViewMat", GlslType.MAT4);
         ctx.output("Direction", new ShaderExpr("normalize((" + iView.code() + " * vec4(0.0, 0.0, -1.0, 0.0)).xyz)", GlslType.VEC3));
+        ctx.output("Up", new ShaderExpr("normalize((" + iView.code() + " * vec4(0.0, 1.0, 0.0, 0.0)).xyz)", GlslType.VEC3));
+        ctx.output("Right", new ShaderExpr("normalize((" + iView.code() + " * vec4(1.0, 0.0, 0.0, 0.0)).xyz)", GlslType.VEC3));
 
         // Orthographic flag straight from the projection matrix's [3][3] (1 for ortho, 0 for perspective).
         ctx.output("Orthographic", new ShaderExpr(

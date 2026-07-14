@@ -72,6 +72,7 @@ import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.PositionNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.NormalNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.ViewDirectionNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexIdNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceIdNode;
@@ -192,6 +193,7 @@ public final class ShaderCompilerGameTest {
     private static final String BUILTIN_VERTEX_IDS = "rendertype_compile_builtin_vertex_ids";
     private static final String POSITION_NORMAL_SPACES = "rendertype_compile_position_normal_spaces";
     private static final String INPUT_NODES_VERTEX_STAGE = "rendertype_compile_input_nodes_vertex_stage";
+    private static final String VIEW_DIRECTION_NORMALIZE = "rendertype_compile_view_direction_normalize";
     private static final String GRADIENT_NODES = "rendertype_compile_gradient_nodes";
     private static final String GRADIENT_VARIABLE = "rendertype_compile_gradient_variable";
     private static final String GRADIENT_VALUE_CODEC = "rendertype_compile_gradient_value_codec";
@@ -270,6 +272,7 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunction(BUILTIN_VERTEX_IDS, ShaderCompilerGameTest::idNodesWorkInBothStages);
         KGGameTests.registerFunction(POSITION_NORMAL_SPACES, ShaderCompilerGameTest::positionNormalNodesEmitSpaceGlsl);
         KGGameTests.registerFunction(INPUT_NODES_VERTEX_STAGE, ShaderCompilerGameTest::uvAndVertexColorUsableInVertexStage);
+        KGGameTests.registerFunction(VIEW_DIRECTION_NORMALIZE, ShaderCompilerGameTest::viewDirectionNormalizeOption);
         KGGameTests.registerFunction(GRADIENT_NODES, ShaderCompilerGameTest::gradientNodesEmitGlsl);
         KGGameTests.registerFunction(GRADIENT_VARIABLE, ShaderCompilerGameTest::gradientVariableBecomesUboStruct);
         KGGameTests.registerFunction(GRADIENT_VALUE_CODEC, ShaderCompilerGameTest::gradientValueCodecRoundTrips);
@@ -348,6 +351,7 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunctionTest(event, BUILTIN_VERTEX_IDS, KGGameTests.functionKey(BUILTIN_VERTEX_IDS), d);
         KGGameTests.registerFunctionTest(event, POSITION_NORMAL_SPACES, KGGameTests.functionKey(POSITION_NORMAL_SPACES), d);
         KGGameTests.registerFunctionTest(event, INPUT_NODES_VERTEX_STAGE, KGGameTests.functionKey(INPUT_NODES_VERTEX_STAGE), d);
+        KGGameTests.registerFunctionTest(event, VIEW_DIRECTION_NORMALIZE, KGGameTests.functionKey(VIEW_DIRECTION_NORMALIZE), d);
         KGGameTests.registerFunctionTest(event, GRADIENT_NODES, KGGameTests.functionKey(GRADIENT_NODES), d);
         KGGameTests.registerFunctionTest(event, GRADIENT_VARIABLE, KGGameTests.functionKey(GRADIENT_VARIABLE), d);
         KGGameTests.registerFunctionTest(event, GRADIENT_VALUE_CODEC, KGGameTests.functionKey(GRADIENT_VALUE_CODEC), d);
@@ -621,6 +625,25 @@ public final class ShaderCompilerGameTest {
         if (option != null) setOption(node, option, value);
         wire(graph, emission.getInputsById().get("color"), node.getOutputsById().get("out"));
         return graph;
+    }
+
+    /** The View Direction node is unnormalized by default (its length is the camera distance); the
+     *  {@code normalize} option wraps the output in a {@code normalize()} for a unit-length direction. */
+    public static void viewDirectionNormalizeOption(GameTestHelper helper) {
+        assertTrue(helper, "the normalize option adds a normalize() call around the view direction",
+                countOccurrences(viewDirectionFsh(true), "normalize(")
+                        > countOccurrences(viewDirectionFsh(false), "normalize("));
+        helper.succeed();
+    }
+
+    /** A View Direction node (given {@code normalize}) wired into fragment emission; returns the fragment GLSL. */
+    private static String viewDirectionFsh(boolean normalize) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel vd = addNode(graph, ViewDirectionNode.class);
+        setOption(vd, "normalize", normalize);
+        wire(graph, emission.getInputsById().get("color"), vd.getOutputsById().get("out"));
+        return compile(graph).fragmentSource();
     }
 
     /**
@@ -2499,7 +2522,7 @@ public final class ShaderCompilerGameTest {
         helper.succeed();
     }
 
-    /** The extended Camera node exposes Direction (IViewMat), Near/Far (inverse-projection) and Orthographic. */
+    /** The extended Camera node exposes Direction/Up/Right (IViewMat), Near/Far (inverse-projection) and Orthographic. */
     public static void cameraNodeExposesNewOutputs(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel camera = addNode(graph, CameraNode.class);
@@ -2520,6 +2543,18 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "Near/Far reconstruct via the kg_scene helpers",
                 fsh.contains("kg_camera_near(") && fsh.contains("kg_camera_far("));
         assertTrue(helper, "Orthographic reads ProjMat[3][3]", fsh.contains("ProjMat[3][3]"));
+
+        // The camera basis vectors (Up/Right) derive from the same inverse view matrix as Direction, each
+        // transforming its own view-space axis. Verify Up compiles and rotates the view-space up axis.
+        RenderTypeGraph upGraph = new RenderTypeGraph();
+        NodeModel upCam = addNode(upGraph, CameraNode.class);
+        wire(upGraph, addBlock(upGraph, upGraph.getFragmentStageModel(), FragmentBaseColorBlock.class).getInputsById().get("color"),
+                upCam.getOutputsById().get("Up"));
+        CompiledShaderGraph upCompiled = compile(upGraph);
+        assertFalse(helper, "camera Up is not a stage error", upCompiled.hasStageErrors());
+        String upFsh = upCompiled.fragmentSource();
+        assertTrue(helper, "camera Up rotates the view-space up axis by IViewMat",
+                upFsh.contains("vec4(0.0, 1.0, 0.0, 0.0)") && upFsh.contains("IViewMat"));
         helper.succeed();
     }
 

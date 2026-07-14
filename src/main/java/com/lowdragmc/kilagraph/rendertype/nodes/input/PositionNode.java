@@ -79,25 +79,15 @@ public class PositionNode extends ShaderNode {
             ctx.output("out", new ShaderExpr("vPos", GlslType.VEC3));
             return;
         }
-        // Object/model-space source: raw (Position + ModelOffset) in the vsh, kg_modelPos varying in the fsh.
-        // Matrices/camera come from KG_Transforms (same values as Minecraft's blocks, no #moj_import).
-        ShaderExpr pos = ctx.meshPosition();
-        String out = switch (space) {
-            case "object" -> pos.code();
-            case "view" -> "(" + ctx.transformField("ModelViewMat", GlslType.MAT4).code()
-                    + " * vec4(" + pos.code() + ", 1.0)).xyz";
-            default /* world */ -> {
-                // object -> view (ModelViewMat), un-rotate view -> camera-relative world (IViewMat), then add
-                // the camera's absolute world position back — MC renders camera-relative, so this recovers
-                // absolute world exactly like TransformNode's object->world for a position.
-                String iView = ctx.transformField("IViewMat", GlslType.MAT4).code();
-                yield "((" + iView + " * " + ctx.transformField("ModelViewMat", GlslType.MAT4).code()
-                        + " * vec4(" + pos.code() + ", 1.0)).xyz"
-                        + " + (vec3(" + ctx.transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "
-                        + ctx.transformField("CameraOffset", GlslType.VEC3).code() + "))";
-            }
+        // The render pipeline owns the coordinate spaces (see ShaderGraphCompiler's *SpacePosition seams):
+        // the vertex input is not necessarily object space (e.g. a subclass whose vertices are already world,
+        // and whose object->world is not a matrix). This node just dispatches to the chosen space.
+        ShaderExpr out = switch (space) {
+            case "object" -> ctx.objectSpacePosition();
+            case "view" -> ctx.viewSpacePosition();
+            default /* world */ -> ctx.worldSpacePosition();
         };
-        ctx.output("out", new ShaderExpr(out, GlslType.VEC3));
+        ctx.output("out", out);
     }
 
     @Override

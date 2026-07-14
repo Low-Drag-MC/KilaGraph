@@ -911,6 +911,82 @@ public class ShaderGraphCompiler {
                 new ShaderExpr("vNormal", GlslType.VEC3));
     }
 
+    // ---- coordinate-space seams (the Position/Normal/ViewDirection nodes dispatch to these) ---
+    // These read a space through an overridable seam instead of hardcoding "object->world is the
+    // ModelView/IView matrix". The base is the vanilla model: the vertex input IS object space, and
+    // world/view are derived by matrix. A pipeline whose vertices arrive in a different space (e.g. a
+    // subclass whose mesh position is already world, and whose object->world is not a matrix) overrides
+    // whichever seams it needs — see Photon's PhotonShaderCompiler. (Injection reconstructs from
+    // gl_FragCoord and stays in the nodes' isInjection() branches — these seams are the vanilla path.)
+
+    /** Object/model-space vertex position — the Position node's "Object" output. */
+    protected ShaderExpr objectSpacePosition() {
+        return meshPosition();
+    }
+
+    /** Eye/view-space vertex position ({@code ModelViewMat · object}) — the Position node's "View" output. */
+    protected ShaderExpr viewSpacePosition() {
+        ShaderExpr obj = objectSpacePosition();
+        String mv = transformField("ModelViewMat", GlslType.MAT4).code();
+        return new ShaderExpr("(" + mv + " * vec4(" + obj.code() + ", 1.0)).xyz", GlslType.VEC3);
+    }
+
+    /** Absolute world-space vertex position: object→view, un-rotated view→world via {@code IViewMat}, plus the
+     *  camera's world position (MC renders camera-relative) — the Position node's "World" output. */
+    protected ShaderExpr worldSpacePosition() {
+        ShaderExpr obj = objectSpacePosition();
+        String mv = transformField("ModelViewMat", GlslType.MAT4).code();
+        String iView = transformField("IViewMat", GlslType.MAT4).code();
+        return new ShaderExpr("((" + iView + " * " + mv + " * vec4(" + obj.code() + ", 1.0)).xyz"
+                + " + (vec3(" + transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "
+                + transformField("CameraOffset", GlslType.VEC3).code() + "))", GlslType.VEC3);
+    }
+
+    /** Object/model-space surface normal (normalized) — the Normal node's "Object" output. */
+    protected ShaderExpr objectSpaceNormal() {
+        return new ShaderExpr("normalize(" + objectNormal().code() + ")", GlslType.VEC3);
+    }
+
+    /** Eye/view-space surface normal ({@code mat3(ModelViewMat) · object}, normalized) — the Normal node's
+     *  "View" output. */
+    protected ShaderExpr viewSpaceNormal() {
+        ShaderExpr obj = objectNormal();
+        String mv = transformField("ModelViewMat", GlslType.MAT4).code();
+        return new ShaderExpr("normalize(mat3(" + mv + ") * " + obj.code() + ")", GlslType.VEC3);
+    }
+
+    /** World-space surface normal ({@code mat3(IViewMat · ModelViewMat) · object}, normalized) — the Normal
+     *  node's "World" output. */
+    protected ShaderExpr worldSpaceNormal() {
+        ShaderExpr obj = objectNormal();
+        String mv = transformField("ModelViewMat", GlslType.MAT4).code();
+        String iView = transformField("IViewMat", GlslType.MAT4).code();
+        return new ShaderExpr("normalize(mat3(" + iView + ") * mat3(" + mv + ") * " + obj.code() + ")",
+                GlslType.VEC3);
+    }
+
+    /** View-space surface&rarr;camera direction (<b>unnormalized</b>; its length is the distance to the
+     *  camera): the camera sits at the view-space origin, so it is simply {@code -viewSpacePosition()} —
+     *  the View Direction node's "View" output. Derived from {@link #viewSpacePosition()} so a subclass that
+     *  overrides the position seams gets a consistent view direction for free. */
+    protected ShaderExpr viewSpaceViewDir() {
+        return new ShaderExpr("(-" + viewSpacePosition().code() + ")", GlslType.VEC3);
+    }
+
+    /** Object-space surface&rarr;camera direction: the view-space direction rotated view&rarr;object by
+     *  {@code IModelViewMat} — the View Direction node's "Object" output. */
+    protected ShaderExpr objectSpaceViewDir() {
+        String iModelView = transformField("IModelViewMat", GlslType.MAT4).code();
+        return new ShaderExpr("(mat3(" + iModelView + ") * " + viewSpaceViewDir().code() + ")", GlslType.VEC3);
+    }
+
+    /** World-space surface&rarr;camera direction: the view-space direction rotated view&rarr;world by
+     *  {@code IViewMat} — the View Direction node's "World" output. */
+    protected ShaderExpr worldSpaceViewDir() {
+        String iView = transformField("IViewMat", GlslType.MAT4).code();
+        return new ShaderExpr("(mat3(" + iView + ") * " + viewSpaceViewDir().code() + ")", GlslType.VEC3);
+    }
+
     /** The element keys actually declared as {@code in} attributes in the current compile: the graph's
      *  composed vertex format, or — in preview — the fixed preview vsh's {@code Position}+{@code UV0}. */
     private Set<String> availableAttributes() {

@@ -358,6 +358,51 @@ public final class ShaderCompileContext {
         return compiler.meshPosition();
     }
 
+    /** The vertex position in object/model space — the Position node's "Object" output. */
+    public ShaderExpr objectSpacePosition() {
+        return compiler.objectSpacePosition();
+    }
+
+    /** The vertex position in eye/view space — the Position node's "View" output. */
+    public ShaderExpr viewSpacePosition() {
+        return compiler.viewSpacePosition();
+    }
+
+    /** The vertex position in absolute world space — the Position node's "World" output. */
+    public ShaderExpr worldSpacePosition() {
+        return compiler.worldSpacePosition();
+    }
+
+    /** The surface normal in object/model space (normalized) — the Normal node's "Object" output. */
+    public ShaderExpr objectSpaceNormal() {
+        return compiler.objectSpaceNormal();
+    }
+
+    /** The surface normal in eye/view space (normalized) — the Normal node's "View" output. */
+    public ShaderExpr viewSpaceNormal() {
+        return compiler.viewSpaceNormal();
+    }
+
+    /** The surface normal in world space (normalized) — the Normal node's "World" output. */
+    public ShaderExpr worldSpaceNormal() {
+        return compiler.worldSpaceNormal();
+    }
+
+    /** The surface&rarr;camera direction in object space (unnormalized) — the View Direction node's "Object" output. */
+    public ShaderExpr objectSpaceViewDir() {
+        return compiler.objectSpaceViewDir();
+    }
+
+    /** The surface&rarr;camera direction in eye/view space (unnormalized) — the View Direction node's "View" output. */
+    public ShaderExpr viewSpaceViewDir() {
+        return compiler.viewSpaceViewDir();
+    }
+
+    /** The surface&rarr;camera direction in world space (unnormalized) — the View Direction node's "World" output. */
+    public ShaderExpr worldSpaceViewDir() {
+        return compiler.worldSpaceViewDir();
+    }
+
     /** The interpolated {@code sphericalVertexDistance} varying (float) — vanilla's spherical fog distance,
      *  the default for an unconnected fog distance port. */
     public ShaderExpr sphericalVertexDistance() {
