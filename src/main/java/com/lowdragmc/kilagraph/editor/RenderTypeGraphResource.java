@@ -28,6 +28,19 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
         return new RenderTypeGraph();
     }
 
+    /** The stored form is the wrapped {@code {graph, settings}} tag — every consumer (editor
+     *  container, cross-library resolvers, runtimes) goes through this pair. */
+    @Override
+    public CompoundTag serializeGraphResource(RenderTypeGraph graph) {
+        return serializeGraph(graph);
+    }
+
+    @Override
+    public RenderTypeGraph deserializeGraphResource(CompoundTag tag,
+            @Nullable com.lowdragmc.lowdraglib2.nodegraphtookit.editor.IGraphReferenceResolver resolver) {
+        return deserializeGraph(tag, resolver);
+    }
+
     @Override
     public Supplier<? extends GraphView> getGraphViewFactory() {
         return RenderTypeGraphView::new;
