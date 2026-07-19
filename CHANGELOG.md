@@ -1,3 +1,4 @@
-## v26.1.0.5
-* Added preview mode persisted
-* Added shader gradient support
+## v21.1.0.7
+* Added geometry nodes
+* Improved camera data
+* Improved APIs
