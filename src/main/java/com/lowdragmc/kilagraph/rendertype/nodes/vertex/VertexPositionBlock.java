@@ -37,4 +37,14 @@ public class VertexPositionBlock extends ShaderBlockNode implements IVertexPosit
         String mv = ctx.useBuiltinUniform("ModelViewMat", GlslType.MAT4);
         return new ShaderExpr(proj + " * " + mv + " * vec4(" + ctx.modelPosition().code() + ", 1.0)", GlslType.VEC4);
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                // connected
+                gl_Position = position;
+                // unconnected (the vanilla transform)
+                gl_Position = ProjMat * ModelViewMat
+                            * vec4(Position, 1.0);""";
+    }
 }

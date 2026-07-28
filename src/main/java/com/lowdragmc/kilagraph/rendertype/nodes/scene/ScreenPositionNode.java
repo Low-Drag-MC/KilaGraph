@@ -102,4 +102,19 @@ public class ScreenPositionNode extends ShaderNode {
     private static String label(String mode) {
         return Character.toUpperCase(mode.charAt(0)) + mode.substring(1);
     }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "mode".equals(optionId) ? MODES : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // default
+                out = vec4(gl_FragCoord.xy / ScreenSize,
+                           0.0, 1.0);
+                // center
+                out.xy = out.xy * 2.0 - 1.0;""";
+    }
 }

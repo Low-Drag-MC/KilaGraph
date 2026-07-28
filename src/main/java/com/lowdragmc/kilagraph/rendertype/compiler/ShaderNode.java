@@ -1,7 +1,9 @@
 package com.lowdragmc.kilagraph.rendertype.compiler;
 
 import com.lowdragmc.kilagraph.rendertype.preview.ShaderPreviewSupport;
+import com.lowdragmc.kilagraph.graph.util.NodeDescriptions;
 import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
+import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.node.NodePreviewContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
@@ -22,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>Nodes that return an output port id from {@link #previewOutputPortId()} get a live Unity-style
  * thumbnail of that output in the editor (compiled via {@link ShaderGraphCompiler#compilePreview}).</p>
  */
-public abstract class ShaderNode extends Node {
+public abstract class ShaderNode extends Node implements IShaderNodeDescription {
 
     @Override
     public void setImplementation(NodeModel nodeModel) {
@@ -30,8 +32,19 @@ public abstract class ShaderNode extends Node {
         NodeTooltipHelper.apply(nodeModel, getNodeTooltip());
     }
 
+    /**
+     * The item library's documentation panel, assembled from this node's {@code kg.node.<name>.*} lang
+     * keys plus the {@link IShaderNodeDescription} hooks. See {@link NodeDescriptions}.
+     */
+    @Override
+    @Nullable
+    public UIElement createDescriptionUI() {
+        return NodeDescriptions.build(this);
+    }
+
+    /** The hover tooltip; by default the same {@code kg.node.<name>.tooltip} the description panel uses. */
     protected @Nullable Component getNodeTooltip() {
-        return null;
+        return NodeTooltipHelper.defaultTooltip(this);
     }
 
     /**

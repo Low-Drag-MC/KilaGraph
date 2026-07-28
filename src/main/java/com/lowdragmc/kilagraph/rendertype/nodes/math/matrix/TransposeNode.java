@@ -23,4 +23,10 @@ public class TransposeNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         ctx.output("out", new ShaderExpr("transpose(" + ctx.input("m").code() + ")", GlslType.MAT4));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = transpose(m);""";
+    }
 }

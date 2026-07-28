@@ -48,4 +48,13 @@ public class PolarCoordinatesNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec2 d = uv - center;
+                out.x = length(d) * 2.0 * radialScale;
+                out.y = atan(d.x, d.y) * 0.15915494
+                      * lengthScale;""";
+    }
 }

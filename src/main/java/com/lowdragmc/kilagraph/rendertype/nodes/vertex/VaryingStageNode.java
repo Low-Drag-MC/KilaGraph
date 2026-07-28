@@ -2,20 +2,24 @@ package com.lowdragmc.kilagraph.rendertype.nodes.vertex;
 
 import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.IShaderNodeDescription;
 import com.lowdragmc.kilagraph.rendertype.compiler.NodeDisplayNames;
+import com.lowdragmc.kilagraph.graph.util.NodeDescriptions;
+import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.ContextNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 @NodeAttribute(name = "rt_vertex_stage", group = "rendertype_vertex", graphTypes = RenderTypeGraph.class)
-public class VaryingStageNode extends ContextNode {
+public class VaryingStageNode extends ContextNode implements IShaderNodeDescription {
     /**
      * Vertex-stage blocks that are single-instance: the vertex position is driven by exactly one block
      * (the object-space {@link VertexModelPositionBlock} <em>or</em> the advanced clip-space
@@ -66,4 +70,9 @@ public class VaryingStageNode extends ContextNode {
         return NodeDisplayNames.fromAttribute(this);
     }
 
+    @Override
+    @Nullable
+    public UIElement createDescriptionUI() {
+        return NodeDescriptions.build(this);
+    }
 }

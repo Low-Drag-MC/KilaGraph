@@ -67,4 +67,14 @@ public class FlipbookNode extends ShaderNode {
         Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
         return raw instanceof Boolean b && b;
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                float t = mod(tile, width * height);
+                vec2 cell = 1.0 / vec2(width, height);
+                float row = floor(t * cell.x);
+                out = (uv + vec2(t - width * row, row))
+                    * cell;""";
+    }
 }

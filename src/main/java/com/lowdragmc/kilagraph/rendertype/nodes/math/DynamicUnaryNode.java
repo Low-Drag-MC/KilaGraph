@@ -18,6 +18,12 @@ public abstract class DynamicUnaryNode extends ShaderNode {
     /** Build the GLSL result expression from the operand (output keeps the operand's width). */
     protected abstract String emit(String a);
 
+    /** Derived from {@link #emit} itself, so the documented GLSL can never drift from the emitted code. */
+    @Override
+    public String glslExample() {
+        return "out = " + emit("a") + ";";
+    }
+
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         context.addInputPort("a", RenderTypeGraphTypes.DYNAMIC);

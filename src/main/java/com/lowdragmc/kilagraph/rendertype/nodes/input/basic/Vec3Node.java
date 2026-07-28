@@ -26,4 +26,9 @@ public class Vec3Node extends ShaderNode {
         String code = "vec3(" + ctx.input("x").code() + ", " + ctx.input("y").code() + ", " + ctx.input("z").code() + ")";
         ctx.output("out", new ShaderExpr(code, GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return "out = vec3(x, y, z);";
+    }
 }

@@ -8,6 +8,8 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 
+import java.util.List;
+
 /**
  * Case conversion via enum {@link Op}. Title casing capitalises the first letter after each
  * whitespace boundary; the rest is lowercased.
@@ -41,5 +43,10 @@ public class CaseNode extends AnnotatedNode {
             nextUpper = false;
         }
         return sb.toString();
+    }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "op".equals(optionId) ? List.of("LOWER", "UPPER", "TITLE") : List.of();
     }
 }

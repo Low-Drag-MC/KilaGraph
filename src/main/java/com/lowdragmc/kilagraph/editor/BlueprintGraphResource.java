@@ -1,9 +1,13 @@
 package com.lowdragmc.kilagraph.editor;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.graph.util.KGGraphView;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.texture.Icons;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.editor.GraphResource;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.GraphView;
+
+import java.util.function.Supplier;
 
 /**
  * Resource type that hosts {@link BlueprintGraph} instances inside a KilaGraph project. The
@@ -17,6 +21,12 @@ public class BlueprintGraphResource extends GraphResource<BlueprintGraph> {
     @Override
     public BlueprintGraph createGraph() {
         return new BlueprintGraph();
+    }
+
+    @Override
+    public Supplier<? extends GraphView> getGraphViewFactory() {
+        // Only to widen the item library's description panel; the blueprint canvas itself is stock.
+        return KGGraphView::new;
     }
 
     @Override

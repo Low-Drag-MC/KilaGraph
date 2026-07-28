@@ -33,4 +33,9 @@ public class Vec4Node extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return "out = vec4(x, y, z, w);";
+    }
 }

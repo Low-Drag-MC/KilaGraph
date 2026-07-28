@@ -34,4 +34,11 @@ public class ScreenNode extends ShaderNode {
         ctx.output("Width", new ShaderExpr(ss + ".x", GlslType.FLOAT));
         ctx.output("Height", new ShaderExpr(ss + ".y", GlslType.FLOAT));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                Width  = ScreenSize.x;
+                Height = ScreenSize.y;""";
+    }
 }

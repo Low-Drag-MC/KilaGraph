@@ -24,4 +24,11 @@ public class GameTimeNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         ctx.output("gameTime", ctx.mcGameTime());
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                uniform float GameTime;
+                gameTime = GameTime;""";
+    }
 }

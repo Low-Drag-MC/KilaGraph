@@ -75,6 +75,23 @@ public class NormalNode extends ShaderNode {
         return "out";
     }
 
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "space".equals(optionId) ? SPACES : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // object
+                out = normalize(Normal);
+                // view
+                out = normalize(mat3(ModelViewMat) * N);
+                // world
+                out = normalize(mat3(IViewMat)
+                    * mat3(ModelViewMat) * N);""";
+    }
+
     private static String label(String space) {
         return switch (space) {
             case "object" -> "Object";

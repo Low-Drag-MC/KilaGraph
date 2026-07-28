@@ -21,4 +21,14 @@ public interface IVaryingBlock {
      * unconnected, fall back to the appropriate builtin vertex attribute/expression.
      */
     ShaderExpr compileVarying(ShaderCompileContext ctx);
+
+    /**
+     * The GLSL a custom varying compiles to, for the description panel — shared by the Custom
+     * Float/Vec2/Vec3/Vec4 blocks, which differ only in the declared type. The real name is derived from
+     * the block's uid ({@code vc_<hash>}); {@code vc_1f3a} here stands in for it.
+     */
+    static String varyingGlslExample(String glslType) {
+        return "// vertex shader\nout " + glslType + " vc_1f3a;\nvc_1f3a = value;\n\n"
+                + "// fragment shader\nin " + glslType + " vc_1f3a;";
+    }
 }

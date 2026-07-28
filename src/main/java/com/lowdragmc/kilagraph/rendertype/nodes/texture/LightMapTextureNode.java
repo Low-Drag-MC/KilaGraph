@@ -30,4 +30,11 @@ public class LightMapTextureNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         ctx.output("sampler", ctx.lightmapSampler());
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                uniform sampler2D Sampler2;
+                sampler = Sampler2;""";
+    }
 }

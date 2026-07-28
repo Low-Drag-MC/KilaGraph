@@ -57,4 +57,15 @@ public class NormalFromTextureNode extends ArtisticNode {
         String vb = "vec3(0.0, 1.0, (" + dv.code() + " - " + n.code() + ") * " + s + ")";
         ctx.output("out", new ShaderExpr("normalize(cross(" + va + ", " + vb + "))", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                float n  = texture(tex, uv).r;
+                float du = texture(tex, uv + vec2(offset, 0)).r;
+                float dv = texture(tex, uv + vec2(0, offset)).r;
+                out = normalize(cross(
+                    vec3(1, 0, (du - n) * strength),
+                    vec3(0, 1, (dv - n) * strength)));""";
+    }
 }

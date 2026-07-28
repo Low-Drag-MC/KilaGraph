@@ -19,6 +19,12 @@ public abstract class DynamicBinaryNode extends ShaderNode {
     /** Build the GLSL result expression from the two operands (already cast to the common width). */
     protected abstract String emit(String a, String b);
 
+    /** Derived from {@link #emit} itself, so the documented GLSL can never drift from the emitted code. */
+    @Override
+    public String glslExample() {
+        return "out = " + emit("a", "b") + ";";
+    }
+
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         context.addInputPort("a", RenderTypeGraphTypes.DYNAMIC);

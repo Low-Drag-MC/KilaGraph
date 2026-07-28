@@ -43,4 +43,12 @@ public class VertexModelPositionBlock extends ShaderBlockNode implements IVertex
         }
         // Unconnected: contribute nothing — the mesh position flows through untouched (identity).
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec3 kg_vertexPos = position;
+                gl_Position = ProjMat * ModelViewMat
+                            * vec4(kg_vertexPos, 1.0);""";
+    }
 }

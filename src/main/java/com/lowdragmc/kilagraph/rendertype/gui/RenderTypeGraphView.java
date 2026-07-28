@@ -15,6 +15,7 @@ import com.lowdragmc.lowdraglib2.gui.util.TreeBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.DockSlot;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.GraphPanel;
+import com.lowdragmc.kilagraph.graph.util.KGGraphView;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.GraphView;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.GraphElementModel;
 import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
@@ -28,7 +29,7 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 @MethodsReturnNonnullByDefault
-public class RenderTypeGraphView extends GraphView {
+public class RenderTypeGraphView extends KGGraphView {
     @Getter
     private final RenderTypeSettingsTool settingsTool;
     @Getter

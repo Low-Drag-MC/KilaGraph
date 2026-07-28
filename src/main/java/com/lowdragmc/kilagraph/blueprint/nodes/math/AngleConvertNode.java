@@ -8,6 +8,8 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 
+import java.util.List;
+
 /**
  * Convert between degrees and radians. Enum {@link Op} → {@code EnumAccessor} dropdown.
  */
@@ -27,5 +29,10 @@ public class AngleConvertNode extends AnnotatedNode {
             default -> (float) Math.toRadians(v);
         };
         ctx.setOutput("out", r);
+    }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "op".equals(optionId) ? List.of("DEG_TO_RAD", "RAD_TO_DEG") : List.of();
     }
 }

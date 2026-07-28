@@ -45,4 +45,11 @@ public class ColorNode extends ShaderNode {
                 + GlslFormat.f(b) + ", " + GlslFormat.f(a) + ")";
         ctx.output("color", new ShaderExpr(code, GlslType.VEC4));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                // baked from the color picker
+                color = vec4(1.0, 0.5, 0.25, 1.0);""";
+    }
 }

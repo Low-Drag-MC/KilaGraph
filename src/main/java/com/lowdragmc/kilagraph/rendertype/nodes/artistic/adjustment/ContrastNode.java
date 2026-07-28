@@ -37,4 +37,12 @@ public class ContrastNode extends ArtisticNode {
         ctx.output("out", new ShaderExpr(
                 "((" + in + " - 0.2176376) * " + contrast + " + 0.2176376)", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                // 0.2176376 is linear mid-grey
+                out = (in - 0.2176376) * contrast
+                    + 0.2176376;""";
+    }
 }

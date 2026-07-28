@@ -40,4 +40,14 @@ public class InstanceIdNode extends ShaderNode {
                 () -> new ShaderExpr("gl_InstanceID", GlslType.INT),
                 new ShaderExpr("0", GlslType.INT)));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                // vertex shader
+                out = gl_InstanceID;
+
+                // fragment shader (auto-forwarded)
+                flat in int kg_instanceId;""";
+    }
 }

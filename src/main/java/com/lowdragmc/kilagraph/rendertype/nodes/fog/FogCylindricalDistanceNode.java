@@ -42,4 +42,10 @@ public class FogCylindricalDistanceNode extends ShaderNode {
         String pos = (ctx.isConnected("pos") ? ctx.input("pos") : ctx.modelPosition()).code();
         ctx.output("out", new ShaderExpr("fog_distance(" + pos + ", 1)", GlslType.FLOAT));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = fog_distance(pos, 1);""";
+    }
 }

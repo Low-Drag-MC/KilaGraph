@@ -58,6 +58,20 @@ public class UVNode extends ShaderNode {
         return "out";
     }
 
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "channel".equals(optionId) ? CHANNELS : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // vertex shader
+                out = UV0;
+                // fragment shader (interpolated)
+                out = vUv;""";
+    }
+
     private UvChannel channel() {
         INodeOption opt = getNodeOptionById("channel");
         Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);

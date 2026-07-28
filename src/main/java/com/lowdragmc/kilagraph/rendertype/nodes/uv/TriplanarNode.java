@@ -67,4 +67,15 @@ public class TriplanarNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec3 uvw = position * tile;
+                vec3 w = pow(abs(normal), vec3(blend));
+                w /= (w.x + w.y + w.z);
+                out = texture(tex, uvw.zy) * w.x
+                    + texture(tex, uvw.xz) * w.y
+                    + texture(tex, uvw.xy) * w.z;""";
+    }
 }

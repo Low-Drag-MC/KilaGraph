@@ -87,4 +87,18 @@ public class ColorspaceConversionNode extends ArtisticNode {
         Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
         return raw instanceof String s && SPACES.contains(s) ? s : def;
     }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "from".equals(optionId) || "to".equals(optionId) ? SPACES : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // rgb -> linear
+                out = pow(in, vec3(2.2));
+                // rgb -> hsv
+                out = kg_rgb2hsv(in);""";
+    }
 }

@@ -28,4 +28,10 @@ public class NormalizeNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = normalize(v);""";
+    }
 }

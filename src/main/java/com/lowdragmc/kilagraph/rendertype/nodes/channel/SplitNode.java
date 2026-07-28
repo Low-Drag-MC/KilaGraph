@@ -36,4 +36,11 @@ public class SplitNode extends ShaderNode {
         ctx.output("b", new ShaderExpr(v.code() + ".z", GlslType.FLOAT));
         ctx.output("a", new ShaderExpr(v.code() + ".w", GlslType.FLOAT));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec4 v = vec4(in, 0.0, 0.0, 0.0);
+                r = v.x; g = v.y; b = v.z; a = v.w;""";
+    }
 }

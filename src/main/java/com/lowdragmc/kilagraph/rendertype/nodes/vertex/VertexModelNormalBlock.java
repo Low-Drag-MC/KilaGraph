@@ -38,4 +38,9 @@ public class VertexModelNormalBlock extends ShaderBlockNode implements IVertexOu
         }
         // Unconnected: contribute nothing — the mesh normal flows through untouched (identity).
     }
+
+    @Override
+    public String glslExample() {
+        return "vec3 kg_vertexNormal = normal;\n// every consumer reads this instead of Normal";
+    }
 }

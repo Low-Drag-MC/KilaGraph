@@ -24,4 +24,10 @@ public class Mat4MultiplyNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         ctx.output("out", new ShaderExpr("(" + ctx.input("a").code() + " * " + ctx.input("b").code() + ")", GlslType.MAT4));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = a * b;""";
+    }
 }

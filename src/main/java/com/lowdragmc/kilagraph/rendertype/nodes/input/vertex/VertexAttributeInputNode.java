@@ -68,7 +68,7 @@ public class VertexAttributeInputNode extends ShaderNode implements IVertexForma
         // String option holding the element key, edited via the registry dropdown (client-only, lazy).
         context.addOption(OPTION, TypeHandles.STRING)
                 .withDefaultValue(DEFAULT_KEY)
-                .withTooltips(Tooltips.of("kg.node.rt_in_vertex_attribute.option.attribute.tooltip"))
+                .withTooltips(Tooltips.of("kg.node.rt_in_vertex_attribute.option.element.tooltip"))
                 .withConfigurable((vc, type) -> VertexAttributeConfigurator.build(vc))
                 .build();
     }

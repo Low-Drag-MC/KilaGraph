@@ -77,6 +77,23 @@ public class PositionNode extends ShaderNode {
         return "out";
     }
 
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "space".equals(optionId) ? SPACES : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // object
+                out = Position;
+                // view
+                out = (ModelViewMat * vec4(pos, 1.0)).xyz;
+                // world
+                out = mat3(IViewMat) * viewPos
+                    + cameraWorldPos;""";
+    }
+
     private static String label(String space) {
         return switch (space) {
             case "object" -> "Object";

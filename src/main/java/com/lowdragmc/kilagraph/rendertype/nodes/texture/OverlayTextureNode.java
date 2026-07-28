@@ -30,4 +30,11 @@ public class OverlayTextureNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         ctx.output("sampler", ctx.overlaySampler());
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                uniform sampler2D Sampler1;
+                sampler = Sampler1;""";
+    }
 }

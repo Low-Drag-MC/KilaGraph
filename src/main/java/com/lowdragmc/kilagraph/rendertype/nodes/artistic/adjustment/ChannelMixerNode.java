@@ -41,4 +41,11 @@ public class ChannelMixerNode extends ArtisticNode {
                 + c + ", " + ctx.input("green").code() + "), dot(" + c + ", " + ctx.input("blue").code() + "))",
                 GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = vec3(dot(in, red), dot(in, green),
+                           dot(in, blue));""";
+    }
 }

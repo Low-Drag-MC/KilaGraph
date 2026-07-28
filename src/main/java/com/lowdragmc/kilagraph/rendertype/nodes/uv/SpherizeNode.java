@@ -49,4 +49,12 @@ public class SpherizeNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec2 d = uv - center;
+                float d2 = dot(d, d);
+                out = uv + d * (d2 * d2 * strength) + offset;""";
+    }
 }

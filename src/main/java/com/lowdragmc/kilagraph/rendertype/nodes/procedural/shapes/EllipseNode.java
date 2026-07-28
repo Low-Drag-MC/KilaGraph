@@ -40,4 +40,13 @@ public class EllipseNode extends ShapeNode {
         ctx.output("out", new ShaderExpr(
                 "clamp((1.0 - " + d.code() + ") / fwidth(" + d.code() + "), 0.0, 1.0)", GlslType.FLOAT));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                float d = length((uv * 2.0 - 1.0)
+                    / vec2(width, height));
+                out = clamp((1.0 - d) / fwidth(d),
+                            0.0, 1.0);""";
+    }
 }

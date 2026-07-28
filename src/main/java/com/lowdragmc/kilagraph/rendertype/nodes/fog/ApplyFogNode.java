@@ -54,4 +54,13 @@ public class ApplyFogNode extends ShaderNode {
     private static String fog(ShaderCompileContext ctx, String id, ShaderExpr def) {
         return (ctx.isConnected(id) ? ctx.input(id) : def).code();
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = linear_fog(inColor,
+                    sphericalVertexDistance,
+                    environmentalStart, environmentalEnd,
+                    fogColor);""";
+    }
 }

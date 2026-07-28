@@ -36,4 +36,10 @@ public class NormalBlendNode extends ArtisticNode {
         ctx.output("out", new ShaderExpr("normalize(vec3(" + a.code() + ".xy + " + b.code() + ".xy, "
                 + a.code() + ".z * " + b.code() + ".z))", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = normalize(vec3(a.xy + b.xy, a.z * b.z));""";
+    }
 }

@@ -49,4 +49,12 @@ public class RadialShearNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec2 d = uv - center;
+                float k = dot(d, d) * strength;
+                out = uv + vec2(d.y, -d.x) * k + offset;""";
+    }
 }

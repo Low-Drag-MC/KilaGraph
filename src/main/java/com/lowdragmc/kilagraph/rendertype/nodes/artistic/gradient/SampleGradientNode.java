@@ -44,4 +44,10 @@ public class SampleGradientNode extends ShaderNode {
         ctx.output("color", new ShaderExpr(
                 "kg_sampleGradient(" + gradient.code() + ", " + time + ")", GlslType.VEC4));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                color = kg_sampleGradient(gradient, time);""";
+    }
 }

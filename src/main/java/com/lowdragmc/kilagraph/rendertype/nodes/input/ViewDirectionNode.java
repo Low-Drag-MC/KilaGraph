@@ -79,6 +79,22 @@ public class ViewDirectionNode extends ShaderNode {
         return "out";
     }
 
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "space".equals(optionId) ? SPACES : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // view: the camera is at the origin
+                vec3 dir = -viewPos;
+                // world
+                out = mat3(IViewMat) * dir;
+                // with normalize enabled
+                out = normalize(out);""";
+    }
+
     private static String label(String space) {
         return switch (space) {
             case "object" -> "Object";

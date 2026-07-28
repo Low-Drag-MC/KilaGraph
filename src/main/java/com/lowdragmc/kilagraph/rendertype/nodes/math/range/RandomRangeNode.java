@@ -37,4 +37,12 @@ public class RandomRangeNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                float h = fract(sin(dot(seed,
+                    vec2(12.9898, 78.233))) * 43758.5453);
+                out = mix(min, max, h);""";
+    }
 }

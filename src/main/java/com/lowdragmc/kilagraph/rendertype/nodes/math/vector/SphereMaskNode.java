@@ -46,4 +46,11 @@ public class SphereMaskNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = 1.0 - clamp((distance(coords, center)
+                    - radius) / (1.0 - hardness), 0.0, 1.0);""";
+    }
 }

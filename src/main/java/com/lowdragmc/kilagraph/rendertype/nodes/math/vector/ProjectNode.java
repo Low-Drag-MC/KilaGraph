@@ -36,4 +36,10 @@ public class ProjectNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = (dot(a, b) / dot(b, b)) * b;""";
+    }
 }

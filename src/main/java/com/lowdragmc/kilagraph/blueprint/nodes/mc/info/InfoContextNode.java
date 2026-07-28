@@ -1,6 +1,9 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.info;
 
+import com.lowdragmc.kilagraph.graph.util.INodeDescription;
+import com.lowdragmc.kilagraph.graph.util.NodeDescriptions;
 import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
+import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.ContextNode;
@@ -25,7 +28,7 @@ import java.util.List;
  *
  * @param <T> the type whose properties the contained blocks read
  */
-public abstract class InfoContextNode<T> extends ContextNode {
+public abstract class InfoContextNode<T> extends ContextNode implements INodeDescription {
 
     /** The class whose properties this context's blocks read. Drives the {@code target} port. */
     protected abstract Class<T> targetClass();
@@ -36,8 +39,15 @@ public abstract class InfoContextNode<T> extends ContextNode {
         NodeTooltipHelper.apply(nodeModel, getNodeTooltip());
     }
 
+    /** The hover tooltip; by default the same {@code kg.node.<name>.tooltip} the panel uses. */
     protected @Nullable Component getNodeTooltip() {
-        return null;
+        return NodeTooltipHelper.defaultTooltip(this);
+    }
+
+    @Override
+    @Nullable
+    public UIElement createDescriptionUI() {
+        return NodeDescriptions.build(this);
     }
 
     protected final Component tooltip(String key) {

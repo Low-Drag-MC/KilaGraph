@@ -90,4 +90,17 @@ public class SceneDepthNode extends ShaderNode {
             default -> mode;
         };
     }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "sampling".equals(optionId) ? MODES : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // raw
+                float d = texture(KG_SceneDepth, uv).r;
+                // linear01 / eye go through IProjMat""";
+    }
 }

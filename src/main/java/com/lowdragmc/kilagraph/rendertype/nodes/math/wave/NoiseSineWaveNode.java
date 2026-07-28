@@ -36,4 +36,12 @@ public class NoiseSineWaveNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                float s = sin(in);
+                float r = fract(sin(s * 12.9898) * 43758.5453);
+                out = s + mix(minMax.x, minMax.y, r);""";
+    }
 }

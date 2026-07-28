@@ -38,5 +38,11 @@ public class SamplerTexture2DNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "color";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                color = texture(sampler, uv);""";
+    }
 }
 
