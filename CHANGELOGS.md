@@ -1,4 +1,7 @@
 # ChangeLogs
+## v21.1.0.8
+* Added node description
+
 ## v21.1.0.7
 * Added geometry nodes
 * Improved camera data

@@ -1,4 +1,2 @@
-## v21.1.0.7
-* Added geometry nodes
-* Improved camera data
-* Improved APIs
+## v21.1.0.8
+* Added node description
