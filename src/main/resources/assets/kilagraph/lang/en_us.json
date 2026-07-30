@@ -944,7 +944,9 @@
   "kg.node.rt_sign.tooltip": "sign(a): -1, 0 or +1 per channel.",
   "kg.node.rt_sign.desc.1": "Reports which side of zero each channel is on.",
   "kg.node.rt_step.tooltip": "step(edge, x): 0 below the edge, 1 at or above it.",
-  "kg.node.rt_step.desc.1": "A hard threshold with no branching. Input a is the edge and b is the value tested against it.",
+  "kg.node.rt_step.desc.1": "A hard threshold with no branching.",
+  "kg.node.rt_step.in.a": "The threshold to compare against.",
+  "kg.node.rt_step.in.b": "The value being tested; the result is 1 once it reaches the edge.",
   "kg.node.rt_step.example.1": "Step with edge 0.5 on a noise texture turns it into a crisp black-and-white mask.",
   "kg.node.rt_step.note.1": "The hard edge aliases badly. Smoothstep, or a Step whose edge width comes from DDXY, gives a cleaner line.",
 

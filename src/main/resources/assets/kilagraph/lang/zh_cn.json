@@ -942,7 +942,9 @@
   "kg.node.rt_sign.tooltip": "sign(a)：逐通道给出 -1、0 或 +1。",
   "kg.node.rt_sign.desc.1": "指出每个通道位于零的哪一侧。",
   "kg.node.rt_step.tooltip": "step(edge, x)：小于阈值为 0，否则为 1。",
-  "kg.node.rt_step.desc.1": "不含分支的硬阈值。输入 a 是阈值，b 是被比较的值。",
+  "kg.node.rt_step.desc.1": "不含分支的硬阈值。",
+  "kg.node.rt_step.in.a": "用于比较的阈值。",
+  "kg.node.rt_step.in.b": "被比较的值；达到阈值后结果为 1。",
   "kg.node.rt_step.example.1": "对噪声贴图用阈值 0.5 做 Step，即可得到干净的黑白遮罩。",
   "kg.node.rt_step.note.1": "硬边缘的锯齿很明显。改用 Smoothstep，或用 DDXY 决定过渡宽度的 Step，边线会干净得多。",
 
