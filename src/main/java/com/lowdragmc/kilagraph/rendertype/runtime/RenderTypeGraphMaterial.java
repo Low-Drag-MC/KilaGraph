@@ -142,9 +142,9 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
 
     /** The KilaGraph-managed UBOs ({@code KG_Globals}/{@code KG_Transforms}/...) to bind onto an Iris
      *  shaderpack program at draw — the vanilla list plus the injection-only reconstruction blocks. */
-    public java.util.List<ShaderUniformBlock> irisUniformBlocks() {
+    public List<ShaderUniformBlock> irisUniformBlocks() {
         if (injectionOnlyBlocks.isEmpty()) return uniformBlocks;
-        var all = new java.util.ArrayList<ShaderUniformBlock>(uniformBlocks.size() + injectionOnlyBlocks.size());
+        var all = new ArrayList<ShaderUniformBlock>(uniformBlocks.size() + injectionOnlyBlocks.size());
         all.addAll(uniformBlocks);
         all.addAll(injectionOnlyBlocks);
         return all;

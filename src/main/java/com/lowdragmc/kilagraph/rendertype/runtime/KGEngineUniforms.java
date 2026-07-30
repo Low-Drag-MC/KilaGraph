@@ -76,6 +76,29 @@ public final class KGEngineUniforms {
     }
 
     /**
+     * Host override for {@code ScreenSize}, or 0 to use the game window.
+     * <p>
+     * {@code ScreenSize} is the {@code gl_FragCoord} basis, so it must be the size of the framebuffer
+     * being drawn into — which is NOT the window whenever a host renders into its own target. A
+     * picture-in-picture widget gets a texture sized to the widget ({@code PictureInPictureRenderer}
+     * allocates {@code rect * guiScale}), so a screen-space node dividing {@code gl_FragCoord} by the
+     * window size lands in a corner of the scene capture and its result changes with the widget size.
+     * Hosts that redirect rendering set this for the duration of that render.
+     */
+    private static int overrideWidth;
+    private static int overrideHeight;
+
+    /** Set the {@code ScreenSize} the next uploads report; pass {@code 0, 0} to fall back to the window. */
+    public static void setScreenSizeOverride(int width, int height) {
+        overrideWidth = width;
+        overrideHeight = height;
+    }
+
+    public static void clearScreenSizeOverride() {
+        setScreenSizeOverride(0, 0);
+    }
+
+    /**
      * Create (if needed) and refresh the buffer for the current frame. Performs a {@code writeToBuffer}
      * — call before {@code RenderType.draw} opens its pass. Idempotent within a frame (skips the write
      * when the time hasn't advanced), so many materials per frame upload at most once.
@@ -105,8 +128,9 @@ public final class KGEngineUniforms {
         float partial = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         // ticks -> seconds (20 ticks/s); wrap at one day (24000 ticks = 1200 s) for float precision.
         currentTimeSeconds = ((gameTime % 24000L) + partial) / 20.0f;
-        screenWidth = mc.getWindow().getWidth();
-        screenHeight = mc.getWindow().getHeight();
+        // the host's target when one is set (PIP/offscreen), else the window
+        screenWidth = overrideWidth > 0 ? overrideWidth : mc.getWindow().getWidth();
+        screenHeight = overrideHeight > 0 ? overrideHeight : mc.getWindow().getHeight();
         // Quantise time to ~1ms so repeated calls in the same frame share a key; fold in the framebuffer
         // size so a resize re-uploads even within the same millisecond.
         return (long) (currentTimeSeconds * 1000.0f) * 31L + (long) screenWidth * 7L + (long) screenHeight;
