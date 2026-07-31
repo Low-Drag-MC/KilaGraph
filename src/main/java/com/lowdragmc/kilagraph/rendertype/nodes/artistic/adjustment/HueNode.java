@@ -43,4 +43,12 @@ public class HueNode extends ArtisticNode {
         ctx.output("out", new ShaderExpr(
                 "kg_hsv2rgb(vec3(" + h + ", " + hsv.code() + ".yz))", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec3 hsv = kg_rgb2hsv(in);
+                hsv.x = fract(hsv.x + offset / 360.0);
+                out = kg_hsv2rgb(hsv);""";
+    }
 }

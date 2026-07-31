@@ -29,4 +29,9 @@ public class FragmentAlphaBlock extends ShaderBlockNode implements IFragmentOutp
     public void emitFragment(ShaderCompileContext ctx, FragmentOutputs out) {
         out.alpha = ctx.input("alpha");
     }
+
+    @Override
+    public String glslExample() {
+        return "float kg_alpha = alpha;\nfragColor = vec4(kg_baseColor, kg_alpha);";
+    }
 }

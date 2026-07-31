@@ -8,6 +8,8 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 
+import java.util.List;
+
 /**
  * Single trig function picker. Enum {@link Op} drives LDLib2's {@code EnumAccessor} which renders
  * a dropdown selector automatically.
@@ -32,5 +34,10 @@ public class TrigNode extends AnnotatedNode {
             default -> Math.sin(v);
         };
         ctx.setOutput("out", (float) r);
+    }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "op".equals(optionId) ? List.of("SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN") : List.of();
     }
 }

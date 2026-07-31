@@ -37,4 +37,10 @@ public class InvertColorsNode extends ArtisticNode {
         // per channel: mask=1 -> 1-in, mask=0 -> in
         ctx.output("out", new ShaderExpr("mix(" + in + ", 1.0 - " + in + ", " + mask + ")", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = mix(in, 1.0 - in, mask);""";
+    }
 }

@@ -24,4 +24,11 @@ public class TimeNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         ctx.output("time", ctx.engineTime());
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                uniform float kg_Time;
+                time = kg_Time;""";
+    }
 }

@@ -50,4 +50,14 @@ public class TotalFogValueNode extends ShaderNode {
     private static String fog(ShaderCompileContext ctx, String id, ShaderExpr def) {
         return (ctx.isConnected(id) ? ctx.input(id) : def).code();
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = total_fog_value(
+                    sphericalVertexDistance,
+                    cylindricalVertexDistance,
+                    environmentalStart, environmentalEnd,
+                    renderDistanceStart, renderDistanceEnd);""";
+    }
 }

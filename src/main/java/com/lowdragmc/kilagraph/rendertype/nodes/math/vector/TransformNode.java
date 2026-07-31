@@ -186,4 +186,23 @@ public class TransformNode extends ShaderNode {
         return "(vec3(" + ctx.transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "
                 + ctx.transformField("CameraOffset", GlslType.VEC3).code() + ")";
     }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return switch (optionId) {
+            case "from" -> SPACES;
+            case "to" -> TARGETS;
+            case "type" -> TYPES;
+            default -> List.of();
+        };
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // object -> world, type = position
+                vec4 v = ModelViewMat * vec4(in, 1.0);
+                out = mat3(IViewMat) * v.xyz
+                    + kg_CameraWorldPos;""";
+    }
 }

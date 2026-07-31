@@ -38,4 +38,9 @@ public class FrontFacingNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         ctx.output("out", new ShaderExpr("gl_FrontFacing", GlslType.BOOL));
     }
+
+    @Override
+    public String glslExample() {
+        return "out = gl_FrontFacing;";
+    }
 }

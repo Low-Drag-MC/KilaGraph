@@ -62,4 +62,14 @@ public class WhiteBalanceNode extends ArtisticNode {
                 + "dot(vec3(-0.210182, 1.15820, 0.000324281), " + l + "), "
                 + "dot(vec3(-0.0418120, -0.118169, 1.06867), " + l + "))", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                // temperature/tint pick a CIE white point,
+                // converted to LMS cone responses, then
+                // back to RGB as a per-channel scale
+                vec3 lms = kg_rgbToLms(in) * balance;
+                out = kg_lmsToRgb(lms);""";
+    }
 }

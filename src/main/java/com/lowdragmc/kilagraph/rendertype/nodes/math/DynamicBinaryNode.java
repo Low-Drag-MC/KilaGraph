@@ -6,6 +6,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
+import net.minecraft.network.chat.Component;
 
 /**
  * Base for a two-argument component-wise node over the {@linkplain RenderTypeGraphTypes#DYNAMIC dynamic}
@@ -19,11 +20,42 @@ public abstract class DynamicBinaryNode extends ShaderNode {
     /** Build the GLSL result expression from the two operands (already cast to the common width). */
     protected abstract String emit(String a, String b);
 
+    /**
+     * What to call the two operands on the canvas and in the docs. The ports keep their {@code a}/{@code b}
+     * <em>ids</em> — those are the wire identity, and renaming them would break every saved graph — so this
+     * only changes their labels.
+     *
+     * <p>Override it when the operands are not interchangeable and {@code a}/{@code b} says nothing about
+     * which is which, as in {@code step(edge, x)}. Commutative operators (add, multiply, min) read fine
+     * as-is and should leave it alone.</p>
+     *
+     * @return the two labels, in order
+     */
+    protected String[] portLabels() {
+        return new String[]{"a", "b"};
+    }
+
+    /** Derived from {@link #emit} itself, so the documented GLSL can never drift from the emitted code. */
+    @Override
+    public String glslExample() {
+        String[] labels = portLabels();
+        return "out = " + emit(labels[0], labels[1]) + ";";
+    }
+
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
-        context.addInputPort("a", RenderTypeGraphTypes.DYNAMIC);
-        context.addInputPort("b", RenderTypeGraphTypes.DYNAMIC);
+        String[] labels = portLabels();
+        defineOperand(context, "a", labels[0]);
+        defineOperand(context, "b", labels[1]);
         context.addOutputPort("out", RenderTypeGraphTypes.DYNAMIC);
+    }
+
+    /** Adds an operand port, labelling it only when the subclass asked for a name other than its id. */
+    private static void defineOperand(IPortDefinitionContext context, String id, String label) {
+        var builder = context.addInputPort(id, RenderTypeGraphTypes.DYNAMIC);
+        if (!id.equals(label)) {
+            builder.withDisplayName(Component.literal(label));
+        }
     }
 
     @Override

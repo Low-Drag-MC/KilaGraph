@@ -104,4 +104,21 @@ public class NormalNode extends ShaderNode {
         Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
         return raw instanceof String s && valid.contains(s) ? s : def;
     }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "space".equals(optionId) ? SPACES : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // object
+                out = normalize(Normal);
+                // view
+                out = normalize(mat3(ModelViewMat) * N);
+                // world
+                out = normalize(mat3(IViewMat)
+                    * mat3(ModelViewMat) * N);""";
+    }
 }

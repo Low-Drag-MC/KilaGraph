@@ -53,4 +53,11 @@ public class DitherNode extends ArtisticNode {
         ctx.output("out", new ShaderExpr(
                 "kg_dither(" + ctx.input("in").code() + ", gl_FragCoord.xy)", GlslType.FLOAT));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                // 4x4 ordered Bayer threshold
+                out = kg_dither(in, gl_FragCoord.xy);""";
+    }
 }

@@ -29,4 +29,10 @@ public class Mat4TransformNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = m * v;""";
+    }
 }

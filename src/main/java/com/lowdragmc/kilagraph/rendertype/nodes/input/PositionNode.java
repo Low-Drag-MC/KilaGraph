@@ -108,4 +108,21 @@ public class PositionNode extends ShaderNode {
         Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
         return raw instanceof String s && valid.contains(s) ? s : def;
     }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "space".equals(optionId) ? SPACES : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // object
+                out = Position;
+                // view
+                out = (ModelViewMat * vec4(pos, 1.0)).xyz;
+                // world
+                out = mat3(IViewMat) * viewPos
+                    + cameraWorldPos;""";
+    }
 }

@@ -40,4 +40,13 @@ public class RectangleNode extends ShapeNode {
         ctx.output("out", new ShaderExpr(
                 "clamp(min(" + aa.code() + ".x, " + aa.code() + ".y), 0.0, 1.0)", GlslType.FLOAT));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec2 d = abs(uv * 2.0 - 1.0)
+                       - vec2(width, height);
+                d = 1.0 - d / fwidth(d);
+                out = clamp(min(d.x, d.y), 0.0, 1.0);""";
+    }
 }

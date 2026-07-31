@@ -38,4 +38,12 @@ public class SaturationNode extends ArtisticNode {
         ctx.output("out", new ShaderExpr(
                 "(" + luma.code() + " + " + sat + " * (" + in + " - " + luma.code() + "))", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                float l = dot(in, vec3(0.2126729,
+                    0.7151522, 0.0721750));
+                out = l + saturation * (in - l);""";
+    }
 }

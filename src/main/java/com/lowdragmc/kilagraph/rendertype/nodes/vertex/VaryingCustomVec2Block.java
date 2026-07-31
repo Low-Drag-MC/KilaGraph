@@ -41,4 +41,9 @@ public class VaryingCustomVec2Block extends ShaderBlockNode implements IVaryingB
     public ShaderExpr compileVarying(ShaderCompileContext ctx) {
         return ctx.input("value");
     }
+
+    @Override
+    public String glslExample() {
+        return IVaryingBlock.varyingGlslExample("vec2");
+    }
 }

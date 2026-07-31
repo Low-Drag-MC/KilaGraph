@@ -33,4 +33,10 @@ public class NormalUnpackNode extends ArtisticNode {
         ctx.output("out", new ShaderExpr(
                 "normalize(" + ctx.input("in").code() + " * 2.0 - 1.0)", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = normalize(in * 2.0 - 1.0);""";
+    }
 }

@@ -34,4 +34,12 @@ public class NormalReconstructZNode extends ArtisticNode {
         String z = "sqrt(1.0 - clamp(dot(" + xy.code() + ", " + xy.code() + "), 0.0, 1.0))";
         ctx.output("out", new ShaderExpr("normalize(vec3(" + xy.code() + ", " + z + "))", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                float z = sqrt(1.0 - clamp(dot(in, in),
+                                           0.0, 1.0));
+                out = normalize(vec3(in, z));""";
+    }
 }

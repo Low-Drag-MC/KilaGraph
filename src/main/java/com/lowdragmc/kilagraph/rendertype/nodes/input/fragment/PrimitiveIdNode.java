@@ -40,4 +40,9 @@ public class PrimitiveIdNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         ctx.output("out", new ShaderExpr("gl_PrimitiveID", GlslType.INT));
     }
+
+    @Override
+    public String glslExample() {
+        return "out = gl_PrimitiveID;";
+    }
 }

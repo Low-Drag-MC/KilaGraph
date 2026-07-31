@@ -11,6 +11,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 import net.minecraft.nbt.CompoundTag;
 
+import java.util.List;
+
 /**
  * Put a value into a {@link CompoundTag} under {@code key}, returning the (mutated) tag. A null
  * input tag yields a fresh compound. The {@link NbtValueType} option types the {@code value} port.
@@ -51,5 +53,10 @@ public class NbtSetNode extends AnnotatedNode {
             }
         }
         ctx.setOutput("out", t);
+    }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "valueType".equals(optionId) ? List.of("STRING", "INT", "LONG", "FLOAT", "DOUBLE", "BOOL", "COMPOUND") : List.of();
     }
 }

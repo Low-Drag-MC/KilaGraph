@@ -58,4 +58,13 @@ public class RotateNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec2 p = uv - center;
+                float c = cos(rotation), s = sin(rotation);
+                out = center + vec2(c * p.x - s * p.y,
+                                    s * p.x + c * p.y);""";
+    }
 }

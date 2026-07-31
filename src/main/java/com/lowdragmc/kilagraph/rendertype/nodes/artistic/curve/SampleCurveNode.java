@@ -43,4 +43,10 @@ public class SampleCurveNode extends ShaderNode {
         ctx.output("value", new ShaderExpr(
                 "kg_sampleCurve(" + curve.code() + ", " + time + ")", GlslType.FLOAT));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                value = kg_sampleCurve(curve, time);""";
+    }
 }

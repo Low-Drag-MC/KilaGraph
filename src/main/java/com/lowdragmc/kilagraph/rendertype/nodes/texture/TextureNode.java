@@ -52,4 +52,11 @@ public class TextureNode extends ShaderNode {
     public float getNodeWidth() {
         return 120;
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                uniform sampler2D kg_tex_1f3a;
+                sampler = kg_tex_1f3a;""";
+    }
 }

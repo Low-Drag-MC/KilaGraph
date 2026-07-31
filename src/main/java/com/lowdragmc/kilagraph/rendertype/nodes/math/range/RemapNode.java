@@ -54,4 +54,11 @@ public class RemapNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = outMin + (in - inMin)
+                    * (outMax - outMin) / (inMax - inMin);""";
+    }
 }

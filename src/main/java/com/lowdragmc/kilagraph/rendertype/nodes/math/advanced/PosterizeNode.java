@@ -35,4 +35,10 @@ public class PosterizeNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = floor(in * steps) / steps;""";
+    }
 }

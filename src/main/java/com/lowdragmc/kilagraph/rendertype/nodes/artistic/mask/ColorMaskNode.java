@@ -42,4 +42,12 @@ public class ColorMaskNode extends ArtisticNode {
         ctx.output("out", new ShaderExpr("clamp(1.0 - (" + dist.code() + " - " + range
                 + ") / max(" + fuzz + ", 1e-5), 0.0, 1.0)", GlslType.FLOAT));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                float d = distance(maskColor, in);
+                out = clamp(1.0 - (d - range)
+                    / max(fuzziness, 1e-5), 0.0, 1.0);""";
+    }
 }

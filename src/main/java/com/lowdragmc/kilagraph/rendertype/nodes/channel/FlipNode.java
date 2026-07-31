@@ -70,4 +70,11 @@ public class FlipNode extends ShaderNode {
         Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
         return raw instanceof Boolean b && b;
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                // flip is a 0/1 mask from the toggles
+                out = (flip * -2.0 + 1.0) * in + flip;""";
+    }
 }

@@ -2,7 +2,10 @@ package com.lowdragmc.kilagraph.graph.core;
 
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
+import com.lowdragmc.kilagraph.graph.util.INodeDescription;
+import com.lowdragmc.kilagraph.graph.util.NodeDescriptions;
 import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
+import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
@@ -24,7 +27,7 @@ import org.jetbrains.annotations.Nullable;
  * lives in {@link EvalContext}, which makes the same node safely usable by multiple executors
  * (current or future async/parallel).</p>
  */
-public abstract class AnnotatedNode extends Node implements IGraphEvaluable {
+public abstract class AnnotatedNode extends Node implements IGraphEvaluable, INodeDescription {
 
     private NodeMetadata metadata;
 
@@ -39,8 +42,19 @@ public abstract class AnnotatedNode extends Node implements IGraphEvaluable {
         NodeTooltipHelper.apply(nodeModel, getNodeTooltip());
     }
 
+    /** The hover tooltip; by default the same {@code kg.node.<name>.tooltip} the description panel uses. */
     protected @Nullable Component getNodeTooltip() {
-        return null;
+        return NodeTooltipHelper.defaultTooltip(this);
+    }
+
+    /**
+     * The item library's documentation panel, assembled from this node's {@code kg.node.<name>.*} lang
+     * keys plus the {@link INodeDescription} hooks. See {@link NodeDescriptions}.
+     */
+    @Override
+    @Nullable
+    public UIElement createDescriptionUI() {
+        return NodeDescriptions.build(this);
     }
 
     @Override

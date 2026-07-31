@@ -56,6 +56,14 @@ public class SwizzleNode extends ShaderNode {
         return "out";
     }
 
+    @Override
+    public String glslExample() {
+        return """
+                // in padded to vec4, then swizzled
+                vec4 v = vec4(in, 0.0, 0.0, 0.0);
+                out = v.xy;   // slots x, y, -, -""";
+    }
+
     /** The swizzle string from the slot options: leading non-{@code -} axes, at least one ({@code x}). */
     private String mask() {
         StringBuilder sb = new StringBuilder();

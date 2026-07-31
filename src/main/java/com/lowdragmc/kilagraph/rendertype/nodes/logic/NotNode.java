@@ -23,4 +23,10 @@ public class NotNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         ctx.output("out", new ShaderExpr("(!" + ctx.input("a").code() + ")", GlslType.BOOL));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = (!a);""";
+    }
 }

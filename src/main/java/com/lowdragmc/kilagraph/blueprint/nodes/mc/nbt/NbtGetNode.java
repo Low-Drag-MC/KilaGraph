@@ -10,6 +10,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 import net.minecraft.nbt.CompoundTag;
 
+import java.util.List;
+
 /**
  * Read a value out of a {@link CompoundTag} by key. The {@link NbtValueType} option both selects
  * how the value is read and types the {@code out} port. Missing key / null tag → type default.
@@ -59,5 +61,11 @@ public class NbtGetNode extends AnnotatedNode {
             case COMPOUND -> new CompoundTag();
             default -> "";
         };
+    }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "valueType".equals(optionId) ? List.of("STRING", "INT", "LONG",
+                "FLOAT", "DOUBLE", "BOOL", "COMPOUND") : List.of();
     }
 }

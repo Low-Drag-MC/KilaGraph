@@ -60,4 +60,9 @@ public class LogNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "base".equals(optionId) ? BASES : List.of();
+    }
 }

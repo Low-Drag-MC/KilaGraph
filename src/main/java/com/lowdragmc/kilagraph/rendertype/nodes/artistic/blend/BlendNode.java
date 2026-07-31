@@ -101,4 +101,17 @@ public class BlendNode extends ArtisticNode {
             default /* overwrite */ -> o;
         };
     }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "mode".equals(optionId) ? MODES : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // multiply mode
+                vec3 blended = base * blend;
+                out = mix(base, blended, opacity);""";
+    }
 }

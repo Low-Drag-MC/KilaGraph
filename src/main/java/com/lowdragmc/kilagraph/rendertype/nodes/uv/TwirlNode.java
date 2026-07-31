@@ -50,4 +50,14 @@ public class TwirlNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec2 d = uv - center;
+                float a = strength * length(d);
+                out = vec2(cos(a) * d.x - sin(a) * d.y,
+                           sin(a) * d.x + cos(a) * d.y)
+                    + center + offset;""";
+    }
 }

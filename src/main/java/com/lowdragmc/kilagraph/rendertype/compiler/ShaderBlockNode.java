@@ -1,7 +1,9 @@
 package com.lowdragmc.kilagraph.rendertype.compiler;
 
+import com.lowdragmc.kilagraph.graph.util.NodeDescriptions;
 import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.kilagraph.rendertype.preview.ShaderPreviewSupport;
+import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.node.NodePreviewContext;
@@ -25,7 +27,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>A block that returns an output port id from {@link #previewOutputPortId()} gets a live preview
  * thumbnail of that output (e.g. a {@code TexCoord} varying block previews the uv gradient).</p>
  */
-public abstract class ShaderBlockNode extends BlockNode {
+public abstract class ShaderBlockNode extends BlockNode implements IShaderNodeDescription {
 
     @Override
     public void setImplementation(NodeModel nodeModel) {
@@ -33,8 +35,20 @@ public abstract class ShaderBlockNode extends BlockNode {
         NodeTooltipHelper.apply(nodeModel, getNodeTooltip());
     }
 
+    /**
+     * The item library's documentation panel. A block reaches this with no {@code NodeModel} (the library
+     * instantiates it reflectively), so its ports are documented in prose rather than a generated table —
+     * see {@link NodeDescriptions}.
+     */
+    @Override
+    @Nullable
+    public UIElement createDescriptionUI() {
+        return NodeDescriptions.build(this);
+    }
+
+    /** The hover tooltip; by default the same {@code kg.node.<name>.tooltip} the description panel uses. */
     protected @Nullable Component getNodeTooltip() {
-        return null;
+        return NodeTooltipHelper.defaultTooltip(this);
     }
 
     protected final Component tooltip(String key) {

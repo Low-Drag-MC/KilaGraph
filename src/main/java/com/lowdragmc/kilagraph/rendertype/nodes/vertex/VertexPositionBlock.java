@@ -35,4 +35,14 @@ public class VertexPositionBlock extends ShaderBlockNode implements IVertexPosit
         // Match vanilla block.vsh: transform Position + ModelOffset (modelPosition adds the dynamictransforms import).
         return new ShaderExpr("ProjMat * ModelViewMat * vec4(" + ctx.modelPosition().code() + ", 1.0)", GlslType.VEC4);
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                // connected
+                gl_Position = position;
+                // unconnected (the vanilla transform)
+                gl_Position = ProjMat * ModelViewMat
+                            * vec4(Position, 1.0);""";
+    }
 }

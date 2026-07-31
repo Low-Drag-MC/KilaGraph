@@ -35,4 +35,11 @@ public class LinearFogValueNode extends ShaderNode {
                 + ctx.input("fogStart").code() + ", " + ctx.input("fogEnd").code() + ")";
         ctx.output("out", new ShaderExpr(code, GlslType.FLOAT));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = linear_fog_value(vertexDistance,
+                    fogStart, fogEnd);""";
+    }
 }

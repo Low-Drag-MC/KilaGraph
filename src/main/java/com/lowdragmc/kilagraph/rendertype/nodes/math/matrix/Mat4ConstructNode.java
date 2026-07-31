@@ -28,4 +28,10 @@ public class Mat4ConstructNode extends ShaderNode {
                 + ctx.input("c2").code() + ", " + ctx.input("c3").code() + ")";
         ctx.output("out", new ShaderExpr(code, GlslType.MAT4));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = mat4(c0, c1, c2, c3);""";
+    }
 }

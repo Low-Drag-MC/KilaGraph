@@ -41,4 +41,9 @@ public class FragmentCoordinateNode extends ShaderNode {
     public void compile(ShaderCompileContext ctx) {
         ctx.output("out", new ShaderExpr("gl_FragCoord", GlslType.VEC4));
     }
+
+    @Override
+    public String glslExample() {
+        return "out = gl_FragCoord;";
+    }
 }

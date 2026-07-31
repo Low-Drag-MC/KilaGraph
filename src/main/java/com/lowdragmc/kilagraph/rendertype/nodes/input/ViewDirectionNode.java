@@ -113,4 +113,20 @@ public class ViewDirectionNode extends ShaderNode {
         Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
         return raw instanceof Boolean b && b;
     }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "space".equals(optionId) ? SPACES : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // view: the camera is at the origin
+                vec3 dir = -viewPos;
+                // world
+                out = mat3(IViewMat) * dir;
+                // with normalize enabled
+                out = normalize(out);""";
+    }
 }

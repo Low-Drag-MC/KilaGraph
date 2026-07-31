@@ -42,4 +42,10 @@ public class ProjectionFromPositionNode extends ShaderNode {
                 : "vec4(" + ctx.modelPosition().code() + ", 1.0)";
         ctx.output("out", new ShaderExpr("projection_from_position(" + pos + ")", GlslType.VEC4));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = ProjMat * position;""";
+    }
 }

@@ -72,6 +72,24 @@ public class VertexColorNode extends ShaderNode {
         return "out";
     }
 
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "mode".equals(optionId) ? MODES : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // color
+                out = Color;
+                // block
+                out = Color * minecraft_sample_lightmap(
+                    Sampler2, UV2);
+                // mix_light
+                out = minecraft_mix_light(Light0_Direction,
+                    Light1_Direction, Normal, Color);""";
+    }
+
     private static String label(String mode) {
         return switch (mode) {
             case MODE_COLOR -> "Color";

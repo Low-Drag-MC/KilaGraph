@@ -29,4 +29,9 @@ public class FragmentEmissionBlock extends ShaderBlockNode implements IFragmentO
     public void emitFragment(ShaderCompileContext ctx, FragmentOutputs out) {
         out.emission = ctx.input("color");
     }
+
+    @Override
+    public String glslExample() {
+        return "vec3 kg_baseColor = <Base Color>;\nkg_baseColor += color;";
+    }
 }

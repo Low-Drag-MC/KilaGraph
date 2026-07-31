@@ -8,6 +8,8 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 
+import java.util.List;
+
 /**
  * Rounding picker. Enum {@link Op} → {@code EnumAccessor} dropdown.
  */
@@ -29,5 +31,10 @@ public class RoundNode extends AnnotatedNode {
             default -> Math.round(v);
         };
         ctx.setOutput("out", r);
+    }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "op".equals(optionId) ? List.of("ROUND", "FLOOR", "CEIL", "TRUNC") : List.of();
     }
 }

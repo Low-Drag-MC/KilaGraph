@@ -44,4 +44,12 @@ public class ReplaceColorNode extends ArtisticNode {
         ctx.output("out", new ShaderExpr("mix(" + to + ", " + in + ", clamp((" + dist.code() + " - "
                 + range + ") / max(" + fuzz + ", 1e-5), 0.0, 1.0))", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                float d = distance(from, in);
+                out = mix(to, in, clamp((d - range)
+                    / max(fuzziness, 1e-5), 0.0, 1.0));""";
+    }
 }

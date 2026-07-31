@@ -55,4 +55,13 @@ public class SimpleNoiseNode extends ProceduralNode {
                 + " + kg_valueNoise(" + p.code() + " / 4.0) * 0.5)";
         ctx.output("out", new ShaderExpr(code, GlslType.FLOAT));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec2 p = uv * scale;
+                out = kg_valueNoise(p / 1.0) * 0.125
+                    + kg_valueNoise(p / 2.0) * 0.25
+                    + kg_valueNoise(p / 4.0) * 0.5;""";
+    }
 }

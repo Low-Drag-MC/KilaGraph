@@ -75,7 +75,7 @@ public class ExpressionNode extends ShaderNode implements INodeValidator {
         context.addOption(OPTION, TypeHandles.STRING)
                 .withDefaultValue(DEFAULT_JSON)
                 .withDisplayName(Component.empty())
-                .withTooltips(Tooltips.of("kg.node.rt_expression.option.expression.tooltip"))
+                .withTooltips(Tooltips.of("kg.node.rt_expression.option.spec.tooltip"))
                 .withConfigurable((vc, t) -> ExpressionConfigurator.build(vc)).build();
     }
 
@@ -307,5 +307,15 @@ public class ExpressionNode extends ShaderNode implements INodeValidator {
             case MAT4 -> "mat4(1.0)";
             case SAMPLER2D, GRADIENT, CURVE -> "0"; // unreachable (opaque outputs are dropped)
         };
+    }
+
+    @Override
+    public String glslExample() {
+        return """
+                // the default spec compiles to
+                void kg_expr_1f3a(in float a, out float result) {
+                    result = a;
+                }
+                kg_expr_1f3a(<a>, kg_tmp0);""";
     }
 }

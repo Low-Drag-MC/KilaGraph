@@ -44,4 +44,10 @@ public class TilingAndOffsetNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = uv * tiling + offset;""";
+    }
 }

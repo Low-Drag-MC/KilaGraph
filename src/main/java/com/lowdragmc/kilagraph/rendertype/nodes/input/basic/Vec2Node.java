@@ -30,4 +30,9 @@ public class Vec2Node extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return "out = vec2(x, y);";
+    }
 }

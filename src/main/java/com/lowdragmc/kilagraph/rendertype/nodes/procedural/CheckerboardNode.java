@@ -61,4 +61,14 @@ public class CheckerboardNode extends ProceduralNode {
         ctx.output("out", new ShaderExpr(
                 "mix(" + colorA + ", " + colorB + ", vec3(" + alpha.code() + "))", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                // derivative-aware; the gist is
+                vec2 t = fract((uv + 0.5) * frequency);
+                float c = step(0.5, t.x) != step(0.5, t.y)
+                        ? 1.0 : 0.0;
+                out = mix(colorA, colorB, c);""";
+    }
 }

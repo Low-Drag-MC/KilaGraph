@@ -64,6 +64,16 @@ public class CompareNode extends ShaderNode {
         ctx.output("out", new ShaderExpr("(" + a + " " + op + " " + b + ")", GlslType.BOOL));
     }
 
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "op".equals(optionId) ? List.copyOf(OPS.keySet()) : List.of();
+    }
+
+    @Override
+    public String glslExample() {
+        return "out = (a == b);";
+    }
+
     private static String label(String mode) {
         return switch (mode) {
             case "equal" -> "A == B";

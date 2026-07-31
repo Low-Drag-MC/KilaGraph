@@ -29,4 +29,9 @@ public class FragmentAlphaDiscardBlock extends ShaderBlockNode implements IFragm
     public void emitFragment(ShaderCompileContext ctx, FragmentOutputs out) {
         out.alphaDiscardCutoff = ctx.input("cutoff");
     }
+
+    @Override
+    public String glslExample() {
+        return "float kg_alpha = <Alpha>;\nif (kg_alpha < cutoff) discard;";
+    }
 }

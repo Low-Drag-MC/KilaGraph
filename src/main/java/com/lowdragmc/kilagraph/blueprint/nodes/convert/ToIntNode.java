@@ -9,6 +9,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
+import java.util.List;
+
 /**
  * Convert a numeric value to {@code int}, choosing how to drop the fractional part. Input is
  * {@code UNKNOWN} so any {@link Number} wire coerces; non-numeric values yield 0.
@@ -34,5 +36,10 @@ public class ToIntNode extends AnnotatedNode {
             default -> (int) v;
         };
         ctx.setOutput("out", r);
+    }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return "op".equals(optionId) ? List.of("TRUNC", "FLOOR", "CEIL", "ROUND") : List.of();
     }
 }

@@ -41,4 +41,9 @@ public class VaryingCustomFloatBlock extends ShaderBlockNode implements IVarying
     public ShaderExpr compileVarying(ShaderCompileContext ctx) {
         return ctx.input("value");
     }
+
+    @Override
+    public String glslExample() {
+        return IVaryingBlock.varyingGlslExample("float");
+    }
 }

@@ -43,4 +43,12 @@ public class CombineNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "rgba";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                rgba = vec4(r, g, b, a);
+                rgb  = vec3(r, g, b);
+                rg   = vec2(r, g);""";
+    }
 }

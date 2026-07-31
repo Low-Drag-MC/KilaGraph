@@ -1,18 +1,22 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.vertex;
 
+import com.lowdragmc.kilagraph.graph.util.NodeDescriptions;
 import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.IShaderNodeDescription;
 import com.lowdragmc.kilagraph.rendertype.compiler.NodeDisplayNames;
+import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.ContextNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
 @NodeAttribute(name = "rt_vertex_stage", group = "rendertype_vertex", graphTypes = RenderTypeGraph.class)
-public class VaryingStageNode extends ContextNode {
+public class VaryingStageNode extends ContextNode implements IShaderNodeDescription {
     @Override
     public void setImplementation(NodeModel nodeModel) {
         super.setImplementation(nodeModel);
@@ -44,5 +48,11 @@ public class VaryingStageNode extends ContextNode {
                 VaryingCustomVec3Block.class,
                 VaryingCustomVec4Block.class
         );
+    }
+
+    @Override
+    @Nullable
+    public UIElement createDescriptionUI() {
+        return NodeDescriptions.build(this);
     }
 }

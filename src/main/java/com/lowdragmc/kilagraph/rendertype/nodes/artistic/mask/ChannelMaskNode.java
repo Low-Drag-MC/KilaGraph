@@ -35,4 +35,10 @@ public class ChannelMaskNode extends ArtisticNode {
         ctx.output("out", new ShaderExpr(
                 "(" + ctx.input("in").code() + " * " + ctx.input("mask").code() + ")", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = in * mask;""";
+    }
 }

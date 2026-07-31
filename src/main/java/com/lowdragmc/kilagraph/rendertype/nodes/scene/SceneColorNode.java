@@ -50,4 +50,11 @@ public class SceneColorNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                uniform sampler2D KG_SceneColor;
+                out = texture(KG_SceneColor, uv).rgb;""";
+    }
 }

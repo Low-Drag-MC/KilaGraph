@@ -38,4 +38,11 @@ public class NormalStrengthNode extends ArtisticNode {
         ctx.output("out", new ShaderExpr("vec3(" + in.code() + ".xy * " + s + ", mix(1.0, " + in.code()
                 + ".z, clamp(" + s + ", 0.0, 1.0)))", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = vec3(in.xy * strength,
+                    mix(1.0, in.z, clamp(strength, 0.0, 1.0)));""";
+    }
 }

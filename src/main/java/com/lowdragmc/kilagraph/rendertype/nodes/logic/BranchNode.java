@@ -56,4 +56,10 @@ public class BranchNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = (predicate ? t : f);""";
+    }
 }

@@ -30,4 +30,11 @@ public class Mat4SplitNode extends ShaderNode {
         ctx.output("c2", new ShaderExpr("(" + in + ")[2]", GlslType.VEC4));
         ctx.output("c3", new ShaderExpr("(" + in + ")[3]", GlslType.VEC4));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                c0 = in[0]; c1 = in[1];
+                c2 = in[2]; c3 = in[3];""";
+    }
 }

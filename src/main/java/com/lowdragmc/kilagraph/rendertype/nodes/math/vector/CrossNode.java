@@ -29,4 +29,10 @@ public class CrossNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = cross(a, b);""";
+    }
 }

@@ -5,7 +5,10 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.mc.MemberInfoRegistry;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.kilagraph.graph.util.KGSearchConfigurators;
+import com.lowdragmc.kilagraph.graph.util.INodeDescription;
+import com.lowdragmc.kilagraph.graph.util.NodeDescriptions;
 import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
+import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
@@ -30,7 +33,7 @@ import java.util.List;
  * a null target / unknown key / no parent yields a null output.</p>
  */
 @NodeAttribute(name = "info_field", group = "mc_info", graphTypes = com.lowdragmc.kilagraph.blueprint.BlueprintGraph.class)
-public class InfoFieldBlock extends BlockNode implements IGraphEvaluable {
+public class InfoFieldBlock extends BlockNode implements IGraphEvaluable, INodeDescription {
 
     @Override
     public void setImplementation(NodeModel nodeModel) {
@@ -40,6 +43,11 @@ public class InfoFieldBlock extends BlockNode implements IGraphEvaluable {
 
     protected Component getNodeTooltip() {
         return Component.translatable("kg.node.info_field.tooltip");
+    }
+
+    @Override
+    public UIElement createDescriptionUI() {
+        return NodeDescriptions.build(this);
     }
 
     @Override

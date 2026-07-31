@@ -49,4 +49,12 @@ public class FresnelNode extends ShaderNode {
     protected String defaultPreviewContentKey() {
         return "sphere";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = pow(1.0 - clamp(dot(
+                    normalize(normal),
+                    normalize(viewDir)), 0.0, 1.0), power);""";
+    }
 }

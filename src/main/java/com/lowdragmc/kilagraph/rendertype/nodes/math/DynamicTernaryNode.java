@@ -23,6 +23,13 @@ public abstract class DynamicTernaryNode extends ShaderNode {
         return new String[]{"a", "b", "c"};
     }
 
+    /** Derived from the builtin and the real port ids, so the documented GLSL matches the emitted code. */
+    @Override
+    public String glslExample() {
+        String[] ids = portIds();
+        return "out = " + glslFunc() + "(" + ids[0] + ", " + ids[1] + ", " + ids[2] + ");";
+    }
+
     @Override
     public void onDefinePorts(IPortDefinitionContext context) {
         for (String id : portIds()) context.addInputPort(id, RenderTypeGraphTypes.DYNAMIC);

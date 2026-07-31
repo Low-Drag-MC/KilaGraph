@@ -61,4 +61,15 @@ public class GradientNoiseNode extends ProceduralNode {
         String code = "(mix(mix(" + d00 + ", " + d10 + ", " + w + ".x), mix(" + d01 + ", " + d11 + ", " + w + ".x), " + w + ".y) + 0.5)";
         ctx.output("out", new ShaderExpr(code, GlslType.FLOAT));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec2 p = uv * scale;
+                vec2 i = floor(p), f = fract(p);
+                // four corner gradients, quintic fade
+                float n = mix(mix(d00, d10, w.x),
+                              mix(d01, d11, w.x), w.y);
+                out = n * 0.5 + 0.5;""";
+    }
 }

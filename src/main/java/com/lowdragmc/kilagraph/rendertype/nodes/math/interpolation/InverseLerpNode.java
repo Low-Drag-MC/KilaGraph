@@ -40,4 +40,10 @@ public class InverseLerpNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = (t - a) / (b - a);""";
+    }
 }

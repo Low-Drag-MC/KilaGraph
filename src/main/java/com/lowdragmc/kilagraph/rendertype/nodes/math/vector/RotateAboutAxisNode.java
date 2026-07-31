@@ -42,4 +42,13 @@ public class RotateAboutAxisNode extends ShaderNode {
     protected String previewOutputPortId() {
         return "out";
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                vec3 n = normalize(axis);
+                out = in * cos(angle)
+                    + cross(n, in) * sin(angle)
+                    + n * dot(n, in) * (1.0 - cos(angle));""";
+    }
 }

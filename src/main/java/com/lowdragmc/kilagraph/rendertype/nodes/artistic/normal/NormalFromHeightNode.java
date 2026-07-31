@@ -45,4 +45,11 @@ public class NormalFromHeightNode extends ArtisticNode {
         ctx.output("out", new ShaderExpr("normalize(vec3(-" + s + " * dFdx(" + in.code() + "), -"
                 + s + " * dFdy(" + in.code() + "), 1.0))", GlslType.VEC3));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                out = normalize(vec3(-strength * dFdx(in),
+                                     -strength * dFdy(in), 1.0));""";
+    }
 }

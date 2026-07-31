@@ -62,4 +62,13 @@ public class MixLightNode extends ShaderNode {
                 + normal.code() + ", " + color.code() + ")";
         ctx.output("litColor", new ShaderExpr(code, GlslType.VEC4));
     }
+
+    @Override
+    public String glslExample() {
+        return """
+                litColor = minecraft_mix_light(
+                    kg_lighting.Light0_Direction,
+                    kg_lighting.Light1_Direction,
+                    normal, color);""";
+    }
 }
