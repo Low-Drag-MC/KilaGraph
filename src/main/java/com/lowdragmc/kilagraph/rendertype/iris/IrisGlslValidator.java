@@ -1,5 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.iris;
 
+import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.systems.RenderSystem;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -17,6 +19,9 @@ import org.lwjgl.opengl.GL20;
  * then skipped and the source accepted — the pre-hardening behaviour, never worse.</p>
  */
 final class IrisGlslValidator {
+
+    /** Info-log cap handed to {@code glGetShaderInfoLog} — same value vanilla uses for its program logs. */
+    private static final int INFO_LOG_MAX = 32768;
 
     private IrisGlslValidator() {}
 
@@ -38,21 +43,24 @@ final class IrisGlslValidator {
 
     @Nullable
     private static String compileError(String source, int glShaderType) {
+        // The GlStateManager wrappers below assert the render thread (and a context is only current there), so
+        // check first and skip validation off-thread rather than letting the assert escape as an exception.
+        if (!RenderSystem.isOnRenderThread()) return null;
         try {
             GL.getCapabilities();
         } catch (Throwable noContext) {
             return null; // headless / no context on this thread — cannot validate, accept
         }
-        int shader = GL20.glCreateShader(glShaderType);
+        int shader = GlStateManager.glCreateShader(glShaderType);
         if (shader == 0) return null; // driver refused a shader object — can't validate, accept
         try {
-            GL20.glShaderSource(shader, source);
-            GL20.glCompileShader(shader);
-            if (GL20.glGetShaderi(shader, GL20.GL_COMPILE_STATUS) == GL11.GL_TRUE) return null;
-            String log = GL20.glGetShaderInfoLog(shader);
+            GlStateManager.glShaderSource(shader, source);
+            GlStateManager.glCompileShader(shader);
+            if (GlStateManager.glGetShaderi(shader, GL20.GL_COMPILE_STATUS) == GL11.GL_TRUE) return null;
+            String log = GlStateManager.glGetShaderInfoLog(shader, INFO_LOG_MAX);
             return log == null || log.isBlank() ? "(no driver info log)" : log;
         } finally {
-            GL20.glDeleteShader(shader);
+            GlStateManager.glDeleteShader(shader);
         }
     }
 }

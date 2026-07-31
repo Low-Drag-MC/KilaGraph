@@ -7,6 +7,7 @@ import com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.opengl.GlSampler;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
@@ -24,7 +25,7 @@ import java.util.Map;
 /**
  * Drives the per-draw state the injected {@code kg_surface} shading needs (see {@link IrisShaderInjector})
  * while a shaderpack owns the (shared) gbuffers program: the {@code kg_surface_id} discriminator <em>and</em>
- * the active material's {@code KG_Material}/managed UBOs, bound onto that program by raw GL.
+ * the active material's {@code KG_Material}/managed UBOs, bound onto that program directly by program id.
  *
  * <p><b>Timing.</b> Iris pairs our {@code RenderPipeline} with the shaderpack's {@code GlProgram} and binds
  * that program lazily inside {@code GlCommandEncoder.trySetup} — <em>after</em> our {@code RenderType.draw}
@@ -39,6 +40,12 @@ import java.util.Map;
  * bind by their own (shared) names. We use <b>high</b> uniform-buffer binding points (near
  * {@code GL_MAX_UNIFORM_BUFFER_BINDINGS}) to avoid colliding with the shaderpack's own low-indexed blocks;
  * Iris rebinds its blocks per draw, so transiently assigning bindings on the shared program is safe.</p>
+ *
+ * <p><b>Raw GL.</b> Everything {@code GlStateManager} wraps goes through it (state queries, uniform-location
+ * lookups). What stays raw has no wrapper and no cached state to corrupt: {@code glProgramUniform1i} (writes
+ * into a program <em>without</em> binding it — the whole point here; {@code GlStateManager._glUniform1i}
+ * targets the currently bound program), the uniform-block calls, and {@code glBindSampler} — plus the
+ * deliberate high-texture-unit exception documented on {@link #bindMaterialSamplers}.</p>
  */
 public final class IrisSurfaceUniform {
 
@@ -90,7 +97,7 @@ public final class IrisSurfaceUniform {
      *  case) so non-KilaGraph draws cost only an int check. */
     public static void applyToBoundProgram() {
         if (currentSurfaceId == 0) return; // nothing of ours drawing — leave the program untouched
-        int program = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+        int program = GlStateManager._getInteger(GL20.GL_CURRENT_PROGRAM);
         if (program == 0) return;
         // Only an Iris-injected shaderpack program declares kg_surface_id. When Iris did NOT override our
         // pipeline (our own program is bound — GUI/editor preview, an unassigned pipeline, or a draw before
@@ -107,7 +114,7 @@ public final class IrisSurfaceUniform {
      *  is not mistaken for ours. Called from the draw's "after drawIndexed" hook (program still bound). */
     public static void clearBoundProgram() {
         if (currentSurfaceId != 0) {
-            int program = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+            int program = GlStateManager._getInteger(GL20.GL_CURRENT_PROGRAM);
             if (program != 0) writeSurfaceId(program, 0);
         }
         currentSurfaceId = 0;
@@ -153,12 +160,14 @@ public final class IrisSurfaceUniform {
      *  ({@code TEXTURES[0..11]}) and would throw {@code ArrayIndexOutOfBounds} on our high units; the high
      *  units it never tracks, so leaving textures bound there is invisible to it. We restore the active
      *  texture unit to its prior value so {@code GlStateManager}'s cached {@code activeTexture} stays
-     *  consistent with real GL for the shaderpack's own subsequent draws. */
+     *  consistent with real GL for the shaderpack's own subsequent draws — that restore must be raw too:
+     *  {@code _activeTexture} skips the GL call when its cache already reads the requested unit, which (since
+     *  we never told it we moved) is exactly the case here, and would leave real GL on our high unit. */
     private static void bindMaterialSamplers(int program) {
         RenderTypeGraphMaterial m = currentMaterial;
         if (m == null) return;
         int base = textureUnitBase();
-        int prevActiveUnit = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
+        int prevActiveUnit = GlStateManager._getInteger(GL13.GL_ACTIVE_TEXTURE);
         int[] next = {0};
         m.bindIrisSamplers((name, view, sampler) -> {
             int location = samplerLocation(program, name);
@@ -194,7 +203,7 @@ public final class IrisSurfaceUniform {
         String key = program + ":" + name;
         Integer cached = SAMPLER_LOCATION.get(key);
         if (cached != null) return cached;
-        int loc = GL20.glGetUniformLocation(program, name);
+        int loc = GlStateManager._glGetUniformLocation(program, name);
         SAMPLER_LOCATION.put(key, loc);
         return loc;
     }
@@ -210,14 +219,14 @@ public final class IrisSurfaceUniform {
      *  are legal for any stage — the per-stage 32 limits how many samplers a stage uses, not their unit
      *  indices — and Iris's allocation can never reach this high. */
     private static int textureUnitBase() {
-        if (maxCombinedTexUnits < 0) maxCombinedTexUnits = GL11.glGetInteger(GL20.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
+        if (maxCombinedTexUnits < 0) maxCombinedTexUnits = GlStateManager._getInteger(GL20.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS);
         return Math.max(0, maxCombinedTexUnits - 8);
     }
 
     private static int location(int program) {
         Integer cached = LOCATION.get(program);
         if (cached != null) return cached;
-        int loc = GL20.glGetUniformLocation(program, UNIFORM);
+        int loc = GlStateManager._glGetUniformLocation(program, UNIFORM);
         LOCATION.put(program, loc);
         return loc;
     }
@@ -234,7 +243,7 @@ public final class IrisSurfaceUniform {
     /** Binding point for the material block; managed blocks follow at +1, +2, … Kept high to dodge the
      *  shaderpack's own (low-indexed) uniform blocks on the shared program. */
     private static int managedBindingBase() {
-        if (maxUboBindings < 0) maxUboBindings = GL11.glGetInteger(GL31.GL_MAX_UNIFORM_BUFFER_BINDINGS);
+        if (maxUboBindings < 0) maxUboBindings = GlStateManager._getInteger(GL31.GL_MAX_UNIFORM_BUFFER_BINDINGS);
         return Math.max(0, maxUboBindings - 8);
     }
 

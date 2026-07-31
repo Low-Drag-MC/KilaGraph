@@ -99,6 +99,28 @@ public final class KGEngineUniforms {
     }
 
     /**
+     * Host override for the CLOCK, in ticks, or negative to use the world's own time.
+     * <p>
+     * A host that renders on its own timeline — an effect editor with a playhead that pauses and
+     * scrubs — needs {@code Time}/{@code GameTime} to be THAT clock while it draws, and to stand
+     * still when it pauses. World game time can express neither. Hosts that drive their own time set
+     * this for the duration of that render, exactly like {@link #setScreenSizeOverride}.
+     * <p>
+     * Freezing the value also stops the per-frame re-upload: the update key is derived from the time,
+     * so a paused host costs nothing.
+     */
+    private static float overrideTicks = -1f;
+
+    /** Set the clock the next uploads report, in ticks; pass a negative value to fall back to the world. */
+    public static void setTimeOverride(float ticks) {
+        overrideTicks = ticks;
+    }
+
+    public static void clearTimeOverride() {
+        overrideTicks = -1f;
+    }
+
+    /**
      * Create (if needed) and refresh the buffer for the current frame. Performs a {@code writeToBuffer}
      * — call before {@code RenderType.draw} opens its pass. Idempotent within a frame (skips the write
      * when the time hasn't advanced), so many materials per frame upload at most once.
@@ -124,10 +146,14 @@ public final class KGEngineUniforms {
     /** World time in seconds, wrapping every 1200s (one MC day) to keep float precision. */
     private static long computeTimeKey() {
         Minecraft mc = Minecraft.getInstance();
-        long gameTime = mc.level != null ? mc.level.getGameTime() : 0L;
-        float partial = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         // ticks -> seconds (20 ticks/s); wrap at one day (24000 ticks = 1200 s) for float precision.
-        currentTimeSeconds = ((gameTime % 24000L) + partial) / 20.0f;
+        if (overrideTicks >= 0f) {
+            currentTimeSeconds = (overrideTicks % 24000f) / 20.0f;
+        } else {
+            long gameTime = mc.level != null ? mc.level.getGameTime() : 0L;
+            float partial = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+            currentTimeSeconds = ((gameTime % 24000L) + partial) / 20.0f;
+        }
         // the host's target when one is set (PIP/offscreen), else the window
         screenWidth = overrideWidth > 0 ? overrideWidth : mc.getWindow().getWidth();
         screenHeight = overrideHeight > 0 ? overrideHeight : mc.getWindow().getHeight();

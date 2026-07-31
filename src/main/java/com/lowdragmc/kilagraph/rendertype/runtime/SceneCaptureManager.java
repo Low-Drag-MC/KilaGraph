@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.runtime;
 
 import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.AddressMode;
@@ -45,7 +46,7 @@ public final class SceneCaptureManager {
     @Nullable private GpuTexture colorTexture, depthTexture;
     @Nullable private GpuTextureView colorView, depthView;
     @Nullable private GpuSampler sampler;
-    /** Lazily created FBO pair for the raw-GL colour blit from Iris's colortex0 (freed in {@link #destroy()}). */
+    /** Lazily created FBO pair for the colour blit from Iris's colortex0 (freed in {@link #destroy()}). */
     private int blitReadFbo, blitDrawFbo;
 
     private SceneCaptureManager() {}
@@ -82,7 +83,7 @@ public final class SceneCaptureManager {
         int w = main.width, h = main.height;
         if (w <= 0 || h <= 0) return;
         // Colour: under an Iris shaderpack the world is rendered into Iris's colortex0 — MC's main colour
-        // target is stale until Iris's end-of-frame blit — so copy from there (raw-GL FBO blit; the ids are
+        // target is stale until Iris's end-of-frame blit — so copy from there (FBO blit; the ids are
         // re-fetched every frame, never cached — they go stale on pack reload/resize/dimension change).
         // Depth stays on the vanilla copy either way: Iris's depthtex0 wraps MC's main depth attachment.
         // Any Iris-path failure falls back to the vanilla copy (worst case: stale colour, never a crash).
@@ -101,35 +102,37 @@ public final class SceneCaptureManager {
      * Copy Iris's colortex0 (GL id {@code srcTex}, {@code w}×{@code h}) into our capture texture via a
      * framebuffer blit — a blit converts formats (packs configure colortex0 as RGBA16F/R11F_G11F_B10F/...,
      * which {@code glCopyImageSubData}/copyTextureToTexture would reject), so our capture stays a plain
-     * RGBA8 the graph samples like any texture. Raw GL with save/restore of both framebuffer bindings
-     * ({@code GlStateManager} doesn't track FBO bindings the way it tracks texture units, but restoring is
-     * cheap and keeps us robust). @return false on any failure — caller falls back to the vanilla copy.
+     * RGBA8 the graph samples like any texture. Driven through {@link GlStateManager} (which caches the
+     * read/write FBO bindings, so we read the previous ones from it and restore through it — vanilla and Iris
+     * both bind their framebuffers the same way, keeping cache and real GL in step). {@code
+     * glCheckFramebufferStatus} has no {@code GlStateManager} wrapper and stays a raw call — it is a pure
+     * query and touches no cached state. @return false on any failure — caller falls back to the vanilla copy.
      */
     private boolean blitIrisColor(int srcTex, int w, int h) {
         if (srcTex == 0 || w <= 0 || h <= 0) return false;
         try {
             ensureColor(w, h, TextureFormat.RGBA8);
             int dstTex = ((GlTexture) colorTexture).glId();
-            if (blitReadFbo == 0) blitReadFbo = GL30.glGenFramebuffers();
-            if (blitDrawFbo == 0) blitDrawFbo = GL30.glGenFramebuffers();
-            int prevRead = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
-            int prevDraw = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
+            if (blitReadFbo == 0) blitReadFbo = GlStateManager.glGenFramebuffers();
+            if (blitDrawFbo == 0) blitDrawFbo = GlStateManager.glGenFramebuffers();
+            int prevRead = GlStateManager.getFrameBuffer(GL30.GL_READ_FRAMEBUFFER);
+            int prevDraw = GlStateManager.getFrameBuffer(GL30.GL_DRAW_FRAMEBUFFER);
             try {
-                GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, blitReadFbo);
-                GL30.glFramebufferTexture2D(GL30.GL_READ_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0,
+                GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, blitReadFbo);
+                GlStateManager._glFramebufferTexture2D(GL30.GL_READ_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0,
                         GL11.GL_TEXTURE_2D, srcTex, 0);
-                GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, blitDrawFbo);
-                GL30.glFramebufferTexture2D(GL30.GL_DRAW_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0,
+                GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, blitDrawFbo);
+                GlStateManager._glFramebufferTexture2D(GL30.GL_DRAW_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0,
                         GL11.GL_TEXTURE_2D, dstTex, 0);
                 if (GL30.glCheckFramebufferStatus(GL30.GL_READ_FRAMEBUFFER) != GL30.GL_FRAMEBUFFER_COMPLETE
                         || GL30.glCheckFramebufferStatus(GL30.GL_DRAW_FRAMEBUFFER) != GL30.GL_FRAMEBUFFER_COMPLETE) {
                     return false;
                 }
-                GL30.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST);
+                GlStateManager._glBlitFrameBuffer(0, 0, w, h, 0, 0, w, h, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST);
                 return true;
             } finally {
-                GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, prevRead);
-                GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, prevDraw);
+                GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, prevRead);
+                GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, prevDraw);
             }
         } catch (Throwable t) {
             return false;
@@ -185,8 +188,8 @@ public final class SceneCaptureManager {
     /** Free the owned textures + blit FBOs (when no material needs the capture anymore). */
     public void destroy() {
         destroyTextures();
-        if (blitReadFbo != 0) { GL30.glDeleteFramebuffers(blitReadFbo); blitReadFbo = 0; }
-        if (blitDrawFbo != 0) { GL30.glDeleteFramebuffers(blitDrawFbo); blitDrawFbo = 0; }
+        if (blitReadFbo != 0) { GlStateManager._glDeleteFramebuffers(blitReadFbo); blitReadFbo = 0; }
+        if (blitDrawFbo != 0) { GlStateManager._glDeleteFramebuffers(blitDrawFbo); blitDrawFbo = 0; }
     }
 
     private void destroyTextures() {
