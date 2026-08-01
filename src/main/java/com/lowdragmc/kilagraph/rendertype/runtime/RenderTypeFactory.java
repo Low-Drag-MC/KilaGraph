@@ -72,6 +72,8 @@ public final class RenderTypeFactory {
     private static final Set<String> FAILED = ConcurrentHashMap.newKeySet();
     /** Graph hashes already warned about Scene Color/Depth on an opaque material (self-sampling feedback). */
     private static final Set<String> SCENE_ON_OPAQUE_WARNED = ConcurrentHashMap.newKeySet();
+    /** Graph hashes already warned about a vertex format the Iris integration can't route (warn once each). */
+    private static final Set<String> IRIS_FORMAT_WARNED = ConcurrentHashMap.newKeySet();
 
     private RenderTypeFactory() {}
 
@@ -190,13 +192,30 @@ public final class RenderTypeFactory {
         // non-zero kg_surface_id when the graph is injection-compatible (the injected kg_surface(id,...)
         // dispatch then shades our geometry), or 0 when it isn't — id 0 still assigns to entities so the
         // geometry renders, falling back to the shaderpack's own albedo (passthrough). No-op without Iris.
+        // Gated on the vertex format: the entity ShaderKeys we assign to carry the ENTITY layout, and Iris
+        // re-checks nothing (see IrisCompat.supportsVertexFormat) — routing another layout there draws
+        // silently-wrong geometry, so such a graph is left out of the integration entirely.
         if (IrisCompat.ENABLED) {
-            material.setIrisSurfaceId(IrisSurfaceRegistry.register(compiled));
-            boolean translucent = compiled.settings().blend() != RenderTypeGraph.Settings.BlendMode.OPAQUE;
-            IrisCompat.assignToEntities(pipeline, translucent, compiled.alphaDiscards());
-            // A reload to inject this new surface (if the programs are now stale) is driven from the client
-            // tick (IrisCompat.reloadShadersIfStale via IrisDebugCommand), NOT here — reloading mid-frame
-            // crashes the world pipeline.
+            if (IrisCompat.supportsVertexFormat(vertexFormat(compiled.settings().vertexFormatElements()))) {
+                material.setIrisSurfaceId(IrisSurfaceRegistry.register(compiled));
+                boolean translucent = compiled.settings().blend() != RenderTypeGraph.Settings.BlendMode.OPAQUE;
+                IrisCompat.assignToEntities(pipeline, translucent, compiled.alphaDiscards());
+                // A reload to inject this new surface (if the programs are now stale) is driven from the
+                // client tick (IrisCompat.reloadShadersIfStale via IrisDebugCommand), NOT here — reloading
+                // mid-frame crashes the world pipeline.
+            } else if (IRIS_FORMAT_WARNED.add(hash)) {
+                // Skipping is not just correctness: registering would GL-validate the surface, bump the
+                // registry generation (forcing a full shaderpack recompile on the next tick) and inject this
+                // surface into every pack program for the rest of the session — all for geometry the pack
+                // program could never shade correctly. Unassigned, Iris finds no override for the pipeline
+                // (it logs one "doesn't have a shader override" error of its own) and leaves our own program
+                // in place, so the material still draws with KilaGraph's shading, just without pack lighting.
+                LOGGER.warn("[KilaGraph][Iris] graph {} uses vertex format {} — shaderpack integration needs "
+                                + "the ENTITY format (Position, Color, UV0, UV1, UV2, Normal), so this graph is "
+                                + "not routed through the pack: it keeps rendering with its own shader, "
+                                + "unlit by the shaderpack.",
+                        hash, compiled.settings().vertexFormatElements());
+            }
         }
         return material;
     }

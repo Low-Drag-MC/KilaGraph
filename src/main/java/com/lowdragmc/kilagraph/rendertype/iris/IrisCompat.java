@@ -2,6 +2,8 @@ package com.lowdragmc.kilagraph.rendertype.iris;
 
 import com.lowdragmc.kilagraph.mixin.iris.IrisMixinPlugin;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.logging.LogUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -84,6 +86,39 @@ public final class IrisCompat {
     }
 
     /**
+     * Whether a graph whose composed vertex format is {@code format} may be routed through a shaderpack at
+     * all — the precondition for calling {@link #assignToEntities} (and for registering an injected surface).
+     *
+     * <p><b>Why this check is ours to make.</b> Iris's own {@code ShaderKey.findBestMatch} only ever returns a
+     * key whose {@code vertexFormat} is <em>identity-equal</em> to the pipeline's, so the public
+     * {@code IrisApi.assignPipeline} cannot produce a layout mismatch. {@link #assignToEntities} deliberately
+     * skips that lookup (it resolved to the alpha-tested {@code ENTITIES_ALPHA} key, which discarded all our
+     * fragments) and names the {@code ShaderKey} directly — so the format check findBestMatch was performing
+     * has to be performed here instead.</p>
+     *
+     * <p><b>What an unchecked mismatch does.</b> Iris binds the pack program's attribute locations by walking
+     * the <em>ShaderKey's</em> format ({@code VertexFormat.bindAttributesIris} → {@code glBindAttribLocation(
+     * i++, name)}), while the VAO is laid out from <em>our</em> pipeline's format. Any other composition
+     * shifts every attribute after the first: with a BLOCK-format graph the pack's {@code iris_UV1} reads our
+     * lightmap, {@code iris_UV2} reads our normal bytes, and {@code iris_Normal} reads nothing at all (a
+     * disabled attribute yields the generic default) — the geometry draws lightmap-black with garbage uv, with
+     * no GL error and no driver warning anywhere.</p>
+     *
+     * <p><b>Why identity and not {@code equals}.</b> Iris upgrades exactly the {@code DefaultVertexFormat}
+     * constants to its extended formats ({@code ENTITY → IrisVertexFormats.ENTITY}) — and extends the vertex
+     * writes to match — by that same identity test, so a structurally-equal-but-distinct format silently
+     * misses both halves. {@code KGVertexFormat} returns the stock constant whenever a graph's composition
+     * matches one, which is precisely what makes entity-format graphs work today.</p>
+     *
+     * <p>Only {@link DefaultVertexFormat#ENTITY} qualifies for now: {@code assignToEntities} is the only
+     * routing we implement. Supporting BLOCK-format graphs means mapping them to {@code TERRAIN_*} /
+     * {@code SHADOW_TERRAIN_CUTOUT} instead, which is a separate (unverified) piece of work.</p>
+     */
+    public static boolean supportsVertexFormat(VertexFormat format) {
+        return format == DefaultVertexFormat.ENTITY;
+    }
+
+    /**
      * Register {@code pipeline} so that, while a shaderpack is active, geometry drawn with it is routed
      * through the shaderpack's entities gbuffers program — {@code ENTITIES_TRANSLUCENT} when
      * {@code translucent}, {@code ENTITIES_CUTOUT} when the graph alpha-discards, else
@@ -101,6 +136,10 @@ public final class IrisCompat {
      * our fragments — geometry was lit-but-invisible (confirmed in the debugger). We instead assign the
      * internal {@code ShaderKey} directly. This uses Iris-internal classes, consistent with our
      * {@code ShaderCreator} mixin already depending on internals.</p>
+     *
+     * <p><b>Precondition:</b> {@link #supportsVertexFormat} on the graph's composed vertex format. These keys
+     * carry the entity format and nothing downstream re-checks it — bypassing {@code findBestMatch} (above)
+     * also bypassed its format check, so the caller owns it.</p>
      */
     public static void assignToEntities(RenderPipeline pipeline, boolean translucent, boolean cutout) {
         if (!ENABLED || !ASSIGNED.add(pipeline)) return;

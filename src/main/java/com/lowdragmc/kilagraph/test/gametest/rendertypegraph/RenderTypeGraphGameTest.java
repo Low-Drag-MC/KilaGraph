@@ -9,7 +9,10 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
+import com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat;
 import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
+import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.lowdragmc.kilagraph.rendertype.gui.RenderTypeGraphView;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphLogger;
@@ -87,6 +90,7 @@ public final class RenderTypeGraphGameTest {
     private static final String UNDO_ROUND_TRIP = "rendertype_undo_round_trip";
     private static final String PREVIEW_SHAPE_PERSISTENCE = "rendertype_preview_shape_persistence";
     private static final String STAGE_AFFINITY_VALIDATION = "rendertype_stage_affinity_validation";
+    private static final String IRIS_VERTEX_FORMAT_GATE = "rendertype_iris_vertex_format_gate";
 
     private RenderTypeGraphGameTest() {}
 
@@ -126,6 +130,8 @@ public final class RenderTypeGraphGameTest {
                 RenderTypeGraphGameTest::previewShapesPersistAcrossRoundTrip);
         KGGameTests.registerFunction(STAGE_AFFINITY_VALIDATION,
                 RenderTypeGraphGameTest::stageAffinityViolationFlaggedOnGraphChanged);
+        KGGameTests.registerFunction(IRIS_VERTEX_FORMAT_GATE,
+                RenderTypeGraphGameTest::irisRoutingRequiresEntityVertexFormat);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -166,6 +172,8 @@ public final class RenderTypeGraphGameTest {
                 KGGameTests.functionKey(PREVIEW_SHAPE_PERSISTENCE), d);
         KGGameTests.registerFunctionTest(event, STAGE_AFFINITY_VALIDATION,
                 KGGameTests.functionKey(STAGE_AFFINITY_VALIDATION), d);
+        KGGameTests.registerFunctionTest(event, IRIS_VERTEX_FORMAT_GATE,
+                KGGameTests.functionKey(IRIS_VERTEX_FORMAT_GATE), d);
     }
 
     public static void resourceCreatesGraph(GameTestHelper helper) {
@@ -707,6 +715,30 @@ public final class RenderTypeGraphGameTest {
         graph.onGraphChanged(logger);
         assertTrue(helper, "a warning is logged for the defaulted attribute",
                 logger.getEntries().stream().anyMatch(e -> e.level() == GraphLogger.Level.WARNING));
+        helper.succeed();
+    }
+
+    /**
+     * The Iris integration's vertex-format gate. We assign our pipelines to Iris's {@code ENTITIES_*}
+     * {@code ShaderKey}s directly (bypassing {@code findBestMatch}, which would have returned the
+     * fragment-discarding {@code ENTITIES_ALPHA}); those keys carry the ENTITY layout and Iris binds the pack
+     * program's attribute locations from the KEY's format while the VAO comes from OURS, so any other
+     * composition shifts every attribute and draws lightmap-black with no error anywhere. Hence only a
+     * graph composed to the stock ENTITY format may be routed — identity, not structural equality, because
+     * Iris's own {@code DefaultVertexFormat -> IrisVertexFormats} upgrade keys off identity too.
+     */
+    public static void irisRoutingRequiresEntityVertexFormat(GameTestHelper helper) {
+        assertTrue(helper, "the ENTITY preset composes to the stock ENTITY format instance",
+                KGVertexFormat.of(VertexFormatPresets.ENTITY) == DefaultVertexFormat.ENTITY);
+        assertTrue(helper, "an entity-format graph is routed through the shaderpack",
+                IrisCompat.supportsVertexFormat(KGVertexFormat.of(VertexFormatPresets.ENTITY)));
+        assertFalse(helper, "a block-format graph is NOT routed",
+                IrisCompat.supportsVertexFormat(KGVertexFormat.of(VertexFormatPresets.BLOCK)));
+        assertFalse(helper, "a position/uv/color graph is NOT routed",
+                IrisCompat.supportsVertexFormat(KGVertexFormat.of(VertexFormatPresets.POSITION_COLOR_TEX)));
+        assertFalse(helper, "merely reordering the entity elements is a different layout, so NOT routed",
+                IrisCompat.supportsVertexFormat(KGVertexFormat.of(
+                        List.of("position", "color", "uv0", "uv2", "uv1", "normal"))));
         helper.succeed();
     }
 
