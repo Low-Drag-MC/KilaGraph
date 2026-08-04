@@ -612,6 +612,8 @@
   "kg.node.rt_scene_depth.option.sampling.tooltip.linear01": "Linear 01：从近裁剪 0 到远裁剪 1 的线性深度。",
   "kg.node.rt_scene_depth.option.sampling.tooltip.raw": "Raw：0..1 范围内的硬件深度值。",
   "kg.node.rt_scene_depth.option.sampling.tooltip.eye": "Eye：以世界单位表示的相机空间距离。",
+  "kg.node.rt_color.option.mode.tooltip.default": "Default：ARGB 拾色器，各通道取值 0..1。",
+  "kg.node.rt_color.option.mode.tooltip.hdr": "HDR：拾色器外加一个 intensity 倍率，rgb 可以超过 1，用于发光与泛光。",
   "kg.node.rt_vertex_color.option.mode.tooltip.mix_light": "Mix Light：使用颜色和法线属性的原版漫反射光照。",
   "kg.node.rt_vertex_color.option.mode.tooltip.color": "Color：未受光照影响的原始顶点颜色。",
   "kg.node.rt_vertex_color.option.mode.tooltip.block": "Block：顶点颜色乘以光照贴图采样。",
@@ -824,7 +826,8 @@
   "kg.node.rt_flip.note.1": "该公式假定数值在 0..1 范围内。范围之外的值同样会绕 0.5 镜像，通常不是你想要的结果。",
 
   "kg.node.rt_color.desc.1": "固定颜色，用 ARGB 拾色器编辑，并作为字面量烘焙进着色器。因为是常量，运行时零开销。",
-  "kg.node.rt_color.out.color": "vec4 形式的颜色，各通道取值 0..1。",
+  "kg.node.rt_color.desc.2": "把 mode 切到 HDR 会多出一个 intensity 字段。烘焙字面量时 intensity 会乘进 rgb，因此颜色可以超过 1，用来驱动发光或泛光。",
+  "kg.node.rt_color.out.color": "vec4 形式的颜色。Default 模式各通道取值 0..1；HDR 模式可以超过 1。",
   "kg.node.rt_color.note.1": "常量，运行时不可调整。若希望逐材质改变颜色，请改为暴露一个全局图变量 —— 它会编译成 uniform。",
 
   "kg.node.rt_time.desc.1": "以秒计的世界时间，由 KilaGraph 每帧更新。做动画时应当使用这个值。",

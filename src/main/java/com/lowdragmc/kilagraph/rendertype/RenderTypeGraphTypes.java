@@ -117,10 +117,12 @@ public final class RenderTypeGraphTypes {
      * is offered alongside {@code VEC4}: it carries the built-in ARGB color-picker configurator but
      * compiles to a {@code vec4} (see {@link com.lowdragmc.kilagraph.rendertype.compiler.GlslType#of}),
      * so it's the ergonomic way to declare a color uniform without editing raw xyzw.
+     * {@link TypeHandles#HDR_COLOR} is the same idea for values that need to exceed 1 (emission/bloom):
+     * a color picker plus an intensity, compiling to the premultiplied {@code vec4}.
      */
     public static final List<TypeHandle> VARIABLE_SUPPORT_TYPES = List.of(
             TypeHandles.BOOL, TypeHandles.INT, TypeHandles.FLOAT,
-            VEC2, VEC3, VEC4, TypeHandles.COLOR, MAT4, SAMPLER2D, GRADIENT, CURVE);
+            VEC2, VEC3, VEC4, TypeHandles.COLOR, TypeHandles.HDR_COLOR, MAT4, SAMPLER2D, GRADIENT, CURVE);
 
     /**
      * Types offered as draggable "Constant" nodes in the item library — scalars only. Vectors come from

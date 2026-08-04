@@ -614,6 +614,8 @@
   "kg.node.rt_scene_depth.option.sampling.tooltip.linear01": "Linear 01: linear depth from near 0 to far 1.",
   "kg.node.rt_scene_depth.option.sampling.tooltip.raw": "Raw: hardware depth value in 0..1.",
   "kg.node.rt_scene_depth.option.sampling.tooltip.eye": "Eye: camera-space distance in world units.",
+  "kg.node.rt_color.option.mode.tooltip.default": "Default: an ARGB color picker, every channel in 0..1.",
+  "kg.node.rt_color.option.mode.tooltip.hdr": "HDR: a color picker plus an intensity multiplier, so rgb can exceed 1 for emission and bloom.",
   "kg.node.rt_vertex_color.option.mode.tooltip.mix_light": "Mix Light: vanilla diffuse lighting using color and normal attributes.",
   "kg.node.rt_vertex_color.option.mode.tooltip.color": "Color: raw unlit vertex color.",
   "kg.node.rt_vertex_color.option.mode.tooltip.block": "Block: vertex color multiplied by the lightmap sample.",
@@ -826,7 +828,8 @@
   "kg.node.rt_flip.note.1": "The formula assumes the 0..1 range. Flipping a value outside it mirrors around 0.5 all the same, which is rarely what you want.",
 
   "kg.node.rt_color.desc.1": "A fixed color, edited with the ARGB picker and baked into the shader as a literal. It costs nothing at runtime because it is a constant.",
-  "kg.node.rt_color.out.color": "The color as a vec4, with each channel in 0..1.",
+  "kg.node.rt_color.desc.2": "Switch mode to HDR to get an extra intensity field. The intensity is multiplied into rgb when the literal is baked, so the color can go above 1 and drive emission or bloom.",
+  "kg.node.rt_color.out.color": "The color as a vec4. Default mode keeps every channel in 0..1; HDR mode can exceed 1.",
   "kg.node.rt_color.note.1": "Constant, not adjustable at runtime. For a color you want to change per material, expose a global graph variable instead — that compiles to a uniform.",
 
   "kg.node.rt_time.desc.1": "World time in seconds, updated every frame by KilaGraph. This is the value to drive animations with.",

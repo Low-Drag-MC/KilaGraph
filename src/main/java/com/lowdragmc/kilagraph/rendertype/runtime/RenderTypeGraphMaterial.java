@@ -8,6 +8,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.lowdraglib2.client.shader.LDShaderInstance;
+import com.lowdragmc.lowdraglib2.math.HDRColor;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexFormat;
@@ -110,6 +111,11 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
 
     /** Set a vec4 (e.g. a Color variable) from an ARGB int — unpacked to rgba in 0..1. */
     public boolean setColorUniform(String variableName, int argb) { return values.setColorUniform(variableName, argb); }
+
+    /** Set a vec4 (an HDR Color variable) from an {@link HDRColor} — intensity premultiplied into rgb. */
+    public boolean setHDRColorUniform(String variableName, HDRColor color) {
+        return values.setHDRColorUniform(variableName, color);
+    }
 
     /** Set a Gradient variable by display name (packed to the {@code KG_Gradient} member layout). */
     public boolean setGradient(String variableName, RenderTypeGraphTypes.GradientValue value) {
