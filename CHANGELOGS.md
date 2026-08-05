@@ -1,4 +1,7 @@
 # ChangeLogs
+## v21.1.0.9
+* Added HDR Support
+
 ## v21.1.0.8
 * Added node description
 
