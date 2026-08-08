@@ -1,4 +1,7 @@
 # ChangeLogs
+## v26.1.0.9
+* Added HDR Support
+
 ## v26.1.0.8
 * Bump up ldlib2
 * Improved APIs
