@@ -88,6 +88,9 @@ public enum GlslType {
         if (type.equals(RenderTypeGraphTypes.VEC4)) return VEC4;
         // COLOR is an ARGB int at the editor surface (color-picker), but a vec4 in the shader.
         if (type.equals(TypeHandles.COLOR)) return VEC4;
+        // HDR_COLOR is an HDRColor (base rgba + intensity) at the editor surface; in the shader it is the
+        // premultiplied vec4, so components may exceed 1.
+        if (type.equals(TypeHandles.HDR_COLOR)) return VEC4;
         if (type.equals(RenderTypeGraphTypes.MAT4)) return MAT4;
         if (type.equals(RenderTypeGraphTypes.SAMPLER2D)) return SAMPLER2D;
         if (type.equals(RenderTypeGraphTypes.GRADIENT)) return GRADIENT;

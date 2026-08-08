@@ -8,6 +8,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
+import com.lowdragmc.lowdraglib2.math.HDRColor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.texture.AbstractTexture;
@@ -223,6 +224,15 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         float g = ((argb >> 8) & 0xFF) / 255f;
         float b = (argb & 0xFF) / 255f;
         return setByVariable(variableName, r, g, b, a);
+    }
+
+    /**
+     * Set a vec4 (an HDR Color variable) from an {@link HDRColor} — the intensity is premultiplied into
+     * rgb, so components may exceed 1. See {@link HDRColor#toVector4f()} for the convention.
+     */
+    public boolean setHDRColorUniform(String variableName, HDRColor color) {
+        var v = color.toVector4f();
+        return setByVariable(variableName, v.x, v.y, v.z, v.w);
     }
 
     public boolean setUniform(String variableName, Matrix4fc m) {

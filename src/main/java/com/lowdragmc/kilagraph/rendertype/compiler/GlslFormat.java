@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.compiler;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
+import com.lowdragmc.lowdraglib2.math.HDRColor;
 
 import java.util.Locale;
 
@@ -52,6 +53,11 @@ public final class GlslFormat {
                     float[] c = argbToRgba(argb);
                     yield "vec4(" + f(c[0]) + ", " + f(c[1]) + ", " + f(c[2]) + ", " + f(c[3]) + ")";
                 }
+                // HDR_COLOR bakes its intensity into rgb (the project-wide HDRColor convention).
+                if (value instanceof HDRColor hdr) {
+                    var c = hdr.toVector4f();
+                    yield "vec4(" + f(c.x) + ", " + f(c.y) + ", " + f(c.z) + ", " + f(c.w) + ")";
+                }
                 yield "vec4(" + f(toFloat(value, 0f)) + ")";
             }
             case MAT4 -> "mat4(1.0)";
@@ -82,7 +88,11 @@ public final class GlslFormat {
             case VEC4 -> value instanceof org.joml.Vector4fc v
                     ? new float[]{v.x(), v.y(), v.z(), v.w()}
                     : value instanceof Integer argb // COLOR-typed (ARGB) default → rgba components
-                    ? argbToRgba(argb) : new float[]{toFloat(value, 0f), 0f, 0f, 0f};
+                    ? argbToRgba(argb)
+                    : value instanceof HDRColor hdr // HDR_COLOR default → premultiplied rgba components
+                    ? new float[]{hdr.getR() * hdr.getIntensity(), hdr.getG() * hdr.getIntensity(),
+                            hdr.getB() * hdr.getIntensity(), hdr.getA()}
+                    : new float[]{toFloat(value, 0f), 0f, 0f, 0f};
             case MAT4 -> new float[]{
                     1f, 0f, 0f, 0f,
                     0f, 1f, 0f, 0f,

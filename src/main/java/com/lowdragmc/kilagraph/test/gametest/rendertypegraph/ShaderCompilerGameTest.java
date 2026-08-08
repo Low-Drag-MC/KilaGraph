@@ -144,6 +144,7 @@ public final class ShaderCompilerGameTest {
     private static final String VAR_UNIFORM_VS_INLINE = "rendertype_compile_var_uniform_vs_inline";
     private static final String VAR_SAMPLER = "rendertype_compile_var_sampler";
     private static final String VAR_COLOR = "rendertype_compile_var_color";
+    private static final String VAR_HDR_COLOR = "rendertype_compile_var_hdr_color";
     private static final String MIX_LIGHT_DEFAULT = "rendertype_compile_mix_light_default";
     private static final String UNIFORM_FIELD_MAP = "rendertype_compile_uniform_field_map";
     private static final String MISSING_SAMPLER_FALLBACK = "rendertype_compile_missing_sampler";
@@ -223,6 +224,7 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunction(VAR_UNIFORM_VS_INLINE, ShaderCompilerGameTest::variableScopeDrivesUniformVsInline);
         KGGameTests.registerFunction(VAR_SAMPLER, ShaderCompilerGameTest::samplerVariableBecomesUniform);
         KGGameTests.registerFunction(VAR_COLOR, ShaderCompilerGameTest::colorVariableCompilesToVec4Uniform);
+        KGGameTests.registerFunction(VAR_HDR_COLOR, ShaderCompilerGameTest::hdrColorVariableCompilesToPremultipliedVec4Uniform);
         KGGameTests.registerFunction(MIX_LIGHT_DEFAULT, ShaderCompilerGameTest::unconnectedVertexColorDefaultsToMixLight);
         KGGameTests.registerFunction(UNIFORM_FIELD_MAP, ShaderCompilerGameTest::uniformFieldMappingExposesVariableNames);
         KGGameTests.registerFunction(MISSING_SAMPLER_FALLBACK, ShaderCompilerGameTest::unconnectedSamplerFallsBackToMissing);
@@ -302,6 +304,7 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunctionTest(event, VAR_UNIFORM_VS_INLINE, KGGameTests.functionKey(VAR_UNIFORM_VS_INLINE), d);
         KGGameTests.registerFunctionTest(event, VAR_SAMPLER, KGGameTests.functionKey(VAR_SAMPLER), d);
         KGGameTests.registerFunctionTest(event, VAR_COLOR, KGGameTests.functionKey(VAR_COLOR), d);
+        KGGameTests.registerFunctionTest(event, VAR_HDR_COLOR, KGGameTests.functionKey(VAR_HDR_COLOR), d);
         KGGameTests.registerFunctionTest(event, MIX_LIGHT_DEFAULT, KGGameTests.functionKey(MIX_LIGHT_DEFAULT), d);
         KGGameTests.registerFunctionTest(event, UNIFORM_FIELD_MAP, KGGameTests.functionKey(UNIFORM_FIELD_MAP), d);
         KGGameTests.registerFunctionTest(event, MISSING_SAMPLER_FALLBACK, KGGameTests.functionKey(MISSING_SAMPLER_FALLBACK), d);
@@ -1528,6 +1531,45 @@ public final class ShaderCompilerGameTest {
         assertEq(helper, "color default g", 128f / 255f, rgba[1], 1e-4f);
         assertEq(helper, "color default b", 64f / 255f, rgba[2], 1e-4f);
         assertEq(helper, "color default a", 128f / 255f, rgba[3], 1e-4f);
+        helper.succeed();
+    }
+
+    /**
+     * A {@link com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles#HDR_COLOR} variable also
+     * compiles to a {@code vec4} uniform, but its default is baked <em>premultiplied</em>: the intensity
+     * folds into rgb (so components may exceed 1) while alpha is left alone. That is the one place the
+     * {@link com.lowdragmc.lowdraglib2.math.HDRColor} convention meets the std140 KG_Material packing.
+     */
+    public static void hdrColorVariableCompilesToPremultipliedVec4Uniform(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel baseColor = addBlock(graph, fragment, FragmentBaseColorBlock.class);
+
+        // base (1, 0.5, 0.25) @ a=0.5, intensity 4 → rgb premultiplied to (4, 2, 1), alpha untouched.
+        var hdr = new com.lowdragmc.lowdraglib2.math.HDRColor(1f, 0.5f, 0.25f, 0.5f, 4f);
+        var hdrVar = (VariableDeclarationModelBase) graph.graphModel.createVariable(
+                "Emission",
+                com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.HDR_COLOR, hdr,
+                VariableKind.INPUT);
+        hdrVar.setScope(VariableScope.EXPOSED);
+        var hdrNode = graph.graphModel.createVariableNode(hdrVar, new Vector2f(0, 0), null, null);
+        wire(graph, baseColor.getInputsById().get("color"), hdrNode.getOutputPort());
+
+        CompiledShaderGraph compiled = compile(graph);
+        String fsh = compiled.fragmentSource();
+
+        assertTrue(helper, "hdr color var is a vec4 uniform field", fsh.contains("vec4 kg_Emission;"));
+        var field = compiled.uniformFields().get("Emission");
+        assertTrue(helper, "hdr color mapped to a uniform field", field != null);
+        assertTrue(helper, "hdr color field type is VEC4",
+                field.type() == com.lowdragmc.kilagraph.rendertype.compiler.GlslType.VEC4);
+        assertTrue(helper, "hdr color uniform default recorded", compiled.uniformDefaults().containsKey("kg_Emission"));
+        float[] rgba = compiled.uniformDefaults().get("kg_Emission");
+        assertEq(helper, "hdr default has 4 components", 4, rgba.length);
+        assertEq(helper, "hdr default r premultiplied", 4.0f, rgba[0], 1e-4f);
+        assertEq(helper, "hdr default g premultiplied", 2.0f, rgba[1], 1e-4f);
+        assertEq(helper, "hdr default b premultiplied", 1.0f, rgba[2], 1e-4f);
+        assertEq(helper, "hdr default a untouched by intensity", 0.5f, rgba[3], 1e-4f);
         helper.succeed();
     }
 
