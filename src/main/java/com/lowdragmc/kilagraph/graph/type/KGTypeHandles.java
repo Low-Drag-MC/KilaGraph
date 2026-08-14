@@ -32,6 +32,22 @@ public final class KGTypeHandles {
     public static final TypeHandle MAP;
     public static final TypeHandle NODE_REF;
 
+    /**
+     * Vectors, two to four components.
+     *
+     * <p>Bound to JOML because LDLib2 already has accessors for {@code Vector2f/3f/4f} — that is
+     * what gives these pins an inline value editor and a serialisable embedded constant, which a
+     * bare custom type would not have.
+     *
+     * <p>They live here rather than in a consumer because vector arithmetic is not specific to any
+     * one host: EntityStudio needed them first, but "add two vectors" belongs beside "add two
+     * floats", not in an animation mod. A consumer that defined its own would also be defining a
+     * second, incompatible handle for the same three floats.
+     */
+    public static final TypeHandle VEC2;
+    public static final TypeHandle VEC3;
+    public static final TypeHandle VEC4;
+
     // Minecraft context/value handles not exposed as constants by LDLib2's TypeHandles.
     // (LDLib2 already registers DIRECTION/BLOCK/ITEM/FLUID/ENTITY_TYPE/ITEM_STACK/FLUID_STACK —
     //  import those from TypeHandles directly; don't re-register.)
@@ -52,6 +68,10 @@ public final class KGTypeHandles {
     private static final Map<Type, TypeHandle> OVERRIDES = new ConcurrentHashMap<>();
 
     static {
+        VEC2 = vector(org.joml.Vector2f.class, "VEC2", "Vector2", 0xFF7ED3F0, org.joml.Vector2f::new);
+        VEC3 = vector(org.joml.Vector3f.class, "VEC3", "Vector3", 0xFFF3C13A, org.joml.Vector3f::new);
+        VEC4 = vector(org.joml.Vector4f.class, "VEC4", "Vector4", 0xFFE08A3C, org.joml.Vector4f::new);
+
         LIST = TypeHandleHelpers.customType(List.class, "LIST", "List");
         // No custom default value: LDLib2 would otherwise initialise the embedded constant with
         // an ArrayList, and serialising it fails because List<raw> has no AccessorRegistries entry.
@@ -92,6 +112,24 @@ public final class KGTypeHandles {
     }
 
     private KGTypeHandles() {}
+
+    /**
+     * A vector handle, fully described in the one call that mints it.
+     *
+     * <p>LDLib2 caches colour, default value and configurator lazily <b>per handle instance</b>, so
+     * a property attached after something has already asked for it is silently ignored. The default
+     * is not cosmetic either: an unconnected port builds its constant from it and hands it straight
+     * to the accessor, which reads {@code .x} off it — a vector type without a default is a null
+     * dereference the first time anyone drops the node.
+     */
+    private static TypeHandle vector(Class<?> javaType, String id, String display, int colour,
+                                     java.util.function.Supplier<Object> defaultValue) {
+        TypeHandle handle = TypeHandleHelpers.customType(javaType, id, display);
+        TypeHandleHelpers.setCustomColor(handle, colour);
+        TypeHandleHelpers.setCustomDefaultValue(handle, defaultValue);
+        registerOverride(javaType, handle);
+        return handle;
+    }
 
     public static void registerOverride(Type javaType, TypeHandle handle) {
         OVERRIDES.put(javaType, handle);
