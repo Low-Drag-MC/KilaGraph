@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.map;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.graph.core.PortIds;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
@@ -41,8 +42,8 @@ public class MapCreateNode extends AnnotatedNode {
         TypeHandle kt = current("keyType");
         TypeHandle vt = current("valueType");
         for (int i = 1; i <= n; i++) {
-            ctx.addInputPort("key" + i, kt);
-            ctx.addInputPort("value" + i, vt);
+            ctx.addInputPort(PortIds.key(i), kt);
+            ctx.addInputPort(PortIds.value(i), vt);
         }
     }
 
@@ -50,8 +51,8 @@ public class MapCreateNode extends AnnotatedNode {
         int n = Math.max(1, ctx.getOption("inputs", Integer.class, inputs));
         Map<Object, Object> result = new LinkedHashMap<>();
         for (int i = 1; i <= n; i++) {
-            Object k = ctx.getInput("key" + i).orElse(null);
-            Object v = ctx.getInput("value" + i).orElse(null);
+            Object k = ctx.getInputRaw(PortIds.key(i));
+            Object v = ctx.getInputRaw(PortIds.value(i));
             if (k != null) result.put(k, v);
         }
         ctx.setOutput("out", result);

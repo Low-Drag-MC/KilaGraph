@@ -17,7 +17,7 @@ public class ToStringNode extends AnnotatedNode {
     }
 
     @Override public void evaluate(EvalContext ctx) {
-        Object v = ctx.getInput("in").orElse(null);
+        Object v = ctx.getInputRaw("in");
         ctx.setOutput("out", v == null ? "" : v.toString());
     }
 }

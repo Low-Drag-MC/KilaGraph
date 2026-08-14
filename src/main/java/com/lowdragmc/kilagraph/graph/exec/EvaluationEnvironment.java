@@ -63,7 +63,8 @@ public class EvaluationEnvironment {
      */
     @Nullable
     public Object lookupVariable(IVariable variable) {
-        if (variables.contains(variable.getName())) return variables.get(variable.getName());
+        Object value = variables.getOrAbsent(variable.getName());
+        if (value != VariableStore.ABSENT) return value;
         return variable.tryGetDefaultValue(variable.getDataType()).result().orElse(null);
     }
 }

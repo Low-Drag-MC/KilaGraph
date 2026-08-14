@@ -1,7 +1,5 @@
 package com.lowdragmc.kilagraph.graph.exec;
 
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
-
 /**
  * A loop activation: each time its body drains, {@link #resume} asks the {@link LoopController}
  * whether to run another iteration (re-arming {@code body} into this frame) or to finish (firing
@@ -15,14 +13,14 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
  */
 public final class LoopFrame extends ExecFrame {
 
-    private final NodeModel node;
+    private final PreparedGraph.Node node;
     private final LoopController controller;
     private final String bodyOut;
     private final String completedOut;
     private final ExecFrame parent;
     private boolean breaking = false;
 
-    LoopFrame(GraphExecutor scope, NodeModel node, LoopController controller,
+    LoopFrame(GraphExecutor scope, PreparedGraph.Node node, LoopController controller,
               String bodyOut, String completedOut, ExecFrame parent) {
         super(scope);
         this.node = node;

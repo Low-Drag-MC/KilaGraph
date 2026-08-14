@@ -33,7 +33,7 @@ public class ListAppendNode extends AnnotatedNode {
 
     @Override public void evaluate(EvalContext ctx) {
         List<?> src = ctx.getInput("list", List.class, List.of());
-        Object value = ctx.getInput("value").orElse(null);
+        Object value = ctx.getInputRaw("value");
         List<Object> result = new ArrayList<>(src);
         result.add(value);
         ctx.setOutput("out", result);

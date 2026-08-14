@@ -41,7 +41,7 @@ public class CastNode extends AnnotatedNode {
 
     @Override
     public void evaluate(EvalContext ctx) {
-        Object v = ctx.getInput("in").orElse(null);
+        Object v = ctx.getInputRaw("in");
         if (v == null) { ctx.setOutput("out", null); return; }
         TypeHandle t = currentTargetType();
         if (!t.equals(TypeHandles.UNKNOWN)

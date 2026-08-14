@@ -23,7 +23,7 @@ public class TrigNode extends AnnotatedNode {
     @InputPort public float in = 0f;
     @OutputPort public float out;
 @Override public void evaluate(EvalContext ctx) {
-        float v = ctx.getInput("in", Float.class, 0f);
+        float v = ctx.getFloat("in", 0f);
         Op o = ctx.getOption("op", Op.class, Op.SIN);
         double r = switch (o) {
             case COS -> Math.cos(v);

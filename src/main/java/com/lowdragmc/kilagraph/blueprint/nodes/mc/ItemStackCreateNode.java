@@ -27,7 +27,7 @@ public class ItemStackCreateNode extends AnnotatedNode {
     @Override
     public void evaluate(EvalContext ctx) {
         Item i = ctx.getInput("item", Item.class, Items.AIR);
-        int c = ctx.getInput("count", Integer.class, 1);
+        int c = ctx.getInt("count", 1);
         ctx.setOutput("out", new ItemStack(i, c));
     }
 }

@@ -17,6 +17,6 @@ public class NotNullNode extends AnnotatedNode {
     }
 
     @Override public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", ctx.getInput("in").orElse(null) != null);
+        ctx.setOutput("out", ctx.getInputRaw("in") != null);
     }
 }

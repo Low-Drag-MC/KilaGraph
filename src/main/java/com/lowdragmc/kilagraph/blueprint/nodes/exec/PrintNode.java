@@ -31,7 +31,7 @@ public class PrintNode extends AnnotatedNode {
 
     @Override
     public void execute(ExecContext ctx) {
-        Object v = ctx.getInput("value").orElse(null);
+        Object v = ctx.getInputRaw("value");
         LOGGER.info("[KGPrint] {}", v);
         ctx.state().put("last", v);
         ctx.flow("next");

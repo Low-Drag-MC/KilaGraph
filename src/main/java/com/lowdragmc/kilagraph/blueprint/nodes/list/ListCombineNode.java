@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.list;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.graph.core.PortIds;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
@@ -38,7 +39,7 @@ public class ListCombineNode extends AnnotatedNode {
         int n = Math.max(1, optionValue("inputs", Integer.class, inputs));
         TypeHandle t = currentElementType();
         for (int i = 1; i <= n; i++) {
-            context.addInputPort("in" + i, t);
+            context.addInputPort(PortIds.in(i), t);
         }
     }
 
@@ -47,7 +48,7 @@ public class ListCombineNode extends AnnotatedNode {
         int n = Math.max(1, ctx.getOption("inputs", Integer.class, inputs));
         List<Object> result = new ArrayList<>(n);
         for (int i = 1; i <= n; i++) {
-            result.add(ctx.getInput("in" + i).orElse(null));
+            result.add(ctx.getInputRaw(PortIds.in(i)));
         }
         ctx.setOutput("out", result);
     }

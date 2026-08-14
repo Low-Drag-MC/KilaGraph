@@ -33,7 +33,7 @@ public class SetVarNode extends AnnotatedNode {
     public void execute(ExecContext ctx) {
         String name = ctx.getOption("varName", String.class, "");
         if (!name.isEmpty()) {
-            Object value = ctx.getInput("value").orElse(null);
+            Object value = ctx.getInputRaw("value");
             ctx.getExecutor().getEnvironment().variables().put(name, value);
         }
         ctx.flow("next");

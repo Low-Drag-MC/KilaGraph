@@ -17,7 +17,7 @@ public class ParseNumberNode extends AnnotatedNode {
     }
 
     @Override public void evaluate(EvalContext ctx) {
-        Object v = ctx.getInput("in").orElse(null);
+        Object v = ctx.getInputRaw("in");
         float result = 0f;
         if (v instanceof Number n) {
             result = n.floatValue();

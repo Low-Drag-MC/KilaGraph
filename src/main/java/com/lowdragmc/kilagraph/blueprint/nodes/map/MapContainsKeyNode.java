@@ -33,7 +33,7 @@ public class MapContainsKeyNode extends AnnotatedNode {
 
     @Override public void evaluate(EvalContext ctx) {
         Map<?, ?> m = ctx.getInput("map", Map.class, Map.of());
-        Object k = ctx.getInput("key").orElse(null);
+        Object k = ctx.getInputRaw("key");
         ctx.setOutput("out", k != null && m.containsKey(k));
     }
 

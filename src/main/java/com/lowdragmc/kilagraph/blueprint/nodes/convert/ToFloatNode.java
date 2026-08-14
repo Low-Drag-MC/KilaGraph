@@ -21,6 +21,6 @@ public class ToFloatNode extends AnnotatedNode {
     }
 
     @Override public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", ctx.getInput("in", Float.class, 0f));
+        ctx.setOutput("out", ctx.getFloat("in", 0f));
     }
 }

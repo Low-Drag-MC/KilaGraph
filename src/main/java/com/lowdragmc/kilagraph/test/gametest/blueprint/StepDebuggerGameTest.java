@@ -348,4 +348,74 @@ public final class StepDebuggerGameTest {
         assertTrue(helper, "variable snapshot reflected a mid-run write", sawCounterMidRun);
         helper.succeed();
     }
+
+    // ---- 12. a breakpoint on the first node of a loop body must still fire -------------------
+
+    /**
+     * {@code step()} settles the frame stack (runs {@code resume()} on exhausted frames) and then
+     * polls and executes, all in one call. A {@code For} node pushes its {@link ExecFrame} with an
+     * <em>empty</em> queue — the body is only armed by {@code LoopFrame.resume}. So between "For
+     * executed" and "first body node executed" there is a state where no frame has anything
+     * pending, and anything that asks "what runs next" without settling gets the wrong answer.
+     *
+     * <p>That state is not exotic: it is entered once per loop iteration, once per {@code Sequence}
+     * branch, and on every subgraph exit. A debugger that reports the next node from it either
+     * skips the breakpoint entirely or names a node from an outer frame that will not run next.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void breakpointInsideLoopBody(GameTestHelper helper) {
+        var g = newGraph();
+        var entry = addNode(g, EntryNode.class);
+        var loop = addNode(g, ForNode.class);
+        setInputConstant(loop, "count", 3);
+        var body = addNode(g, NoopNode.class);
+        wire(g, loop.getInputsById().get("in"), entry.getOutputsById().get("next"));
+        wire(g, body.getInputsById().get("in"), loop.getOutputsById().get("body"));
+
+        var s = new ExecSession(new GraphExecutor(g)).begin(entry);
+        s.addBreakpoint(body);
+
+        var hit = s.runToBreakpoint();
+        assertEq(helper, "paused on the loop body node", body, hit);
+        assertEq(helper, "body not executed yet (last was the For)", loop, s.lastExecuted());
+        assertFalse(helper, "not finished at the breakpoint", s.isFinished());
+
+        // And currentNode() must agree with what step() is about to run.
+        assertEq(helper, "currentNode agrees with the breakpoint", body, s.currentNode());
+        s.step();
+        assertEq(helper, "stepping ran exactly that node", body, s.lastExecuted());
+        helper.succeed();
+    }
+
+    // ---- 13. currentNode() must never name a node that step() will not run next --------------
+
+    /**
+     * Same unsettled state, seen from the other side: {@code Entry} fans out to a {@code For} and a
+     * {@code Noop} in that order, so the root frame still holds {@code Noop} while the loop body is
+     * what actually runs next.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void currentNodeMatchesWhatStepRuns(GameTestHelper helper) {
+        var g = newGraph();
+        var entry = addNode(g, EntryNode.class);
+        var loop = addNode(g, ForNode.class);
+        setInputConstant(loop, "count", 2);
+        var body = addNode(g, NoopNode.class);
+        var after = addNode(g, NoopNode.class);
+        wire(g, loop.getInputsById().get("in"), entry.getOutputsById().get("next"));
+        wire(g, after.getInputsById().get("in"), entry.getOutputsById().get("next"));
+        wire(g, body.getInputsById().get("in"), loop.getOutputsById().get("body"));
+
+        var s = new ExecSession(new GraphExecutor(g)).begin(entry);
+        for (int i = 0; i < 12; i++) {
+            NodeModel predicted = s.currentNode();
+            if (!s.step()) break;
+            assertEq(helper, "step " + i + ": currentNode predicted the executed node",
+                    predicted, s.lastExecuted());
+        }
+        assertTrue(helper, "flow finished", s.isFinished());
+        helper.succeed();
+    }
 }

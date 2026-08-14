@@ -40,11 +40,11 @@ public class NbtSetNode extends AnnotatedNode {
         NbtValueType vt = ctx.getOption("valueType", NbtValueType.class, NbtValueType.STRING);
         if (!k.isEmpty()) {
             switch (vt) {
-                case INT -> t.putInt(k, ctx.getInput("value", Integer.class, 0));
-                case LONG -> t.putLong(k, ctx.getInput("value", Long.class, 0L));
-                case FLOAT -> t.putFloat(k, ctx.getInput("value", Float.class, 0f));
-                case DOUBLE -> t.putDouble(k, ctx.getInput("value", Double.class, 0d));
-                case BOOL -> t.putBoolean(k, ctx.getInput("value", Boolean.class, false));
+                case INT -> t.putInt(k, ctx.getInt("value", 0));
+                case LONG -> t.putLong(k, ctx.getLong("value", 0L));
+                case FLOAT -> t.putFloat(k, ctx.getFloat("value", 0f));
+                case DOUBLE -> t.putDouble(k, ctx.getDouble("value", 0d));
+                case BOOL -> t.putBoolean(k, ctx.getBool("value", false));
                 case COMPOUND -> {
                     CompoundTag c = ctx.getInput("value", CompoundTag.class, null);
                     if (c != null) t.put(k, c);

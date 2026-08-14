@@ -22,7 +22,7 @@ public class ListIndexOfNode extends AnnotatedNode {
 
     @Override public void evaluate(EvalContext ctx) {
         List<?> src = ctx.getInput("list", List.class, List.of());
-        Object target = ctx.getInput("value").orElse(null);
+        Object target = ctx.getInputRaw("value");
         for (int i = 0; i < src.size(); i++) {
             if (Objects.equals(src.get(i), target)) { ctx.setOutput("out", i); return; }
         }

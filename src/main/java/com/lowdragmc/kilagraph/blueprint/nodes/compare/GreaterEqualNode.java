@@ -13,6 +13,6 @@ public class GreaterEqualNode extends AnnotatedNode {
     @InputPort  public float b = 0f;
     @OutputPort public boolean out;
 @Override public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", ctx.getInput("a", Float.class, 0f) >= ctx.getInput("b", Float.class, 0f));
+        ctx.setOutput("out", ctx.getFloat("a", 0f) >= ctx.getFloat("b", 0f));
     }
 }

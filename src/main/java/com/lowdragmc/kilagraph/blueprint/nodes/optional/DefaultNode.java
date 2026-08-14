@@ -34,8 +34,8 @@ public class DefaultNode extends AnnotatedNode {
     }
 
     @Override public void evaluate(EvalContext ctx) {
-        Object v = ctx.getInput("in").orElse(null);
-        ctx.setOutput("out", v != null ? v : ctx.getInput("defaultValue").orElse(null));
+        Object v = ctx.getInputRaw("in");
+        ctx.setOutput("out", v != null ? v : ctx.getInputRaw("defaultValue"));
     }
 
     private TypeHandle currentType() {

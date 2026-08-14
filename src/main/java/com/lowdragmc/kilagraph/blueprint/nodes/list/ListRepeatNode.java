@@ -32,8 +32,8 @@ public class ListRepeatNode extends AnnotatedNode {
     }
 
     @Override public void evaluate(EvalContext ctx) {
-        int n = Math.max(0, ctx.getInput("count", Integer.class, 0));
-        Object v = ctx.getInput("value").orElse(null);
+        int n = Math.max(0, ctx.getInt("count", 0));
+        Object v = ctx.getInputRaw("value");
         List<Object> result = new ArrayList<>(n);
         for (int i = 0; i < n; i++) result.add(v);
         ctx.setOutput("out", result);

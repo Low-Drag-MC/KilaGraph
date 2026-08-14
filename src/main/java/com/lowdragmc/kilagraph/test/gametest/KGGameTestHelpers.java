@@ -114,8 +114,20 @@ public final class KGGameTestHelpers {
         }
     }
 
+    /**
+     * Float comparison with a tolerance.
+     *
+     * <p>The NaN handling is load-bearing, not pedantry: {@code Math.abs(expected - actual)} is NaN
+     * whenever either side is, and {@code NaN > epsilon} is {@code false} — so the obvious
+     * one-line version silently <em>passes</em> for any actual value that is NaN, which is what a
+     * helper like {@code orNaN(executor.evaluate(...))} produces from a null result. Several
+     * assertions were vacuous because of it.</p>
+     */
     public static void assertEq(GameTestHelper helper, String label, float expected, float actual, float epsilon) {
-        if (Math.abs(expected - actual) > epsilon) {
+        boolean ok = Float.isNaN(expected)
+                ? Float.isNaN(actual)
+                : !Float.isNaN(actual) && Math.abs(expected - actual) <= epsilon;
+        if (!ok) {
             helper.fail(label + ": expected " + expected + " (±" + epsilon + "), got " + actual);
         }
     }

@@ -22,6 +22,6 @@ public class BranchNode extends AnnotatedNode {
 
     @Override
     public void execute(ExecContext ctx) {
-        ctx.flow(ctx.getInput("cond", Boolean.class, false) ? "trueExec" : "falseExec");
+        ctx.flow(ctx.getBool("cond", false) ? "trueExec" : "falseExec");
     }
 }

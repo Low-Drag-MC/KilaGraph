@@ -12,6 +12,6 @@ public class BitNotNode extends AnnotatedNode {
     @InputPort public int in = 0;
     @OutputPort public int out;
 @Override public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", ~ctx.getInput("in", Integer.class, 0));
+        ctx.setOutput("out", ~ctx.getInt("in", 0));
     }
 }

@@ -39,8 +39,8 @@ public class MapPutNode extends AnnotatedNode {
 
     @Override public void evaluate(EvalContext ctx) {
         Map<?, ?> src = ctx.getInput("map", Map.class, Map.of());
-        Object k = ctx.getInput("key").orElse(null);
-        Object v = ctx.getInput("value").orElse(null);
+        Object k = ctx.getInputRaw("key");
+        Object v = ctx.getInputRaw("value");
         Map<Object, Object> result = new LinkedHashMap<>(src);
         if (k != null) result.put(k, v);
         ctx.setOutput("out", result);

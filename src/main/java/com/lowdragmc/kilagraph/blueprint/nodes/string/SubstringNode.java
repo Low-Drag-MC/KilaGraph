@@ -18,8 +18,8 @@ public class SubstringNode extends AnnotatedNode {
     @OutputPort public String out;
 @Override public void evaluate(EvalContext ctx) {
         String s = ctx.getInput("in", String.class, "");
-        int st = Math.max(0, Math.min(s.length(), ctx.getInput("start", Integer.class, 0)));
-        int en = Math.max(0, Math.min(s.length(), ctx.getInput("end", Integer.class, s.length())));
+        int st = Math.max(0, Math.min(s.length(), ctx.getInt("start", 0)));
+        int en = Math.max(0, Math.min(s.length(), ctx.getInt("end", s.length())));
         ctx.setOutput("out", st > en ? "" : s.substring(st, en));
     }
 }

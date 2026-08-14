@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.logic;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.graph.core.PortIds;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
@@ -23,16 +24,16 @@ public class EqualsNode extends AnnotatedNode {
     protected void onDefineDynamicPorts(IPortDefinitionContext context) {
         int n = Math.max(2, optionValue("inputs", Integer.class, inputs));
         for (int i = 1; i <= n; i++) {
-            context.addInputPort("in" + i, Object.class);
+            context.addInputPort(PortIds.in(i), Object.class);
         }
     }
 
     @Override
     public void evaluate(EvalContext ctx) {
         int n = Math.max(2, ctx.getOption("inputs", Integer.class, inputs));
-        Object first = ctx.getInput("in1").orElse(null);
+        Object first = ctx.getInputRaw("in1");
         for (int i = 2; i <= n; i++) {
-            if (!Objects.equals(first, ctx.getInput("in" + i).orElse(null))) {
+            if (!Objects.equals(first, ctx.getInputRaw(PortIds.in(i)))) {
                 ctx.setOutput("out", false);
                 return;
             }

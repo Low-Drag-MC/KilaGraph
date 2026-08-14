@@ -14,9 +14,9 @@ public class LerpNode extends AnnotatedNode {
     @InputPort public float t = 0f;
     @OutputPort public float out;
 @Override public void evaluate(EvalContext ctx) {
-        float va = ctx.getInput("a", Float.class, 0f);
-        float vb = ctx.getInput("b", Float.class, 1f);
-        float vt = ctx.getInput("t", Float.class, 0f);
+        float va = ctx.getFloat("a", 0f);
+        float vb = ctx.getFloat("b", 1f);
+        float vt = ctx.getFloat("t", 0f);
         ctx.setOutput("out", va + (vb - va) * vt);
     }
 }

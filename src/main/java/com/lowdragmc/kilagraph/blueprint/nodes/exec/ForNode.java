@@ -32,7 +32,7 @@ public class ForNode extends AnnotatedNode {
 
     @Override
     public void execute(ExecContext ctx) {
-        int n = Math.max(0, ctx.getInput("count", Integer.class, 0));
+        int n = Math.max(0, ctx.getInt("count", 0));
         // The controller drives iterations on the step-able engine: each iteration clears the cache
         // and publishes "index" into node state (read back by evaluate()); the engine runs the body
         // a node at a time and fires "completed" when the count is exhausted.

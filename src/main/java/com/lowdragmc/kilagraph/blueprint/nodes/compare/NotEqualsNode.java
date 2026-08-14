@@ -22,7 +22,7 @@ public class NotEqualsNode extends AnnotatedNode {
     }
 
     @Override public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", !Objects.equals(ctx.getInput("a").orElse(null),
-                ctx.getInput("b").orElse(null)));
+        ctx.setOutput("out", !Objects.equals(ctx.getInputRaw("a"),
+                ctx.getInputRaw("b")));
     }
 }

@@ -28,7 +28,7 @@ public class BlockPosOffsetNode extends AnnotatedNode {
     public void evaluate(EvalContext ctx) {
         BlockPos p = ctx.getInput("pos", BlockPos.class, BlockPos.ZERO);
         Direction d = ctx.getInput("direction", Direction.class, Direction.NORTH);
-        int n = ctx.getInput("amount", Integer.class, 1);
+        int n = ctx.getInt("amount", 1);
         ctx.setOutput("out", p.relative(d, n));
     }
 }

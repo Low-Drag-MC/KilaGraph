@@ -18,8 +18,8 @@ public class RandomNode extends AnnotatedNode {
     @InputPort public float max = 1f;
     @OutputPort public float out;
 @Override public void evaluate(EvalContext ctx) {
-        float lo = ctx.getInput("min", Float.class, 0f);
-        float hi = ctx.getInput("max", Float.class, 1f);
+        float lo = ctx.getFloat("min", 0f);
+        float hi = ctx.getFloat("max", 1f);
         if (hi <= lo) { ctx.setOutput("out", lo); return; }
         float r = lo + ctx.getExecutor().rng().nextFloat() * (hi - lo);
         ctx.setOutput("out", r);

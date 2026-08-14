@@ -25,9 +25,9 @@ public class BlockPosCreateNode extends AnnotatedNode {
 
     @Override
     public void evaluate(EvalContext ctx) {
-        int px = ctx.getInput("x", Integer.class, 0);
-        int py = ctx.getInput("y", Integer.class, 0);
-        int pz = ctx.getInput("z", Integer.class, 0);
+        int px = ctx.getInt("x", 0);
+        int py = ctx.getInt("y", 0);
+        int pz = ctx.getInt("z", 0);
         ctx.setOutput("out", new BlockPos(px, py, pz));
     }
 }

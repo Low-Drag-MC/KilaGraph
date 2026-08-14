@@ -21,7 +21,7 @@ public class MapContainsValueNode extends AnnotatedNode {
 
     @Override public void evaluate(EvalContext ctx) {
         Map<?, ?> m = ctx.getInput("map", Map.class, Map.of());
-        Object v = ctx.getInput("value").orElse(null);
+        Object v = ctx.getInputRaw("value");
         ctx.setOutput("out", m.containsValue(v));
     }
 }

@@ -23,7 +23,7 @@ public class AssertNode extends AnnotatedNode {
 
     @Override
     public void execute(ExecContext ctx) {
-        boolean cond = ctx.getInput("condition", Boolean.class, true);
+        boolean cond = ctx.getBool("condition", true);
         if (!cond) {
             String msg = ctx.getInput("message", String.class, "");
             throw new AssertionError(msg.isEmpty() ? "Assert failed" : msg);

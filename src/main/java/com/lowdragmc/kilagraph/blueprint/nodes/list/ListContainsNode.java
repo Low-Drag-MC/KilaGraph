@@ -22,7 +22,7 @@ public class ListContainsNode extends AnnotatedNode {
 
     @Override public void evaluate(EvalContext ctx) {
         List<?> src = ctx.getInput("list", List.class, List.of());
-        Object target = ctx.getInput("value").orElse(null);
+        Object target = ctx.getInputRaw("value");
         boolean found = false;
         for (Object o : src) if (Objects.equals(o, target)) { found = true; break; }
         ctx.setOutput("out", found);

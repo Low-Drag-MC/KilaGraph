@@ -42,8 +42,8 @@ public class MapGetNode extends AnnotatedNode {
 
     @Override public void evaluate(EvalContext ctx) {
         Map<?, ?> m = ctx.getInput("map", Map.class, Map.of());
-        Object k = ctx.getInput("key").orElse(null);
-        Object def = ctx.getInput("defaultValue").orElse(null);
+        Object k = ctx.getInputRaw("key");
+        Object def = ctx.getInputRaw("defaultValue");
         Object v = m.get(k);
         ctx.setOutput("value", v != null ? v : def);
     }

@@ -43,6 +43,21 @@ public final class VariableStore {
         return values.get(name);
     }
 
+    /**
+     * Sentinel returned by {@link #getOrAbsent} for a name with no entry, so "absent" and
+     * "present but null" stay distinguishable in a single lookup.
+     */
+    static final Object ABSENT = new Object();
+
+    /**
+     * The value for {@code name}, or {@link #ABSENT}. Exists so a variable read costs one hash
+     * lookup rather than the {@code contains} + {@code get} pair, which is two on every read of
+     * every variable node.
+     */
+    Object getOrAbsent(String name) {
+        return values.getOrDefault(name, ABSENT);
+    }
+
     public void remove(String name) {
         values.remove(name);
     }

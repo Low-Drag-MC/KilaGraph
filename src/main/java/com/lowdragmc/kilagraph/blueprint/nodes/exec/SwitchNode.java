@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.exec;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.graph.core.PortIds;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
@@ -32,7 +33,7 @@ public class SwitchNode extends AnnotatedNode {
     protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         int n = Math.max(1, optionValue("cases", Integer.class, cases));
         for (int i = 1; i <= n; i++) {
-            ctx.addOutputPort("case" + i, TypeHandles.EXECUTION_FLOW)
+            ctx.addOutputPort(PortIds.caseId(i), TypeHandles.EXECUTION_FLOW)
                     .withConnectorUI(PortConnectorUI.FLOW);
         }
     }
@@ -40,8 +41,8 @@ public class SwitchNode extends AnnotatedNode {
     @Override
     public void execute(ExecContext ctx) {
         int n = Math.max(1, ctx.getOption("cases", Integer.class, cases));
-        int sel = ctx.getInput("selector", Integer.class, 0);
-        if (sel >= 1 && sel <= n) ctx.flow("case" + sel);
+        int sel = ctx.getInt("selector", 0);
+        if (sel >= 1 && sel <= n) ctx.flow(PortIds.caseId(sel));
         else ctx.flow("defaultExec");
     }
 }

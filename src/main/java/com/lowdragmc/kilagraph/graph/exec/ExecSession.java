@@ -30,6 +30,10 @@ import java.util.UUID;
  * {@link SubgraphFrame}) instead of draining synchronously, and {@code Break}/{@code Continue} are
  * delivered as {@link Signal}s that {@link #applySignal()} routes to the nearest {@link LoopFrame}.</p>
  *
+ * <p>A session is reusable: {@link #begin} re-arms it, and the root {@link ChainFrame} and the frame
+ * stack are kept rather than rebuilt, so {@code executeFrom} on a pooled session allocates nothing.
+ * The breakpoint set is created only if a breakpoint is actually set.</p>
+ *
  * <p>Not thread-safe. Drive from one thread.</p>
  */
 public final class ExecSession {
@@ -42,6 +46,8 @@ public final class ExecSession {
 
     private final GraphExecutor rootScope;
     private final Deque<ExecFrame> stack = new ArrayDeque<>();
+    /** Reused root frame — every run starts from a chain, and rebuilding it per run is pure garbage. */
+    private final ChainFrame rootFrame;
 
     private NodeModel entry;
     private State state = State.NOT_STARTED;
@@ -49,10 +55,11 @@ public final class ExecSession {
 
     @Nullable private NodeModel lastExecuted;
     private int stepCount = 0;
-    private final Set<UUID> breakpoints = new HashSet<>();
+    @Nullable private Set<UUID> breakpoints;
 
     public ExecSession(GraphExecutor rootScope) {
         this.rootScope = Objects.requireNonNull(rootScope);
+        this.rootFrame = new ChainFrame(rootScope);
     }
 
     // ---- lifecycle --------------------------------------------------------------------------
@@ -76,9 +83,13 @@ public final class ExecSession {
         signal = Signal.NONE;
         lastExecuted = null;
         stepCount = 0;
+        rootScope.prepareForRun();
         rootScope.reachedExecOutputs().clear();
-        stack.push(ChainFrame.entry(rootScope, entry));
+        rootFrame.reset(rootScope);
+        rootFrame.enqueueOne(entry);
+        stack.push(rootFrame);
         state = State.RUNNING;
+        settleToRunnableFrame();
     }
 
     // ---- stepping ---------------------------------------------------------------------------
@@ -96,6 +107,13 @@ public final class ExecSession {
         lastExecuted = node;
         stepCount++;
         applySignal();
+        // Leave the stack settled. A frame is pushed empty (a loop body is only armed by
+        // LoopFrame.resume, a Sequence branch by SequenceFrame.resume), so between two steps there
+        // is a state where nothing is pending anywhere even though the flow is not over. Settling
+        // here rather than only on the way into the next step keeps the invariant that "what runs
+        // next" is always readable from the queues — which is what currentNode() promises and what
+        // runToBreakpoint() relies on to stop *before* a node.
+        settleToRunnableFrame();
         return true;
     }
 
@@ -123,7 +141,7 @@ public final class ExecSession {
     public NodeModel runToBreakpoint() {
         while (true) {
             NodeModel next = currentNode();
-            if (next != null && breakpoints.contains(next.getUid())) return next;
+            if (next != null && breakpoints != null && breakpoints.contains(next.getUid())) return next;
             if (!step()) return null;
         }
     }
@@ -131,19 +149,21 @@ public final class ExecSession {
     // ---- breakpoints ------------------------------------------------------------------------
 
     public void addBreakpoint(NodeModel node) {
-        if (node != null) breakpoints.add(node.getUid());
+        if (node == null) return;
+        if (breakpoints == null) breakpoints = new HashSet<>();
+        breakpoints.add(node.getUid());
     }
 
     public void removeBreakpoint(NodeModel node) {
-        if (node != null) breakpoints.remove(node.getUid());
+        if (node != null && breakpoints != null) breakpoints.remove(node.getUid());
     }
 
     public void clearBreakpoints() {
-        breakpoints.clear();
+        if (breakpoints != null) breakpoints.clear();
     }
 
     public Set<UUID> breakpoints() {
-        return Set.copyOf(breakpoints);
+        return breakpoints == null ? Set.of() : Set.copyOf(breakpoints);
     }
 
     // ---- introspection ----------------------------------------------------------------------
@@ -156,7 +176,14 @@ public final class ExecSession {
         return state == State.FINISHED;
     }
 
-    /** The next node {@link #step()} would execute, without running it. Null if finished/none ready. */
+    /**
+     * The next node {@link #step()} would execute, without running it. Null if finished/none ready.
+     *
+     * <p>Side-effect free by construction: {@link #reset()} and {@link #step()} leave the frame
+     * stack settled, so this only has to read it. It deliberately does not settle the stack itself —
+     * settling runs frame continuations, and for a {@code While} loop that re-evaluates the loop
+     * condition, which an introspection call must not do.</p>
+     */
     @Nullable
     public NodeModel currentNode() {
         for (ExecFrame f : stack) {

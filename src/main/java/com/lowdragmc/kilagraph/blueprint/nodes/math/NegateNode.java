@@ -12,6 +12,6 @@ public class NegateNode extends AnnotatedNode {
     @InputPort public float in = 0f;
     @OutputPort public float out;
 @Override public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", -ctx.getInput("in", Float.class, 0f));
+        ctx.setOutput("out", -ctx.getFloat("in", 0f));
     }
 }

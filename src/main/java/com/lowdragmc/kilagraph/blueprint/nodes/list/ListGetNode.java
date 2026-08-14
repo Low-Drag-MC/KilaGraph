@@ -41,7 +41,7 @@ public class ListGetNode extends AnnotatedNode {
     @Override
     public void evaluate(EvalContext ctx) {
         List<?> l = ctx.getInput("list", List.class, List.of());
-        int i = ctx.getInput("index", Integer.class, 0);
+        int i = ctx.getInt("index", 0);
         if (i < 0 || i >= l.size()) {
             throw new IndexOutOfBoundsException("ListGet index " + i + " out of bounds (size " + l.size() + ")");
         }

@@ -20,7 +20,7 @@ public class ParseBoolNode extends AnnotatedNode {
     }
 
     @Override public void evaluate(EvalContext ctx) {
-        Object v = ctx.getInput("in").orElse(null);
+        Object v = ctx.getInputRaw("in");
         boolean result;
         if (v instanceof Boolean b) {
             result = b;

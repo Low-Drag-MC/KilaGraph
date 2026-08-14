@@ -26,7 +26,7 @@ public class ListRemoveNode extends AnnotatedNode {
 
     @Override public void evaluate(EvalContext ctx) {
         List<?> src = ctx.getInput("list", List.class, List.of());
-        Object target = ctx.getInput("value").orElse(null);
+        Object target = ctx.getInputRaw("value");
         List<Object> result = new ArrayList<>(src.size());
         boolean removed = false;
         for (Object o : src) {

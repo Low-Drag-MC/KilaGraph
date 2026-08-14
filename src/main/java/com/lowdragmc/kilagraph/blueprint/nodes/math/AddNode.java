@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.math;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.graph.core.PortIds;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
@@ -21,7 +22,7 @@ public class AddNode extends AnnotatedNode {
     protected void onDefineDynamicPorts(IPortDefinitionContext context) {
         int n = Math.max(1, optionValue("inputs", Integer.class, inputs));
         for (int i = 1; i <= n; i++) {
-            context.addInputPort("in" + i, Float.class);
+            context.addInputPort(PortIds.in(i), Float.class);
         }
     }
 
@@ -30,7 +31,7 @@ public class AddNode extends AnnotatedNode {
         int n = Math.max(1, ctx.getOption("inputs", Integer.class, inputs));
         float sum = 0f;
         for (int i = 1; i <= n; i++) {
-            sum += ctx.getInput("in" + i, Float.class, 0f);
+            sum += ctx.getFloat(PortIds.in(i), 0f);
         }
         ctx.setOutput("out", sum);
     }

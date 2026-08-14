@@ -27,7 +27,7 @@ public class ToIntNode extends AnnotatedNode {
     }
 
     @Override public void evaluate(EvalContext ctx) {
-        float v = ctx.getInput("in", Float.class, 0f);
+        float v = ctx.getFloat("in", 0f);
         Op o = ctx.getOption("op", Op.class, Op.TRUNC);
         int r = switch (o) {
             case FLOOR -> (int) Math.floor(v);
