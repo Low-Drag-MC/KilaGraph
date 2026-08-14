@@ -412,7 +412,7 @@ public final class GraphExecutor {
             if (outerInput == null) continue;
             childStore.put(v.getName(), pullInput(outerInput, Object.class));
         }
-        var childEnv = new EvaluationEnvironment(childStore, env.seed());
+        var childEnv = env.createChild(childStore);
         var childExec = new GraphExecutor(inner.getGraph(), childEnv);
         var subFrame = new SubgraphFrame(childExec, this, frame, sub, inner);
         subFrame.enqueueEntry(findExecEntryNode(inner));
@@ -838,7 +838,7 @@ public final class GraphExecutor {
             childStore.put(v.getName(), pullInput(outerInput, Object.class));
         }
 
-        var childEnv = new EvaluationEnvironment(childStore, env.seed());
+        var childEnv = env.createChild(childStore);
         Graph innerGraph = inner.getGraph();
         if (innerGraph == null) {
             writeAllOutputs(node, null);
