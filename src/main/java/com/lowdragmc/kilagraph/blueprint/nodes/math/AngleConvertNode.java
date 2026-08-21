@@ -21,7 +21,9 @@ public class AngleConvertNode extends AnnotatedNode {
     @Option public Op op = Op.DEG_TO_RAD;
     @InputPort public float in = 0f;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         float v = ctx.getFloat("in", 0f);
         Op o = ctx.getOption("op", Op.class, Op.DEG_TO_RAD);
         float r = switch (o) {

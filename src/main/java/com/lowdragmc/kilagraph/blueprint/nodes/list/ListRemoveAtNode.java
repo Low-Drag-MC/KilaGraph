@@ -15,7 +15,9 @@ public class ListRemoveAtNode extends AnnotatedNode {
     @InputPort public List<?> list = List.of();
     @InputPort public int index = 0;
     @OutputPort public List<?> out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         List<?> src = ctx.getInput("list", List.class, List.of());
         int i = ctx.getInt("index", 0);
         List<Object> result = new ArrayList<>(src);

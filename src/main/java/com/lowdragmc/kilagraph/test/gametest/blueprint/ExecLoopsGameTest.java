@@ -27,8 +27,52 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputCo
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
+/*
+ * Loop iteration state is held by the running LoopController and republished on demand, rather than
+ * written into the loop node's output slot when an iteration starts. Two properties follow, and both
+ * are pinned here and in ExecSemanticsGameTest.nestedForOuterIndex:
+ *
+ *   - an enclosing loop's index survives a nested loop's clearCache(), because it is recomputed
+ *     rather than stored;
+ *   - a loop's final index stays readable after it completes, which is what per-node state used to
+ *     give and what a graph reading `index` on the `completed` path depends on.
+ */
 @GameTestHolder(Kilagraph.MODID)
 public final class ExecLoopsGameTest {
+
+    /**
+     * A loop's {@code index} output still reports the last iteration after the loop has finished.
+     *
+     * <p>Iteration state used to live in the executor's per-node map, which the end of a loop did
+     * not clear, so a graph reading {@code index} on the {@code completed} path saw the final value.
+     * Moving that state onto the controller made it possible to unregister it when the loop ends —
+     * which would have been tidy and would have silently changed this to 0.</p>
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void aFinishedLoopStillReportsItsLastIndex(GameTestHelper helper) {
+        var b = com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder.blueprint();
+        b.add("entry", com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode.class);
+        b.add("loop", com.lowdragmc.kilagraph.blueprint.nodes.exec.ForNode.class)
+                .constant("loop.count", 4);
+        b.add("body", com.lowdragmc.kilagraph.blueprint.nodes.exec.NoopNode.class);
+        b.add("after", com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode.class)
+                .option("after", "varName", "lastIndex")
+                .wire("after.value", "loop.index");
+        b.wire("loop.in", "entry");
+        b.wire("body.in", "loop.body");
+        b.wire("after.trigger", "loop.completed");
+
+        var exec = new com.lowdragmc.kilagraph.graph.exec.GraphExecutor(b.graph());
+        exec.executeFrom(b.node("entry"));
+        Object seen = exec.getEnvironment().variables().get("lastIndex");
+        if (!(seen instanceof Number n) || Math.abs(n.floatValue() - 3f) > 1e-5f) {
+            helper.fail("after a 4-iteration loop, index should still read 3, got " + seen);
+            return;
+        }
+        helper.succeed();
+    }
+
     private static final String FOR_COUNTS = "exec_for_counts";
     private static final String FOR_BREAK = "exec_for_break";
     private static final String FOR_CONTINUE = "exec_for_continue";

@@ -130,6 +130,7 @@ public class RenderTypeGraphView extends KGGraphView {
         var rc = findDescendant(editor.resourceView, ResourceContainer.class,
                 c -> c.resourceInstance.resource == ShaderFunctionGraphResource.INSTANCE);
         if (rc == null) return;
+
         @SuppressWarnings("unchecked")
         ResourceProviderContainer<CompoundTag> rpc = findDescendant(rc.providerContainer,
                 ResourceProviderContainer.class, c -> true);

@@ -48,7 +48,18 @@ public final class EvalContext {
     private Object[] staged = new Object[8];
     private long[] stagedNum = new long[8];
     private byte[] stagedKind = new byte[8];
-    private boolean[] stagedSet = new boolean[8];
+    /**
+     * Which outputs this evaluation has staged, as a generation stamp rather than a flag array.
+     *
+     * <p>{@code bind} used to clear a {@code boolean[]} with {@code Arrays.fill} on every node
+     * evaluation. Bumping a counter is O(1) and the comparison costs the same as reading a flag. A
+     * bitmask would be smaller still and is the obvious alternative, but a {@code long} caps the
+     * node at 64 outputs, and {@code Sequence} and {@code Switch} are as wide as their option says.</p>
+     */
+    private int[] stagedStamp = new int[8];
+    private int stagedGen;
+    /** Whether anything was staged at all, so a node that writes no data output can skip the flush. */
+    private boolean anyStaged;
 
     EvalContext(GraphExecutor executor) {
         this.executor = executor;
@@ -62,9 +73,15 @@ public final class EvalContext {
             staged = new Object[Math.max(n, staged.length * 2)];
             stagedNum = new long[staged.length];
             stagedKind = new byte[staged.length];
-            stagedSet = new boolean[staged.length];
+            // Fresh zeros, and stagedGen is never 0, so every slot reads as unstaged.
+            stagedStamp = new int[staged.length];
         }
-        Arrays.fill(stagedSet, 0, n, false);
+        if (++stagedGen == Integer.MAX_VALUE) {
+            // Wrap-around would make an ancient stamp look current. Effectively never taken.
+            Arrays.fill(stagedStamp, 0);
+            stagedGen = 1;
+        }
+        anyStaged = false;
     }
 
     /**
@@ -76,7 +93,7 @@ public final class EvalContext {
         PreparedGraph.Node n = prepared;
         for (int k = 0; k < n.outputSlots.length; k++) {
             int slot = n.outputSlots[k];
-            if (!stagedSet[k]) {
+            if (stagedStamp[k] != stagedGen) {
                 executor.writeSlot(slot, null);
             } else if (stagedKind[k] == GraphExecutor.KIND_OBJECT) {
                 executor.writeSlot(slot, staged[k]);
@@ -184,7 +201,12 @@ public final class EvalContext {
     private Object rawOption(String optionId) {
         int idx = prepared.optionIndex(optionId);
         if (idx >= 0) {
-            Constant constant = prepared.optionPorts[idx].getEmbeddedValue();
+            // An option port is an input port, so its Constant is already in the prepared table and
+            // this costs an array read rather than getEmbeddedValue()'s name-keyed hash lookup. The
+            // value itself is still read live, so an edited option is visible immediately.
+            int inputIdx = executor.optionPreresolve() ? prepared.optionInputIndex[idx] : -1;
+            Constant constant = inputIdx >= 0 ? prepared.inputConstants[inputIdx]
+                    : prepared.optionPorts[idx].getEmbeddedValue();
             return constant == null ? null : constant.getValue();
         }
         if (prepared.asNodeModel == null) return null;
@@ -201,7 +223,7 @@ public final class EvalContext {
      * ever published values for real ports.
      */
     public void setOutput(String outputId, Object value) {
-        stage(prepared, staged, stagedKind, stagedSet, outputId, value);
+        if (stage(prepared, staged, stagedKind, stagedStamp, stagedGen, outputId, value)) anyStaged = true;
     }
 
     /**
@@ -216,28 +238,30 @@ public final class EvalContext {
      *       value. Ports survive a rename as the same object, so identity still finds the slot.</li>
      * </ul>
      */
-    static void stage(PreparedGraph.Node prepared, Object[] staged, byte[] stagedKind,
-                      boolean[] stagedSet, String outputId, Object value) {
+    static boolean stage(PreparedGraph.Node prepared, Object[] staged, byte[] stagedKind,
+                         int[] stagedStamp, int stagedGen, String outputId, Object value) {
         boolean matched = false;
         String[] ids = prepared.outputIds;
         for (int k = 0; k < ids.length; k++) {
             if (ids[k].equals(outputId)) {
                 staged[k] = value;
                 stagedKind[k] = GraphExecutor.KIND_OBJECT;
-                stagedSet[k] = true;
+                stagedStamp[k] = stagedGen;
                 matched = true;
             }
         }
-        if (matched || prepared.asNodeModel == null) return;
+        if (matched || prepared.asNodeModel == null) return matched;
         for (PortModel live : prepared.asNodeModel.getOutputsByDisplayOrder()) {
             if (!outputId.equals(live.getPortId())) continue;
             int idx = prepared.outputIndexOf(live);
             if (idx >= 0) {
                 staged[idx] = value;
                 stagedKind[idx] = GraphExecutor.KIND_OBJECT;
-                stagedSet[idx] = true;
+                stagedStamp[idx] = stagedGen;
+                matched = true;
             }
         }
+        return matched;
     }
 
 
@@ -356,7 +380,8 @@ public final class EvalContext {
             if (ids[k].equals(outputId)) {
                 stagedNum[k] = bits;
                 stagedKind[k] = kind;
-                stagedSet[k] = true;
+                stagedStamp[k] = stagedGen;
+                anyStaged = true;
                 matched = true;
             }
         }
@@ -369,9 +394,31 @@ public final class EvalContext {
             if (idx >= 0) {
                 stagedNum[idx] = bits;
                 stagedKind[idx] = kind;
-                stagedSet[idx] = true;
+                stagedStamp[idx] = stagedGen;
+                anyStaged = true;
             }
         }
+    }
+
+    // ---- loop iteration state ------------------------------------------------------------------
+
+    /**
+     * The index of the iteration this node's loop is currently running, or 0 when it is not running.
+     *
+     * <p>For the loop nodes to republish their {@code index} output after the engine has cleared the
+     * value cache. Reading it from the controller rather than from per-node state is what lets an
+     * iteration cost no hash lookups and no boxing — see {@link LoopController}.</p>
+     */
+    public int loopIndex() {
+        LoopController c = executor.activeLoop(prepared.index);
+        return c == null ? 0 : c.index();
+    }
+
+    /** The element this node's loop is currently on, or null. @see #loopIndex() */
+    @Nullable
+    public Object loopItem() {
+        LoopController c = executor.activeLoop(prepared.index);
+        return c == null ? null : c.item();
     }
 
     // ---- meta --------------------------------------------------------------------------------

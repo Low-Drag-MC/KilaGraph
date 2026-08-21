@@ -12,11 +12,14 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 public class ToStringNode extends AnnotatedNode {
 
     @OutputPort public String out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("in", TypeHandles.UNKNOWN);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         Object v = ctx.getInputRaw("in");
         ctx.setOutput("out", v == null ? "" : v.toString());
     }

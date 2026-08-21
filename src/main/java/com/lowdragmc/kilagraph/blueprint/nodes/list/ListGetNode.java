@@ -25,7 +25,8 @@ public class ListGetNode extends AnnotatedNode {
 
     @InputPort public List<?> list = List.of();
     @InputPort public int     index = 0;
-@Override
+
+    @Override
     protected void onDefineExtraOptions(IOptionDefinitionContext context) {
         context.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())

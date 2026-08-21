@@ -14,7 +14,9 @@ public class JoinNode extends AnnotatedNode {
     @InputPort public List<?> in = List.of();
     @InputPort public String delimiter = ",";
     @OutputPort public String out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         List<?> list = ctx.getInput("in", List.class, List.of());
         String d = ctx.getInput("delimiter", String.class, ",");
         StringBuilder sb = new StringBuilder();

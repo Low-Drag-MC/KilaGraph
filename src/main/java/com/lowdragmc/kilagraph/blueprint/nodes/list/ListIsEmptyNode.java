@@ -13,7 +13,9 @@ import java.util.List;
 public class ListIsEmptyNode extends AnnotatedNode {
     @InputPort public List<?> list = List.of();
     @OutputPort public boolean out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         ctx.setOutput("out", ctx.getInput("list", List.class, List.of()).isEmpty());
     }
 }

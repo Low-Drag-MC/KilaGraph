@@ -7,7 +7,7 @@ import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.BlockEntityNbtNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.ItemStackNbtNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.item.ItemStackNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtCreateNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtGetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtHasNode;
@@ -161,7 +161,7 @@ public final class NbtNodeGameTest {
 
         var g = newGraph();
         PortModel stackOut = source(g, "stack", TypeHandles.ITEM_STACK);
-        var isn = addNode(g, ItemStackNbtNode.class);
+        var isn = addNode(g, ItemStackNodes.GetCustomData.class);
         wire(g, isn.getInputsById().get("stack"), stackOut);
 
         var get = addNode(g, NbtGetNode.class);

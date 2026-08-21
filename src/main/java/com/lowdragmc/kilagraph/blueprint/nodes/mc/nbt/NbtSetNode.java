@@ -17,6 +17,8 @@ import java.util.List;
  * Put a value into a {@link CompoundTag} under {@code key}, returning the (mutated) tag. A null
  * input tag yields a fresh compound. The {@link NbtValueType} option types the {@code value} port.
  */
+// valueType MUST stay an option — see NbtGetNode: it drives the dynamic port's type, decided at
+// defineNode time, before any wire has a value.
 @NodeAttribute(name = "mc_nbt_set", group = "mc_nbt", graphTypes = BlueprintGraph.class)
 public class NbtSetNode extends AnnotatedNode {
     @Override
@@ -29,11 +31,14 @@ public class NbtSetNode extends AnnotatedNode {
     @InputPort public CompoundTag tag;
     @InputPort public String key = "";
     @OutputPort public CompoundTag out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("value", optionValue("valueType", NbtValueType.class, valueType).portType());
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         CompoundTag t = ctx.getInput("tag", CompoundTag.class, null);
         if (t == null) t = new CompoundTag();
         String k = ctx.getInput("key", String.class, "");

@@ -13,7 +13,8 @@ public class SubtractNode extends AnnotatedNode {
     @InputPort  public float a = 0f;
     @InputPort  public float b = 0f;
     @OutputPort public float out;
-@Override
+
+    @Override
     public void evaluate(EvalContext ctx) {
         float va = ctx.getFloat("a", 0f);
         float vb = ctx.getFloat("b", 0f);

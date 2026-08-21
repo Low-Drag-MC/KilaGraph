@@ -20,7 +20,9 @@ public class NbtRemoveNode extends AnnotatedNode {
     @InputPort public CompoundTag tag;
     @InputPort public String key = "";
     @OutputPort public CompoundTag out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         CompoundTag t = ctx.getInput("tag", CompoundTag.class, null);
         if (t == null) { ctx.setOutput("out", new CompoundTag()); return; }
         String k = ctx.getInput("key", String.class, "");

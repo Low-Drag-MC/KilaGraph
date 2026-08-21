@@ -13,7 +13,9 @@ import java.util.Map;
 public class MapIsEmptyNode extends AnnotatedNode {
     @InputPort public Map<?, ?> map = Map.of();
     @OutputPort public boolean out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         ctx.setOutput("out", ctx.getInput("map", Map.class, Map.of()).isEmpty());
     }
 }

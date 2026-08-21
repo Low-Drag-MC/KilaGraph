@@ -18,12 +18,15 @@ public class FormatNode extends AnnotatedNode {
     @Option public String pattern = "%s";
     @Option public int inputs = 1;
     @OutputPort public String out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         int n = Math.max(0, optionValue("inputs", Integer.class, inputs));
         for (int i = 1; i <= n; i++) ctx.addInputPort(PortIds.arg(i), TypeHandles.UNKNOWN);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         int n = Math.max(0, ctx.getOption("inputs", Integer.class, inputs));
         Object[] args = new Object[n];
         for (int i = 1; i <= n; i++) args[i - 1] = ctx.getInputRaw(PortIds.arg(i));

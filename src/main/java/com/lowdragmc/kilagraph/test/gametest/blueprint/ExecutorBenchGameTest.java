@@ -125,6 +125,8 @@ public final class ExecutorBenchGameTest {
         // regression to boxing per node.
         assertAllocationUnder(helper, "lerp-chain-16", frozen, 64);
 
+        KGBench.reportDigestCost("lerp-chain-16", checked, frozen);
+        KGBench.reportRow(frozen);
         KGBench.report("data pull, static ports", checked, frozen);
         helper.succeed();
     }
@@ -169,6 +171,8 @@ public final class ExecutorBenchGameTest {
         assertEq(helper, "still computes after bench", (float) CHAIN_LENGTH,
                 orNaN(exec.evaluate(out, Float.class)), 1e-6f);
         assertAllocationUnder(helper, "add-chain-16", frozen, 64);
+        KGBench.reportDigestCost("add-chain-16", checked, frozen);
+        KGBench.reportRow(frozen);
         KGBench.report("data pull, dynamic ports", checked, frozen);
         helper.succeed();
     }
@@ -288,6 +292,8 @@ public final class ExecutorBenchGameTest {
         // Higher budget than the pure-data chains: SetVar necessarily boxes each value it puts into
         // the VariableStore, which is a Map<String,Object>. Was 10,936 B/run before this work.
         assertAllocationUnder(helper, "locomotion", frozen, 256);
+        KGBench.reportDigestCost("locomotion", checked, frozen);
+        KGBench.reportRow(frozen);
         KGBench.report("exec flow, EntityStudio locomotion analogue", checked, frozen);
         helper.succeed();
     }

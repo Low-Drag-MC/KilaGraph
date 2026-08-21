@@ -19,7 +19,9 @@ public class SplitNode extends AnnotatedNode {
     @InputPort public String in = "";
     @InputPort public String delimiter = ",";
     @OutputPort public List<?> out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         String s = ctx.getInput("in", String.class, "");
         String d = ctx.getInput("delimiter", String.class, ",");
         if (d.isEmpty()) { ctx.setOutput("out", List.of(s)); return; }

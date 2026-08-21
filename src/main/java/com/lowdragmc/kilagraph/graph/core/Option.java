@@ -11,8 +11,14 @@ import java.lang.annotation.Target;
  * initialiser is the option's default value.
  *
  * <p>UI is delegated to LDLib2: combine with {@code @Configurable} +
- * {@code @ConfigNumber}/{@code @ConfigColor}/{@code @ConfigSelector}/... or with
- * {@link CustomConfigurable} to supply an arbitrary {@code ITypeConfigurable}.</p>
+ * {@code @ConfigNumber}/{@code @ConfigColor}/{@code @ConfigSelector}/... To supply an arbitrary
+ * {@code ITypeConfigurable} — a type-handle picker, a member-key search box — declare the option in
+ * {@code AnnotatedNode.onDefineExtraOptions} and call {@code withConfigurable} on the builder; see
+ * {@link com.lowdragmc.kilagraph.graph.util.KGSearchConfigurators} and {@code docs/CONVENTIONS.md} §1.</p>
+ *
+ * <p>An enum field renders as a dropdown over <em>all</em> of its constants automatically, via
+ * LDLib2's {@code ITypeConfigurable.DEFAULT}. Note that path ignores the field, so
+ * {@code @ConfigSelector(candidate = …)} does not narrow an option's choices.</p>
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)

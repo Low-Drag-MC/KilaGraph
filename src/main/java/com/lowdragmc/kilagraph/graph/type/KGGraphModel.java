@@ -44,10 +44,24 @@ public class KGGraphModel extends CustomGraphModelImpl {
         return types;
     }
 
+    /** VEC2/VEC3/VEC4 — the widths the vector nodes read interchangeably. */
+    private static boolean isVector(TypeHandle handle) {
+        return KGTypeHandles.VEC2.equals(handle) || KGTypeHandles.VEC3.equals(handle)
+                || KGTypeHandles.VEC4.equals(handle);
+    }
+
     @Override
     public boolean canAssignTo(PortModel destination, PortModel source) {
         TypeHandle dst = destination.getDataTypeHandle();
         TypeHandle src = source.getDataTypeHandle();
+
+        // Any vector into any vector width. A pin has to name one type (LDLib2 has no polymorphic
+        // pin), so the vector nodes declare VEC3 — but they read however many components arrive and
+        // answer in kind. Refusing a VEC4 here would make the editor enforce a rule the machine does
+        // not have, and thirteen of the fifteen vector nodes would be width-polymorphic in name only.
+        if (isVector(dst) && isVector(src)) {
+            return true;
+        }
 
         if (dst.equals(TypeHandles.EXECUTION_FLOW) || src.equals(TypeHandles.EXECUTION_FLOW)) {
             return dst.equals(TypeHandles.EXECUTION_FLOW) && src.equals(TypeHandles.EXECUTION_FLOW);

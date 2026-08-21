@@ -26,7 +26,9 @@ import java.util.Map;
 public class MapCreateNode extends AnnotatedNode {
     @Option public int inputs = 1;
     @OutputPort public Map<?, ?> out;
-@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("keyType", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))
@@ -37,7 +39,8 @@ public class MapCreateNode extends AnnotatedNode {
                 .build();
     }
 
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         int n = Math.max(1, optionValue("inputs", Integer.class, inputs));
         TypeHandle kt = current("keyType");
         TypeHandle vt = current("valueType");
@@ -47,7 +50,8 @@ public class MapCreateNode extends AnnotatedNode {
         }
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         int n = Math.max(1, ctx.getOption("inputs", Integer.class, inputs));
         Map<Object, Object> result = new LinkedHashMap<>();
         for (int i = 1; i <= n; i++) {

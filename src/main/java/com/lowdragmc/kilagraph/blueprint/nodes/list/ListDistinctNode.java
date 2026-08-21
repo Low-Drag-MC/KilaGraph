@@ -16,7 +16,9 @@ import java.util.List;
 public class ListDistinctNode extends AnnotatedNode {
     @InputPort public List<?> list = List.of();
     @OutputPort public List<?> out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         ctx.setOutput("out",
                 new ArrayList<>(new LinkedHashSet<>(ctx.getInput("list", List.class, List.of()))));
     }

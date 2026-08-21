@@ -11,7 +11,9 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 public class SignNode extends AnnotatedNode {
     @InputPort public float in = 0f;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         float v = ctx.getFloat("in", 0f);
         ctx.setOutput("out", v > 0f ? 1f : v < 0f ? -1f : 0f);
     }

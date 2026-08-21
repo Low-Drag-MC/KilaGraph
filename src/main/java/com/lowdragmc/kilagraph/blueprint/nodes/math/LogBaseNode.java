@@ -13,7 +13,9 @@ public class LogBaseNode extends AnnotatedNode {
     @InputPort public float value = 1f;
     @InputPort public float base = 10f;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         float v = ctx.getFloat("value", 1f);
         float b = ctx.getFloat("base", 10f);
         if (v <= 0f || b <= 0f || b == 1f) { ctx.setOutput("out", 0f); return; }

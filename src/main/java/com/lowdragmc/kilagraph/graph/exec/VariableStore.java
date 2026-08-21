@@ -9,38 +9,46 @@ import java.util.Objects;
 /**
  * Mutable, name-keyed bag of graph-variable values. Lives on {@link EvaluationEnvironment} so the
  * executor (and host code) can feed live values for {@code INPUT} variables and harvest values
- * written by {@code SetVar} (future) or by subgraph composition.
+ * written by {@code SetVar} or by subgraph composition.
  *
  * <p>Lookup distinguishes "absent" from "present-but-null". {@link #contains(String)} answers the
  * first question; {@link #get(String)} answers the second. The variable runtime in
  * {@link EvaluationEnvironment#lookupVariable} uses this to decide whether to fall back to the
  * variable's static default — only when there is no entry.</p>
  *
+ * <p>Values are held in {@link VarCell}s rather than directly in the map. The name-keyed API here is
+ * unchanged and still costs one hash lookup per call, which is what a host seeding values per frame
+ * should pay; the executor resolves a cell once per node and then reads and writes through the
+ * reference, which is what a node running every frame should pay. See {@link VarCell}.</p>
+ *
  * <p>Not thread-safe. One store per evaluation, or guard externally.</p>
  */
 public final class VariableStore {
 
-    private final Map<String, Object> values;
+    private final Map<String, VarCell> cells;
 
     public VariableStore() {
-        this.values = new HashMap<>();
+        this.cells = new HashMap<>();
     }
 
     public VariableStore(Map<String, Object> initial) {
-        this.values = new HashMap<>(Objects.requireNonNull(initial));
+        this.cells = new HashMap<>();
+        Objects.requireNonNull(initial).forEach(this::put);
     }
 
     public void put(String name, @Nullable Object value) {
-        values.put(name, value);
+        cell(name).setObject(value);
     }
 
     public boolean contains(String name) {
-        return values.containsKey(name);
+        VarCell c = cells.get(name);
+        return c != null && c.present;
     }
 
     @Nullable
     public Object get(String name) {
-        return values.get(name);
+        VarCell c = cells.get(name);
+        return c == null || !c.present ? null : c.boxed();
     }
 
     /**
@@ -55,18 +63,36 @@ public final class VariableStore {
      * every variable node.
      */
     Object getOrAbsent(String name) {
-        return values.getOrDefault(name, ABSENT);
+        VarCell c = cells.get(name);
+        return c == null || !c.present ? ABSENT : c.boxed();
     }
 
+    /**
+     * The cell for {@code name}, creating it if this store has never seen the name.
+     *
+     * <p>The returned reference stays valid for the life of the store, including across
+     * {@link #remove} and {@link #clear} — that is what makes it safe for the executor to cache.</p>
+     */
+    VarCell cell(String name) {
+        return cells.computeIfAbsent(name, VarCell::new);
+    }
+
+    /** Mark {@code name} absent. The cell is kept — see {@link VarCell}. */
     public void remove(String name) {
-        values.remove(name);
+        VarCell c = cells.get(name);
+        if (c != null) c.clear();
     }
 
+    /** Mark every name absent. The cells are kept — see {@link VarCell}. */
     public void clear() {
-        values.clear();
+        for (VarCell c : cells.values()) c.clear();
     }
 
     public Map<String, Object> snapshot() {
-        return Map.copyOf(values);
+        Map<String, Object> out = new HashMap<>();
+        for (VarCell c : cells.values()) {
+            if (c.present) out.put(c.name, c.boxed());
+        }
+        return Map.copyOf(out);
     }
 }

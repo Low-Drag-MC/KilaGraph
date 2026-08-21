@@ -11,7 +11,9 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 public class TrimNode extends AnnotatedNode {
     @InputPort public String in = "";
     @OutputPort public String out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         ctx.setOutput("out", ctx.getInput("in", String.class, "").trim());
     }
 }

@@ -13,12 +13,15 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 public class MaxNode extends AnnotatedNode {
     @Option public int inputs = 2;
     @OutputPort public float out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         int n = Math.max(1, optionValue("inputs", Integer.class, inputs));
         for (int i = 1; i <= n; i++) ctx.addInputPort(PortIds.in(i), Float.class);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         int n = Math.max(1, ctx.getOption("inputs", Integer.class, inputs));
         float m = Float.NEGATIVE_INFINITY;
         for (int i = 1; i <= n; i++) m = Math.max(m, ctx.getFloat(PortIds.in(i), 0f));

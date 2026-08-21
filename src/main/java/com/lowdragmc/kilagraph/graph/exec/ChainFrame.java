@@ -13,7 +13,8 @@ public final class ChainFrame extends ExecFrame {
         super(scope);
     }
 
-    @Override public Kind kind() { return Kind.CHAIN; }
+    @Override
+    public Kind kind() { return Kind.CHAIN; }
 
     @Override boolean resume(ExecSession session) {
         return false;  // nothing left — pop

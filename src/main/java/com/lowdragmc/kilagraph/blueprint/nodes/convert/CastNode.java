@@ -25,7 +25,7 @@ import java.util.List;
  */
 @NodeAttribute(name = "convert_cast", group = "convert", graphTypes = BlueprintGraph.class)
 public class CastNode extends AnnotatedNode {
-@Override
+    @Override
     protected void onDefineExtraOptions(IOptionDefinitionContext context) {
         context.addOption("targetType", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())

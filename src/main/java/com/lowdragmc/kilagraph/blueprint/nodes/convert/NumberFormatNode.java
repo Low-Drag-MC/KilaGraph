@@ -20,7 +20,9 @@ public class NumberFormatNode extends AnnotatedNode {
     @Option public String pattern = "#.##";
     @InputPort public float in = 0f;
     @OutputPort public String out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         float v = ctx.getFloat("in", 0f);
         String p = ctx.getOption("pattern", String.class, "#.##");
         try {

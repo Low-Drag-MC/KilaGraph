@@ -12,11 +12,14 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 public class ParseNumberNode extends AnnotatedNode {
 
     @OutputPort public float out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("in", TypeHandles.UNKNOWN);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         Object v = ctx.getInputRaw("in");
         float result = 0f;
         if (v instanceof Number n) {

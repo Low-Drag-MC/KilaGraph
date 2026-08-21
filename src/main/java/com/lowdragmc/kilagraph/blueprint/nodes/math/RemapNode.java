@@ -18,7 +18,9 @@ public class RemapNode extends AnnotatedNode {
     @InputPort public float toMin = 0f;
     @InputPort public float toMax = 1f;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         float v = ctx.getFloat("in", 0f);
         float fMin = ctx.getFloat("fromMin", 0f);
         float fMax = ctx.getFloat("fromMax", 1f);

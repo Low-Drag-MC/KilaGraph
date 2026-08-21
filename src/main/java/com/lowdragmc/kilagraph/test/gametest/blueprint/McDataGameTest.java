@@ -5,35 +5,27 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.BlockConstNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.BlockPosCreateNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.BlockToItemNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.DirectionAxisNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.DirectionOppositeNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.ItemConstNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.ItemInTagNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.ItemStackCreateNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.ItemToBlockNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.info.BlockPosInfoNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.info.InfoFieldBlock;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.info.ItemStackInfoNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosCreateNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.item.BlockToItemNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.tag.ItemInTagNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.item.ItemStackCreateNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.item.ItemToBlockNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosNodes;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.item.ItemStackNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 
-import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertFalse;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertTrue;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.newGraph;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputConstant;
-import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
 /** Pure-data MC nodes: construct/destructure, conversions, tags. */
@@ -47,7 +39,13 @@ public final class McDataGameTest {
 
     private McDataGameTest() {}
 
-    /** BlockPosCreate(3,4,5) → BlockPos info context + x/y/z blocks read it back. */
+    /**
+     * BlockPosCreate(3,4,5) → mc_block_pos_unpack reads it back.
+     *
+     * <p>Used to go through {@code info_block_pos} + three Field blocks. A {@code BlockPos} is three
+     * integers, so it no longer has a reflective context at all — this is the round trip it always was,
+     * against the node that replaced it.</p>
+     */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void blockPosRoundTrip(GameTestHelper helper) {
@@ -57,25 +55,19 @@ public final class McDataGameTest {
         setInputConstant(create, "y", 4);
         setInputConstant(create, "z", 5);
 
-        var ctx = addNode(g, BlockPosInfoNode.class);
-        wire(g, ctx.getInputsById().get("target"), create.getOutputsById().get("out"));
-        var xBlock = addBlock(g, ctx, InfoFieldBlock.class);
-        setOption(xBlock, "field", "x");
-        var yBlock = addBlock(g, ctx, InfoFieldBlock.class);
-        setOption(yBlock, "field", "y");
-        var zBlock = addBlock(g, ctx, InfoFieldBlock.class);
-        setOption(zBlock, "field", "z");
+        var unpack = addNode(g, BlockPosNodes.Unpack.class);
+        wire(g, unpack.getInputsById().get("in"), create.getOutputsById().get("out"));
 
         var exec = new GraphExecutor(g);
         BlockPos pos = exec.evaluate(create.getOutputsById().get("out"), BlockPos.class);
         assertEq(helper, "BlockPos", new BlockPos(3, 4, 5), pos);
-        assertEq(helper, "info.x", 3, ((Number) exec.evaluate(xBlock.getOutputsById().get("value"), Object.class)).intValue());
-        assertEq(helper, "info.y", 4, ((Number) exec.evaluate(yBlock.getOutputsById().get("value"), Object.class)).intValue());
-        assertEq(helper, "info.z", 5, ((Number) exec.evaluate(zBlock.getOutputsById().get("value"), Object.class)).intValue());
+        assertEq(helper, "unpack.x", 3, exec.evaluate(unpack.getOutputsById().get("x"), Integer.class).intValue());
+        assertEq(helper, "unpack.y", 4, exec.evaluate(unpack.getOutputsById().get("y"), Integer.class).intValue());
+        assertEq(helper, "unpack.z", 5, exec.evaluate(unpack.getOutputsById().get("z"), Integer.class).intValue());
         helper.succeed();
     }
 
-    /** ItemStackCreate(diamond, 5) → ItemStack info context + count/maxStackSize/isEmpty blocks. */
+    /** ItemStackCreate(diamond, 5) → mc_item_stack_unpack and mc_item_stack_limits read it back. */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void itemStackCreateRead(GameTestHelper helper) {
@@ -84,31 +76,30 @@ public final class McDataGameTest {
         setInputConstant(create, "item", Items.DIAMOND);
         setInputConstant(create, "count", 5);
 
-        var ctx = addNode(g, ItemStackInfoNode.class);
-        wire(g, ctx.getInputsById().get("target"), create.getOutputsById().get("out"));
-        var countBlock = addBlock(g, ctx, InfoFieldBlock.class);
-        setOption(countBlock, "field", "count");
-        var maxBlock = addBlock(g, ctx, InfoFieldBlock.class);
-        setOption(maxBlock, "field", "maxStackSize");
-        var emptyBlock = addBlock(g, ctx, InfoFieldBlock.class);
-        setOption(emptyBlock, "field", "isEmpty");
+        var unpack = addNode(g, ItemStackNodes.Unpack.class);
+        wire(g, unpack.getInputsById().get("stack"), create.getOutputsById().get("out"));
+        var limits = addNode(g, ItemStackNodes.Limits.class);
+        wire(g, limits.getInputsById().get("stack"), create.getOutputsById().get("out"));
 
         var exec = new GraphExecutor(g);
-        assertEq(helper, "count", 5, ((Number) exec.evaluate(countBlock.getOutputsById().get("value"), Object.class)).intValue());
-        assertEq(helper, "maxStackSize", 64, ((Number) exec.evaluate(maxBlock.getOutputsById().get("value"), Object.class)).intValue());
-        assertFalse(helper, "isEmpty", (Boolean) exec.evaluate(emptyBlock.getOutputsById().get("value"), Object.class));
+        assertEq(helper, "item", Items.DIAMOND, exec.evaluate(unpack.getOutputsById().get("item"), Item.class));
+        assertEq(helper, "count", 5, exec.evaluate(unpack.getOutputsById().get("count"), Integer.class).intValue());
+        assertFalse(helper, "empty", exec.evaluate(unpack.getOutputsById().get("empty"), Boolean.class));
+        assertEq(helper, "maxStackSize", 64,
+                exec.evaluate(limits.getOutputsById().get("maxStackSize"), Integer.class).intValue());
+        assertTrue(helper, "stackable", exec.evaluate(limits.getOutputsById().get("stackable"), Boolean.class));
         helper.succeed();
     }
 
-    /** BlockConst(stone) → BlockToItem → ItemToBlock round-trips back to stone. */
+    /** stone → BlockToItem → ItemToBlock round-trips back to stone. */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void blockItemRoundTrip(GameTestHelper helper) {
         var g = newGraph();
-        var blockConst = addNode(g, BlockConstNode.class);
-        setOption(blockConst, "value", Blocks.STONE);
+        // The block comes from the port's own constant. A dedicated "block constant" node used to
+        // sit here; a plain Block constant node, or this constant, does the same thing.
         var toItem = addNode(g, BlockToItemNode.class);
-        wire(g, toItem.getInputsById().get("in"), blockConst.getOutputsById().get("out"));
+        setInputConstant(toItem, "in", Blocks.STONE);
         var toBlock = addNode(g, ItemToBlockNode.class);
         wire(g, toBlock.getInputsById().get("in"), toItem.getOutputsById().get("out"));
 
@@ -120,38 +111,19 @@ public final class McDataGameTest {
         helper.succeed();
     }
 
-    /** DirectionOpposite(EAST)=WEST; DirectionAxis(UP)="y". */
-    @GameTest(template = "empty")
-    @PrefixGameTestTemplate(false)
-    public static void directionOps(GameTestHelper helper) {
-        var g = newGraph();
-        var opp = addNode(g, DirectionOppositeNode.class);
-        setInputConstant(opp, "in", Direction.EAST);
-        var axis = addNode(g, DirectionAxisNode.class);
-        setInputConstant(axis, "in", Direction.UP);
 
-        var exec = new GraphExecutor(g);
-        assertEq(helper, "opposite", Direction.WEST, exec.evaluate(opp.getOutputsById().get("out"), Direction.class));
-        assertEq(helper, "axis", "y", exec.evaluate(axis.getOutputsById().get("out"), String.class));
-        helper.succeed();
-    }
-
-    /** ItemConst(oak planks) in tag minecraft:planks → true; diamond → false. */
+    /** Oak planks are in minecraft:planks; a diamond is not. */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void itemInTag(GameTestHelper helper) {
         var g = newGraph();
-        var planks = addNode(g, ItemConstNode.class);
-        setOption(planks, "value", Items.OAK_PLANKS);
         var inTag = addNode(g, ItemInTagNode.class);
         setInputConstant(inTag, "tag", "minecraft:planks");
-        wire(g, inTag.getInputsById().get("item"), planks.getOutputsById().get("out"));
+        setInputConstant(inTag, "item", Items.OAK_PLANKS);
 
-        var diamond = addNode(g, ItemConstNode.class);
-        setOption(diamond, "value", Items.DIAMOND);
         var notInTag = addNode(g, ItemInTagNode.class);
         setInputConstant(notInTag, "tag", "minecraft:planks");
-        wire(g, notInTag.getInputsById().get("item"), diamond.getOutputsById().get("out"));
+        setInputConstant(notInTag, "item", Items.DIAMOND);
 
         var exec = new GraphExecutor(g);
         assertTrue(helper, "planks in #planks", exec.evaluate(inTag.getOutputsById().get("out"), Boolean.class));

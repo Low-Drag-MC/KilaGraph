@@ -5,6 +5,9 @@ import com.lowdragmc.kilagraph.graph.core.IGraphEvaluable;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IConstantNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IVariableNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.constant.Constant;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.AbstractNodeModel;
@@ -88,10 +91,11 @@ public final class PreparedGraph {
     /** How {@code executeStep} used to dispatch — resolved once, in the order it tested. */
     enum ExecKind { SUBGRAPH, PORTAL_ENTRY, VARIABLE, ANNOTATED, NONE }
 
-    private static final NodeModel[] NO_TARGETS = new NodeModel[0];
+    private static final Node[] NO_TARGETS = new Node[0];
     private static final WireModel[] NO_WIRES = new WireModel[0];
     private static final PortModel[] NO_PORTS = new PortModel[0];
     private static final int[] NO_COUNTS = new int[0];
+    private static final int[] NO_OPERANDS = new int[0];
 
     /**
      * Prepared graphs are keyed by the model they describe and shared by every executor over it —
@@ -227,6 +231,34 @@ public final class PreparedGraph {
         return nodes.size();
     }
 
+    private Node[] variableWriters;
+
+    /**
+     * The nodes that are the "set" form of a graph variable — an {@code IVariableNode} that exposes
+     * an input-side port.
+     *
+     * <p>{@code resolveOutputVariable} used to find these by walking every node in the model, once
+     * per OUTPUT variable, on every call — so a subgraph with V outputs over N nodes paid O(V·N) per
+     * invocation, plus an iterator each time round. There are usually none at all (a graph that
+     * writes its outputs with {@code SetVar} has zero), and the answer is fixed for the life of this
+     * prepared graph, so the walk happens once here.</p>
+     *
+     * <p>Candidates only: the caller still matches on the variable's <em>current</em> name, because a
+     * rename changes no port count and no wire and would therefore slip past the structural digest.
+     * Kept in prepared order, which begins with {@code getNodeModels()} order, so a graph with two
+     * writers for one variable resolves to the same one it did before.</p>
+     */
+    Node[] variableWriters() {
+        Node[] cached = variableWriters;
+        if (cached != null) return cached;
+        List<Node> found = new ArrayList<>();
+        for (int i = 0; i < nodes.size(); i++) {
+            Node n = nodes.get(i);
+            if (n.variableNode != null && n.asNodeModel != null && n.inputPorts.length > 0) found.add(n);
+        }
+        return variableWriters = found.toArray(new Node[0]);
+    }
+
     /**
      * The prepared form of {@code m}, preparing it now if it was not reachable when this graph was
      * built — an orphan-spawned node with no wires reaches this, and so does anything the caller
@@ -259,6 +291,10 @@ public final class PreparedGraph {
             admitShallow(modelOf(wire.getToPort()));
         }
         // Resolve only after every node has an index, so a source can be named by slot.
+        // Indexed, and the size is re-read every iteration, both deliberately: link() resolves an
+        // input's source through node(), which admits a node the discovery pass did not reach and
+        // appends it to this very list. An enhanced for would throw ConcurrentModificationException,
+        // and a hoisted size would leave the late arrival unlinked.
         for (int i = 0; i < nodes.size(); i++) nodes.get(i).link();
         mayCycle = detectCycle();
         snapshotStructure();
@@ -316,7 +352,7 @@ public final class PreparedGraph {
         //
         //   - a wire-portal EXIT resolves its value by pulling the *entry* portal's input, and the
         //     exit node has no inputs of its own (the entry/exit gap has no wire, by design);
-        //   - a context-node block (InfoFieldBlock) pulls its *parent* context node's "target"
+        //   - a context-node block (InfoPropertyBlock) pulls its *parent* context node's "target"
         //     input, and the block has no data inputs of its own.
         //
         // Getting this wrong is not a slow path but a crash: skipping the runtime check on a graph
@@ -384,6 +420,31 @@ public final class PreparedGraph {
     // ---- one node ----------------------------------------------------------------------------
 
     /**
+     * One inner variable of a subgraph paired with the outer pins that mirror it.
+     *
+     * <p>Resolving a pin used to cost {@code v.getUid().toString()} plus a concatenation plus a map
+     * lookup — <em>per variable, per call</em>, and again on the way out. A {@code UUID.toString()}
+     * alone is a 36-character {@code String} and its backing {@code byte[]}. None of it changes
+     * while the graph is being run, so it is resolved here instead.</p>
+     *
+     * <p>The declaration is kept as a reference and its <b>name is still read live</b>. The name is
+     * what the child variable store is keyed by, and renaming an inner variable changes neither a
+     * port count nor a wire, so the structural digest cannot see it — caching the name would make a
+     * rename silently write to the wrong key. Reading it is a field access; resolving the pin was
+     * the expensive half, and that is the half now cached.</p>
+     */
+    record SubBinding(VariableDeclarationModelBase decl,
+                      @Nullable PortModel outerIn,
+                      @Nullable PortModel outerOut,
+                      int outerInIndex,
+                      int outerOutSlot,
+                      boolean read,
+                      boolean write,
+                      boolean isExec) {}
+
+    private static final SubBinding[] NO_BINDINGS = new SubBinding[0];
+
+    /**
      * Everything the executor needs to know about one node, answered once. The dispatch tags mirror
      * the two {@code instanceof} chains they replace ({@code evaluateNode} and {@code executeStep})
      * in the same order those tested, so the correspondence stays checkable by eye.
@@ -433,6 +494,23 @@ public final class PreparedGraph {
         /** Node options, so a read skips the id lookup and the DataResult/Optional wrapper. */
         final String[] optionIds;
         final PortModel[] optionPorts;
+        /**
+         * Where each option's port sits in {@link #inputPorts}, or -1.
+         *
+         * <p>An option <em>is</em> an input port: {@code NodeModel.addNodeOption} builds it with
+         * {@code addNoConnectorInputPort}, and its {@link Constant} lives in the same
+         * {@code inputConstantsById} map as any other input's. So {@link #inputConstants} already
+         * holds it, and a read can use that instead of asking {@code getEmbeddedValue()} — which is
+         * a hash lookup keyed by the port's unique name, paid on every option read of every
+         * evaluation. {@code Add}, {@code Multiply}, {@code And}, {@code Or}, {@code SetVar},
+         * {@code Sequence} and {@code Switch} all read an option every time they run.</p>
+         *
+         * <p>No new freshness check is needed, and that is worth stating because it looks like it
+         * should be: {@link #isFresh()} already compares {@link #inputTypes} for every input, option
+         * ports included, and {@code updateConstantForInput} only ever swaps a {@code Constant} when
+         * the port's type stopped being compatible — which is exactly what that comparison catches.</p>
+         */
+        final int[] optionInputIndex;
 
         // outputs, in getOutputsByDisplayOrder() order.
         //
@@ -445,8 +523,45 @@ public final class PreparedGraph {
         final String[] outputUniqueIds;
         final PortModel[] outputPorts;
         final int[] outputSlots;
-        /** Downstream nodes of each output, in wire order — what {@code enqueueFlow} used to derive. */
-        final NodeModel[][] flowTargets;
+        /**
+         * Downstream nodes of each output, in wire order — what {@code enqueueFlow} used to derive.
+         *
+         * <p>Prepared nodes rather than models, so an exec step costs nothing to address: the queue
+         * holds what the executor dispatches on, and {@code executeStep} no longer has to look each
+         * one up in an {@code IdentityHashMap} on the way past.</p>
+         */
+        final Node[][] flowTargets;
+
+        // ---- intrinsic, resolved once (NONE unless this node's class is in Intrinsics.TABLE) ----
+        /** @see Intrinsics */
+        int op = Intrinsics.NONE;
+        /** Input indices this opcode reads, in the order the node's own body reads them. */
+        int[] opIn = NO_OPERANDS;
+        /** Slot of the output this opcode writes. */
+        int opOutSlot = -1;
+        /** Opcode-specific extra: for the variadic arithmetic nodes, the index of the arity option. */
+        int opAux = -1;
+
+        /** @see Intrinsics#bindExec */
+        int execOp = Intrinsics.NONE;
+        /** Flow output fired unconditionally, or on the true side of a branch. */
+        int execFlowA = -1;
+        /** Flow output fired on the false side of a branch. */
+        int execFlowB = -1;
+        /** Input this opcode reads (a condition, or a value to store). */
+        int execIn = -1;
+        /** Opcode-specific extra: {@code SetVar}'s name option. */
+        int execAux = -1;
+
+        // ---- subgraph call, resolved once (all null/empty unless this is a SubgraphNodeModel) ----
+        /** The called graph, or null when unresolved or self-referential. */
+        @Nullable CustomGraphModelImpl subInner;
+        /** Inner variables paired with their outer mirror pins. Never null; empty when not a call. */
+        SubBinding[] subBindings = NO_BINDINGS;
+        /** The inner exec-IN variable's get-node, whose downstream is the callee's entry. */
+        @Nullable NodeModel subEntry;
+        /** This node's exec outputs, for the unresolved-subgraph fallback that fires all of them. */
+        PortModel[] execOutputs = NO_PORTS;
 
         private final PreparedGraph owner;
         private boolean linked;
@@ -517,9 +632,11 @@ public final class PreparedGraph {
             List<NodeOption> opts = m instanceof ICustomNodeModel co ? co.getNodeOptions() : List.of();
             this.optionIds = new String[opts.size()];
             this.optionPorts = new PortModel[opts.size()];
+            this.optionInputIndex = new int[opts.size()];
             for (int k = 0; k < opts.size(); k++) {
                 optionIds[k] = opts.get(k).getId();
                 optionPorts[k] = opts.get(k).getPortModel();
+                optionInputIndex[k] = optionPorts[k] == null ? -1 : inputIndexOf(optionPorts[k]);
             }
 
             List<PortModel> outs = asNodeModel != null ? asNodeModel.getOutputsByDisplayOrder() : List.of();
@@ -528,7 +645,7 @@ public final class PreparedGraph {
             this.outputUniqueIds = new String[nOut];
             this.outputPorts = new PortModel[nOut];
             this.outputSlots = new int[nOut];
-            this.flowTargets = new NodeModel[nOut][];
+            this.flowTargets = new Node[nOut][];
             for (int k = 0; k < nOut; k++) {
                 PortModel p = outs.get(k);
                 outputIds[k] = p.getPortId();
@@ -565,12 +682,91 @@ public final class PreparedGraph {
             for (int k = 0; k < outputPorts.length; k++) {
                 List<PortModel> connected = outputPorts[k].getConnectedPorts();
                 if (connected.isEmpty()) continue;
-                List<NodeModel> targets = new ArrayList<>(connected.size());
+                List<Node> targets = new ArrayList<>(connected.size());
                 for (PortModel p : connected) {
-                    if (p.getNodeModel() instanceof NodeModel nm) targets.add(nm);
+                    if (!(p.getNodeModel() instanceof NodeModel nm)) continue;
+                    Node target = owner.node(nm);
+                    if (target != null) targets.add(target);
                 }
                 flowTargets[k] = targets.toArray(NO_TARGETS);
             }
+            linkSubgraph();
+            Intrinsics.bind(this);
+            Intrinsics.bindExec(this);
+        }
+
+        /**
+         * Resolve a subgraph call site: the callee, its variables paired with the outer mirror pins,
+         * and the inner entry node. All of it is fixed for the life of this prepared graph — adding
+         * or removing an inner variable redefines the call node's ports, which the structural digest
+         * does see.
+         */
+        private void linkSubgraph() {
+            if (subgraphNode == null || asNodeModel == null) return;
+
+            int execCount = 0;
+            for (PortModel p : outputPorts) {
+                if (TypeHandles.EXECUTION_FLOW.equals(p.getDataTypeHandle())) execCount++;
+            }
+            if (execCount > 0) {
+                execOutputs = new PortModel[execCount];
+                int at = 0;
+                for (PortModel p : outputPorts) {
+                    if (TypeHandles.EXECUTION_FLOW.equals(p.getDataTypeHandle())) execOutputs[at++] = p;
+                }
+            }
+
+            if (!(subgraphNode.getSubgraphModel() instanceof CustomGraphModelImpl inner)
+                    || inner == owner.model || inner.getGraph() == null) {
+                return;   // unresolved or self-referential: the executor fires every exec pin instead
+            }
+            subInner = inner;
+
+            var ins = asNodeModel.getInputsById();
+            var outs = asNodeModel.getOutputsById();
+            List<SubBinding> bindings = new ArrayList<>();
+            for (var v : inner.getGraphVariableModels()) {
+                if (v == null) continue;
+                ModifierFlags mods = v.getModifiers();
+                if (mods == null) continue;
+                boolean read = mods.hasFlag(ModifierFlags.READ);
+                boolean write = mods.hasFlag(ModifierFlags.WRITE);
+                if (!read && !write) continue;
+
+                // Port ids are the inner variable's uid, with -in/-out only when it is READ_WRITE
+                // and therefore mirrored on both sides.
+                String base = v.getUid().toString();
+                boolean both = mods == ModifierFlags.READ_WRITE;
+                PortModel outerIn = read ? ins.get(both ? base + "-in" : base) : null;
+                PortModel outerOut = write ? outs.get(both ? base + "-out" : base) : null;
+                if (outerIn == null && outerOut == null) continue;
+
+                bindings.add(new SubBinding(v, outerIn, outerOut,
+                        outerIn == null ? -1 : inputIndexOf(outerIn),
+                        outerOut == null ? -1 : slotOf(outerOut),
+                        read, write,
+                        TypeHandles.EXECUTION_FLOW.equals(v.getDataTypeHandle())));
+            }
+            subBindings = bindings.toArray(NO_BINDINGS);
+
+            for (var nm : inner.getNodeModels()) {
+                if (!(nm instanceof NodeModel n)) continue;
+                if (!(n instanceof IVariableNode) && !(n instanceof ICustomNodeModel c
+                        && c.getNode() instanceof IVariableNode)) continue;
+                // The READ ("get") form of an exec variable exposes an EXECUTION_FLOW output — the entry.
+                for (PortModel p : n.getOutputsById().values()) {
+                    if (TypeHandles.EXECUTION_FLOW.equals(p.getDataTypeHandle())) {
+                        subEntry = n;
+                        break;
+                    }
+                }
+                if (subEntry != null) break;
+            }
+        }
+
+        /** The graph this node belongs to — see the scope check in {@code GraphExecutor.executeStep}. */
+        PreparedGraph ownerGraph() {
+            return owner;
         }
 
         /** The slot of {@code port} on this node, or -1. */

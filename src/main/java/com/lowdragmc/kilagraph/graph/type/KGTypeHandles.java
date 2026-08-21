@@ -2,12 +2,20 @@ package com.lowdragmc.kilagraph.graph.type;
 
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandleHelpers;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -61,8 +69,38 @@ public final class KGTypeHandles {
     public static final TypeHandle ENTITY;
     public static final TypeHandle PLAYER;
     public static final TypeHandle BLOCK_ENTITY;
-    /** NBT compound tag — wire-only (no accessor/picker), like LEVEL/ENTITY. */
+    /**
+     * NBT compound tag. LDLib2 has a {@code Tag} accessor and a {@code TagAccessor} widget, so unlike
+     * LEVEL/ENTITY this one is a real editable value — it just needed a default before the editor
+     * could build a constant for it.
+     */
     public static final TypeHandle NBT_COMPOUND;
+
+    // ---- data types whose codec and widget LDLib2 already provides ----------------------------
+    //
+    // Each of these is two lines of work: fromType mints the handle (identification = class name, so
+    // handleFor resolves it with no override) and setCustomDefaultValue keeps an unconnected port's
+    // constant from being null. AccessorRegistries already has an entry for every one of them
+    // (ResourceLocation, AABB, ChunkPos, Component, and every enum via EnumAccessor), and so does
+    // ConfiguratorAccessors — except ChunkPos, which falls back to an empty inspector row rather
+    // than crashing.
+
+    /** A namespaced id. Also how this graph models registry keys, tags, biomes and dimensions. */
+    public static final TypeHandle RESOURCE_LOCATION;
+    /** An axis-aligned bounding box. */
+    public static final TypeHandle AABB;
+    /** A chunk coordinate pair. */
+    public static final TypeHandle CHUNK_POS;
+    /** A chat component. Named TEXT rather than COMPONENT to avoid reading as a UI component. */
+    public static final TypeHandle TEXT;
+    /** Block rotation, for {@code BlockState.rotate}. */
+    public static final TypeHandle ROTATION;
+    /** Block mirroring, for {@code BlockState.mirror}. */
+    public static final TypeHandle MIRROR;
+    /** {@code Direction.Axis} — X, Y or Z. */
+    public static final TypeHandle AXIS;
+    /** Which slot an entity holds or wears something in. */
+    public static final TypeHandle EQUIPMENT_SLOT;
 
     /** Optional overrides: a Java type that should resolve to a specific custom TypeHandle. */
     private static final Map<Type, TypeHandle> OVERRIDES = new ConcurrentHashMap<>();
@@ -109,6 +147,36 @@ public final class KGTypeHandles {
         PLAYER = TypeHandleHelpers.fromType(Player.class, "Player");
         BLOCK_ENTITY = TypeHandleHelpers.fromType(BlockEntity.class, "BlockEntity");
         NBT_COMPOUND = TypeHandleHelpers.fromType(CompoundTag.class, "CompoundTag");
+        // Without this the NBT editor cannot open: Constant.init seeds the value from
+        // getDefaultValue(), and TagAccessor has nothing to edit when that is null.
+        TypeHandleHelpers.setCustomDefaultValue(NBT_COMPOUND, CompoundTag::new);
+
+        // DIRECTION is LDLib2's handle, not ours, and it is the one Minecraft handle LDLib2 minted
+        // without a default value — every other one (BLOCK, ITEM, FLUID, ENTITY_TYPE, ITEM_STACK,
+        // FLUID_STACK) got a setCustomDefaultValue and Direction did not. The consequence is worse
+        // than a null: an enum constant renders through SelectorConfigurator, which displays the
+        // first candidate when the value is null WITHOUT writing it back, so a Direction constant
+        // node reads "down" in the editor while emitting null. Seeding the default here is what
+        // makes a plain Direction constant node behave, and it is the whole difference between one
+        // and DirectionConstNode.
+        //
+        // Safe to do from here because nothing has read the handle's default yet: LDLib2's
+        // TypeHandles.init() only mints handles, and defaults are first read when a constant is
+        // built — which happens no earlier than the node registry scan, and Kilagraph's constructor
+        // calls KGTypeHandles.init() before touching the registry.
+        TypeHandleHelpers.setCustomDefaultValue(TypeHandles.DIRECTION, () -> Direction.NORTH);
+
+        RESOURCE_LOCATION = mc(ResourceLocation.class, "ResourceLocation", 0xFFB48EAD,
+                () -> ResourceLocation.fromNamespaceAndPath("minecraft", "air"));
+        AABB = mc(net.minecraft.world.phys.AABB.class, "AABB", 0xFF88C0D0,
+                () -> new net.minecraft.world.phys.AABB(0, 0, 0, 1, 1, 1));
+        CHUNK_POS = mc(ChunkPos.class, "ChunkPos", 0xFF81A1C1, () -> new ChunkPos(0, 0));
+        TEXT = mc(Component.class, "Text", 0xFFEBCB8B, Component::empty);
+        ROTATION = mc(Rotation.class, "Rotation", 0xFFA3BE8C, () -> Rotation.NONE);
+        MIRROR = mc(Mirror.class, "Mirror", 0xFF8FBCBB, () -> Mirror.NONE);
+        AXIS = mc(Direction.Axis.class, "Axis", 0xFFD08770, () -> Direction.Axis.Y);
+        EQUIPMENT_SLOT = mc(EquipmentSlot.class, "EquipmentSlot", 0xFFBF616A,
+                () -> EquipmentSlot.MAINHAND);
     }
 
     private KGTypeHandles() {}
@@ -128,6 +196,22 @@ public final class KGTypeHandles {
         TypeHandleHelpers.setCustomColor(handle, colour);
         TypeHandleHelpers.setCustomDefaultValue(handle, defaultValue);
         registerOverride(javaType, handle);
+        return handle;
+    }
+
+    /**
+     * A Minecraft value handle, fully described in the one call that mints it.
+     *
+     * <p>Same caching hazard as {@link #vector}: colour and default are cached lazily per handle
+     * instance, so both have to be attached here rather than later. No {@code registerOverride} —
+     * {@code fromType} makes the identification the class name, which is exactly what
+     * {@link #handleFor} falls through to.
+     */
+    private static TypeHandle mc(Class<?> javaType, String display, int colour,
+                                java.util.function.Supplier<Object> defaultValue) {
+        TypeHandle handle = TypeHandleHelpers.fromType(javaType, display);
+        TypeHandleHelpers.setCustomColor(handle, colour);
+        TypeHandleHelpers.setCustomDefaultValue(handle, defaultValue);
         return handle;
     }
 

@@ -22,7 +22,9 @@ public class TrigNode extends AnnotatedNode {
     @Option public Op op = Op.SIN;
     @InputPort public float in = 0f;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         float v = ctx.getFloat("in", 0f);
         Op o = ctx.getOption("op", Op.class, Op.SIN);
         double r = switch (o) {

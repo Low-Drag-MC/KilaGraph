@@ -15,11 +15,14 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 public class ParseBoolNode extends AnnotatedNode {
 
     @OutputPort public boolean out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("in", TypeHandles.UNKNOWN);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         Object v = ctx.getInputRaw("in");
         boolean result;
         if (v instanceof Boolean b) {

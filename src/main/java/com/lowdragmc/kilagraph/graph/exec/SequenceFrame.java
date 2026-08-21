@@ -19,7 +19,8 @@ public final class SequenceFrame extends ExecFrame {
         this.outIds = outIds;
     }
 
-    @Override public Kind kind() { return Kind.SEQUENCE; }
+    @Override
+    public Kind kind() { return Kind.SEQUENCE; }
 
     @Override boolean resume(ExecSession session) {
         if (cursor >= outIds.size()) return false;  // all outputs done — pop

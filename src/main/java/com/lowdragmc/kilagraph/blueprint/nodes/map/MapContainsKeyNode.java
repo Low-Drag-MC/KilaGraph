@@ -20,18 +20,22 @@ import java.util.Map;
 public class MapContainsKeyNode extends AnnotatedNode {
     @InputPort public Map<?, ?> map = Map.of();
     @OutputPort public boolean out;
-@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("keyType", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))
                 .build();
     }
 
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("key", current());
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         Map<?, ?> m = ctx.getInput("map", Map.class, Map.of());
         Object k = ctx.getInputRaw("key");
         ctx.setOutput("out", k != null && m.containsKey(k));

@@ -22,11 +22,14 @@ public class ToIntNode extends AnnotatedNode {
 
     @Option public Op op = Op.TRUNC;
     @OutputPort public int out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("in", TypeHandles.UNKNOWN);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         float v = ctx.getFloat("in", 0f);
         Op o = ctx.getOption("op", Op.class, Op.TRUNC);
         int r = switch (o) {

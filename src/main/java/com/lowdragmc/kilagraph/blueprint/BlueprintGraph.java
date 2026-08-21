@@ -69,6 +69,46 @@ public class BlueprintGraph extends Graph {
         types.add(KGTypeHandles.ENTITY);
         types.add(KGTypeHandles.PLAYER);
         types.add(KGTypeHandles.BLOCK_ENTITY);
+        types.add(KGTypeHandles.NBT_COMPOUND);
+        types.add(KGTypeHandles.RESOURCE_LOCATION);
+        types.add(KGTypeHandles.AABB);
+        types.add(KGTypeHandles.CHUNK_POS);
+        types.add(KGTypeHandles.TEXT);
+        types.add(KGTypeHandles.ROTATION);
+        types.add(KGTypeHandles.MIRROR);
+        types.add(KGTypeHandles.AXIS);
+        types.add(KGTypeHandles.EQUIPMENT_SLOT);
         return List.copyOf(types);
+    }
+
+    /**
+     * The types the item library offers as draggable Constant nodes.
+     *
+     * <p>Overridden because the default is {@link #getSupportTypes()}, which is the wrong list for
+     * this question. A type belongs in the type-picker dropdowns as soon as a port can carry it, but
+     * it only belongs here if a literal of it can be authored: {@code Level}, {@code Entity},
+     * {@code Player} and {@code BlockEntity} are deliberately wire-only — they have no
+     * {@code AccessorRegistries} entry, so their constant node renders an empty inspector row and
+     * emits {@code null}. Offering four nodes that cannot do anything is worse than not offering
+     * them.</p>
+     *
+     * <p>{@code LIST}, {@code MAP} and {@code NODE_REF} are excluded for the same reason — they are
+     * registered without a default constant on purpose (see {@link KGTypeHandles}).</p>
+     */
+    @Override
+    public List<TypeHandle> getLibrarySupportTypes() {
+        KGTypeHandles.init();
+        return List.of(
+                TypeHandles.BOOL, TypeHandles.INT, TypeHandles.LONG, TypeHandles.FLOAT,
+                TypeHandles.DOUBLE, TypeHandles.STRING,
+                KGTypeHandles.VEC2, KGTypeHandles.VEC3, KGTypeHandles.VEC4,
+                // Minecraft (LDLib2-provided) — all accessor-backed, all have pickers
+                TypeHandles.DIRECTION, TypeHandles.BLOCK, TypeHandles.ITEM, TypeHandles.FLUID,
+                TypeHandles.ENTITY_TYPE, TypeHandles.ITEM_STACK, TypeHandles.FLUID_STACK,
+                // Minecraft (KilaGraph-provided)
+                KGTypeHandles.BLOCK_POS, KGTypeHandles.BLOCK_STATE, KGTypeHandles.NBT_COMPOUND,
+                KGTypeHandles.RESOURCE_LOCATION, KGTypeHandles.AABB, KGTypeHandles.CHUNK_POS,
+                KGTypeHandles.TEXT, KGTypeHandles.ROTATION, KGTypeHandles.MIRROR,
+                KGTypeHandles.AXIS, KGTypeHandles.EQUIPMENT_SLOT);
     }
 }

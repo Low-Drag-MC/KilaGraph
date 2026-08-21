@@ -28,7 +28,17 @@ public abstract class ExecFrame {
 
     GraphExecutor scope;
 
-    private NodeModel[] pending = new NodeModel[8];
+    /**
+     * Prepared nodes rather than models.
+     *
+     * <p>The queue holds what {@code executeStep} dispatches on, so a step no longer starts by
+     * looking its node up in an {@code IdentityHashMap}. The lookup does not move to enqueue time
+     * either for the path that matters: {@code ctx.flow(...)} appends a pre-resolved
+     * {@code flowTargets} array with an {@code arraycopy}, and only the three entry points that
+     * genuinely start from a model — the session's entry node, a wire-portal fan-out, and a subgraph
+     * entry — resolve anything at all.</p>
+     */
+    private PreparedGraph.Node[] pending = new PreparedGraph.Node[8];
     private int head;
     private int tail;
 
@@ -41,19 +51,22 @@ public abstract class ExecFrame {
     // ---- queue ------------------------------------------------------------------------------
 
     /** Enqueue pre-resolved exec targets — what {@link ExecContext#flow} hands us. */
-    void enqueueAll(NodeModel[] targets) {
+    void enqueueAll(PreparedGraph.Node[] targets) {
         if (targets.length == 0) return;
         ensureRoom(targets.length);
         System.arraycopy(targets, 0, pending, tail, targets.length);
         tail += targets.length;
     }
 
-    /** Enqueue the node(s) wired to {@code outputPort}. For paths that hold a raw port. */
+    /**
+     * Enqueue the node(s) wired to {@code outputPort}. For the paths that hold a raw port — a
+     * wire-portal fan-out and a subgraph entry, neither of which has a prepared exec output to read.
+     */
     void enqueueFlow(PortModel outputPort) {
         if (outputPort == null) return;
         List<PortModel> connected = outputPort.getConnectedPorts();
         for (int i = 0; i < connected.size(); i++) {
-            if (connected.get(i).getNodeModel() instanceof NodeModel nm) enqueueOne(nm);
+            if (connected.get(i).getNodeModel() instanceof NodeModel nm) enqueueModel(nm);
         }
     }
 
@@ -64,9 +77,21 @@ public abstract class ExecFrame {
         if (idx >= 0) enqueueAll(node.flowTargets[idx]);
     }
 
-    void enqueueOne(NodeModel node) {
+    void enqueueOne(PreparedGraph.Node node) {
+        if (node == null) return;
         ensureRoom(1);
         pending[tail++] = node;
+    }
+
+    /**
+     * Enqueue a node named by its model, resolving it against this frame's scope.
+     *
+     * <p>Resolving here rather than at step time is also what keeps a nested subgraph honest: the
+     * scope is the executor the node will actually run in, so a node can only ever enter a queue
+     * paired with the graph it belongs to.</p>
+     */
+    void enqueueModel(NodeModel node) {
+        enqueueOne(scope.resolveForFlow(node));
     }
 
     private void ensureRoom(int n) {
@@ -76,7 +101,7 @@ public abstract class ExecFrame {
             System.arraycopy(pending, head, pending, 0, size);
             Arrays.fill(pending, size, tail, null);
         } else {
-            NodeModel[] bigger = new NodeModel[Math.max(size + n, pending.length * 2)];
+            PreparedGraph.Node[] bigger = new PreparedGraph.Node[Math.max(size + n, pending.length * 2)];
             System.arraycopy(pending, head, bigger, 0, size);
             pending = bigger;
         }
@@ -88,16 +113,22 @@ public abstract class ExecFrame {
         return head < tail;
     }
 
-    NodeModel poll() {
-        NodeModel n = pending[head];
+    PreparedGraph.Node poll() {
+        PreparedGraph.Node n = pending[head];
         pending[head++] = null;
         if (head == tail) head = tail = 0;
         return n;
     }
 
     /** Peek the next node this frame would run (without removing it). Null if none pending. */
-    NodeModel peek() {
+    PreparedGraph.Node peek() {
         return head < tail ? pending[head] : null;
+    }
+
+    /** {@link #peek} as the model the debugger surface reports. Null if none pending. */
+    NodeModel peekModel() {
+        PreparedGraph.Node n = peek();
+        return n == null ? null : n.asNodeModel;
     }
 
     void clearPending() {

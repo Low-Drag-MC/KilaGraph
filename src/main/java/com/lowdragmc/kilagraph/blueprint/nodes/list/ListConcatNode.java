@@ -16,12 +16,15 @@ import java.util.List;
 public class ListConcatNode extends AnnotatedNode {
     @Option public int inputs = 2;
     @OutputPort public List<?> out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         int n = Math.max(1, optionValue("inputs", Integer.class, inputs));
         for (int i = 1; i <= n; i++) ctx.addInputPort(PortIds.in(i), List.class);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         int n = Math.max(1, ctx.getOption("inputs", Integer.class, inputs));
         List<Object> result = new ArrayList<>();
         for (int i = 1; i <= n; i++) {

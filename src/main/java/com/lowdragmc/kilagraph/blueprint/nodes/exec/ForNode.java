@@ -36,12 +36,13 @@ public class ForNode extends AnnotatedNode {
         // The controller drives iterations on the step-able engine: each iteration clears the cache
         // and publishes "index" into node state (read back by evaluate()); the engine runs the body
         // a node at a time and fires "completed" when the count is exhausted.
-        ctx.pushLoop(new LoopController.ForController((NodeModel) getNodeModel(), n), "body", "completed");
+        ctx.pushLoop(new LoopController.ForController(n), "body", "completed");
     }
 
     @Override
     public void evaluate(EvalContext ctx) {
-        Object i = ctx.getExecutor().nodeState(getNodeModel().getUid()).get("index");
-        ctx.setOutput("index", i == null ? 0 : i);
+        // The int overload, so the index reaches downstream nodes through the numeric lane. Read
+        // from the running controller rather than per-node state: no hash lookups, no boxing.
+        ctx.setOutput("index", ctx.loopIndex());
     }
 }

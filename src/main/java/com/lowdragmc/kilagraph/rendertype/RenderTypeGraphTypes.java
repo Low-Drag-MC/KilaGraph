@@ -144,7 +144,8 @@ public final class RenderTypeGraphTypes {
         UV0("uv0"), UV1("uv1"), UV2("uv2");
         private final String name;
         UvChannel(String name) { this.name = name; }
-        @Override public String getSerializedName() { return name; }
+        @Override
+        public String getSerializedName() { return name; }
     }
 
     public static final Codec<UvChannel> UV_CODEC =
@@ -159,7 +160,8 @@ public final class RenderTypeGraphTypes {
         CUSTOM("custom"), ATLAS("atlas");
         private final String name;
         SamplerMode(String name) { this.name = name; }
-        @Override public String getSerializedName() { return name; }
+        @Override
+        public String getSerializedName() { return name; }
     }
 
     /** Texture filtering (maps to {@code com.mojang.blaze3d.textures.FilterMode}). */
@@ -167,7 +169,8 @@ public final class RenderTypeGraphTypes {
         NEAREST("nearest"), LINEAR("linear");
         private final String name;
         SamplerFilter(String name) { this.name = name; }
-        @Override public String getSerializedName() { return name; }
+        @Override
+        public String getSerializedName() { return name; }
     }
 
     /** Texture address/wrap mode (maps to {@code com.mojang.blaze3d.textures.AddressMode}). */
@@ -175,7 +178,8 @@ public final class RenderTypeGraphTypes {
         REPEAT("repeat"), CLAMP("clamp");
         private final String name;
         SamplerAddress(String name) { this.name = name; }
-        @Override public String getSerializedName() { return name; }
+        @Override
+        public String getSerializedName() { return name; }
     }
 
     /**
@@ -227,7 +231,8 @@ public final class RenderTypeGraphTypes {
         BLEND("blend"), FIXED("fixed");
         private final String name;
         BlendMode(String name) { this.name = name; }
-        @Override public String getSerializedName() { return name; }
+        @Override
+        public String getSerializedName() { return name; }
     }
 
     /**

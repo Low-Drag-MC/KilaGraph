@@ -40,14 +40,12 @@ public class ForEachNode extends AnnotatedNode {
         List<?> values = ctx.getInput("list", List.class, List.of());
         // The controller publishes "index"/"item" into node state per iteration (read by evaluate());
         // the engine steps the body and fires "completed" when the list is exhausted.
-        ctx.pushLoop(new LoopController.ForEachController((NodeModel) getNodeModel(), values), "body", "completed");
+        ctx.pushLoop(new LoopController.ForEachController(values), "body", "completed");
     }
 
     @Override
     public void evaluate(EvalContext ctx) {
-        var state = ctx.getExecutor().nodeState(getNodeModel().getUid());
-        Object i = state.get("index");
-        ctx.setOutput("index", i == null ? 0 : i);
-        ctx.setOutput("item", state.get("item"));
+        ctx.setOutput("index", ctx.loopIndex());
+        ctx.setOutput("item", ctx.loopItem());
     }
 }

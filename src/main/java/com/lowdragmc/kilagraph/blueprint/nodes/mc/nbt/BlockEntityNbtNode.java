@@ -20,7 +20,9 @@ public class BlockEntityNbtNode extends AnnotatedNode {
 
     @InputPort public BlockEntity blockEntity;
     @OutputPort public CompoundTag out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         BlockEntity be = ctx.getInput("blockEntity", BlockEntity.class, null);
         if (be == null || be.getLevel() == null) { ctx.setOutput("out", new CompoundTag()); return; }
         ctx.setOutput("out", be.saveWithoutMetadata(be.getLevel().registryAccess()));

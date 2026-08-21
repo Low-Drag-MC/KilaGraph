@@ -3,7 +3,6 @@ package com.lowdragmc.kilagraph.graph.exec;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 
 /**
  * An entered subgraph. The frame's {@link #scope} is the <em>child</em> {@link GraphExecutor}, so
@@ -17,27 +16,26 @@ public final class SubgraphFrame extends ExecFrame {
 
     private final GraphExecutor parentScope;
     private final ExecFrame parentFrame;
-    private final SubgraphNodeModel sub;
+    private final PreparedGraph.Node subNode;
     private final CustomGraphModelImpl inner;
 
     SubgraphFrame(GraphExecutor childScope, GraphExecutor parentScope, ExecFrame parentFrame,
-                  SubgraphNodeModel sub, CustomGraphModelImpl inner) {
+                  PreparedGraph.Node subNode, CustomGraphModelImpl inner) {
         super(childScope);
         this.parentScope = parentScope;
         this.parentFrame = parentFrame;
-        this.sub = sub;
+        this.subNode = subNode;
         this.inner = inner;
     }
 
-    @Override public Kind kind() { return Kind.SUBGRAPH; }
+    @Override
+    public Kind kind() { return Kind.SUBGRAPH; }
 
     @Override boolean resume(ExecSession session) {
-        // Harvest inner WRITE data vars into the parent's output cache, then fire the exec-out pins
-        // the inner run reached into the parent frame so the outer flow continues.
-        parentScope.harvestSubgraphOutputs(sub, inner, scope);
-        for (PortModel pin : parentScope.reachedExecOutPins(sub, inner, scope)) {
-            parentFrame.enqueueFlow(pin);
-        }
+        // Harvest inner WRITE data vars into the parent's value table and fire the exec-out pins the
+        // inner run reached, so the outer flow continues. One call rather than two, because the
+        // pins used to be collected into a list only to be walked once and discarded.
+        parentScope.finishSubgraph(subNode, inner, scope, parentFrame);
         return false;  // subgraph done — pop
     }
 

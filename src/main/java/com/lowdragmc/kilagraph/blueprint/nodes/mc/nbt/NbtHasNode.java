@@ -20,7 +20,9 @@ public class NbtHasNode extends AnnotatedNode {
     @InputPort public CompoundTag tag;
     @InputPort public String key = "";
     @OutputPort public boolean out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         CompoundTag t = ctx.getInput("tag", CompoundTag.class, null);
         String k = ctx.getInput("key", String.class, "");
         ctx.setOutput("out", t != null && !k.isEmpty() && t.contains(k));

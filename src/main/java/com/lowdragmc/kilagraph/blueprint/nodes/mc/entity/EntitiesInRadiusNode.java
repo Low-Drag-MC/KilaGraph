@@ -27,7 +27,9 @@ public class EntitiesInRadiusNode extends AnnotatedNode {
     @InputPort public BlockPos center = BlockPos.ZERO;
     @InputPort public double radius = 8.0;
     @OutputPort public List<Entity> out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         Level l = ctx.getInput("level", Level.class, null);
         if (l == null) { ctx.setOutput("out", List.of()); return; }
         BlockPos c = ctx.getInput("center", BlockPos.class, BlockPos.ZERO);

@@ -26,7 +26,8 @@ public class ListCombineNode extends AnnotatedNode {
     @Option public int inputs = 2;
 
     @OutputPort public List<?> out;
-@Override
+
+    @Override
     protected void onDefineExtraOptions(IOptionDefinitionContext context) {
         context.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())

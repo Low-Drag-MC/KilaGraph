@@ -74,6 +74,7 @@ public final class MapNodeGameTest {
     public static void create(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1", "b", "2");
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> map = new GraphExecutor(g).evaluate(m.getOutputsById().get("out"), Map.class);
         assertEq(helper, "size", 2, map.size());
@@ -131,6 +132,7 @@ public final class MapNodeGameTest {
         setInputConstant(put, "key", "b");
         setInputConstant(put, "value", "2");
         wire(g, put.getInputsById().get("map"), m.getOutputsById().get("out"));
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> result = new GraphExecutor(g).evaluate(put.getOutputsById().get("out"), Map.class);
         assertEq(helper, "size", 2, result.size());
@@ -149,6 +151,7 @@ public final class MapNodeGameTest {
         setOption(rm, "keyType", TypeHandles.STRING.getIdentification());
         setInputConstant(rm, "key", "a");
         wire(g, rm.getInputsById().get("map"), m.getOutputsById().get("out"));
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> result = new GraphExecutor(g).evaluate(rm.getOutputsById().get("out"), Map.class);
         assertEq(helper, "size", 1, result.size());
@@ -220,6 +223,7 @@ public final class MapNodeGameTest {
         var k = addNode(g, MapKeysNode.class);
         setOption(k, "keyType", TypeHandles.STRING.getIdentification());
         wire(g, k.getInputsById().get("map"), m.getOutputsById().get("out"));
+
         @SuppressWarnings("unchecked")
         List<Object> keys = new GraphExecutor(g).evaluate(k.getOutputsById().get("out"), List.class);
         assertEq(helper, "size", 3, keys.size());
@@ -239,6 +243,7 @@ public final class MapNodeGameTest {
         var m = stringStringMap(g, "a", "1", "b", "2");
         var v = addNode(g, MapValuesNode.class);
         wire(g, v.getInputsById().get("map"), m.getOutputsById().get("out"));
+
         @SuppressWarnings("unchecked")
         List<Object> values = new GraphExecutor(g).evaluate(v.getOutputsById().get("out"), List.class);
         assertEq(helper, "size", 2, values.size());
@@ -291,6 +296,7 @@ public final class MapNodeGameTest {
         var merge = addNode(g, MapMergeNode.class);
         wire(g, merge.getInputsById().get("a"), mA.getOutputsById().get("out"));
         wire(g, merge.getInputsById().get("b"), mB.getOutputsById().get("out"));
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> result = new GraphExecutor(g).evaluate(merge.getOutputsById().get("out"), Map.class);
         assertEq(helper, "size", 3, result.size());
@@ -316,10 +322,13 @@ public final class MapNodeGameTest {
         wire(g, put.getInputsById().get("map"), src.getOutputsById().get("out"));
 
         var exec = new GraphExecutor(g);
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> s1 = exec.evaluate(src.getOutputsById().get("out"), Map.class);
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> pAfter = exec.evaluate(put.getOutputsById().get("out"), Map.class);
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> s2 = exec.evaluate(src.getOutputsById().get("out"), Map.class);
 

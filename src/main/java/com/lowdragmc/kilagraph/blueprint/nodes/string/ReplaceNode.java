@@ -13,7 +13,9 @@ public class ReplaceNode extends AnnotatedNode {
     @InputPort public String search = "";
     @InputPort public String replacement = "";
     @OutputPort public String out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         String s = ctx.getInput("in", String.class, "");
         String search = ctx.getInput("search", String.class, "");
         String repl = ctx.getInput("replacement", String.class, "");

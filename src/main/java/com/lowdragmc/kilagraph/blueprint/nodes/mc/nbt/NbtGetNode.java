@@ -16,6 +16,8 @@ import java.util.List;
  * Read a value out of a {@link CompoundTag} by key. The {@link NbtValueType} option both selects
  * how the value is read and types the {@code out} port. Missing key / null tag → type default.
  */
+// valueType MUST stay an option, not a port: it decides the dynamic output port's TypeHandle, and
+// onDefineDynamicPorts can read an option (optionValue) but cannot know what a wire will carry.
 @NodeAttribute(name = "mc_nbt_get", group = "mc_nbt", graphTypes = BlueprintGraph.class)
 public class NbtGetNode extends AnnotatedNode {
     @Override
@@ -27,11 +29,14 @@ public class NbtGetNode extends AnnotatedNode {
     @Option public NbtValueType valueType = NbtValueType.STRING;
     @InputPort public CompoundTag tag;
     @InputPort public String key = "";
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addOutputPort("out", optionValue("valueType", NbtValueType.class, valueType).portType());
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         CompoundTag t = ctx.getInput("tag", CompoundTag.class, null);
         String k = ctx.getInput("key", String.class, "");
         NbtValueType vt = ctx.getOption("valueType", NbtValueType.class, NbtValueType.STRING);

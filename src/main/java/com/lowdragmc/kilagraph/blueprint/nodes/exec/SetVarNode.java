@@ -31,11 +31,10 @@ public class SetVarNode extends AnnotatedNode {
 
     @Override
     public void execute(ExecContext ctx) {
-        String name = ctx.getOption("varName", String.class, "");
-        if (!name.isEmpty()) {
-            Object value = ctx.getInputRaw("value");
-            ctx.getExecutor().getEnvironment().variables().put(name, value);
-        }
+        // setVariable rather than variables().put(name, getInputRaw("value")): the latter reads the
+        // value as an Object, which boxes every number on the way out of the port table. This copies
+        // it lane to lane, so writing a float allocates nothing.
+        ctx.setVariable(ctx.getOption("varName", String.class, ""), "value");
         ctx.flow("next");
     }
 }

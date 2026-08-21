@@ -16,11 +16,14 @@ import java.util.Objects;
 public class ListContainsNode extends AnnotatedNode {
     @InputPort public List<?> list = List.of();
     @OutputPort public boolean out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("value", TypeHandles.UNKNOWN);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         List<?> src = ctx.getInput("list", List.class, List.of());
         Object target = ctx.getInputRaw("value");
         boolean found = false;

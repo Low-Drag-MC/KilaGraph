@@ -77,7 +77,12 @@ import java.util.UUID;
 public final class GraphExecutor {
 
     private final Graph graph;
-    private final EvaluationEnvironment env;
+    /**
+     * Not final: a pooled subgraph child is handed a fresh environment on every call, because
+     * {@code createChild} is a documented override point for a host carrying its own context
+     * down and must not be skipped. See {@link #resetForReuse}.
+     */
+    private EvaluationEnvironment env;
 
     // ---- resolved structure (shared, rebuilt when the graph is edited) ----
     @Nullable private PreparedGraph prepared;
@@ -116,6 +121,33 @@ public final class GraphExecutor {
     private int[] written = EMPTY_STAMPS;
     private int writtenCount;
 
+    /**
+     * The variable cell each variable-touching node resolved, by node index, plus the name it was
+     * resolved for.
+     *
+     * <p>Per executor, not per prepared graph: a cell belongs to one {@link VariableStore}, and a
+     * prepared graph is shared by executors with different environments. Cleared whenever the
+     * environment or the prepared graph is replaced, which is the only way a cached cell could come
+     * to belong to the wrong store.</p>
+     *
+     * <p>The name is re-checked by identity. {@code SetVar} takes its name from an option whose
+     * {@code String} is stable until edited, and a variable node's name likewise — so the check
+     * costs a reference compare and an edit resolves afresh.</p>
+     */
+    private VarCell[] varCells = EMPTY_CELLS;
+    private String[] varCellNames = EMPTY_CELL_NAMES;
+
+    /**
+     * The controller of each loop node currently iterating, by node index.
+     *
+     * <p>A loop's {@code index} and {@code item} outputs are recomputed from here whenever they are
+     * demanded, rather than written into the node's slot when the iteration begins. The engine clears
+     * the value cache between iterations, so a slot written at iteration start would be wiped by a
+     * <em>nested</em> loop's clear and the enclosing loop's index would vanish — which is the bug
+     * {@code ForNode}'s javadoc has always warned about.</p>
+     */
+    private LoopController[] activeLoops = EMPTY_LOOPS;
+
     // ---- cycle detection: an on-stack flag per node index, plus the path for the exception ----
     private boolean[] onStack = EMPTY_FLAGS;
     private PreparedGraph.Node[] visitStack = EMPTY_NODES;
@@ -147,6 +179,95 @@ public final class GraphExecutor {
     /** See {@link #setGraphFrozen}. Off by default — correctness is not opt-in. */
     private boolean graphFrozen;
 
+    /**
+     * Recorder for what this run actually evaluated, or {@code null} — see {@link EvalTrace}.
+     * Null for every non-test caller, so the hot paths pay one perfectly-predicted null check.
+     */
+    @Nullable private EvalTrace trace;
+
+    /**
+     * An executor optimisation that can be switched off.
+     *
+     * <p>Every optimisation keeps the path it replaced, reachable through here, so a test can run the
+     * same graph both ways and demand the results be indistinguishable — see
+     * {@code KGDifferential}. That is the safety argument for each of them, and it only works if
+     * turning one off really does restore the old behaviour rather than an approximation of it.</p>
+     */
+    public enum Opt {
+        /**
+         * Resolve a subgraph call site's mirror pins, callee and entry node at prepare time instead
+         * of re-deriving them — {@code uid.toString()} and a concatenation per variable per call.
+         */
+        SUBGRAPH_PRERESOLVE,
+        /**
+         * Reuse a subgraph's child executor across calls instead of building one — and its value
+         * tables, its context pools and its two collections — every time.
+         */
+        SUBGRAPH_POOLING,
+        /**
+         * Read a node option through the prepared constant table instead of
+         * {@code PortModel.getEmbeddedValue()}, which is a hash lookup keyed by the port's unique
+         * name — paid on every option read of every evaluation.
+         */
+        OPTION_PRERESOLVE,
+        /**
+         * Dispatch an exec step straight off the prepared node the frame queue holds.
+         *
+         * <p>Switching this off does not restore an older code path — there isn't one, the queue now
+         * holds prepared nodes throughout. It puts back exactly the work that removing that lookup
+         * took away: the {@code IdentityHashMap} hop from model to prepared node, and the
+         * {@code mayCycle} re-read that came with it. That makes the change measurable against itself
+         * on a machine where a before-and-after across two runs of the suite cannot resolve it.</p>
+         */
+        EXEC_PRERESOLVE,
+        /**
+         * Read and write graph variables through a cached {@link VarCell} instead of the store's
+         * name-keyed map, keeping numbers in the raw-bits lane on the way through.
+         */
+        VARIABLE_CELLS,
+        /**
+         * Evaluate the arithmetic nodes {@link Intrinsics} knows directly, instead of calling
+         * their {@code evaluate} through the shared megamorphic call site.
+         */
+        INTRINSICS,
+        /**
+         * Run the simple exec nodes — {@code Entry}, {@code Noop}, {@code Branch}, {@code Gate},
+         * {@code SetVar} — without binding an {@link ExecContext} or calling their {@code execute}.
+         */
+        EXEC_INTRINSICS,
+        /**
+         * Drain a frame's queue without re-settling the stack between nodes, in
+         * {@link ExecSession#runToCompletion()}. Stepping one node at a time is unaffected.
+         */
+        FUSED_EXEC_DRIVER
+    }
+
+    /** @see Opt#FUSED_EXEC_DRIVER */
+    boolean fusedExecDriver() {
+        return opt(Opt.FUSED_EXEC_DRIVER);
+    }
+
+    /** @see Opt#OPTION_PRERESOLVE */
+    boolean optionPreresolve() {
+        return opt(Opt.OPTION_PRERESOLVE);
+    }
+
+    /** Bitmask over {@link Opt}; every optimisation on by default. Propagated to child executors. */
+    private int enabledOpts = -1;
+
+    private boolean opt(Opt o) {
+        return (enabledOpts & (1 << o.ordinal())) != 0;
+    }
+
+    /**
+     * Turn an executor optimisation on or off. Test and diagnostic use only — the off path exists to
+     * be compared against, not to be shipped. Applies to subgraph child executors too.
+     */
+    public void setOptimisationEnabled(Opt o, boolean enabled) {
+        int bit = 1 << o.ordinal();
+        enabledOpts = enabled ? (enabledOpts | bit) : (enabledOpts & ~bit);
+    }
+
     /** Mirrors {@link PreparedGraph#mayCycle()} — false lets a pull skip the visiting stack. */
     private boolean cycleChecks = true;
 
@@ -165,6 +286,9 @@ public final class GraphExecutor {
     private static final int[] EMPTY_STAMPS = new int[0];
     private static final boolean[] EMPTY_FLAGS = new boolean[0];
     private static final PreparedGraph.Node[] EMPTY_NODES = new PreparedGraph.Node[0];
+    private static final VarCell[] EMPTY_CELLS = new VarCell[0];
+    private static final String[] EMPTY_CELL_NAMES = new String[0];
+    private static final LoopController[] EMPTY_LOOPS = new LoopController[0];
 
     public GraphExecutor(Graph graph) {
         this(graph, EvaluationEnvironment.defaults());
@@ -277,6 +401,9 @@ public final class GraphExecutor {
                 stamps = EMPTY_STAMPS;
                 written = EMPTY_STAMPS;
                 writtenCount = 0;
+                varCells = EMPTY_CELLS;
+                varCellNames = EMPTY_CELL_NAMES;
+                activeLoops = EMPTY_LOOPS;
             }
         }
         cycleChecks = prepared == null || prepared.mayCycle();
@@ -287,7 +414,7 @@ public final class GraphExecutor {
      * Refresh the prepared form, but only when this really is a top-level entry.
      *
      * <p>Swapping it mid-evaluation would pull the slot table out from under every caller further
-     * up that already holds slot indices. {@code InfoFieldBlock} reaches {@link #pullInputValue}
+     * up that already holds slot indices. {@code InfoPropertyBlock} reaches {@link #pullInputValue}
      * from inside its own {@code evaluate}, and nothing stops a third-party node calling
      * {@link #evaluate} the same way — so the guard belongs on all three entry points rather than
      * on the one where a caller happens to exist today.</p>
@@ -315,6 +442,9 @@ public final class GraphExecutor {
             int size = Math.max(nodes, Math.max(16, onStack.length * 2));
             onStack = Arrays.copyOf(onStack, size);
             visitStack = Arrays.copyOf(visitStack, size);
+            varCells = Arrays.copyOf(varCells, size);
+            varCellNames = Arrays.copyOf(varCellNames, size);
+            activeLoops = Arrays.copyOf(activeLoops, size);
         }
     }
 
@@ -331,6 +461,16 @@ public final class GraphExecutor {
         return n;
     }
 
+    /**
+     * Resolve a node named by its model, for the enqueue paths that start from one. Prepares the
+     * graph first: a subgraph child is seeded with its entry node before it has ever run.
+     */
+    @Nullable
+    PreparedGraph.Node resolveForFlow(@Nullable NodeModel m) {
+        if (prepared == null) syncPrepared();
+        return resolve(m);
+    }
+
     // ---- exec stepping -----------------------------------------------------------------------
 
     /**
@@ -345,12 +485,27 @@ public final class GraphExecutor {
      *       drive the session's frame stack.</li>
      * </ul>
      */
-    void executeStep(NodeModel n, ExecSession session, ExecFrame frame) {
-        // A child scope entered through a SubgraphFrame is stepped without ever passing through one
-        // of this executor's own kick-off surfaces, so this is its first chance to be prepared.
-        if (prepared == null) syncPrepared();
-        PreparedGraph.Node node = resolve(n);
+    void executeStep(PreparedGraph.Node node, ExecSession session, ExecFrame frame) {
         if (node == null) return;
+        // The queue is addressed by prepared node now, so a node from another graph would index this
+        // executor's slot table and quietly read someone else's values. Frames resolve against their
+        // own scope, so this cannot happen — but "cannot" here rested on every enqueue path being
+        // right, and the failure is silent wrong data rather than a crash, which is worth one
+        // reference compare per step to rule out.
+        if (node.ownerGraph() != prepared) {
+            throw new IllegalStateException("exec step for a node from a different prepared graph: "
+                    + node.uid);
+        }
+        if (!opt(Opt.EXEC_PRERESOLVE)) {
+            // Measurement path only — see Opt.EXEC_PRERESOLVE. Same node back, same work as before.
+            node = resolve(node.model);
+            if (node == null) return;
+        }
+        if (trace != null) trace.recordExec(node.model);
+        if (node.execOp != Intrinsics.NONE && opt(Opt.EXEC_INTRINSICS)) {
+            execIntrinsic(node, frame);
+            return;
+        }
         switch (node.execKind) {
             case SUBGRAPH -> subgraphEnter(node, session, frame);
             case PORTAL_ENTRY -> {
@@ -386,6 +541,55 @@ public final class GraphExecutor {
     }
 
     /**
+     * Run an exec node directly, without binding a context or calling it.
+     *
+     * <p>As on the data side, each case is a transcription of the node's {@code execute} body. The
+     * saving is larger here: an exec node's context bind clears a staged-output table and its flush
+     * walks every output slot, and {@code Branch}, {@code Gate} and {@code Noop} stage nothing at
+     * all — so the whole staging round trip was pure overhead for the commonest control-flow nodes
+     * in any graph.</p>
+     */
+    private void execIntrinsic(PreparedGraph.Node n, ExecFrame frame) {
+        switch (n.execOp) {
+            // Entry / Noop: ctx.flow(the one exec output)
+            case Intrinsics.XOP_FLOW -> frame.enqueueAll(n.flowTargets[n.execFlowA]);
+
+            // Branch: ctx.flow(ctx.getBool("cond", false) ? "trueExec" : "falseExec")
+            case Intrinsics.XOP_BRANCH ->
+                    frame.enqueueAll(n.flowTargets[pullBool(n, n.execIn, false) ? n.execFlowA : n.execFlowB]);
+
+            // Gate: if (ctx.getBool("enabled", true)) ctx.flow("out")
+            case Intrinsics.XOP_GATE -> {
+                if (pullBool(n, n.execIn, true)) frame.enqueueAll(n.flowTargets[n.execFlowA]);
+            }
+
+            // SetVar: ctx.setVariable(ctx.getOption("varName", String, ""), "value"); ctx.flow("next")
+            case Intrinsics.XOP_SETVAR -> {
+                Object raw = optionValue(n, n.execAux);
+                if (raw instanceof String name) assignVariable(n, n.execIn, name);
+                frame.enqueueAll(n.flowTargets[n.execFlowA]);
+            }
+
+            default -> { }
+        }
+    }
+
+    /** An input as a {@code boolean}, matching {@code EvalContext.getBool}: only a Boolean counts. */
+    private boolean pullBool(PreparedGraph.Node owner, int inputIndex, boolean def) {
+        Object raw = pullInput(owner, inputIndex, Object.class);
+        return raw instanceof Boolean b ? b : def;
+    }
+
+    /** A node option's current value, read the way {@code EvalContext.getOption} reads it. */
+    @Nullable
+    private Object optionValue(PreparedGraph.Node n, int optionIndex) {
+        int ii = n.optionInputIndex[optionIndex];
+        Constant c = ii >= 0 && opt(Opt.OPTION_PRERESOLVE) ? n.inputConstants[ii]
+                : n.optionPorts[optionIndex].getEmbeddedValue();
+        return c == null ? null : c.getValue();
+    }
+
+    /**
      * Enter a subgraph on the exec path: seed the child env from the inner READ data variables, then
      * push a {@link SubgraphFrame} (scoped to a child executor) primed at the inner exec-IN
      * variable's downstream. The frame's {@code resume} harvests WRITE data + fires reached exec-out
@@ -393,6 +597,33 @@ public final class GraphExecutor {
      * so the outer flow doesn't dead-end.
      */
     private void subgraphEnter(PreparedGraph.Node node, ExecSession session, ExecFrame frame) {
+        if (!opt(Opt.SUBGRAPH_PRERESOLVE)) {
+            subgraphEnterUnresolved(node, session, frame);
+            return;
+        }
+        CustomGraphModelImpl inner = node.subInner;
+        if (inner == null) {
+            // Unresolved or self-referential callee: fire every exec pin so the outer flow does not
+            // dead-end, exactly as before.
+            for (PortModel p : node.execOutputs) frame.enqueueFlow(p);
+            return;
+        }
+        VariableStore childStore = childStoreFor(node);
+        for (PreparedGraph.SubBinding bind : node.subBindings) {
+            if (bind.isExec() || !bind.read() || bind.outerIn() == null) continue;
+            Object value = bind.outerInIndex() >= 0
+                    ? pullInput(node, bind.outerInIndex(), Object.class)
+                    : pullInput(bind.outerIn(), Object.class);
+            childStore.put(bind.decl().getName(), value);
+        }
+        var childExec = checkoutChild(node, inner, childStore);
+        var subFrame = new SubgraphFrame(childExec, this, frame, node, inner);
+        subFrame.enqueueEntry(node.subEntry);
+        session.push(subFrame);
+    }
+
+    /** The pre-{@link Opt#SUBGRAPH_PRERESOLVE} path, kept so the two can be compared. */
+    private void subgraphEnterUnresolved(PreparedGraph.Node node, ExecSession session, ExecFrame frame) {
         SubgraphNodeModel sub = node.subgraphNode;
         if (!(sub.getSubgraphModel() instanceof CustomGraphModelImpl inner)
                 || inner == graph.graphModel || inner.getGraph() == null) {
@@ -412,11 +643,152 @@ public final class GraphExecutor {
             if (outerInput == null) continue;
             childStore.put(v.getName(), pullInput(outerInput, Object.class));
         }
-        var childEnv = env.createChild(childStore);
-        var childExec = new GraphExecutor(inner.getGraph(), childEnv);
-        var subFrame = new SubgraphFrame(childExec, this, frame, sub, inner);
+        var childExec = checkoutChild(null, inner, childStore);
+        var subFrame = new SubgraphFrame(childExec, this, frame, node, inner);
         subFrame.enqueueEntry(findExecEntryNode(inner));
         session.push(subFrame);
+    }
+
+    /**
+     * Free child executors, keyed by the call site that made them. Lazily created — a graph with no
+     * subgraphs never allocates it.
+     *
+     * <p>A list per call site rather than one executor, because a subgraph can be entered while an
+     * earlier entry of the same call site is still live: recursion, and a loop body whose
+     * continuation outlives the call. The list is a stack, so the common depth-1 case touches
+     * index 0 every time.</p>
+     */
+    @Nullable private Map<PreparedGraph.Node, List<GraphExecutor>> subPool;
+
+    /**
+     * A child executor for {@code inner}, taken from the pool if one is free.
+     *
+     * <p>Building one per call meant building its value tables, its two context pools, its node-state
+     * map and its reached-exits set every time — and then throwing all of it away. Reuse keeps the
+     * arrays, which is most of what a subgraph call was allocating.</p>
+     */
+    /**
+     * The variable store to seed for a call of {@code site}: the free child's, emptied for reuse, or
+     * a new one.
+     *
+     * <p>Pooling the store as well as the executor matters more than it looks. A store now holds a
+     * {@link VarCell} per name rather than a boxed value, and a fresh store per call means a fresh
+     * cell per parameter per call — which cost more than the boxing the cells removed. Reusing it
+     * makes a repeated call allocate neither.</p>
+     *
+     * <p>{@code clear()} marks the cells absent without dropping them, so a node that resolved one
+     * keeps a valid reference. This peeks the same end of the free list that
+     * {@link #checkoutChild} pops from, so the store and the executor that get used are a pair.</p>
+     *
+     * <p>The contract this asks of a host: the store handed to {@code createChild} belongs to the
+     * call and must not be retained past it. Nothing retains one today, and the environment wrapping
+     * it is still built fresh every time.</p>
+     */
+    private VariableStore childStoreFor(@Nullable PreparedGraph.Node site) {
+        if (site == null || !opt(Opt.SUBGRAPH_POOLING) || subPool == null) return new VariableStore();
+        List<GraphExecutor> free = subPool.get(site);
+        if (free == null || free.isEmpty()) return new VariableStore();
+        VariableStore store = free.get(free.size() - 1).env.variables();
+        store.clear();
+        return store;
+    }
+
+    private GraphExecutor checkoutChild(@Nullable PreparedGraph.Node site, CustomGraphModelImpl inner,
+                                        VariableStore childStore) {
+        // createChild is a documented override point for a host carrying its own context down, so it
+        // is called on every entry rather than cached or reused.
+        EvaluationEnvironment childEnv = env.createChild(childStore);
+        if (site != null && opt(Opt.SUBGRAPH_POOLING) && subPool != null) {
+            List<GraphExecutor> free = subPool.get(site);
+            if (free != null && !free.isEmpty()) {
+                GraphExecutor reused = free.remove(free.size() - 1);
+                reused.resetForReuse(childEnv);
+                reused.trace = trace;
+                reused.enabledOpts = enabledOpts;
+                return reused;
+            }
+        }
+        var childExec = new GraphExecutor(inner.getGraph(), childEnv);
+        childExec.trace = trace;                  // one trace spans the whole call tree; see EvalTrace
+        childExec.enabledOpts = enabledOpts;      // a mode applies to the whole call tree, not just its root
+        return childExec;
+    }
+
+    /**
+     * Hand a finished child executor back for the next call of the same site.
+     *
+     * <p>Only ever called on the path where the child completed normally. A child whose run threw is
+     * simply dropped: its depth counters and cycle-detection stack are mid-unwind, and putting that
+     * back into a pool would carry the damage into an unrelated later call.</p>
+     */
+    private void releaseChild(@Nullable PreparedGraph.Node site, GraphExecutor child) {
+        if (site == null || !opt(Opt.SUBGRAPH_POOLING)) return;
+        if (subPool == null) subPool = new HashMap<>();
+        subPool.computeIfAbsent(site, k -> new ArrayList<>(2)).add(child);
+    }
+
+    /**
+     * Make a pooled executor indistinguishable from a newly built one, then bind it to {@code newEnv}.
+     *
+     * <p>Every difference a caller could observe has to be undone, and each of these is load-bearing
+     * rather than defensive:</p>
+     * <ul>
+     *   <li><b>node state</b> — a fresh executor has no {@code Cache} memo, so a subgraph containing
+     *       a {@code Cache} recomputes on every call. Keeping the map would silently turn that into
+     *       a memo across calls;</li>
+     *   <li><b>the RNG</b> — a fresh executor builds a new {@code Random} from the environment's
+     *       seed, so a seeded subgraph draws the same sequence on every call. Keeping it would make
+     *       the sequence continue instead;</li>
+     *   <li><b>reached exits</b> — the parent reads these to decide which exec-out pins to fire;</li>
+     *   <li><b>the value tables</b> — kept deliberately. That is the entire point.</li>
+     * </ul>
+     */
+    private void resetForReuse(EvaluationEnvironment newEnv) {
+        // A cached cell belongs to a store, not to an environment. The environment is rebuilt on
+        // every call (createChild is a host override point), but the store behind it is pooled — so
+        // the cache survives exactly when the store does.
+        if (this.env == null || this.env.variables() != newEnv.variables()) {
+            Arrays.fill(varCells, null);
+            Arrays.fill(varCellNames, null);
+        }
+        this.env = newEnv;
+        Arrays.fill(activeLoops, null);
+        this.rng = null;
+        nodeState.clear();
+        reachedExecOutputs.clear();
+        clearCache();
+        for (int i = 0; i < visitDepth; i++) {
+            onStack[visitStack[i].index] = false;
+            visitStack[i] = null;
+        }
+        visitDepth = 0;
+        evalDepth = 0;
+        execDepth = 0;
+        pooledSessionBusy = false;
+    }
+
+    // ---- loop iteration state ------------------------------------------------------------------
+
+    /** Register {@code controller} as {@code node}'s running loop. @see #activeLoops */
+    void beginLoop(PreparedGraph.Node node, LoopController controller) {
+        if (node.index < activeLoops.length) activeLoops[node.index] = controller;
+    }
+
+    /**
+     * Forget every loop's iteration state.
+     *
+     * <p>Paired with {@link #clearNodeState()}, which is where this state used to live: a loop's
+     * index and item were entries in the per-node map, so clearing that cleared them. Nothing else
+     * clears it — in particular the end of a loop does not, so its final index stays readable.</p>
+     */
+    void clearActiveLoops() {
+        Arrays.fill(activeLoops, null);
+    }
+
+    /** The controller of the loop {@code nodeIndex} is running, or null. */
+    @Nullable
+    LoopController activeLoop(int nodeIndex) {
+        return nodeIndex < activeLoops.length ? activeLoops[nodeIndex] : null;
     }
 
     // ---- per-node state ----------------------------------------------------------------------
@@ -429,6 +801,7 @@ public final class GraphExecutor {
     /** Reset per-node state — call between independent runs if you want a clean slate. */
     public void clearNodeState() {
         nodeState.clear();
+        clearActiveLoops();   // loop index/item used to live in nodeState; clearing it cleared them
     }
 
     /**
@@ -440,6 +813,27 @@ public final class GraphExecutor {
      * {@link #clearNodeState} (which drops every node's state), this targets exactly one node so a
      * {@code Cache} recomputes while unrelated memoised values stay put.</p>
      */
+    /**
+     * Drops a node's cached outputs, keeping its memory.
+     *
+     * <p>The distinction matters: {@link #invalidateNode} exists for {@code CacheClear}, whose whole
+     * job is to forget, while a host that writes a variable mid-run only needs the readers
+     * downstream of it to recompute. Erasing {@code nodeState} on that path silently resets every
+     * damped value, previous-frame edge and loop counter downstream of the write — once per frame,
+     * so they never accumulate anything and no error is ever raised.
+     */
+    public void invalidateNodeOutputs(NodeModel target) {
+        if (target == null) return;
+        PreparedGraph.Node n = resolve(target);
+        if (n == null) return;
+        for (int slot : n.outputSlots) {
+            if (slot < stamps.length) {
+                stamps[slot] = 0;
+                slots[slot] = null;
+            }
+        }
+    }
+
     public void invalidateNode(NodeModel target) {
         if (target == null) return;
         nodeState.remove(target.getUid());
@@ -479,12 +873,24 @@ public final class GraphExecutor {
 
     // ---- slot access -------------------------------------------------------------------------
 
+    /**
+     * Write a reference value, logging the slot so {@link #clearCache()} can release it.
+     *
+     * <p>The log is keyed on <em>storing a reference</em>, not on being the first write of the
+     * generation. Those two used to be the same thing, and are not any more: {@link #writeNum} marks
+     * a slot's stamp without logging it, so a later object write to that same slot would have found
+     * the stamp current and skipped the log — and the object would then have survived
+     * {@code clearCache} with nothing holding a record of it. No path reaches that today, but the
+     * consequence is a retained {@code Entity} or {@code ItemStack} rather than a wrong answer, and
+     * an invariant that has to be argued from the whole program is not one worth relying on.
+     * Logging every non-null store keeps it local: <b>if a slot holds a reference, it is in the
+     * log.</b> A null store needs no entry because there is nothing to release, and duplicates are
+     * harmless — {@code clearCache} just nulls the slot twice.</p>
+     */
     void writeSlot(int slot, Object value) {
         kinds[slot] = KIND_OBJECT;
-        if (stamps[slot] != generation) {
-            stamps[slot] = generation;
-            // Grow rather than drop: invalidateNode clears a stamp mid-generation, so one slot can
-            // be logged twice, and a log that silently stops recording would leak the rest.
+        stamps[slot] = generation;
+        if (value != null) {
             if (writtenCount == written.length) {
                 written = Arrays.copyOf(written, Math.max(16, written.length * 2));
             }
@@ -493,18 +899,20 @@ public final class GraphExecutor {
         slots[slot] = value;
     }
 
-    /** Write an unboxed number. {@code slots[slot]} is cleared so the old value is not retained. */
+    /**
+     * Write an unboxed number. {@code slots[slot]} is cleared so the old value is not retained.
+     *
+     * <p>Unlike {@link #writeSlot} this does not log the slot in {@link #written}, and does not need
+     * to: the only thing {@link #clearCache()} does with that log is null the object lane, and this
+     * method has just nulled it. Skipping the log removes a load, a branch, a bounds check and a
+     * store from every numeric write — and shortens {@code clearCache} to the object writes, which
+     * for an arithmetic graph is almost none of them.</p>
+     */
     void writeNum(int slot, byte kind, long bits) {
         slots[slot] = null;
         nums[slot] = bits;
         kinds[slot] = kind;
-        if (stamps[slot] != generation) {
-            stamps[slot] = generation;
-            if (writtenCount == written.length) {
-                written = Arrays.copyOf(written, Math.max(16, written.length * 2));
-            }
-            written[writtenCount++] = slot;
-        }
+        stamps[slot] = generation;
     }
 
     /**
@@ -770,13 +1178,17 @@ public final class GraphExecutor {
     }
 
     private void evaluateNode(PreparedGraph.Node n) {
+        // Recorded before the intrinsic check, so the trace — and therefore the evaluation count the
+        // differential harness compares — is identical whichever path runs.
+        if (trace != null) trace.recordEval(n.model);
+        if (n.op != Intrinsics.NONE && opt(Opt.INTRINSICS) && evalIntrinsic(n)) return;
         switch (n.dataKind) {
             // 1) Constant node — read the constant value directly.
             case CONSTANT -> writeAllOutputs(n,
                     n.constantNode.tryGetValue(n.constantNode.getDataType()).result().orElse(null));
 
             // 2) Variable node — defer to the environment (which checks store then default).
-            case VARIABLE -> writeAllOutputs(n, env.lookupVariable(n.variableNode.getVariable()));
+            case VARIABLE -> evaluateVariable(n);
 
             // 3) Subgraph node — invoke the inner graph with mirrored variables.
             case SUBGRAPH -> evaluateSubgraph(n);
@@ -809,6 +1221,294 @@ public final class GraphExecutor {
     }
 
     /**
+     * Evaluate {@code n} directly, without calling the node.
+     *
+     * <p>Each case transcribes one node's {@code evaluate} body — the same reads, in the same order,
+     * with the same default literals. See {@link Intrinsics} for why that is the whole trick, and for
+     * the size limit this method has to stay under.</p>
+     *
+     * @return whether it was handled; {@code false} sends the node down its normal path
+     */
+    private boolean evalIntrinsic(PreparedGraph.Node n) {
+        return n.op < Intrinsics.OP_PREDICATE_BASE ? evalArithmetic(n) : evalPredicate(n);
+    }
+
+    /**
+     * The arithmetic half of the intrinsic dispatch.
+     *
+     * <p>Split from {@link #evalPredicate} deliberately. One switch over every opcode would grow
+     * toward HotSpot's {@code DontCompileHugeMethods} limit and eventually stop being compiled at
+     * all — an "optimisation" that is a large regression and looks like nothing. Keep each half
+     * small, and split again rather than merging them to tidy up.</p>
+     */
+    private boolean evalArithmetic(PreparedGraph.Node n) {
+        int[] in = n.opIn;
+        switch (n.op) {
+            // Math.abs(getFloat("in", 0f))
+            case Intrinsics.OP_ABS -> writeFloat(n.opOutSlot, Math.abs(pullFloat(n, in[0], 0f)));
+
+            // v = getFloat("in", 0f); v < 0f ? 0f : (float) Math.sqrt(v)
+            case Intrinsics.OP_SQRT -> {
+                float v = pullFloat(n, in[0], 0f);
+                writeFloat(n.opOutSlot, v < 0f ? 0f : (float) Math.sqrt(v));
+            }
+
+            // -getFloat("in", 0f)
+            case Intrinsics.OP_NEGATE -> writeFloat(n.opOutSlot, -pullFloat(n, in[0], 0f));
+
+            // v = getFloat("in", 0f); v > 0f ? 1f : v < 0f ? -1f : 0f
+            case Intrinsics.OP_SIGN -> {
+                float v = pullFloat(n, in[0], 0f);
+                writeFloat(n.opOutSlot, v > 0f ? 1f : v < 0f ? -1f : 0f);
+            }
+
+            // v = getFloat("in", 0f); v - (float) Math.floor(v)
+            case Intrinsics.OP_FRACT -> {
+                float v = pullFloat(n, in[0], 0f);
+                writeFloat(n.opOutSlot, v - (float) Math.floor(v));
+            }
+
+            // (float) Math.exp(getFloat("in", 0f))
+            case Intrinsics.OP_EXP -> writeFloat(n.opOutSlot, (float) Math.exp(pullFloat(n, in[0], 0f)));
+
+            // v=getFloat("in",0f); lo=getFloat("min",0f); hi=getFloat("max",1f); max(lo, min(hi, v))
+            case Intrinsics.OP_CLAMP -> {
+                float v = pullFloat(n, in[0], 0f);
+                float lo = pullFloat(n, in[1], 0f);
+                float hi = pullFloat(n, in[2], 1f);
+                writeFloat(n.opOutSlot, Math.max(lo, Math.min(hi, v)));
+            }
+
+            // va=getFloat("a",0f); vb=getFloat("b",0f); va - vb
+            case Intrinsics.OP_SUB -> {
+                float va = pullFloat(n, in[0], 0f);
+                float vb = pullFloat(n, in[1], 0f);
+                writeFloat(n.opOutSlot, va - vb);
+            }
+
+            // va=getFloat("a",0f); vb=getFloat("b",1f); vb == 0f ? 0f : va / vb
+            case Intrinsics.OP_DIV -> {
+                float va = pullFloat(n, in[0], 0f);
+                float vb = pullFloat(n, in[1], 1f);
+                writeFloat(n.opOutSlot, vb == 0f ? 0f : va / vb);
+            }
+
+            // va=getFloat("a",0f); vb=getFloat("b",1f); vb == 0f ? 0f : va % vb
+            case Intrinsics.OP_MOD -> {
+                float va = pullFloat(n, in[0], 0f);
+                float vb = pullFloat(n, in[1], 1f);
+                writeFloat(n.opOutSlot, vb == 0f ? 0f : va % vb);
+            }
+
+            // (float) Math.pow(getFloat("base", 1f), getFloat("exp", 1f))
+            case Intrinsics.OP_POW -> writeFloat(n.opOutSlot,
+                    (float) Math.pow(pullFloat(n, in[0], 1f), pullFloat(n, in[1], 1f)));
+
+            // vy=getFloat("y",0f); vx=getFloat("x",1f); (float) Math.atan2(vy, vx)
+            case Intrinsics.OP_ATAN2 -> {
+                float vy = pullFloat(n, in[0], 0f);
+                float vx = pullFloat(n, in[1], 1f);
+                writeFloat(n.opOutSlot, (float) Math.atan2(vy, vx));
+            }
+
+            // v=getFloat("in",1f); b=getFloat("base",E); guard, then log(v)/log(b)
+            case Intrinsics.OP_LOG -> {
+                float v = pullFloat(n, in[0], 1f);
+                float b = pullFloat(n, in[1], (float) Math.E);
+                writeFloat(n.opOutSlot, v <= 0f || b <= 0f || b == 1f
+                        ? 0f : (float) (Math.log(v) / Math.log(b)));
+            }
+
+            // v=getFloat("value",1f); b=getFloat("base",10f); same guard
+            case Intrinsics.OP_LOGBASE -> {
+                float v = pullFloat(n, in[0], 1f);
+                float b = pullFloat(n, in[1], 10f);
+                writeFloat(n.opOutSlot, v <= 0f || b <= 0f || b == 1f
+                        ? 0f : (float) (Math.log(v) / Math.log(b)));
+            }
+
+            // va=getFloat("a",0f); vb=getFloat("b",1f); vt=getFloat("t",0f); va + (vb - va) * vt
+            case Intrinsics.OP_LERP -> {
+                float va = pullFloat(n, in[0], 0f);
+                float vb = pullFloat(n, in[1], 1f);
+                float vt = pullFloat(n, in[2], 0f);
+                writeFloat(n.opOutSlot, va + (vb - va) * vt);
+            }
+
+            // in/fromMin/fromMax/toMin/toMax, defaults 0,0,1,0,1; a zero span answers toMin
+            case Intrinsics.OP_REMAP -> {
+                float v = pullFloat(n, in[0], 0f);
+                float fMin = pullFloat(n, in[1], 0f);
+                float fMax = pullFloat(n, in[2], 1f);
+                float tMin = pullFloat(n, in[3], 0f);
+                float tMax = pullFloat(n, in[4], 1f);
+                float span = fMax - fMin;
+                if (span == 0f) {
+                    writeFloat(n.opOutSlot, tMin);
+                } else {
+                    writeFloat(n.opOutSlot, tMin + (tMax - tMin) * ((v - fMin) / span));
+                }
+            }
+
+            // n = max(1, option("inputs")); sum = 0f; sum += getFloat("in"+i, 0f)
+            case Intrinsics.OP_ADD -> {
+                if (variadicArity(n) != in.length) return false;
+                float sum = 0f;
+                for (int i = 0; i < in.length; i++) sum += pullFloat(n, in[i], 0f);
+                writeFloat(n.opOutSlot, sum);
+            }
+
+            // n = max(1, option("inputs")); p = 1f; p *= getFloat("in"+i, 1f)
+            case Intrinsics.OP_MUL -> {
+                if (variadicArity(n) != in.length) return false;
+                float p = 1f;
+                for (int i = 0; i < in.length; i++) p *= pullFloat(n, in[i], 1f);
+                writeFloat(n.opOutSlot, p);
+            }
+
+            // n = max(1, option("inputs")); m = +Inf; m = min(m, getFloat("in"+i, 0f))
+            case Intrinsics.OP_MIN -> {
+                if (variadicArity(n) != in.length) return false;
+                float m = Float.POSITIVE_INFINITY;
+                for (int i = 0; i < in.length; i++) m = Math.min(m, pullFloat(n, in[i], 0f));
+                writeFloat(n.opOutSlot, m);
+            }
+
+            // n = max(1, option("inputs")); m = -Inf; m = max(m, getFloat("in"+i, 0f))
+            case Intrinsics.OP_MAX -> {
+                if (variadicArity(n) != in.length) return false;
+                float m = Float.NEGATIVE_INFINITY;
+                for (int i = 0; i < in.length; i++) m = Math.max(m, pullFloat(n, in[i], 0f));
+                writeFloat(n.opOutSlot, m);
+            }
+
+            default -> {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The predicate half of the intrinsic dispatch. See {@link #evalArithmetic} for why it is split.
+     *
+     * <p>These stay in the object lane, as their nodes do: neither has a boolean {@code setOutput}
+     * overload, {@code Boolean.valueOf} is cached so nothing is allocated, and the wrapper a
+     * consumer sees is the same one.</p>
+     */
+    private boolean evalPredicate(PreparedGraph.Node n) {
+        int[] in = n.opIn;
+        switch (n.op) {
+            // getFloat("a", 0f) OP getFloat("b", 0f)
+            case Intrinsics.OP_GT -> writeSlot(n.opOutSlot, pullFloat(n, in[0], 0f) > pullFloat(n, in[1], 0f));
+            case Intrinsics.OP_GE -> writeSlot(n.opOutSlot, pullFloat(n, in[0], 0f) >= pullFloat(n, in[1], 0f));
+            case Intrinsics.OP_LT -> writeSlot(n.opOutSlot, pullFloat(n, in[0], 0f) < pullFloat(n, in[1], 0f));
+            case Intrinsics.OP_LE -> writeSlot(n.opOutSlot, pullFloat(n, in[0], 0f) <= pullFloat(n, in[1], 0f));
+
+            // !Objects.equals(getInputRaw("a"), getInputRaw("b"))
+            case Intrinsics.OP_NEQ -> writeSlot(n.opOutSlot, !Objects.equals(
+                    pullInput(n, in[0], Object.class), pullInput(n, in[1], Object.class)));
+
+            // !getBool("in", false)
+            case Intrinsics.OP_NOT -> writeSlot(n.opOutSlot, !pullBool(n, in[0], false));
+
+            default -> {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The arity a variadic arithmetic node's option asks for, or -1 when it cannot be read as a
+     * number.
+     *
+     * <p>Checked against the port count rather than trusted. The two agree in practice — the ports
+     * are defined from this same option — but if they ever disagreed the node would read a different
+     * number of inputs than the intrinsic, or throw. Returning -1 there sends it down its own path
+     * to do whichever of those it was going to do.</p>
+     */
+    private int variadicArity(PreparedGraph.Node n) {
+        Object raw = optionValue(n, n.opAux);
+        return raw instanceof Number num ? Math.max(1, num.intValue()) : -1;
+    }
+
+    private void writeFloat(int slot, float value) {
+        writeNum(slot, KIND_FLOAT, Float.floatToRawIntBits(value));
+    }
+
+    /**
+     * Publish a variable node's current value.
+     *
+     * <p>Through a cached {@link VarCell} rather than a name-keyed lookup, and staying in the
+     * numeric lane when the value is there — so a float written by {@code SetVar} and read back by a
+     * get-node never becomes a {@code Float} on either leg.</p>
+     */
+    private void evaluateVariable(PreparedGraph.Node n) {
+        IVariable var = n.variableNode.getVariable();
+        if (!opt(Opt.VARIABLE_CELLS) || var == null) {
+            writeAllOutputs(n, env.lookupVariable(var));
+            return;
+        }
+        VarCell cell = cellFor(n.index, var.getName());
+        if (!cell.present) {
+            writeAllOutputs(n, var.tryGetDefaultValue(var.getDataType()).result().orElse(null));
+        } else if (cell.kind == KIND_OBJECT) {
+            writeAllOutputs(n, cell.value);
+        } else {
+            for (int slot : n.outputSlots) writeNum(slot, cell.kind, cell.num);
+        }
+    }
+
+    /**
+     * Assign the value feeding {@code owner}'s input {@code inputIndex} to the variable {@code name},
+     * preserving the lane it arrived in.
+     *
+     * <p>This is what lets {@code SetVar} stop boxing. The old path read the input as an
+     * {@code Object} — which boxed every float on the way out of the port table — and then put that
+     * box into a {@code Map<String,Object>}. Here the producing slot's kind is read directly and raw
+     * bits are copied across.</p>
+     */
+    void assignVariable(PreparedGraph.Node owner, int inputIndex, String name) {
+        if (name == null || name.isEmpty()) return;
+        if (!opt(Opt.VARIABLE_CELLS)) {
+            env.variables().put(name, pullInput(owner, inputIndex, Object.class));
+            return;
+        }
+        VarCell cell = cellFor(owner.index, name);
+        int srcSlot = owner.inputSourceSlots[inputIndex];
+        if (srcSlot < 0) {
+            cell.setObject(readConstant(owner.inputConstants[inputIndex], Object.class));
+            return;
+        }
+        PreparedGraph.Node src = owner.inputSourceOwners[inputIndex];
+        if (!ensureComputed(src, srcSlot)) {
+            cell.setObject(null);
+            return;
+        }
+        byte k = kinds[srcSlot];
+        if (k == KIND_OBJECT) cell.setObject(slots[srcSlot]);
+        else cell.setNum(k, nums[srcSlot]);
+    }
+
+    /** The cell {@code name} resolves to for the node at {@code nodeIndex}. @see #varCells */
+    private VarCell cellFor(int nodeIndex, String name) {
+        // Identity, not equals: the name comes from a Constant or an IVariable and is the same
+        // String object until edited, so a reference compare is both correct and the point.
+        //noinspection StringEquality
+        if (nodeIndex < varCells.length && varCellNames[nodeIndex] == name) {
+            VarCell cached = varCells[nodeIndex];
+            if (cached != null) return cached;
+        }
+        VarCell cell = env.variables().cell(name);
+        if (nodeIndex < varCells.length) {
+            varCells[nodeIndex] = cell;
+            varCellNames[nodeIndex] = name;
+        }
+        return cell;
+    }
+
+    /**
      * Walk a {@link SubgraphNodeModel}:
      * <ol>
      *   <li>Resolve the inner graph. Unresolved → all outer output ports stay null.</li>
@@ -821,6 +1521,37 @@ public final class GraphExecutor {
      * </ol>
      */
     private void evaluateSubgraph(PreparedGraph.Node node) {
+        if (opt(Opt.SUBGRAPH_PRERESOLVE)) {
+            CustomGraphModelImpl inner = node.subInner;
+            if (inner == null) {
+                writeAllOutputs(node, null);
+                return;
+            }
+            VariableStore childStore = childStoreFor(node);
+            for (PreparedGraph.SubBinding bind : node.subBindings) {
+                if (bind.isExec() || !bind.read() || bind.outerIn() == null) continue;
+                Object value = bind.outerInIndex() >= 0
+                        ? pullInput(node, bind.outerInIndex(), Object.class)
+                        : pullInput(bind.outerIn(), Object.class);
+                childStore.put(bind.decl().getName(), value);
+            }
+            GraphExecutor childExec = checkoutChild(node, inner, childStore);
+            // The child has run nothing yet, so nothing has resolved its graph. runOutputs() used to
+            // do this on the way in; harvesting straight out of the child means doing it here — and
+            // once, rather than once per harvested variable.
+            childExec.prepareForRun();
+            for (PreparedGraph.SubBinding bind : node.subBindings) {
+                if (bind.isExec() || !bind.write() || bind.outerOutSlot() < 0) continue;
+                writeSlot(bind.outerOutSlot(), childExec.resolveOutputValue(bind.decl()));
+            }
+            releaseChild(node, childExec);
+            return;
+        }
+        evaluateSubgraphUnresolved(node);
+    }
+
+    /** The pre-{@link Opt#SUBGRAPH_PRERESOLVE} data path, kept so the two can be compared. */
+    private void evaluateSubgraphUnresolved(PreparedGraph.Node node) {
         SubgraphNodeModel sub = node.subgraphNode;
         if (!(sub.getSubgraphModel() instanceof CustomGraphModelImpl inner)
                 // Guard against trivial self-reference (inner graph is the model we're already in).
@@ -845,6 +1576,8 @@ public final class GraphExecutor {
             return;
         }
         var childExec = new GraphExecutor(innerGraph, childEnv);
+        childExec.trace = trace;                  // one trace spans the whole call tree; see EvalTrace
+        childExec.enabledOpts = enabledOpts;      // a mode applies to the whole call tree
         Map<String, Object> innerResults = childExec.runOutputs();
 
         for (var v : inner.getGraphVariableModels()) {
@@ -860,9 +1593,41 @@ public final class GraphExecutor {
     // ---- subgraph plumbing -------------------------------------------------------------------
 
     /**
+     * A finished subgraph: publish its inner WRITE data variables into this (parent) scope's value
+     * table, then fire the outer exec-out pins whose inner exit the child actually reached.
+     *
+     * <p>One call rather than a harvest followed by a list of pins, because the pins were collected
+     * into an {@code ArrayList} only to be walked once, and the data values were collected into a
+     * {@code LinkedHashMap} only to be looked up by the names that had just been used to build it.
+     * Both maps existed to cross a method boundary that no longer needs crossing.</p>
+     */
+    void finishSubgraph(PreparedGraph.Node node, CustomGraphModelImpl inner,
+                        GraphExecutor childExec, ExecFrame parentFrame) {
+        if (!opt(Opt.SUBGRAPH_PRERESOLVE)) {
+            harvestSubgraphOutputs(node.subgraphNode, inner, childExec);
+            for (PortModel pin : reachedExecOutPins(node.subgraphNode, inner, childExec)) {
+                parentFrame.enqueueFlow(pin);
+            }
+            return;
+        }
+        // Normally the child is already resolved — it just ran nodes — but an inner graph with no
+        // exec entry runs nothing at all, and its data outputs still have to be harvestable.
+        childExec.prepareForRun();
+        Set<String> reached = childExec.reachedExecOutputs();
+        for (PreparedGraph.SubBinding bind : node.subBindings) {
+            if (!bind.write() || bind.outerOut() == null) continue;
+            if (bind.isExec()) {
+                if (reached.contains(bind.decl().getName())) parentFrame.enqueueFlow(bind.outerOut());
+            } else if (bind.outerOutSlot() >= 0) {
+                writeSlot(bind.outerOutSlot(), childExec.resolveOutputValue(bind.decl()));
+            }
+        }
+        releaseChild(node, childExec);
+    }
+
+    /**
      * Harvest a finished subgraph's inner WRITE <em>data</em> variables into this (parent) scope's
-     * value table, so downstream data pulls on the subgraph node see them. Called by
-     * {@link SubgraphFrame#resume} once the inner exec has drained.
+     * value table. The pre-{@link Opt#SUBGRAPH_PRERESOLVE} path, kept for comparison.
      */
     void harvestSubgraphOutputs(SubgraphNodeModel sub, CustomGraphModelImpl inner, GraphExecutor childExec) {
         Map<String, Object> innerResults = childExec.runOutputs();
@@ -962,6 +1727,7 @@ public final class GraphExecutor {
      * variable's declared default.
      */
     private Object resolveOutputVariable(VariableDeclarationModelBase v, CustomGraphModelImpl gm) {
+        if (opt(Opt.SUBGRAPH_PRERESOLVE) && prepared != null) return resolveOutputValue(v);
         for (var nm : gm.getNodeModels()) {
             if (!(nm instanceof NodeModel n)) continue;
             IVariableNode vn = asVariableNode(n);
@@ -975,6 +1741,28 @@ public final class GraphExecutor {
             return pullInput(inputPort, Object.class);
         }
         // No writer node — fall back to env, then default.
+        if (env.variables().contains(v.getName())) return env.variables().get(v.getName());
+        return v.tryGetDefaultValue(v.getDataType()).result().orElse(null);
+    }
+
+    /**
+     * The current value of graph OUTPUT variable {@code v}: pulled from its writer-form variable node
+     * if the graph has one, else the env store, else the declared default.
+     *
+     * <p>Same rule as {@link #resolveOutputVariable}, but the writer is looked for among the nodes
+     * {@link PreparedGraph#variableWriters()} already identified rather than by walking the whole
+     * model again. The name comparison stays live: a rename is invisible to the structural digest,
+     * so the <em>pairing</em> must not be cached even though the candidate set can be.</p>
+     */
+    Object resolveOutputValue(VariableDeclarationModelBase v) {
+        if (prepared != null) {
+            String wanted = v.getName();
+            for (PreparedGraph.Node n : prepared.variableWriters()) {
+                IVariable refVar = n.variableNode.getVariable();
+                if (refVar == null || !Objects.equals(refVar.getName(), wanted)) continue;
+                return pullInput(n, 0, Object.class);
+            }
+        }
         if (env.variables().contains(v.getName())) return env.variables().get(v.getName());
         return v.tryGetDefaultValue(v.getDataType()).result().orElse(null);
     }
@@ -1041,6 +1829,24 @@ public final class GraphExecutor {
      */
     public void setGraphFrozen(boolean frozen) {
         this.graphFrozen = frozen;
+    }
+
+    /**
+     * Record what this executor evaluates, for a test that needs to check evaluation order and
+     * count rather than only the final values — see {@link EvalTrace} for why that distinction
+     * matters. {@code null} (the default) disables recording.
+     *
+     * <p>The trace is handed to child executors on subgraph entry, so it covers the whole call
+     * tree. Set it before the run; changing it mid-run traces only the remainder.</p>
+     */
+    public void setTrace(@Nullable EvalTrace trace) {
+        this.trace = trace;
+    }
+
+    /** The recorder set by {@link #setTrace}, or {@code null}. */
+    @Nullable
+    public EvalTrace getTrace() {
+        return trace;
     }
 
     /** Drop this executor's resolved view of the graph; it is rebuilt on the next run. */

@@ -16,7 +16,9 @@ public class MapMergeNode extends AnnotatedNode {
     @InputPort public Map<?, ?> a = Map.of();
     @InputPort public Map<?, ?> b = Map.of();
     @OutputPort public Map<?, ?> out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         Map<?, ?> aMap = ctx.getInput("a", Map.class, Map.of());
         Map<?, ?> bMap = ctx.getInput("b", Map.class, Map.of());
         Map<Object, Object> result = new LinkedHashMap<>(aMap);

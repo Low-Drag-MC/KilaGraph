@@ -27,7 +27,8 @@ import java.util.List;
 public class SelectNode extends AnnotatedNode {
 
     @InputPort public boolean cond = false;
-@Override
+
+    @Override
     protected void onDefineExtraOptions(IOptionDefinitionContext context) {
         context.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())

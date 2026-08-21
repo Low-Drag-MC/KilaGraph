@@ -28,9 +28,11 @@ public final class LoopFrame extends ExecFrame {
         this.bodyOut = bodyOut;
         this.completedOut = completedOut;
         this.parent = parent;
+        scope.beginLoop(node, controller);
     }
 
-    @Override public Kind kind() { return Kind.LOOP; }
+    @Override
+    public Kind kind() { return Kind.LOOP; }
 
     /** Marked by a BREAK signal: complete on the next resume instead of iterating. */
     void markBreak() {
@@ -43,7 +45,12 @@ public final class LoopFrame extends ExecFrame {
             enqueueFlow(node, bodyOut);   // body runs in THIS frame
             return true;
         }
-        // loop finished (normally or via break): continue after the loop in the parent frame
+        // Loop finished (normally or via break): continue after the loop in the parent frame.
+        //
+        // The controller stays registered on purpose. Its index and item were previously published
+        // into per-node state, which the end of a loop did not clear either — so a graph reading a
+        // loop's `index` on the `completed` path saw the final iteration's value, and still does.
+        // Unregistering here would have quietly turned that into 0.
         parent.enqueueFlow(node, completedOut);
         return false;
     }

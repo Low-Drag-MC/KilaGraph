@@ -153,6 +153,7 @@ public final class StringNodeGameTest {
         var n = addNode(g, SplitNode.class);
         setInputConstant(n, "in", "a,b,c");
         setInputConstant(n, "delimiter", ",");
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "split size", 3, out.size());
@@ -165,6 +166,7 @@ public final class StringNodeGameTest {
         var n2 = addNode(g2, SplitNode.class);
         setInputConstant(n2, "in", "abc");
         setInputConstant(n2, "delimiter", "");
+
         @SuppressWarnings("unchecked")
         List<Object> out2 = new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), List.class);
         assertEq(helper, "empty-delim size", 1, out2.size());

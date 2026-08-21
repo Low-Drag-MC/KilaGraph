@@ -13,7 +13,9 @@ public class ShiftRightNode extends AnnotatedNode {
     @InputPort public int value = 0;
     @InputPort public int bits = 0;
     @OutputPort public int out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         ctx.setOutput("out", ctx.getInt("value", 0) >> ctx.getInt("bits", 0));
     }
 }

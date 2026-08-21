@@ -17,7 +17,9 @@ public class NbtCreateNode extends AnnotatedNode {
     }
 
     @OutputPort public CompoundTag out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         ctx.setOutput("out", new CompoundTag());
     }
 }

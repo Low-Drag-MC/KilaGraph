@@ -12,7 +12,9 @@ public class ModuloNode extends AnnotatedNode {
     @InputPort public float a = 0f;
     @InputPort public float b = 1f;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         float va = ctx.getFloat("a", 0f);
         float vb = ctx.getFloat("b", 1f);
         ctx.setOutput("out", vb == 0f ? 0f : va % vb);

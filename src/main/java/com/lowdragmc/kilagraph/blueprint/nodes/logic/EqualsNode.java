@@ -20,7 +20,8 @@ public class EqualsNode extends AnnotatedNode {
     @Option public int inputs = 2;
 
     @OutputPort public boolean out;
-@Override
+
+    @Override
     protected void onDefineDynamicPorts(IPortDefinitionContext context) {
         int n = Math.max(2, optionValue("inputs", Integer.class, inputs));
         for (int i = 1; i <= n; i++) {

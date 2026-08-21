@@ -21,8 +21,9 @@ import org.joml.Vector4f;
  *
  * <p>Pins are typed VEC3 because a pin has to name one type (LDLib2 has no polymorphic pin;
  * {@code PortModel.isPolymorphic} is hardcoded false) and three is what most graphs use. Wiring a
- * VEC2 or VEC4 in is allowed by {@code KGGraphModel} and handled here — refusing it would be the
- * editor enforcing a rule the machine does not have.
+ * VEC2 or VEC4 in is allowed by {@link com.lowdragmc.kilagraph.graph.type.KGGraphModel}, which
+ * treats any vector width as assignable to any other — refusing it would be the editor enforcing a
+ * rule the machine does not have.
  */
 public final class VectorNodes {
 
@@ -262,6 +263,12 @@ public final class VectorNodes {
     /**
      * Signed angle in degrees from one direction to another about the Y axis — the turn a character
      * has to make to face where it is going.
+     *
+     * <p><b>Minecraft's yaw convention</b>, i.e. {@code atan2(-x, z)}: zero looks down +Z and
+     * positive turns toward -X, which is what {@code Vec3.directionFromRotation} produces. The
+     * mathematically tidier {@code atan2(x, z)} would answer the negative of this for every input —
+     * a sign flip that reads as a character strafing while it walks straight, and that nothing but a
+     * convention-aware test can catch.
      */
     @NodeAttribute(name = "vector_yaw_between", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class YawBetween extends AnnotatedNode {
@@ -273,7 +280,7 @@ public final class VectorNodes {
         public void evaluate(EvalContext ctx) {
             float[] p = components(ctx.getInputRaw("from"));
             float[] q = components(ctx.getInputRaw("to"));
-            double angle = Math.toDegrees(Math.atan2(at(q, 0), at(q, 2)) - Math.atan2(at(p, 0), at(p, 2)));
+            double angle = Math.toDegrees(Math.atan2(-at(q, 0), at(q, 2)) - Math.atan2(-at(p, 0), at(p, 2)));
             // folded into [-180, 180): a turn of 350 degrees is a turn of -10
             angle = ((angle + 180d) % 360d + 360d) % 360d - 180d;
             ctx.setOutput("out", (float) angle);

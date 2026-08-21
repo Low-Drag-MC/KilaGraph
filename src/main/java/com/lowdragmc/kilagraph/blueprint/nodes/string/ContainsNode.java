@@ -12,7 +12,9 @@ public class ContainsNode extends AnnotatedNode {
     @InputPort public String in = "";
     @InputPort public String needle = "";
     @OutputPort public boolean out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         ctx.setOutput("out",
                 ctx.getInput("in", String.class, "").contains(ctx.getInput("needle", String.class, "")));
     }

@@ -53,7 +53,7 @@ public final class ExecSession {
     private State state = State.NOT_STARTED;
     private Signal signal = Signal.NONE;
 
-    @Nullable private NodeModel lastExecuted;
+    @Nullable private PreparedGraph.Node lastExecuted;
     private int stepCount = 0;
     @Nullable private Set<UUID> breakpoints;
 
@@ -86,7 +86,7 @@ public final class ExecSession {
         rootScope.prepareForRun();
         rootScope.reachedExecOutputs().clear();
         rootFrame.reset(rootScope);
-        rootFrame.enqueueOne(entry);
+        rootFrame.enqueueModel(entry);
         stack.push(rootFrame);
         state = State.RUNNING;
         settleToRunnableFrame();
@@ -102,7 +102,7 @@ public final class ExecSession {
     public boolean step() {
         ExecFrame frame = settleToRunnableFrame();
         if (frame == null) return false;
-        NodeModel node = frame.poll();
+        PreparedGraph.Node node = frame.poll();
         frame.scope.executeStep(node, this, frame);
         lastExecuted = node;
         stepCount++;
@@ -127,9 +127,42 @@ public final class ExecSession {
         return taken;
     }
 
-    /** Step until the flow finishes. */
+    /**
+     * Step until the flow finishes.
+     *
+     * <p>Not {@code while (step())}. {@link #step()} settles the frame stack twice per node — once to
+     * find the node and once afterwards, so that {@link #currentNode()} is readable between steps.
+     * Running to completion needs neither: while the same frame is still on top and still has work,
+     * settling would return that same frame, so this drains it directly and settles only when the
+     * situation actually changes — a frame was pushed, a signal was raised, or the queue emptied.</p>
+     *
+     * <p>The one-node-at-a-time driver is left exactly as it was. It is what the debugger uses, and
+     * the invariant it maintains — that what runs next is always readable from the queues — is the
+     * thing this loop is allowed to skip precisely because nobody is looking in between.
+     * {@link #stepCount()} counts the same nodes either way, which is what
+     * {@code ExecDriverGameTest} asserts.</p>
+     */
     public void runToCompletion() {
-        while (step()) { /* keep stepping */ }
+        if (!rootScope.fusedExecDriver()) {
+            while (step()) { /* keep stepping */ }
+            return;
+        }
+        while (true) {
+            ExecFrame frame = settleToRunnableFrame();
+            if (frame == null) return;
+            do {
+                PreparedGraph.Node node = frame.poll();
+                frame.scope.executeStep(node, this, frame);
+                lastExecuted = node;
+                stepCount++;
+                if (signal != Signal.NONE) {
+                    applySignal();
+                    break;
+                }
+                // A loop, sequence or subgraph pushed its own frame: that one runs next, not this.
+                if (stack.peek() != frame) break;
+            } while (frame.hasPending());
+        }
     }
 
     /**
@@ -140,8 +173,11 @@ public final class ExecSession {
     @Nullable
     public NodeModel runToBreakpoint() {
         while (true) {
-            NodeModel next = currentNode();
-            if (next != null && breakpoints != null && breakpoints.contains(next.getUid())) return next;
+            PreparedGraph.Node next = currentPrepared();
+            // node.uid rather than model.getUid(): the prepared node already carries it.
+            if (next != null && breakpoints != null && breakpoints.contains(next.uid)) {
+                return next.asNodeModel;
+            }
             if (!step()) return null;
         }
     }
@@ -186,6 +222,13 @@ public final class ExecSession {
      */
     @Nullable
     public NodeModel currentNode() {
+        PreparedGraph.Node n = currentPrepared();
+        return n == null ? null : n.asNodeModel;
+    }
+
+    /** {@link #currentNode} without the model hop — what the stepping loop itself wants. */
+    @Nullable
+    PreparedGraph.Node currentPrepared() {
         for (ExecFrame f : stack) {
             if (f.hasPending()) return f.peek();
         }
@@ -195,7 +238,7 @@ public final class ExecSession {
     /** The node the most recent {@link #step()} executed. Null before the first step. */
     @Nullable
     public NodeModel lastExecuted() {
-        return lastExecuted;
+        return lastExecuted == null ? null : lastExecuted.asNodeModel;
     }
 
     public int stepCount() {
@@ -217,7 +260,7 @@ public final class ExecSession {
     public List<StackEntry> callStack() {
         List<StackEntry> out = new ArrayList<>(stack.size());
         for (ExecFrame f : stack) {
-            out.add(new StackEntry(f.kind(), f.peek()));
+            out.add(new StackEntry(f.kind(), f.peekModel()));
         }
         return out;
     }

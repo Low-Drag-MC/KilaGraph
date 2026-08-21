@@ -107,6 +107,7 @@ public final class ListNodeGameTest {
         setOption(n, "type", TypeHandles.STRING.getIdentification());
         wire(g, n.getInputsById().get("list"), stringList(g, "a", "b"));
         setInputConstant(n, "value", "c");
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "append size", 3, out.size());
@@ -124,6 +125,7 @@ public final class ListNodeGameTest {
         setOption(n, "type", TypeHandles.STRING.getIdentification());
         wire(g, n.getInputsById().get("list"), stringList(g, "a", "b"));
         setInputConstant(n, "value", "z");
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "prepend size", 3, out.size());
@@ -142,6 +144,7 @@ public final class ListNodeGameTest {
         wire(g, n.getInputsById().get("list"), stringList(g, "a", "c"));
         setInputConstant(n, "index", 1);
         setInputConstant(n, "value", "b");
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "size", 3, out.size());
@@ -158,6 +161,7 @@ public final class ListNodeGameTest {
         var n = addNode(g, ListRemoveAtNode.class);
         wire(g, n.getInputsById().get("list"), stringList(g, "a", "b", "c"));
         setInputConstant(n, "index", 1);
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "size", 2, out.size());
@@ -169,6 +173,7 @@ public final class ListNodeGameTest {
         var n2 = addNode(g2, ListRemoveAtNode.class);
         wire(g2, n2.getInputsById().get("list"), stringList(g2, "a"));
         setInputConstant(n2, "index", 99);
+
         @SuppressWarnings("unchecked")
         List<Object> out2 = new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), List.class);
         assertEq(helper, "unchanged size", 1, out2.size());
@@ -184,6 +189,7 @@ public final class ListNodeGameTest {
         var n = addNode(g, ListRemoveNode.class);
         wire(g, n.getInputsById().get("list"), stringList(g, "a", "b", "a"));
         wire(g, n.getInputsById().get("value"), stringScalar(g, "a"));
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "first match removed", 2, out.size());
@@ -244,6 +250,7 @@ public final class ListNodeGameTest {
         wire(g, n.getInputsById().get("list"), stringList(g, "a", "b", "c", "d"));
         setInputConstant(n, "from", 1);
         setInputConstant(n, "to", 3);
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "size", 2, out.size());
@@ -256,6 +263,7 @@ public final class ListNodeGameTest {
         wire(g2, n2.getInputsById().get("list"), stringList(g2, "a", "b"));
         setInputConstant(n2, "from", 5);
         setInputConstant(n2, "to", 0);
+
         @SuppressWarnings("unchecked")
         List<Object> out2 = new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), List.class);
         assertEq(helper, "empty slice", 0, out2.size());
@@ -273,6 +281,7 @@ public final class ListNodeGameTest {
         wire(g, n.getInputsById().get("in1"), stringList(g, "a"));
         wire(g, n.getInputsById().get("in2"), stringList(g, "b", "c"));
         wire(g, n.getInputsById().get("in3"), stringList(g, "d"));
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "concat size", 4, out.size());
@@ -288,6 +297,7 @@ public final class ListNodeGameTest {
         var g = newGraph();
         var n = addNode(g, ListReverseNode.class);
         wire(g, n.getInputsById().get("list"), stringList(g, "a", "b", "c"));
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "size", 3, out.size());
@@ -304,6 +314,7 @@ public final class ListNodeGameTest {
         var g = newGraph();
         var n = addNode(g, ListDistinctNode.class);
         wire(g, n.getInputsById().get("list"), stringList(g, "a", "b", "a", "c", "b"));
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "size", 3, out.size());
@@ -322,6 +333,7 @@ public final class ListNodeGameTest {
         var n = addNode(g, ListSortNode.class);
         setOption(n, "ascending", true);
         wire(g, n.getInputsById().get("list"), stringList(g, "c", "a", "b"));
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "[0]", "a", out.get(0));
@@ -332,6 +344,7 @@ public final class ListNodeGameTest {
         var n2 = addNode(g2, ListSortNode.class);
         setOption(n2, "ascending", false);
         wire(g2, n2.getInputsById().get("list"), stringList(g2, "a", "c", "b"));
+
         @SuppressWarnings("unchecked")
         List<Object> out2 = new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), List.class);
         assertEq(helper, "desc[0]", "c", out2.get(0));
@@ -349,6 +362,7 @@ public final class ListNodeGameTest {
         setInputConstant(n, "from", 0);
         setInputConstant(n, "to", 5);
         setInputConstant(n, "step", 1);
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "size", 5, out.size());
@@ -361,6 +375,7 @@ public final class ListNodeGameTest {
         setInputConstant(n2, "from", 0);
         setInputConstant(n2, "to", 10);
         setInputConstant(n2, "step", 2);
+
         @SuppressWarnings("unchecked")
         List<Object> out2 = new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), List.class);
         assertEq(helper, "step=2 size", 5, out2.size());
@@ -372,6 +387,7 @@ public final class ListNodeGameTest {
         setInputConstant(n3, "from", 0);
         setInputConstant(n3, "to", 10);
         setInputConstant(n3, "step", 0);
+
         @SuppressWarnings("unchecked")
         List<Object> out3 = new GraphExecutor(g3).evaluate(n3.getOutputsById().get("out"), List.class);
         assertEq(helper, "step=0 empty", 0, out3.size());
@@ -388,6 +404,7 @@ public final class ListNodeGameTest {
         setOption(n, "type", TypeHandles.STRING.getIdentification());
         setInputConstant(n, "value", "x");
         setInputConstant(n, "count", 4);
+
         @SuppressWarnings("unchecked")
         List<Object> out = new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), List.class);
         assertEq(helper, "size", 4, out.size());
@@ -413,8 +430,10 @@ public final class ListNodeGameTest {
         // Two pulls of the source should give the same un-mutated list (size 2)
         @SuppressWarnings("unchecked")
         List<Object> s1 = exec.evaluate(src, List.class);
+
         @SuppressWarnings("unchecked")
         List<Object> appended = exec.evaluate(append.getOutputsById().get("out"), List.class);
+
         @SuppressWarnings("unchecked")
         List<Object> s2 = exec.evaluate(src, List.class);
 
