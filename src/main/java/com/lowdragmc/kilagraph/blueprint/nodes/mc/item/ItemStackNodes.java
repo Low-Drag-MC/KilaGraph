@@ -6,15 +6,16 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemLore;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Item stacks: counts, equality, and the data components a blueprint is likely to read or write.
@@ -63,7 +64,7 @@ public final class ItemStackNodes {
         }
 
         @InputPort public ItemStack stack = ItemStack.EMPTY;
-        @OutputPort public net.minecraft.world.item.Item item;
+        @OutputPort public Item item;
         @OutputPort public int count;
         @OutputPort public boolean empty;
 
@@ -143,15 +144,15 @@ public final class ItemStackNodes {
             return Component.translatable("kg.node.mc_item_props.tooltip");
         }
 
-        @InputPort public net.minecraft.world.item.Item in;
+        @InputPort public Item in;
         @OutputPort public Component name;
         @OutputPort public int maxStackSize;
         @OutputPort public int enchantmentValue;
 
         @Override
         public void evaluate(EvalContext ctx) {
-            var item = ctx.getInput("in", net.minecraft.world.item.Item.class, null);
-            if (item == null) item = net.minecraft.world.item.Items.AIR;
+            var item = ctx.getInput("in", Item.class, null);
+            if (item == null) item = Items.AIR;
             ctx.setOutput("name", (Object) item.getDescription());
             ctx.setOutput("maxStackSize", item.getDefaultMaxStackSize());
             ctx.setOutput("enchantmentValue", item.getEnchantmentValue());

@@ -12,7 +12,9 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionFlow;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
@@ -21,6 +23,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import org.joml.Vector3f;
 
 /**
@@ -59,7 +62,7 @@ public final class EntityActionNodes {
         @ExecInputPort public ExecutionFlow trigger;
         @ExecOutputPort public ExecutionFlow next;
 
-        @InputPort public net.minecraft.world.level.Level level;
+        @InputPort public Level level;
         @InputPort public EntityType<?> type;
         @InputPort public BlockPos pos = BlockPos.ZERO;
         @OutputPort public Entity entity;
@@ -273,8 +276,8 @@ public final class EntityActionNodes {
                 return;
             }
             var holder = BuiltInRegistries.MOB_EFFECT.getHolder(
-                    net.minecraft.resources.ResourceKey.create(
-                            net.minecraft.core.registries.Registries.MOB_EFFECT, id)).orElse(null);
+                    ResourceKey.create(
+                            Registries.MOB_EFFECT, id)).orElse(null);
             if (holder == null) {
                 McActions.done(ctx, false);
                 return;

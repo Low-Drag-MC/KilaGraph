@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.MultiplyNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes;
@@ -10,12 +11,13 @@ import com.lowdragmc.kilagraph.graph.exec.VariableStore;
 import com.lowdragmc.kilagraph.test.gametest.KGBench;
 import com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder;
 import com.lowdragmc.kilagraph.test.gametest.KGGraphFixtures;
+import com.mojang.logging.LogUtils;
+import java.util.OptionalLong;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-
-import java.util.OptionalLong;
+import org.slf4j.Logger;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertTrue;
@@ -99,7 +101,7 @@ public final class ExecutorBenchShapesGameTest {
         helper.succeed();
     }
 
-    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     /**
      * What one option read per node costs, measured against itself.
@@ -220,7 +222,7 @@ public final class ExecutorBenchShapesGameTest {
         helper.succeed();
     }
 
-    private static GraphExecutor frozen(com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, boolean intrinsics) {
+    private static GraphExecutor frozen(BlueprintGraph g, boolean intrinsics) {
         var exec = new GraphExecutor(g);
         exec.setGraphFrozen(true);
         exec.setOptimisationEnabled(GraphExecutor.Opt.INTRINSICS, intrinsics);

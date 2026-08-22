@@ -5,34 +5,35 @@ import com.lowdragmc.kilagraph.blueprint.nodes.compare.GreaterThanNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.compare.LessEqualNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.compare.LessThanNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.compare.NotEqualsNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.logic.NotNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.Atan2Node;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.DivideNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.ExpNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.FractNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.LogBaseNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.LogNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.MaxNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.MinNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.ModuloNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.NegateNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.PowNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.RemapNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.SignNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BranchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.GateNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.NoopNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.logic.NotNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AbsNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.Atan2Node;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.ClampNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.DivideNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.ExpNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.FractNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.LerpNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.LogBaseNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.LogNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.MaxNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.MinNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.ModuloNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.MultiplyNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.NegateNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.PowNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.RemapNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.SignNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.SqrtNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.SubtractNode;
-
+import com.lowdragmc.kilagraph.graph.core.PortIds;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Arithmetic nodes the executor can evaluate without calling them.
@@ -216,12 +217,12 @@ public final class Intrinsics {
     }
 
     /** Every node class with an intrinsic — what the parity test enumerates to prove coverage. */
-    public static java.util.Set<Class<?>> classes() {
+    public static Set<Class<?>> classes() {
         return TABLE.keySet();
     }
 
     /** Every node class with an exec intrinsic. @see #classes() */
-    public static java.util.Set<Class<?>> execClasses() {
+    public static Set<Class<?>> execClasses() {
         return EXEC_TABLE.keySet();
     }
 
@@ -292,11 +293,11 @@ public final class Intrinsics {
     /** Input indices for {@code in1..inN}, stopping at the first gap. Null if there are none. */
     private static int[] numberedInputs(PreparedGraph.Node n) {
         int count = 0;
-        while (n.inputIndex(com.lowdragmc.kilagraph.graph.core.PortIds.in(count + 1)) >= 0) count++;
+        while (n.inputIndex(PortIds.in(count + 1)) >= 0) count++;
         if (count == 0) return null;   // no in1 at all: not the shape this opcode expects
         int[] out = new int[count];
         for (int i = 0; i < count; i++) {
-            out[i] = n.inputIndex(com.lowdragmc.kilagraph.graph.core.PortIds.in(i + 1));
+            out[i] = n.inputIndex(PortIds.in(i + 1));
         }
         return out;
     }

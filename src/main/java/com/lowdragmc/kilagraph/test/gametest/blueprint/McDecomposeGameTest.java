@@ -15,6 +15,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -23,9 +24,11 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
@@ -33,8 +36,6 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-
-import java.util.List;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -192,7 +193,7 @@ public final class McDecomposeGameTest {
     public static void blockStateBlockAndFlags(GameTestHelper helper) {
         assertEq(helper, "state → block", Blocks.STONE,
                 probe(BlockStateNodes.StateBlock.class, "in", Blocks.STONE.defaultBlockState())
-                        .eval("out", net.minecraft.world.level.block.Block.class));
+                        .eval("out", Block.class));
 
         var stone = probe(BlockStateNodes.Flags.class, "in", Blocks.STONE.defaultBlockState());
         assertFalse(helper, "stone is not air", stone.eval("air", Boolean.class));
@@ -257,7 +258,7 @@ public final class McDecomposeGameTest {
     public static void itemStackUnpackDamageLimits(GameTestHelper helper) {
         ItemStack stack = new ItemStack(Items.DIAMOND, 7);
         var u = probe(ItemStackNodes.Unpack.class, "stack", stack);
-        assertEq(helper, "item", Items.DIAMOND, u.eval("item", net.minecraft.world.item.Item.class));
+        assertEq(helper, "item", Items.DIAMOND, u.eval("item", Item.class));
         assertEq(helper, "count", 7, u.eval("count", Integer.class).intValue());
         assertFalse(helper, "not empty", u.eval("empty", Boolean.class));
 
@@ -317,9 +318,9 @@ public final class McDecomposeGameTest {
                 probe(FluidNodes.Unpack.class, "stack", FluidStack.EMPTY).eval("empty", Boolean.class));
 
         assertEq(helper, "water's bucket", Items.WATER_BUCKET,
-                probe(FluidNodes.Bucket.class, "in", Fluids.WATER).eval("out", net.minecraft.world.item.Item.class));
+                probe(FluidNodes.Bucket.class, "in", Fluids.WATER).eval("out", Item.class));
         assertEq(helper, "EMPTY has no bucket", Items.AIR,
-                probe(FluidNodes.Bucket.class, "in", Fluids.EMPTY).eval("out", net.minecraft.world.item.Item.class));
+                probe(FluidNodes.Bucket.class, "in", Fluids.EMPTY).eval("out", Item.class));
         helper.succeed();
     }
 

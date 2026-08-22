@@ -2,8 +2,8 @@ package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.bitwise.BitAndNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ToStringNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListGetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AbsNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
@@ -17,12 +17,13 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionFlow;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
+import java.util.List;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.neoforged.neoforge.gametest.GameTestHolder;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionFlow;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -242,7 +243,7 @@ public final class ExecutorEdgeCaseGameTest {
         assertEq(helper, "A before", 105.0f, orNaN(a.evaluate(out, Float.class)), 1e-6f);
         assertEq(helper, "B before", 105.0f, orNaN(b.evaluate(out, Float.class)), 1e-6f);
 
-        g.graphModel.deleteWires(java.util.List.copyOf(
+        g.graphModel.deleteWires(List.copyOf(
                 sink.getInputsById().get("in1").getConnectedWires()));
         wire(g, sink.getInputsById().get("in1"), nine.getOutputsById().get("out"));
 

@@ -1,18 +1,20 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.graph.exec.VariableStore;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
-import net.minecraft.gametest.framework.GameTestHelper;
-import org.joml.Vector2f;
-
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import java.util.Map;
+import java.util.OptionalLong;
+import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -40,7 +42,7 @@ public final class VariableGameTest {
         var graph = newGraph();
 
         // INPUT variable x:int defaults to ModifierFlags.READ → variable node has OUTPUT port.
-        var xVar = (com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase)
+        var xVar = (VariableDeclarationModelBase)
                 graph.graphModel.createVariable("x", int.class, 0, VariableKind.INPUT);
         var xNode = graph.graphModel.createVariableNode(xVar, new Vector2f(0, 0), null, null);
         if (xNode.getOutputPort() == null) { helper.fail("get-form variable node missing output port"); return; }
@@ -65,9 +67,9 @@ public final class VariableGameTest {
         var graph = newGraph();
 
         // INPUT x (READ → get-form) and OUTPUT y (WRITE → set-form)
-        var xVar = (com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase)
+        var xVar = (VariableDeclarationModelBase)
                 graph.graphModel.createVariable("x", int.class, 0, VariableKind.INPUT);
-        var yVar = (com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase)
+        var yVar = (VariableDeclarationModelBase)
                 graph.graphModel.createVariable("y", int.class, 0, VariableKind.OUTPUT);
 
         var xNode = graph.graphModel.createVariableNode(xVar, new Vector2f(0, 0), null, null);
@@ -122,9 +124,9 @@ public final class VariableGameTest {
         graph.graphModel.createVariable("y", int.class, 42, VariableKind.OUTPUT);
 
         // Store has y=null explicitly; no writer node. Falls through to store, which contains null.
-        var store = new com.lowdragmc.kilagraph.graph.exec.VariableStore();
+        var store = new VariableStore();
         store.put("y", null);
-        var env = new EvaluationEnvironment(store, java.util.OptionalLong.empty());
+        var env = new EvaluationEnvironment(store, OptionalLong.empty());
 
         var executor = new GraphExecutor(graph, env);
         Map<String, Object> results = executor.runOutputs();

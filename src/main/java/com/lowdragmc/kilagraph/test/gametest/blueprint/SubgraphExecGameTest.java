@@ -1,11 +1,7 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
-import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BranchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
@@ -17,7 +13,12 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.SpawnFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import java.util.HashMap;
+import java.util.Map;
+import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -157,7 +158,7 @@ public final class SubgraphExecGameTest {
     }
 
     // ---- 3. exclusive multi-exit: Branch picks exactly one of two exec-out pins ------------------
-    private static java.util.Map<String, Object> runMultiExit(boolean cond) {
+    private static Map<String, Object> runMultiExit(boolean cond) {
         var outer = newGraph();
         var inner = outer.graphModel.createLocalSubgraphInstance();
         outer.graphModel.addLocalSubgraph(inner);
@@ -205,7 +206,7 @@ public final class SubgraphExecGameTest {
         var exec = new GraphExecutor(outer);
         exec.executeFrom(entry);
         var vars = exec.getEnvironment().variables();
-        var result = new java.util.HashMap<String, Object>();
+        var result = new HashMap<String, Object>();
         result.put("tookA", vars.get("tookA"));
         result.put("tookB", vars.get("tookB"));
         return result;

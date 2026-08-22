@@ -4,11 +4,11 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
 import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
-
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
 
 /**
  * Builds a real {@link VertexFormat} from an ordered list of {@link KGVertexElement} keys (a graph's
@@ -55,7 +55,7 @@ public final class KGVertexFormat {
         VertexFormat.Builder builder = VertexFormat.builder();
         int size = 0;
         int added = 0;
-        var seen = new java.util.HashSet<String>();
+        var seen = new HashSet<String>();
         for (String key : elementKeys) {
             KGVertexElement desc = KGVertexElements.get(key);
             if (desc == null) continue;

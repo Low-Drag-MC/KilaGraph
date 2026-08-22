@@ -5,9 +5,11 @@ import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.action.BlockEntityActionNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.action.ContainerActionNodes;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.action.EntityInteractionNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.container.ContainerNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.container.FluidContainerNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.BlockEntityNbtNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.EntityNbtNode;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
@@ -16,21 +18,27 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LayeredCauldronBlock;
+import net.minecraft.world.level.material.Fluids;
+import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
-
-import java.util.Map;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -192,7 +200,7 @@ public final class McContainerGameTest {
     @PrefixGameTestTemplate(false)
     public static void aPlayerInventoryIsAContainer(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
 
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
@@ -267,7 +275,7 @@ public final class McContainerGameTest {
         var write2 = addNode(g2, BlockEntityActionNodes.SetNbt.class);
         wire(g2, write2.getInputsById().get("level"), declareLevel(g2));
         setInputConstant(write2, "pos", stone);
-        setInputConstant(write2, "nbt", new net.minecraft.nbt.CompoundTag());
+        setInputConstant(write2, "nbt", new CompoundTag());
         wire(g2, write2.getInputsById().get("trigger"), entry2.getOutputsById().get("next"));
         var exec2 = executor(g2, level);
         exec2.executeFrom(entry2);
@@ -298,7 +306,7 @@ public final class McContainerGameTest {
         ServerLevel level = helper.getLevel();
         BlockPos cauldron = helper.absolutePos(new BlockPos(1, 2, 1));
         level.setBlock(cauldron, Blocks.WATER_CAULDRON.defaultBlockState()
-                .setValue(net.minecraft.world.level.block.LayeredCauldronBlock.LEVEL, 3), 3);
+                .setValue(LayeredCauldronBlock.LEVEL, 3), 3);
 
         var g = newGraph();
         var resolve = addNode(g, FluidContainerNodes.BlockFluidContainer.class);
@@ -316,9 +324,9 @@ public final class McContainerGameTest {
                 exec.evaluate(tanks.getOutputsById().get("tanks"), Integer.class) >= 1);
         assertFalse(helper, "which is not empty",
                 exec.evaluate(get.getOutputsById().get("empty"), Boolean.class));
-        assertEq(helper, "and holds water", net.minecraft.world.level.material.Fluids.WATER,
+        assertEq(helper, "and holds water", Fluids.WATER,
                 exec.evaluate(get.getOutputsById().get("out"),
-                        net.neoforged.neoforge.fluids.FluidStack.class).getFluid());
+                        FluidStack.class).getFluid());
         assertTrue(helper, "with a capacity",
                 exec.evaluate(get.getOutputsById().get("capacity"), Integer.class) > 0);
 
@@ -334,15 +342,15 @@ public final class McContainerGameTest {
         // --- a real drain empties it ---
         var drain = runFluid(level, cauldron, FluidContainerNodes.Drain.class, "amount", 1000);
         assertTrue(helper, "the drain reported success", drain.ok());
-        assertEq(helper, "and yielded water", net.minecraft.world.level.material.Fluids.WATER,
-                drain.get("out", net.neoforged.neoforge.fluids.FluidStack.class).getFluid());
+        assertEq(helper, "and yielded water", Fluids.WATER,
+                drain.get("out", FluidStack.class).getFluid());
         assertEq(helper, "and the cauldron is empty now", Blocks.CAULDRON,
                 level.getBlockState(cauldron).getBlock());
 
         // --- and filling it puts the water back ---
         var fill = runFluid(level, cauldron, FluidContainerNodes.Fill.class,
-                "fluid", new net.neoforged.neoforge.fluids.FluidStack(
-                        net.minecraft.world.level.material.Fluids.WATER, 1000));
+                "fluid", new FluidStack(
+                        Fluids.WATER, 1000));
         assertTrue(helper, "the fill reported success", fill.ok());
         assertTrue(helper, "and moved something", fill.get("filled", Integer.class) > 0);
         assertEq(helper, "and the cauldron holds water again", Blocks.WATER_CAULDRON,
@@ -378,15 +386,15 @@ public final class McContainerGameTest {
                 exec.evaluate(get.getOutputsById().get("capacity"), Integer.class).intValue());
 
         var fill = runFluid(level, stone, FluidContainerNodes.Fill.class,
-                "fluid", new net.neoforged.neoforge.fluids.FluidStack(
-                        net.minecraft.world.level.material.Fluids.WATER, 1000));
+                "fluid", new FluidStack(
+                        Fluids.WATER, 1000));
         assertFalse(helper, "filling a non-tank is refused", fill.ok());
         assertEq(helper, "with nothing moved", 0, fill.get("filled", Integer.class).intValue());
 
         var drain = runFluid(level, stone, FluidContainerNodes.Drain.class, "amount", 1000);
         assertFalse(helper, "draining a non-tank is refused", drain.ok());
         assertTrue(helper, "and returns nothing",
-                drain.get("out", net.neoforged.neoforge.fluids.FluidStack.class).isEmpty());
+                drain.get("out", FluidStack.class).isEmpty());
         helper.succeed();
     }
 
@@ -402,18 +410,18 @@ public final class McContainerGameTest {
     @PrefixGameTestTemplate(false)
     public static void entityNbtRoundTripsWithoutTeleporting(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        var donor = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(1, 2, 1));
-        var target = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(4, 2, 4));
-        donor.setCustomName(net.minecraft.network.chat.Component.literal("Donor"));
+        var donor = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        var target = helper.spawn(EntityType.PIG, new BlockPos(4, 2, 4));
+        donor.setCustomName(Component.literal("Donor"));
         double targetX = target.getX();
         double targetZ = target.getZ();
 
         var g = newGraph();
         var entry = addNode(g, EntryNode.class);
-        var read = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.EntityNbtNode.class);
+        var read = addNode(g, EntityNbtNode.class);
         setInputConstant(read, "entity", donor);
         var write = addNode(g,
-                com.lowdragmc.kilagraph.blueprint.nodes.mc.action.EntityInteractionNodes.SetNbt.class);
+                EntityInteractionNodes.SetNbt.class);
         setInputConstant(write, "entity", target);
         wire(g, write.getInputsById().get("nbt"), read.getOutputsById().get("out"));
         wire(g, write.getInputsById().get("trigger"), entry.getOutputsById().get("next"));

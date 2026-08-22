@@ -5,6 +5,7 @@ import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.action.BlockActionNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.action.EntityActionNodes;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.action.RunCommandNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.action.WorldEffectNodes;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
@@ -14,14 +15,17 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -29,8 +33,6 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
-
-import java.util.Map;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -173,7 +175,7 @@ public final class McActionGameTest {
         var effect = run(level, EntityActionNodes.AddEffect.class, "entity", pig,
                 "effect", ResourceLocation.parse("minecraft:speed"), "duration", 200, "amplifier", 1);
         assertTrue(helper, "effect reported success", effect.ok());
-        var speed = pig.getEffect(net.minecraft.world.effect.MobEffects.MOVEMENT_SPEED);
+        var speed = pig.getEffect(MobEffects.MOVEMENT_SPEED);
         assertTrue(helper, "and the effect is on the entity", speed != null);
         assertEq(helper, "with the amplifier given", 1, speed.getAmplifier());
 
@@ -228,8 +230,8 @@ public final class McActionGameTest {
                 "pos", at, "stack", new ItemStack(Items.DIAMOND, 3));
         assertTrue(helper, "drop reported success", drop.ok());
         Entity item = drop.get("entity", Entity.class);
-        assertTrue(helper, "and handed back the item entity", item instanceof net.minecraft.world.entity.item.ItemEntity);
-        var stack = ((net.minecraft.world.entity.item.ItemEntity) item).getItem();
+        assertTrue(helper, "and handed back the item entity", item instanceof ItemEntity);
+        var stack = ((ItemEntity) item).getItem();
         assertEq(helper, "holding the right item", Items.DIAMOND, stack.getItem());
         assertEq(helper, "and the right count", 3, stack.getCount());
 
@@ -276,5 +278,79 @@ public final class McActionGameTest {
         var exec = new GraphExecutor(g, EvaluationEnvironment.with(Map.of("level", level)));
         exec.executeFrom(entry);
         return new Result(exec, node);
+    }
+
+    /**
+     * Running a Minecraft command, the escape hatch for everything with no node.
+     *
+     * <p>Every assertion is on the world or on captured text, never on {@code ok} alone: a node that
+     * reported success without running anything would pass a test that trusted the flag.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void runsACommand(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos at = helper.absolutePos(new BlockPos(1, 2, 1));
+        level.setBlock(at, Blocks.AIR.defaultBlockState(), 3);
+
+        // --- a command that changes the world ---
+        var set = run(level, RunCommandNode.class,
+                "command", "setblock " + at.getX() + " " + at.getY() + " " + at.getZ() + " minecraft:gold_block");
+        assertTrue(helper, "setblock reported success", set.ok());
+        assertEq(helper, "and the block is really there", Blocks.GOLD_BLOCK,
+                level.getBlockState(at).getBlock());
+
+        // --- a leading slash is accepted, as when typed ---
+        assertTrue(helper, "a leading slash is stripped",
+                run(level, RunCommandNode.class,
+                        "command", "/setblock " + at.getX() + " " + at.getY() + " " + at.getZ()
+                                + " minecraft:diamond_block").ok());
+        assertEq(helper, "and it took effect", Blocks.DIAMOND_BLOCK,
+                level.getBlockState(at).getBlock());
+
+        // --- feedback and the result value are both captured ---
+        // "time query daytime" is chosen because both halves are checkable: its feedback text is
+        // deterministic and its result IS the number, so this ties the node's outputs to the real world
+        // rather than just asserting they are non-empty.
+        var query = run(level, RunCommandNode.class, "command", "time query daytime");
+        assertTrue(helper, "time query succeeded", query.ok());
+        assertEq(helper, "and the result is the day time",
+                (int) (level.getDayTime() % 24000L), query.get("result", Integer.class).intValue());
+        assertTrue(helper, "with feedback text captured, got: " + query.get("output", String.class),
+                query.get("output", String.class).contains(
+                        String.valueOf(level.getDayTime() % 24000L)));
+
+        // --- relative coordinates resolve against pos ---
+        BlockPos origin = helper.absolutePos(new BlockPos(4, 2, 1));
+        level.setBlock(origin, Blocks.AIR.defaultBlockState(), 3);
+        assertTrue(helper, "a relative setblock works from pos",
+                run(level, RunCommandNode.class, "pos", origin, "command", "setblock ~ ~ ~ minecraft:stone").ok());
+        assertEq(helper, "and landed on the given position", Blocks.STONE,
+                level.getBlockState(origin).getBlock());
+
+        // --- @s resolves to the entity, and not otherwise ---
+        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(6, 2, 1));
+        var named = run(level, RunCommandNode.class, "entity", pig,
+                "command", "data merge entity @s {CustomName:'\"Commanded\"'}");
+        assertTrue(helper, "a command ran as the entity", named.ok());
+        assertTrue(helper, "and @s was that entity", pig.hasCustomName());
+
+        var noExecutor = run(level, RunCommandNode.class, "pos", origin,
+                "command", "data get entity @s");
+        assertFalse(helper, "with no entity, @s matches nothing", noExecutor.ok());
+
+        // --- failures are reported, with the reason ---
+        var bad = run(level, RunCommandNode.class, "command", "thisisnotacommand");
+        assertFalse(helper, "an unknown command fails", bad.ok());
+        assertTrue(helper, "and says why, got: " + bad.get("output", String.class),
+                !bad.get("output", String.class).isEmpty());
+
+        var blank = run(level, RunCommandNode.class, "command", "");
+        assertFalse(helper, "an empty command is refused", blank.ok());
+
+        // --- permission is capped at command-block level, not operator level ---
+        var opped = run(level, RunCommandNode.class, "command", "stop");
+        assertFalse(helper, "a level-4 command is refused at command-block permission", opped.ok());
+        helper.succeed();
     }
 }

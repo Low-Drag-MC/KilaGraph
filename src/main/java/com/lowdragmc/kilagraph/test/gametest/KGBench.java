@@ -1,9 +1,9 @@
 package com.lowdragmc.kilagraph.test.gametest;
 
+import com.lowdragmc.kilagraph.graph.exec.PreparedGraph;
 import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
-
 import java.lang.management.ManagementFactory;
+import org.slf4j.Logger;
 
 /**
  * Headless micro-benchmark harness for the graph executor. Deliberately tiny and dependency-free:
@@ -78,7 +78,7 @@ public final class KGBench {
      *                  the portable ns/node-step figure
      */
     public static Result measure(String label, int nodeSteps, int warmupRuns, int timedRuns, Runnable body) {
-        long builds0 = com.lowdragmc.kilagraph.graph.exec.PreparedGraph.buildCount();
+        long builds0 = PreparedGraph.buildCount();
         for (int i = 0; i < warmupRuns; i++) body.run();
 
         // Give the JIT's OSR/compile queue a moment to settle before the timed pass.
@@ -100,7 +100,7 @@ public final class KGBench {
         Result r = new Result(label, nodeSteps, timedRuns, elapsed, totalAlloc, allocRuns);
         LOGGER.info("[KGBench] {}", r);
         LOGGER.info("[KGBench]   prepare: {} rebuilds over {} warmup runs",
-                com.lowdragmc.kilagraph.graph.exec.PreparedGraph.buildCount() - builds0, warmupRuns);
+                PreparedGraph.buildCount() - builds0, warmupRuns);
         return r;
     }
 

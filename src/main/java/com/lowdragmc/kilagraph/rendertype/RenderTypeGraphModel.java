@@ -4,14 +4,14 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.ChangeHint;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.GraphElementModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * The {@link RenderTypeGraph}'s graph model. Inherits the shader vec-assign rule from
@@ -93,7 +93,7 @@ public class RenderTypeGraphModel extends ShaderGraphModelBase {
     }
 
     public void setPreviewToolContentKey(@Nullable String key) {
-        if (java.util.Objects.equals(previewToolContentKey, key)) return;
+        if (Objects.equals(previewToolContentKey, key)) return;
         previewToolContentKey = key;
         setGraphObjectDirty();
     }

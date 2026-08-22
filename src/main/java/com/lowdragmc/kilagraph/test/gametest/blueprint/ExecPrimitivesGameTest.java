@@ -1,10 +1,8 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BranchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.GateNode;
@@ -13,7 +11,11 @@ import com.lowdragmc.kilagraph.blueprint.nodes.exec.SequenceNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SwitchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
+import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -35,8 +37,8 @@ public final class ExecPrimitivesGameTest {
     private ExecPrimitivesGameTest() {}
 
     /** Helper: Add node emitting a Float constant. */
-    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel
-            floatSource(com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, float v) {
+    private static NodeModel
+            floatSource(BlueprintGraph g, float v) {
         var add = addNode(g, AddNode.class);
         setInputConstant(add, "in1", v);
         setInputConstant(add, "in2", 0.0f);
@@ -68,7 +70,7 @@ public final class ExecPrimitivesGameTest {
         var exec = new GraphExecutor(g);
         exec.executeFrom(entry);
         for (int i = 0; i < 3; i++) {
-            Object captured = exec.nodeState(new com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel[]{p1, p2, p3}[i].getUid()).get("last");
+            Object captured = exec.nodeState(new NodeModel[]{p1, p2, p3}[i].getUid()).get("last");
             if (!(captured instanceof Number n) || Math.abs(n.floatValue() - (i + 1)) > 1e-5f) {
                 helper.fail("p" + (i + 1) + " missing or wrong: " + captured);
                 return;
@@ -177,7 +179,7 @@ public final class ExecPrimitivesGameTest {
         wire(g, p2.getInputsById().get("trigger"), sw.getOutputsById().get("case2"));
         wire(g, p3.getInputsById().get("trigger"), sw.getOutputsById().get("case3"));
         wire(g, pDef.getInputsById().get("trigger"), sw.getOutputsById().get("defaultExec"));
-        for (var p : new com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel[]{p1, p2, p3, pDef}) {
+        for (var p : new NodeModel[]{p1, p2, p3, pDef}) {
             wire(g, p.getInputsById().get("value"), floatSource(g, 1f).getOutputsById().get("out"));
         }
 
@@ -208,7 +210,7 @@ public final class ExecPrimitivesGameTest {
         wire(g, p1.getInputsById().get("trigger"), sw.getOutputsById().get("case1"));
         wire(g, p2.getInputsById().get("trigger"), sw.getOutputsById().get("case2"));
         wire(g, pDef.getInputsById().get("trigger"), sw.getOutputsById().get("defaultExec"));
-        for (var p : new com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel[]{p1, p2, pDef}) {
+        for (var p : new NodeModel[]{p1, p2, pDef}) {
             wire(g, p.getInputsById().get("value"), floatSource(g, 1f).getOutputsById().get("out"));
         }
 

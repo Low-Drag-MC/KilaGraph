@@ -12,18 +12,18 @@ import com.lowdragmc.lowdraglib2.math.HDRColor;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
-import org.lwjgl.opengl.GL11;
 import org.joml.Matrix4fc;
 import org.joml.Vector2fc;
 import org.joml.Vector3fc;
 import org.joml.Vector4fc;
-
-import java.util.HashMap;
-import java.util.Map;
+import org.lwjgl.opengl.GL11;
 
 /**
  * A compiled, ready-to-draw material for the 1.21.1 backport: a vanilla {@link ShaderInstance} (built from the
@@ -248,7 +248,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         if (b == null) return RenderStateShard.NO_TRANSPARENCY;
         // A custom shard built from the shared blendFactors — the public (name, setup, clear) constructor lets us
         // honour every mode exactly (incl. those with no vanilla constant), and matches applyRenderState 1:1.
-        return new RenderStateShard.TransparencyStateShard("kg_" + blend.name().toLowerCase(java.util.Locale.ROOT),
+        return new RenderStateShard.TransparencyStateShard("kg_" + blend.name().toLowerCase(Locale.ROOT),
                 () -> {
                     RenderSystem.enableBlend();
                     RenderSystem.blendFuncSeparate(b.src(), b.dst(), b.srcAlpha(), b.dstAlpha());

@@ -20,6 +20,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseFireBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Interacting with the world the way a player or a tool would — fire, bone meal, lightning, explosions.
@@ -173,7 +174,7 @@ public final class WorldInteractionNodes {
                 McActions.done(ctx, false);
                 return;
             }
-            bolt.moveTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(at));
+            bolt.moveTo(Vec3.atBottomCenterOf(at));
             bolt.setVisualOnly(ctx.getBool("visualOnly", false));
             boolean added = world.addFreshEntity(bolt);
             ctx.setOutput("entity", added ? bolt : null);

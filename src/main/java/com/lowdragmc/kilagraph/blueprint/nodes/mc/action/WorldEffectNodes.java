@@ -18,7 +18,9 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 /**
  * Sound, particles and dropped items — the actions a player sees and hears rather than walks on.
@@ -51,7 +53,7 @@ public final class WorldEffectNodes {
         @ExecInputPort public ExecutionFlow trigger;
         @ExecOutputPort public ExecutionFlow next;
 
-        @InputPort public net.minecraft.world.level.Level level;
+        @InputPort public Level level;
         @InputPort public BlockPos pos = BlockPos.ZERO;
         @InputPort public ResourceLocation sound;
         @InputPort public float volume = 1f;
@@ -101,7 +103,7 @@ public final class WorldEffectNodes {
         @ExecInputPort public ExecutionFlow trigger;
         @ExecOutputPort public ExecutionFlow next;
 
-        @InputPort public net.minecraft.world.level.Level level;
+        @InputPort public Level level;
         @InputPort public BlockPos pos = BlockPos.ZERO;
         @InputPort public ResourceLocation particle;
         @InputPort public int count = 1;
@@ -147,7 +149,7 @@ public final class WorldEffectNodes {
         @ExecInputPort public ExecutionFlow trigger;
         @ExecOutputPort public ExecutionFlow next;
 
-        @InputPort public net.minecraft.world.level.Level level;
+        @InputPort public Level level;
         @InputPort public BlockPos pos = BlockPos.ZERO;
         @InputPort public ItemStack stack = ItemStack.EMPTY;
         @OutputPort public Entity entity;
@@ -190,14 +192,14 @@ public final class WorldEffectNodes {
         @ExecInputPort public ExecutionFlow trigger;
         @ExecOutputPort public ExecutionFlow next;
 
-        @InputPort public net.minecraft.world.entity.player.Player player;
+        @InputPort public Player player;
         @InputPort public Component message;
         @InputPort public boolean actionBar = false;
         @OutputPort public boolean ok;
 
         @Override
         public void execute(ExecContext ctx) {
-            var p = ctx.getInput("player", net.minecraft.world.entity.player.Player.class, null);
+            var p = ctx.getInput("player", Player.class, null);
             Component text = ctx.getInput("message", Component.class, null);
             if (p == null || text == null || p.level().isClientSide) {
                 McActions.done(ctx, false);

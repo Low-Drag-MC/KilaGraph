@@ -9,6 +9,7 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionFlow;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -198,13 +199,13 @@ public final class EntityInteractionNodes {
         @ExecOutputPort public ExecutionFlow next;
 
         @InputPort public Entity entity;
-        @InputPort public net.minecraft.nbt.CompoundTag nbt;
+        @InputPort public CompoundTag nbt;
         @OutputPort public boolean ok;
 
         @Override
         public void execute(ExecContext ctx) {
             Entity e = ctx.getInput("entity", Entity.class, null);
-            var tag = ctx.getInput("nbt", net.minecraft.nbt.CompoundTag.class, null);
+            var tag = ctx.getInput("nbt", CompoundTag.class, null);
             if (e == null || tag == null || e.level().isClientSide || e.isRemoved()) {
                 McActions.done(ctx, false);
                 return;

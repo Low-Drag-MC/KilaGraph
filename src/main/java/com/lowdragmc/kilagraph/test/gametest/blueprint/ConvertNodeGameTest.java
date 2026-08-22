@@ -1,10 +1,9 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.blueprint.nodes.convert.CastNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.NumberFormatNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ParseBoolNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ParseNumberNode;
@@ -14,9 +13,19 @@ import com.lowdragmc.kilagraph.blueprint.nodes.convert.ToStringNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListGetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosNodes;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.id.McIdNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.graph.exec.TypeMismatchException;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -38,8 +47,8 @@ public final class ConvertNodeGameTest {
     private ConvertNodeGameTest() {}
 
     /** A wired Float source (AddNode out) to feed UNKNOWN inputs that have no embedded constant. */
-    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel floatSource(
-            com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, float value) {
+    private static PortModel floatSource(
+            BlueprintGraph g, float value) {
         var add = addNode(g, AddNode.class);
         setInputConstant(add, "in1", value);
         setInputConstant(add, "in2", 0f);
@@ -47,8 +56,8 @@ public final class ConvertNodeGameTest {
     }
 
     /** A wired Integer source (ListCombine(INT)+ListGet(INT)) to feed UNKNOWN inputs. */
-    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel intSource(
-            com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, int value) {
+    private static PortModel intSource(
+            BlueprintGraph g, int value) {
         var combine = addNode(g, ListCombineNode.class);
         setOption(combine, "type", TypeHandles.INT.getIdentification());
         setOption(combine, "inputs", 1);
@@ -61,8 +70,8 @@ public final class ConvertNodeGameTest {
     }
 
     /** Helper: feed a String value into an UNKNOWN port via a ListCombine(STRING)+ListGet(STRING). */
-    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel stringSource(
-            com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, String value) {
+    private static PortModel stringSource(
+            BlueprintGraph g, String value) {
         var combine = addNode(g, ListCombineNode.class);
         setOption(combine, "type", TypeHandles.STRING.getIdentification());
         setOption(combine, "inputs", 1);
@@ -222,7 +231,7 @@ public final class ConvertNodeGameTest {
         boolean threw = false;
         try {
             castText(TypeHandles.INT, Integer.class);
-        } catch (com.lowdragmc.kilagraph.graph.exec.TypeMismatchException expected) {
+        } catch (TypeMismatchException expected) {
             threw = true;
         }
         assertTrue(helper, "non-numeric text promised as int throws", threw);
@@ -230,29 +239,29 @@ public final class ConvertNodeGameTest {
     }
 
     /** Casts the int 7, sourced from a Block Pos Unpack so the value arrives over a wire. */
-    private static <T> T castInt(com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle target,
+    private static <T> T castInt(TypeHandle target,
                                  Class<T> type) {
         var g = newGraph();
-        var src = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosNodes.Unpack.class);
-        setInputConstant(src, "in", new net.minecraft.core.BlockPos(7, 0, 0));
+        var src = addNode(g, BlockPosNodes.Unpack.class);
+        setInputConstant(src, "in", new BlockPos(7, 0, 0));
         return runCast(g, src.getOutputsById().get("x"), target, type);
     }
 
     /** Casts the text "not_a_number", sourced from an Identifier Unpack. */
-    private static <T> T castText(com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle target,
+    private static <T> T castText(TypeHandle target,
                                   Class<T> type) {
         var g = newGraph();
-        var src = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.mc.id.McIdNodes.Unpack.class);
+        var src = addNode(g, McIdNodes.Unpack.class);
         setInputConstant(src, "in",
-                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("minecraft", "not_a_number"));
+                ResourceLocation.fromNamespaceAndPath("minecraft", "not_a_number"));
         return runCast(g, src.getOutputsById().get("path"), target, type);
     }
 
-    private static <T> T runCast(com.lowdragmc.kilagraph.blueprint.BlueprintGraph g,
-                                 com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel source,
-                                 com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle target,
+    private static <T> T runCast(BlueprintGraph g,
+                                 PortModel source,
+                                 TypeHandle target,
                                  Class<T> type) {
-        var n = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.convert.CastNode.class);
+        var n = addNode(g, CastNode.class);
         setOption(n, "targetType", target.getIdentification());
         wire(g, n.getInputsById().get("in"), source);
         return new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), type);

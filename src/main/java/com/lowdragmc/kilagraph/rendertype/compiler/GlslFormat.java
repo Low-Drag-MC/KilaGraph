@@ -2,8 +2,10 @@ package com.lowdragmc.kilagraph.rendertype.compiler;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.lowdraglib2.math.HDRColor;
-
 import java.util.Locale;
+import org.joml.Vector2fc;
+import org.joml.Vector3fc;
+import org.joml.Vector4fc;
 
 /** Helpers for emitting GLSL literals with a stable, locale-independent format. */
 public final class GlslFormat {
@@ -35,17 +37,17 @@ public final class GlslFormat {
             case INT -> Integer.toString((int) toFloat(value, 0f));
             case BOOL -> Boolean.toString(toBool(value));
             case VEC2 -> {
-                if (value instanceof org.joml.Vector2fc v) yield "vec2(" + f(v.x()) + ", " + f(v.y()) + ")";
+                if (value instanceof Vector2fc v) yield "vec2(" + f(v.x()) + ", " + f(v.y()) + ")";
                 yield "vec2(" + f(toFloat(value, 0f)) + ")";
             }
             case VEC3 -> {
-                if (value instanceof org.joml.Vector3fc v) {
+                if (value instanceof Vector3fc v) {
                     yield "vec3(" + f(v.x()) + ", " + f(v.y()) + ", " + f(v.z()) + ")";
                 }
                 yield "vec3(" + f(toFloat(value, 0f)) + ")";
             }
             case VEC4 -> {
-                if (value instanceof org.joml.Vector4fc v) {
+                if (value instanceof Vector4fc v) {
                     yield "vec4(" + f(v.x()) + ", " + f(v.y()) + ", " + f(v.z()) + ", " + f(v.w()) + ")";
                 }
                 // A bare Integer with a vec4 target is a COLOR-typed value (ARGB) — unpack to rgba.
@@ -81,11 +83,11 @@ public final class GlslFormat {
         return switch (type) {
             case FLOAT, INT -> new float[]{toFloat(value, 0f)};
             case BOOL -> new float[]{toBool(value) ? 1f : 0f};
-            case VEC2 -> value instanceof org.joml.Vector2fc v
+            case VEC2 -> value instanceof Vector2fc v
                     ? new float[]{v.x(), v.y()} : new float[]{toFloat(value, 0f), 0f};
-            case VEC3 -> value instanceof org.joml.Vector3fc v
+            case VEC3 -> value instanceof Vector3fc v
                     ? new float[]{v.x(), v.y(), v.z()} : new float[]{toFloat(value, 0f), 0f, 0f};
-            case VEC4 -> value instanceof org.joml.Vector4fc v
+            case VEC4 -> value instanceof Vector4fc v
                     ? new float[]{v.x(), v.y(), v.z(), v.w()}
                     : value instanceof Integer argb // COLOR-typed (ARGB) default → rgba components
                     ? argbToRgba(argb)

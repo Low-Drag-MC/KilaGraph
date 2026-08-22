@@ -1,63 +1,68 @@
 package com.lowdragmc.kilagraph.test.gametest.rendertypegraph;
 
 
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.editor.RenderTypeGraphResource;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphModel;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
-import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
 import com.lowdragmc.kilagraph.rendertype.gui.RenderTypeGraphView;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphLogger;
+import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.ApplyFogNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.texture.LightMapTextureNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.texture.OverlayTextureNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.transform.DynamicTransformsUboNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogCylindricalDistanceNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogSphericalDistanceNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogUboNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.LinearFogValueNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.TotalFogValueNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaDiscardBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentBaseColorBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentEmissionBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentStageNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogCylindricalDistanceNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogSphericalDistanceNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogUboNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.fog.LinearFogValueNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.AddNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4ConstructNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.texture.LightMapTextureNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.texture.OverlayTextureNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.transform.DynamicTransformsUboNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.transform.ProjectionFromPositionNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.transform.ProjectionUboNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.AddNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4ConstructNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.fog.TotalFogValueNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomFloatBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec4Block;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingStageNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingStageNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
+import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents;
+import com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder;
+import com.lowdragmc.kilagraph.rendertype.preview.PreviewTessellator;
+import com.lowdragmc.kilagraph.rendertype.preview.PreviewVertex;
+import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphLogger;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.command.GraphCommands;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.command.GraphCommands;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ContextNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
-import net.minecraft.core.Holder;
-import net.minecraft.gametest.framework.GameTestHelper;
-import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-
-import java.util.List;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -115,8 +120,8 @@ public final class RenderTypeGraphGameTest {
         CompiledShaderGraph before = new ShaderGraphCompiler(graph).compile();
         assertFalse(helper, "baseline graph compiles without stage errors", before.hasStageErrors());
 
-        var provider = com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry();
-        net.minecraft.nbt.CompoundTag snapshot = graph.graphModel.serializeNBT(provider);
+        var provider = Platform.getFrozenRegistry();
+        CompoundTag snapshot = graph.graphModel.serializeNBT(provider);
 
         NodeModel texture = findNode(graph, TextureNode.class);
         assertTrue(helper, "default graph has a Texture node", texture != null);
@@ -162,7 +167,7 @@ public final class RenderTypeGraphGameTest {
         RenderTypeGraphModel model = (RenderTypeGraphModel) graph.graphModel;
         NodeModel node = findNode(graph, SamplerTexture2DNode.class);
         assertTrue(helper, "default graph has a node to tag with a preview shape", node != null);
-        java.util.UUID nodeUid = node.getUid();
+        UUID nodeUid = node.getUid();
         model.setNodePreviewContentKey(nodeUid, sphere);
         model.setPreviewToolContentKey(quad);
 
@@ -178,8 +183,8 @@ public final class RenderTypeGraphGameTest {
                 restored.graphModel.getModel(nodeUid) != null);
 
         // --- Undo path: snapshot, mutate, then deserialize the snapshot back into the SAME model. ---
-        var provider = com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry();
-        net.minecraft.nbt.CompoundTag snapshot = graph.graphModel.serializeNBT(provider);
+        var provider = Platform.getFrozenRegistry();
+        CompoundTag snapshot = graph.graphModel.serializeNBT(provider);
 
         // Edit after the snapshot: change both shapes to something else.
         model.setNodePreviewContentKey(nodeUid, cube);
@@ -651,7 +656,7 @@ public final class RenderTypeGraphGameTest {
     public static void vertexElementDefaultFallsBackAndWarns(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         RenderTypeGraph.Settings s = graph.getSettings();
-        var without = new java.util.ArrayList<>(s.vertexFormatElements());
+        var without = new ArrayList<>(s.vertexFormatElements());
         without.remove("color");
         graph.setSettings(new RenderTypeGraph.Settings(without, s.vertexFormatMode(), s.blend(), s.depthTest(),
                 s.depthWrite(), s.cull(), s.outputTarget(), s.affectsOutline(), s.sortOnUpload()));
@@ -673,22 +678,22 @@ public final class RenderTypeGraphGameTest {
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void previewContentsBuildGeometry(GameTestHelper helper) {
-        var quad = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
-        com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents.QUAD.build(quad);
+        var quad = new PreviewMeshBuilder();
+        KGPreviewContents.QUAD.build(quad);
         assertTrue(helper, "quad content is one quad", quad.quads.size() == 1 && quad.tris.isEmpty());
 
-        var cube = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
-        com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents.CUBE.build(cube);
+        var cube = new PreviewMeshBuilder();
+        KGPreviewContents.CUBE.build(cube);
         assertTrue(helper, "cube content is six quads", cube.quads.size() == 6 && cube.tris.isEmpty());
 
-        var sphere = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
-        com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents.SPHERE.build(sphere);
+        var sphere = new PreviewMeshBuilder();
+        KGPreviewContents.SPHERE.build(sphere);
         assertTrue(helper, "sphere content has quad bands + triangle caps",
                 !sphere.quads.isEmpty() && !sphere.tris.isEmpty());
 
         // Custom-element adaptation: a vertex carries per-element values for mod-registered elements,
         // and copies preserve them (so a content can supply data a custom writer reads).
-        var pv = new com.lowdragmc.kilagraph.rendertype.preview.PreviewVertex();
+        var pv = new PreviewVertex();
         pv.setAttribute("mod_tangent", 1f, 0f, 0f);
         var cp = pv.copy();
         assertTrue(helper, "custom attribute round-trips through copy",
@@ -702,28 +707,28 @@ public final class RenderTypeGraphGameTest {
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void previewTessellatorMatchesMode(GameTestHelper helper) {
-        var mb = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
-        com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents.CUBE.build(mb); // 6 quads, 24 edges
+        var mb = new PreviewMeshBuilder();
+        KGPreviewContents.CUBE.build(mb); // 6 quads, 24 edges
 
         var QUADS = RenderTypeGraph.Settings.VertexFormatMode.QUADS;
         var TRIANGLES = RenderTypeGraph.Settings.VertexFormatMode.TRIANGLES;
         var LINES = RenderTypeGraph.Settings.VertexFormatMode.LINES;
         var LINE_STRIP = RenderTypeGraph.Settings.VertexFormatMode.LINE_STRIP;
-        var stream = com.lowdragmc.kilagraph.rendertype.preview.PreviewTessellator.toStream(mb, QUADS);
+        var stream = PreviewTessellator.toStream(mb, QUADS);
         assertEq(helper, "QUADS: 6 quads -> 24 verts", 24, stream.size());
         assertEq(helper, "TRIANGLES: 12 tris -> 36 verts", 36,
-                com.lowdragmc.kilagraph.rendertype.preview.PreviewTessellator.toStream(mb, TRIANGLES).size());
+                PreviewTessellator.toStream(mb, TRIANGLES).size());
         assertEq(helper, "LINES: 24 edges -> 96 verts", 96,
-                com.lowdragmc.kilagraph.rendertype.preview.PreviewTessellator.toStream(mb, LINES).size());
+                PreviewTessellator.toStream(mb, LINES).size());
         assertEq(helper, "LINE_STRIP: 24 edges -> 48 verts", 48,
-                com.lowdragmc.kilagraph.rendertype.preview.PreviewTessellator.toStream(mb, LINE_STRIP).size());
+                PreviewTessellator.toStream(mb, LINE_STRIP).size());
 
         // Triangle-strip winding: two CCW (+Z) triangles in XY -> stitched strip -> all reconstructed
         // (non-degenerate) triangles must remain CCW (+Z cross product).
-        var flat = new com.lowdragmc.kilagraph.rendertype.preview.PreviewMeshBuilder();
+        var flat = new PreviewMeshBuilder();
         flat.tri(pv(0, 0), pv(1, 0), pv(0, 1));   // CCW
         flat.tri(pv(2, 0), pv(3, 0), pv(2, 1));   // CCW, separated
-        var strip = com.lowdragmc.kilagraph.rendertype.preview.PreviewTessellator.toStream(
+        var strip = PreviewTessellator.toStream(
                 flat, RenderTypeGraph.Settings.VertexFormatMode.TRIANGLE_STRIP);
         int real = 0;
         for (int i = 0; i + 2 < strip.size(); i++) {
@@ -738,8 +743,8 @@ public final class RenderTypeGraphGameTest {
         helper.succeed();
     }
 
-    private static com.lowdragmc.kilagraph.rendertype.preview.PreviewVertex pv(float x, float y) {
-        return new com.lowdragmc.kilagraph.rendertype.preview.PreviewVertex(x, y, 0, 0, 0, 0, 0, 1);
+    private static PreviewVertex pv(float x, float y) {
+        return new PreviewVertex(x, y, 0, 0, 0, 0, 0, 1);
     }
 
     private static NodeModel findNode(RenderTypeGraph graph, Class<? extends Node> nodeClass) {
@@ -786,7 +791,7 @@ public final class RenderTypeGraphGameTest {
 
     private static NodeModel findSubgraphNode(RenderTypeGraph graph) {
         return graph.graphModel.getNodeModels().stream()
-                .filter(com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel.class::isInstance)
+                .filter(SubgraphNodeModel.class::isInstance)
                 .map(NodeModel.class::cast)
                 .findFirst()
                 .orElse(null);

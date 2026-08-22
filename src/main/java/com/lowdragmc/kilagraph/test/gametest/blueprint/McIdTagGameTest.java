@@ -1,11 +1,13 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.id.McIdNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.tag.McTagNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
+import java.util.List;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
@@ -91,7 +93,7 @@ public final class McIdTagGameTest {
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void unknownIdsAreNotSilentlyDefaulted(GameTestHelper helper) {
-        for (var cls : java.util.List.of(McIdNodes.ItemFromId.class, McIdNodes.BlockFromId.class,
+        for (var cls : List.of(McIdNodes.ItemFromId.class, McIdNodes.BlockFromId.class,
                 McIdNodes.FluidFromId.class, McIdNodes.EntityTypeFromId.class)) {
             var n = node(cls, "id", ResourceLocation.fromNamespaceAndPath("kilagraph", "no_such_thing"));
             assertFalse(helper, cls.getSimpleName() + " reports not found",
@@ -153,7 +155,7 @@ public final class McIdTagGameTest {
     }
 
     /** One node in its own graph, carried with the graph so it can be evaluated. */
-    private record Probe(com.lowdragmc.kilagraph.blueprint.BlueprintGraph graph, NodeModel model) {
+    private record Probe(BlueprintGraph graph, NodeModel model) {
     }
 
     /** A node in its own graph with the given input constants applied, as {@code id, value} pairs. */

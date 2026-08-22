@@ -2,8 +2,8 @@ package com.lowdragmc.kilagraph.rendertype.compiler;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.CurveValue;
 import com.lowdragmc.lowdraglib2.math.curve.ExplicitCubicBezierCurve2;
-
 import java.util.List;
+import org.joml.Vector2f;
 
 /**
  * GLSL emission + packing for the {@code CURVE} wire type (a Unity-style float curve). The shader
@@ -119,6 +119,6 @@ public final class CurveGlsl {
     }
 
     private static final ExplicitCubicBezierCurve2 FLAT = new ExplicitCubicBezierCurve2(
-            new org.joml.Vector2f(0f, 0.5f), new org.joml.Vector2f(0.25f, 0.5f),
-            new org.joml.Vector2f(0.75f, 0.5f), new org.joml.Vector2f(1f, 0.5f));
+            new Vector2f(0f, 0.5f), new Vector2f(0.25f, 0.5f),
+            new Vector2f(0.75f, 0.5f), new Vector2f(1f, 0.5f));
 }

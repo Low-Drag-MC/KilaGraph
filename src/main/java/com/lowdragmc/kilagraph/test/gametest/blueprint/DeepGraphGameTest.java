@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.blueprint.nodes.compare.GreaterThanNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BranchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.NoopNode;
@@ -144,7 +145,7 @@ public final class DeepGraphGameTest {
     @PrefixGameTestTemplate(false)
     public static void deepChainDrivingABranch(GameTestHelper helper) {
         var b = chainOfAdds(DEEP);
-        b.add("gt", com.lowdragmc.kilagraph.blueprint.nodes.compare.GreaterThanNode.class)
+        b.add("gt", GreaterThanNode.class)
                 .wire("gt.a", "n" + (DEEP - 1)).constant("gt.b", (float) DEEP - 1f);
         b.add("entry", EntryNode.class);
         b.add("branch", BranchNode.class).wire("branch.cond", "gt");

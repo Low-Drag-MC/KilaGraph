@@ -7,13 +7,16 @@ import com.lowdragmc.kilagraph.blueprint.nodes.mc.block.BlockStateNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.component.DataComponentNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.fluid.FluidNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.gameplay.RegistryProbeNodes;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.id.McIdNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.item.ItemStackNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.text.TextNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
+import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTest;
@@ -31,8 +34,6 @@ import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-
-import java.util.List;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -396,9 +397,9 @@ public final class McStructureGameTest {
     }
 
     /** Is Type over a wired-in {@code ResourceLocation}, against {@code target}. */
-    private static boolean probeIsType(com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle target) {
+    private static boolean probeIsType(TypeHandle target) {
         var g = newGraph();
-        NodeModel source = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.mc.id.McIdNodes.Create.class);
+        NodeModel source = addNode(g, McIdNodes.Create.class);
         setInputConstant(source, "namespace", "minecraft");
         setInputConstant(source, "path", "stone");
         NodeModel test = addNode(g, InstanceOfNode.class);

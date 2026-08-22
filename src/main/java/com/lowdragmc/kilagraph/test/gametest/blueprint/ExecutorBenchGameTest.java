@@ -18,17 +18,18 @@ import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.exec.VariableStore;
 import com.lowdragmc.kilagraph.test.gametest.KGBench;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import java.util.OptionalLong;
+import java.util.function.Consumer;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
-
-import java.util.OptionalLong;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -382,8 +383,8 @@ public final class ExecutorBenchGameTest {
 
     /** Build an N-long chain of {@code cls} and report its per-node cost. */
     private static void measureChain(GameTestHelper helper, String label, int n,
-                                     Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node> cls,
-                                     String chainInput, java.util.function.Consumer<NodeModel> constants) {
+                                     Class<? extends Node> cls,
+                                     String chainInput, Consumer<NodeModel> constants) {
         var g = newGraph();
         NodeModel tail = null;
         for (int i = 0; i < n; i++) {

@@ -1,11 +1,9 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.CaseNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.ConcatNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.ContainsNode;
@@ -21,9 +19,11 @@ import com.lowdragmc.kilagraph.blueprint.nodes.string.SubstringNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.TrimNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
-import net.minecraft.gametest.framework.GameTestHelper;
-
 import java.util.List;
+import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -204,7 +204,7 @@ public final class StringNodeGameTest {
         var n = addNode(g, FormatNode.class);
         setOption(n, "pattern", "%.2f");
         setOption(n, "inputs", 1);
-        var add = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode.class);
+        var add = addNode(g, AddNode.class);
         setInputConstant(add, "in1", 3.14159f);
         setInputConstant(add, "in2", 0f);
         wire(g, n.getInputsById().get("arg1"), add.getOutputsById().get("out"));

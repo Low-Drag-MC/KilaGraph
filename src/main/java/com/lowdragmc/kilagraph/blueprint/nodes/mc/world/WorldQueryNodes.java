@@ -8,9 +8,12 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.mc.McConvert;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -25,9 +28,6 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import org.joml.Vector3f;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Read-only questions about the world.
@@ -75,7 +75,7 @@ public final class WorldQueryNodes {
             // unwrapKey rather than the registry: a Holder from a live world already knows its key, and
             // going back through registryAccess would be a lookup that can fail for no reason.
             ctx.setOutput("out", l.getBiome(pos(ctx)).unwrapKey()
-                    .map(net.minecraft.resources.ResourceKey::location).orElse(null));
+                    .map(ResourceKey::location).orElse(null));
         }
     }
 

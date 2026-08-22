@@ -1,19 +1,16 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AbsNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AngleConvertNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.Atan2Node;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.ClampNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.FractNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.LogBaseNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.DivideNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.ExpNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.FractNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.LerpNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.LogBaseNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.LogNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.MaxNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.MinNode;
@@ -31,9 +28,13 @@ import com.lowdragmc.kilagraph.blueprint.nodes.math.TrigNode;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.exec.VariableStore;
-import net.minecraft.gametest.framework.GameTestHelper;
-
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
+import java.util.Map;
 import java.util.OptionalLong;
+import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -72,8 +73,8 @@ public final class MathNodeGameTest {
 
     /** Run a simple float-out node with provided input constants; assert the output. */
     @SafeVarargs
-    private static float runFloat(Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node> nodeClass,
-                                   java.util.Map.Entry<String, Object>... inputs) {
+    private static float runFloat(Class<? extends Node> nodeClass,
+                                   Map.Entry<String, Object>... inputs) {
         var g = newGraph();
         var n = addNode(g, nodeClass);
         for (var e : inputs) {
@@ -109,7 +110,7 @@ public final class MathNodeGameTest {
     public static void divide(GameTestHelper helper) {
         assertEq(helper, "10/4",
                 2.5f,
-                runFloat(DivideNode.class, java.util.Map.entry("a", 10f), java.util.Map.entry("b", 4f)),
+                runFloat(DivideNode.class, Map.entry("a", 10f), Map.entry("b", 4f)),
                 1e-5f);
         helper.succeed();
     }
@@ -121,7 +122,7 @@ public final class MathNodeGameTest {
     public static void divideByZero(GameTestHelper helper) {
         assertEq(helper, "x/0 = 0",
                 0f,
-                runFloat(DivideNode.class, java.util.Map.entry("a", 10f), java.util.Map.entry("b", 0f)),
+                runFloat(DivideNode.class, Map.entry("a", 10f), Map.entry("b", 0f)),
                 0f);
         helper.succeed();
     }
@@ -132,9 +133,9 @@ public final class MathNodeGameTest {
 
     public static void modulo(GameTestHelper helper) {
         assertEq(helper, "10%3", 1f,
-                runFloat(ModuloNode.class, java.util.Map.entry("a", 10f), java.util.Map.entry("b", 3f)), 1e-5f);
+                runFloat(ModuloNode.class, Map.entry("a", 10f), Map.entry("b", 3f)), 1e-5f);
         assertEq(helper, "10%0 = 0", 0f,
-                runFloat(ModuloNode.class, java.util.Map.entry("a", 10f), java.util.Map.entry("b", 0f)), 0f);
+                runFloat(ModuloNode.class, Map.entry("a", 10f), Map.entry("b", 0f)), 0f);
         helper.succeed();
     }
 
@@ -143,8 +144,8 @@ public final class MathNodeGameTest {
     @PrefixGameTestTemplate(false)
 
     public static void negate(GameTestHelper helper) {
-        assertEq(helper, "-5", -5f, runFloat(NegateNode.class, java.util.Map.entry("in", 5f)), 1e-5f);
-        assertEq(helper, "--(-3)", 3f, runFloat(NegateNode.class, java.util.Map.entry("in", -3f)), 1e-5f);
+        assertEq(helper, "-5", -5f, runFloat(NegateNode.class, Map.entry("in", 5f)), 1e-5f);
+        assertEq(helper, "--(-3)", 3f, runFloat(NegateNode.class, Map.entry("in", -3f)), 1e-5f);
         helper.succeed();
     }
 
@@ -153,8 +154,8 @@ public final class MathNodeGameTest {
     @PrefixGameTestTemplate(false)
 
     public static void abs(GameTestHelper helper) {
-        assertEq(helper, "|-7|", 7f, runFloat(AbsNode.class, java.util.Map.entry("in", -7f)), 1e-5f);
-        assertEq(helper, "|7|", 7f, runFloat(AbsNode.class, java.util.Map.entry("in", 7f)), 1e-5f);
+        assertEq(helper, "|-7|", 7f, runFloat(AbsNode.class, Map.entry("in", -7f)), 1e-5f);
+        assertEq(helper, "|7|", 7f, runFloat(AbsNode.class, Map.entry("in", 7f)), 1e-5f);
         helper.succeed();
     }
 
@@ -192,14 +193,14 @@ public final class MathNodeGameTest {
 
     public static void clamp(GameTestHelper helper) {
         assertEq(helper, "clamp(5, 0, 10)", 5f,
-                runFloat(ClampNode.class, java.util.Map.entry("in", 5f),
-                        java.util.Map.entry("min", 0f), java.util.Map.entry("max", 10f)), 1e-5f);
+                runFloat(ClampNode.class, Map.entry("in", 5f),
+                        Map.entry("min", 0f), Map.entry("max", 10f)), 1e-5f);
         assertEq(helper, "clamp(-1, 0, 10)", 0f,
-                runFloat(ClampNode.class, java.util.Map.entry("in", -1f),
-                        java.util.Map.entry("min", 0f), java.util.Map.entry("max", 10f)), 1e-5f);
+                runFloat(ClampNode.class, Map.entry("in", -1f),
+                        Map.entry("min", 0f), Map.entry("max", 10f)), 1e-5f);
         assertEq(helper, "clamp(99, 0, 10)", 10f,
-                runFloat(ClampNode.class, java.util.Map.entry("in", 99f),
-                        java.util.Map.entry("min", 0f), java.util.Map.entry("max", 10f)), 1e-5f);
+                runFloat(ClampNode.class, Map.entry("in", 99f),
+                        Map.entry("min", 0f), Map.entry("max", 10f)), 1e-5f);
         helper.succeed();
     }
 
@@ -209,7 +210,7 @@ public final class MathNodeGameTest {
 
     public static void pow(GameTestHelper helper) {
         assertEq(helper, "2^10", 1024f,
-                runFloat(PowNode.class, java.util.Map.entry("base", 2f), java.util.Map.entry("exp", 10f)),
+                runFloat(PowNode.class, Map.entry("base", 2f), Map.entry("exp", 10f)),
                 1e-3f);
         helper.succeed();
     }
@@ -219,8 +220,8 @@ public final class MathNodeGameTest {
     @PrefixGameTestTemplate(false)
 
     public static void sqrt(GameTestHelper helper) {
-        assertEq(helper, "sqrt(9)", 3f, runFloat(SqrtNode.class, java.util.Map.entry("in", 9f)), 1e-5f);
-        assertEq(helper, "sqrt(-1) = 0", 0f, runFloat(SqrtNode.class, java.util.Map.entry("in", -1f)), 0f);
+        assertEq(helper, "sqrt(9)", 3f, runFloat(SqrtNode.class, Map.entry("in", 9f)), 1e-5f);
+        assertEq(helper, "sqrt(-1) = 0", 0f, runFloat(SqrtNode.class, Map.entry("in", -1f)), 0f);
         helper.succeed();
     }
 
@@ -232,20 +233,20 @@ public final class MathNodeGameTest {
         // log_e(e) = 1
         assertEq(helper, "log_e(e)", 1f,
                 runFloat(LogNode.class,
-                        java.util.Map.entry("in", (float) Math.E),
-                        java.util.Map.entry("base", (float) Math.E)),
+                        Map.entry("in", (float) Math.E),
+                        Map.entry("base", (float) Math.E)),
                 1e-5f);
         // log_10(100) = 2
         assertEq(helper, "log_10(100)", 2f,
                 runFloat(LogNode.class,
-                        java.util.Map.entry("in", 100f),
-                        java.util.Map.entry("base", 10f)),
+                        Map.entry("in", 100f),
+                        Map.entry("base", 10f)),
                 1e-4f);
         // non-positive → 0
         assertEq(helper, "log(0) = 0", 0f,
                 runFloat(LogNode.class,
-                        java.util.Map.entry("in", 0f),
-                        java.util.Map.entry("base", (float) Math.E)),
+                        Map.entry("in", 0f),
+                        Map.entry("base", (float) Math.E)),
                 0f);
         helper.succeed();
     }
@@ -255,9 +256,9 @@ public final class MathNodeGameTest {
     @PrefixGameTestTemplate(false)
 
     public static void exp(GameTestHelper helper) {
-        assertEq(helper, "e^0", 1f, runFloat(ExpNode.class, java.util.Map.entry("in", 0f)), 1e-5f);
+        assertEq(helper, "e^0", 1f, runFloat(ExpNode.class, Map.entry("in", 0f)), 1e-5f);
         assertEq(helper, "e^1", (float) Math.E,
-                runFloat(ExpNode.class, java.util.Map.entry("in", 1f)), 1e-4f);
+                runFloat(ExpNode.class, Map.entry("in", 1f)), 1e-4f);
         helper.succeed();
     }
 
@@ -305,9 +306,9 @@ public final class MathNodeGameTest {
     @PrefixGameTestTemplate(false)
 
     public static void sign(GameTestHelper helper) {
-        assertEq(helper, "sign(5)", 1f, runFloat(SignNode.class, java.util.Map.entry("in", 5f)), 0f);
-        assertEq(helper, "sign(-5)", -1f, runFloat(SignNode.class, java.util.Map.entry("in", -5f)), 0f);
-        assertEq(helper, "sign(0)", 0f, runFloat(SignNode.class, java.util.Map.entry("in", 0f)), 0f);
+        assertEq(helper, "sign(5)", 1f, runFloat(SignNode.class, Map.entry("in", 5f)), 0f);
+        assertEq(helper, "sign(-5)", -1f, runFloat(SignNode.class, Map.entry("in", -5f)), 0f);
+        assertEq(helper, "sign(0)", 0f, runFloat(SignNode.class, Map.entry("in", 0f)), 0f);
         helper.succeed();
     }
 
@@ -317,14 +318,14 @@ public final class MathNodeGameTest {
 
     public static void lerp(GameTestHelper helper) {
         assertEq(helper, "lerp(0,10,0.5)", 5f,
-                runFloat(LerpNode.class, java.util.Map.entry("a", 0f),
-                        java.util.Map.entry("b", 10f), java.util.Map.entry("t", 0.5f)), 1e-5f);
+                runFloat(LerpNode.class, Map.entry("a", 0f),
+                        Map.entry("b", 10f), Map.entry("t", 0.5f)), 1e-5f);
         assertEq(helper, "lerp(0,10,0)", 0f,
-                runFloat(LerpNode.class, java.util.Map.entry("a", 0f),
-                        java.util.Map.entry("b", 10f), java.util.Map.entry("t", 0f)), 1e-5f);
+                runFloat(LerpNode.class, Map.entry("a", 0f),
+                        Map.entry("b", 10f), Map.entry("t", 0f)), 1e-5f);
         assertEq(helper, "lerp(0,10,1)", 10f,
-                runFloat(LerpNode.class, java.util.Map.entry("a", 0f),
-                        java.util.Map.entry("b", 10f), java.util.Map.entry("t", 1f)), 1e-5f);
+                runFloat(LerpNode.class, Map.entry("a", 0f),
+                        Map.entry("b", 10f), Map.entry("t", 1f)), 1e-5f);
         helper.succeed();
     }
 
@@ -335,9 +336,9 @@ public final class MathNodeGameTest {
     public static void remap(GameTestHelper helper) {
         assertEq(helper, "0.5 of [0,1] → [0,100]", 50f,
                 runFloat(RemapNode.class,
-                        java.util.Map.entry("in", 0.5f),
-                        java.util.Map.entry("fromMin", 0f), java.util.Map.entry("fromMax", 1f),
-                        java.util.Map.entry("toMin", 0f), java.util.Map.entry("toMax", 100f)), 1e-4f);
+                        Map.entry("in", 0.5f),
+                        Map.entry("fromMin", 0f), Map.entry("fromMax", 1f),
+                        Map.entry("toMin", 0f), Map.entry("toMax", 100f)), 1e-4f);
         helper.succeed();
     }
 
@@ -368,8 +369,8 @@ public final class MathNodeGameTest {
     @PrefixGameTestTemplate(false)
 
     public static void fract(GameTestHelper helper) {
-        assertEq(helper, "fract(3.25)", 0.25f, runFloat(FractNode.class, java.util.Map.entry("in", 3.25f)), 1e-5f);
-        assertEq(helper, "fract(-0.25)", 0.75f, runFloat(FractNode.class, java.util.Map.entry("in", -0.25f)), 1e-5f);
+        assertEq(helper, "fract(3.25)", 0.25f, runFloat(FractNode.class, Map.entry("in", 3.25f)), 1e-5f);
+        assertEq(helper, "fract(-0.25)", 0.75f, runFloat(FractNode.class, Map.entry("in", -0.25f)), 1e-5f);
         helper.succeed();
     }
 
@@ -379,9 +380,9 @@ public final class MathNodeGameTest {
 
     public static void atan2(GameTestHelper helper) {
         assertEq(helper, "atan2(1,1)", (float) (Math.PI / 4),
-                runFloat(Atan2Node.class, java.util.Map.entry("y", 1f), java.util.Map.entry("x", 1f)), 1e-5f);
+                runFloat(Atan2Node.class, Map.entry("y", 1f), Map.entry("x", 1f)), 1e-5f);
         assertEq(helper, "atan2(0,1)", 0f,
-                runFloat(Atan2Node.class, java.util.Map.entry("y", 0f), java.util.Map.entry("x", 1f)), 1e-5f);
+                runFloat(Atan2Node.class, Map.entry("y", 0f), Map.entry("x", 1f)), 1e-5f);
         helper.succeed();
     }
 
@@ -391,11 +392,11 @@ public final class MathNodeGameTest {
 
     public static void logBase(GameTestHelper helper) {
         assertEq(helper, "log_2(8)", 3f,
-                runFloat(LogBaseNode.class, java.util.Map.entry("value", 8f), java.util.Map.entry("base", 2f)), 1e-4f);
+                runFloat(LogBaseNode.class, Map.entry("value", 8f), Map.entry("base", 2f)), 1e-4f);
         assertEq(helper, "log_10(1000)", 3f,
-                runFloat(LogBaseNode.class, java.util.Map.entry("value", 1000f), java.util.Map.entry("base", 10f)), 1e-4f);
+                runFloat(LogBaseNode.class, Map.entry("value", 1000f), Map.entry("base", 10f)), 1e-4f);
         assertEq(helper, "log_base(value<=0) = 0", 0f,
-                runFloat(LogBaseNode.class, java.util.Map.entry("value", 0f), java.util.Map.entry("base", 2f)), 0f);
+                runFloat(LogBaseNode.class, Map.entry("value", 0f), Map.entry("base", 2f)), 0f);
         helper.succeed();
     }
 

@@ -6,8 +6,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IConstantNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IVariableNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.constant.Constant;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.AbstractNodeModel;
@@ -21,17 +19,19 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.WirePortalModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.wire.WireModel;
-import org.jetbrains.annotations.Nullable;
-
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A graph resolved once, up front, so that running it does not have to re-derive anything.
@@ -201,7 +201,7 @@ public final class PreparedGraph {
                 // keeps its original handle object so this short-circuits on identity anyway, but
                 // if that ever stops holding, == would silently rebuild the prepared graph on every
                 // single check — a 100% regression of the thing this class exists for.
-                if (!java.util.Objects.equals(ports[k].getDataTypeHandle(), types[k])) return false;
+                if (!Objects.equals(ports[k].getDataTypeHandle(), types[k])) return false;
             }
         }
         return true;

@@ -1,9 +1,6 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.world.GetBlockEntityNode;
@@ -14,18 +11,20 @@ import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
-
-import java.util.Map;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -83,7 +82,7 @@ public final class McWorldQueryGameTest {
 
         var exec = execWithLevel(g, level);
         assertEq(helper, "GetBlock", Blocks.STONE,
-                exec.evaluate(getBlock.getOutputsById().get("out"), net.minecraft.world.level.block.Block.class));
+                exec.evaluate(getBlock.getOutputsById().get("out"), Block.class));
         BlockState state = exec.evaluate(getState.getOutputsById().get("out"), BlockState.class);
         assertTrue(helper, "GetBlockState non-null", state != null);
         assertEq(helper, "state.block", Blocks.STONE, state.getBlock());

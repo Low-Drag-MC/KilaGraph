@@ -7,24 +7,20 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.IVertexFormatDependentNode;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
-import com.mojang.logging.LogUtils;
-import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
+import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.ApplyFogNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.transform.DynamicTransformsUboNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogUboNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentBaseColorBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentStageNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.transform.DynamicTransformsUboNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingStageNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingStageNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphLogger;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphNodeRegistry;
@@ -37,20 +33,28 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.command.IGraphCommand;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.itemlibrary.GraphNodeCreationData;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.SpawnFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ContextNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.BlockNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ContextNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.CustomBlockNodeModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import net.minecraft.resources.ResourceLocation;
-import org.joml.Vector2f;
-import org.joml.Vector4f;
-
+import com.mojang.logging.LogUtils;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
+import org.joml.Vector2f;
+import org.joml.Vector4f;
+import org.slf4j.Logger;
 
 public class RenderTypeGraph extends Graph {
     public static final GraphNodeRegistry NODE_REGISTRY =
@@ -344,7 +348,7 @@ public class RenderTypeGraph extends Graph {
         // 1) Explicit attribute-reader nodes (e.g. VertexAttributeInputNode): a node-keyed ERROR for one
         //    whose chosen element isn't in the format. Track the attribute names so the default-behavior
         //    pass below doesn't also warn about the same attribute.
-        var flaggedAttribs = new java.util.HashSet<String>();
+        var flaggedAttribs = new HashSet<String>();
         for (var model : graphModel.getNodeModels()) {
             if (!(model instanceof ICustomNodeModel custom)) continue;
             if (!(custom.getNode() instanceof IVertexFormatDependentNode dependent)) continue;
@@ -379,9 +383,9 @@ public class RenderTypeGraph extends Graph {
         //     drive the vertex position, so having both is ambiguous (the compiler lets glPosition win).
         //     Node-keyed ERRORs, surfaced in the editor GraphLogger.
         if (vertexStageModel instanceof ContextNodeModel vertexStage) {
-            var glPositionBlocks = new java.util.ArrayList<BlockNodeModel>();
-            var modelPositionBlocks = new java.util.ArrayList<BlockNodeModel>();
-            var modelNormalBlocks = new java.util.ArrayList<BlockNodeModel>();
+            var glPositionBlocks = new ArrayList<BlockNodeModel>();
+            var modelPositionBlocks = new ArrayList<BlockNodeModel>();
+            var modelNormalBlocks = new ArrayList<BlockNodeModel>();
             for (BlockNodeModel block : vertexStage.getBlocks()) {
                 if (!(block instanceof ICustomNodeModel custom) || custom.getNode() == null) continue;
                 var node = custom.getNode();
@@ -394,7 +398,7 @@ public class RenderTypeGraph extends Graph {
             flagDuplicateVertexBlocks(logger, modelNormalBlocks, "rt_vertex_model_normal");
             if (!glPositionBlocks.isEmpty() && !modelPositionBlocks.isEmpty()) {
                 var conflict = Component.translatable("rendertypegraph.error.position_block_conflict");
-                java.util.stream.Stream.concat(glPositionBlocks.stream(), modelPositionBlocks.stream())
+                Stream.concat(glPositionBlocks.stream(), modelPositionBlocks.stream())
                         .forEach(block -> reportVertexBlockIssue(logger, conflict, block));
             }
         }
@@ -548,8 +552,8 @@ public class RenderTypeGraph extends Graph {
 
         /** Dedupe + sort the element keys into the canonical id order (unknown keys kept, sorted last). */
         private static List<String> canonicalizeElements(List<String> keys) {
-            var unique = new java.util.ArrayList<>(new java.util.LinkedHashSet<>(keys));
-            unique.sort(java.util.Comparator.comparingInt(key -> {
+            var unique = new ArrayList<>(new LinkedHashSet<>(keys));
+            unique.sort(Comparator.comparingInt(key -> {
                 var element = KGVertexElements.get(key);
                 return element == null ? Integer.MAX_VALUE : element.mcElementId();
             }));

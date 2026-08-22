@@ -3,7 +3,7 @@ package com.lowdragmc.kilagraph.rendertype.gui;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphModel;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
-import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
+import com.lowdragmc.kilagraph.rendertype.compiler.StageError;
 import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContent;
 import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents;
 import com.lowdragmc.kilagraph.rendertype.preview.PreviewContentMenu;
@@ -31,6 +31,7 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Vector3f;
 import org.slf4j.Logger;
 
 /**
@@ -85,7 +86,7 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
         // Immediate renderer (no FBO): renders straight into the element's rect, so the camera's aspect matches
         // the panel and the result isn't stretched.
         scene.createScene(new TrackedDummyWorld());
-        scene.setCenter(new org.joml.Vector3f(0, 0, 0));
+        scene.setCenter(new Vector3f(0, 0, 0));
         scene.setZoom(2.5f);
         scene.setCameraYawAndPitch(45f, 25f);
         Style.defaultPipeline(scene.getLayout(), l -> l.widthPercent(100).heightPercent(100));
@@ -161,7 +162,7 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
         // A lightmap-sampling shader (e.g. the block-style vertex colour) needs Sampler2 bound — the
         // RenderType path gets it from the LIGHTMAP shard; this immediate draw must enable it itself,
         // else the preview renders black.
-        var lightTexture = net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture();
+        var lightTexture = Minecraft.getInstance().gameRenderer.lightTexture();
         if (mat.usesLightmap()) lightTexture.turnOnLightLayer();
 
         RenderSystem.setShader(mat::shader);
@@ -258,7 +259,7 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
             return;
         }
         var text = Component.literal(compiled.stageErrors().stream()
-                .map(com.lowdragmc.kilagraph.rendertype.compiler.StageError::message)
+                .map(StageError::message)
                 .reduce((a, b) -> a + "\n" + b).orElse(""));
         errorLabel.setValue(text.withStyle(s -> s.withColor(0xFF5555)));
     }

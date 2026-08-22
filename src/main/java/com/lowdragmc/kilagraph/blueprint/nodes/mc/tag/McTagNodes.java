@@ -6,12 +6,14 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -118,7 +120,7 @@ public final class McTagNodes {
         @Override
         public void evaluate(EvalContext ctx) {
             ItemStack s = ctx.getInput("stack", ItemStack.class, ItemStack.EMPTY);
-            TagKey<net.minecraft.world.item.Item> key = tagKey(ctx, Registries.ITEM);
+            TagKey<Item> key = tagKey(ctx, Registries.ITEM);
             ctx.setOutput("out", s != null && key != null && s.is(key));
         }
     }
@@ -149,7 +151,7 @@ public final class McTagNodes {
     }
 
     /** The {@code tag} input as a {@link TagKey} in {@code registry}, or null if it is absent. */
-    private static <T> TagKey<T> tagKey(EvalContext ctx, ResourceKey<? extends net.minecraft.core.Registry<T>> registry) {
+    private static <T> TagKey<T> tagKey(EvalContext ctx, ResourceKey<? extends Registry<T>> registry) {
         ResourceLocation rl = ctx.getInput("tag", ResourceLocation.class, null);
         return rl == null ? null : TagKey.create(registry, rl);
     }

@@ -1,6 +1,5 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.lighting;
 
-import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
@@ -9,8 +8,10 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity;
+import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
+import net.minecraft.network.chat.Component;
 
 /**
  * Minecraft's vanilla per-vertex diffuse lighting: {@code minecraft_mix_light(Light0_Direction,
@@ -46,10 +47,10 @@ public class MixLightNode extends ShaderNode {
         // Unconnected normal/color fall back to the Normal/Color attributes — via ctx.attribute so removing
         // those elements degrades to safe constants (up / white) instead of undefined-variable GLSL.
         ShaderExpr normal = ctx.isConnected("normal") ? ctx.input("normal")
-                : ctx.attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.NORMAL,
+                : ctx.attribute(KGVertexElements.NORMAL,
                         GlslType.VEC3, new ShaderExpr("vec3(0.0, 1.0, 0.0)", GlslType.VEC3));
         ShaderExpr color = ctx.isConnected("color") ? ctx.input("color")
-                : ctx.attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.COLOR,
+                : ctx.attribute(KGVertexElements.COLOR,
                         GlslType.VEC4, new ShaderExpr("vec4(1.0)", GlslType.VEC4));
         String code = "minecraft_mix_light(Light0_Direction, Light1_Direction, "
                 + normal.code() + ", " + color.code() + ")";

@@ -13,6 +13,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import java.util.List;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -25,13 +27,12 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeverBlock;
+import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
-
-import java.util.List;
-import java.util.Map;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -114,9 +115,9 @@ public final class McRedstoneGameTest {
         BlockPos lever = base.above();
         level.setBlock(base, Blocks.STONE.defaultBlockState(), 3);
         level.setBlock(lever, Blocks.LEVER.defaultBlockState()
-                .setValue(net.minecraft.world.level.block.LeverBlock.FACE,
-                        net.minecraft.world.level.block.state.properties.AttachFace.FLOOR)
-                .setValue(net.minecraft.world.level.block.LeverBlock.POWERED, true), 3);
+                .setValue(LeverBlock.FACE,
+                        AttachFace.FLOOR)
+                .setValue(LeverBlock.POWERED, true), 3);
 
         assertEq(helper, "a thrown lever strongly powers what it stands on", 15,
                 probe(level, RedstoneNodes.DirectSignal.class, "pos", base, "side", Direction.UP)

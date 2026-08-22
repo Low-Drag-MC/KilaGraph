@@ -12,6 +12,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionF
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -60,7 +61,7 @@ public final class BlockEntityActionNodes {
         @ExecInputPort public ExecutionFlow trigger;
         @ExecOutputPort public ExecutionFlow next;
 
-        @InputPort public net.minecraft.world.level.Level level;
+        @InputPort public Level level;
         @InputPort public BlockPos pos = BlockPos.ZERO;
         @InputPort public CompoundTag nbt;
         @OutputPort public boolean ok;

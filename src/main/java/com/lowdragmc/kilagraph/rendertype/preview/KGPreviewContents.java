@@ -1,12 +1,12 @@
 package com.lowdragmc.kilagraph.rendertype.preview;
 
-import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.Nullable;
-
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Consumer;
+import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Registry of {@link KGPreviewContent}s offered in the RenderType preview's right-click menu. Seeded with
@@ -96,7 +96,7 @@ public final class KGPreviewContents {
 
     /** A built-in content whose geometry is a plain builder consumer (quad/cube/sphere). */
     private record SimpleContent(String key, String translationKey,
-                                 java.util.function.Consumer<PreviewMeshBuilder> builder) implements KGPreviewContent {
+                                 Consumer<PreviewMeshBuilder> builder) implements KGPreviewContent {
         @Override
         public Component title() {
             return Component.translatable(translationKey);

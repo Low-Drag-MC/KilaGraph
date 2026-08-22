@@ -11,11 +11,11 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.Nullable;
-
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Unity's Comparison node: compares two scalars {@code a} and {@code b} with the chosen operator and outputs
@@ -32,7 +32,7 @@ public class CompareNode extends ShaderNode {
     }
 
     /** Option value -> GLSL operator. Insertion order drives the dropdown order. */
-    private static final Map<String, String> OPS = new java.util.LinkedHashMap<>();
+    private static final Map<String, String> OPS = new LinkedHashMap<>();
     static {
         OPS.put("equal", "==");
         OPS.put("notEqual", "!=");

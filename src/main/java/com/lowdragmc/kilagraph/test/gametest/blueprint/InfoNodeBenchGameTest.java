@@ -8,10 +8,12 @@ import com.lowdragmc.kilagraph.test.gametest.KGBench;
 import com.lowdragmc.kilagraph.test.gametest.KGGraphFixtures;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
+import com.mojang.logging.LogUtils;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import org.slf4j.Logger;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -39,7 +41,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
 @GameTestHolder(Kilagraph.MODID)
 public final class InfoNodeBenchGameTest {
 
-    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private InfoNodeBenchGameTest() {
     }

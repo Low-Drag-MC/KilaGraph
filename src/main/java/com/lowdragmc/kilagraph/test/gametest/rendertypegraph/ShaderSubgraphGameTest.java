@@ -1,27 +1,31 @@
 package com.lowdragmc.kilagraph.test.gametest.rendertypegraph;
 
 
+import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.editor.ShaderFunctionGraphResource;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentBaseColorBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.CrossNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
+import com.lowdragmc.lowdraglib2.Platform;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.itemlibrary.GraphNodeCreationData;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.SpawnFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.AbstractNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import net.minecraft.core.Holder;
-import net.minecraft.gametest.framework.GameTestHelper;
-import com.lowdragmc.kilagraph.Kilagraph;
+import java.util.Objects;
 import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
@@ -47,7 +51,7 @@ public final class ShaderSubgraphGameTest {
     private static NodeModel innerNode(CustomGraphModelImpl inner, Class<?> nodeClass) {
         AbstractNodeModel m = CustomGraphModelImpl.createNodeFromData(
                 GraphNodeCreationData.ofOrphan(inner), nodeClass.asSubclass(
-                        com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node.class));
+                        Node.class));
         return (NodeModel) m;
     }
 
@@ -127,7 +131,7 @@ public final class ShaderSubgraphGameTest {
     @PrefixGameTestTemplate(false)
     public static void functionGraphResourceRoundTrips(GameTestHelper helper) {
         // Author a function graph via the resource, exactly as a saved asset would be created.
-        var resource = com.lowdragmc.kilagraph.editor.ShaderFunctionGraphResource.INSTANCE;
+        var resource = ShaderFunctionGraphResource.INSTANCE;
         ShaderFunctionGraph authored = resource.createGraph();
         var aVar = (VariableDeclarationModelBase) authored.graphModel.createVariable("a", RenderTypeGraphTypes.VEC3, new Vector3f(), VariableKind.INPUT);
         var bVar = (VariableDeclarationModelBase) authored.graphModel.createVariable("b", RenderTypeGraphTypes.VEC3, new Vector3f(), VariableKind.INPUT);
@@ -145,24 +149,24 @@ public final class ShaderSubgraphGameTest {
         authored.graphModel.createWire(outNode.getInputPort(), cross.getOutputsById().get("out"));
 
         // Serialize → deserialize (the resource save/load round-trip).
-        var tag = authored.graphModel.serializeNBT(com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry());
+        var tag = authored.graphModel.serializeNBT(Platform.getFrozenRegistry());
 
         ShaderFunctionGraph restored = resource.createGraph();
-        restored.graphModel.deserializeNBT(com.lowdragmc.lowdraglib2.Platform.getFrozenRegistry(), tag);
+        restored.graphModel.deserializeNBT(Platform.getFrozenRegistry(), tag);
 
         assertTrue(helper, "restored graph is a ShaderFunctionGraph", restored instanceof ShaderFunctionGraph);
-        long varCount = restored.graphModel.getGraphVariableModels().stream().filter(java.util.Objects::nonNull).count();
+        long varCount = restored.graphModel.getGraphVariableModels().stream().filter(Objects::nonNull).count();
         assertEq(helper, "restored graph keeps its 3 variables", 3L, varCount);
         assertTrue(helper, "restored graph keeps the cross node",
                 restored.graphModel.getNodeModels().stream().anyMatch(
-                        n -> n instanceof com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel c
+                        n -> n instanceof ICustomNodeModel c
                                 && c.getNode() instanceof CrossNode));
 
         // The restored function graph still inlines when embedded as a local subgraph in a host.
         RenderTypeGraph outer = new RenderTypeGraph();
         outer.graphModel.addLocalSubgraph(restored.graphModel);
         var restoredVars = restored.graphModel.getGraphVariableModels().stream()
-                .filter(java.util.Objects::nonNull).toList();
+                .filter(Objects::nonNull).toList();
         var ra = restoredVars.stream().filter(v -> "a".equals(v.getName())).findFirst().orElseThrow();
         var rb = restoredVars.stream().filter(v -> "b".equals(v.getName())).findFirst().orElseThrow();
         var rout = restoredVars.stream().filter(v -> "out".equals(v.getName())).findFirst().orElseThrow();

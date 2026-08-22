@@ -12,7 +12,6 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.gui.ExpressionConfigurator;
-import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.lowdraglib2.gui.ui.data.Tooltips;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
@@ -20,13 +19,13 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
+import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A user-authored GLSL node (Unity's "Custom Function", String mode): the user declares any number of typed
@@ -234,7 +233,7 @@ public class ExpressionNode extends ShaderNode implements INodeValidator {
     public static final List<String> OUTPUT_TYPES = List.of("FLOAT", "INT", "BOOL", "VEC2", "VEC3", "VEC4", "MAT4");
 
     private static String normalizeType(String type) {
-        return type == null ? "FLOAT" : type.trim().toUpperCase(java.util.Locale.ROOT);
+        return type == null ? "FLOAT" : type.trim().toUpperCase(Locale.ROOT);
     }
 
     /** Reduce to a legal GLSL identifier body ([A-Za-z_][A-Za-z0-9_]*), collapsing illegal runs to '_'. */

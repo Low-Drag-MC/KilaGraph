@@ -6,10 +6,11 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
 import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
 
 /**
  * Client-side bridge from a {@link KGPreviewContent} to a {@code VertexConsumer}: builds the content's mesh,
@@ -21,7 +22,7 @@ public final class PreviewRenderer {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     /** Element ids we've already warned about lacking a writer (warn once, not every frame). */
-    private static final java.util.Set<Integer> WARNED_MISSING_WRITER = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final Set<Integer> WARNED_MISSING_WRITER = ConcurrentHashMap.newKeySet();
 
     private PreviewRenderer() {}
 

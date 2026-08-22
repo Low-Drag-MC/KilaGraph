@@ -11,6 +11,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionFlow;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -44,7 +45,7 @@ public final class BlockActionNodes {
         @ExecInputPort public ExecutionFlow trigger;
         @ExecOutputPort public ExecutionFlow next;
 
-        @InputPort public net.minecraft.world.level.Level level;
+        @InputPort public Level level;
         @InputPort public BlockPos pos = BlockPos.ZERO;
         @InputPort public BlockState state;
         @InputPort public boolean notifyNeighbours = true;
@@ -86,7 +87,7 @@ public final class BlockActionNodes {
         @ExecInputPort public ExecutionFlow trigger;
         @ExecOutputPort public ExecutionFlow next;
 
-        @InputPort public net.minecraft.world.level.Level level;
+        @InputPort public Level level;
         @InputPort public BlockPos pos = BlockPos.ZERO;
         @InputPort public boolean drop = true;
         @OutputPort public boolean ok;
@@ -128,7 +129,7 @@ public final class BlockActionNodes {
         @ExecInputPort public ExecutionFlow trigger;
         @ExecOutputPort public ExecutionFlow next;
 
-        @InputPort public net.minecraft.world.level.Level level;
+        @InputPort public Level level;
         @InputPort public BlockPos min = BlockPos.ZERO;
         @InputPort public BlockPos max = BlockPos.ZERO;
         @InputPort public BlockState state;
@@ -189,7 +190,7 @@ public final class BlockActionNodes {
         @ExecInputPort public ExecutionFlow trigger;
         @ExecOutputPort public ExecutionFlow next;
 
-        @InputPort public net.minecraft.world.level.Level level;
+        @InputPort public Level level;
         @InputPort public BlockPos pos = BlockPos.ZERO;
         @InputPort public Block expected = Blocks.AIR;
         @InputPort public BlockState state;

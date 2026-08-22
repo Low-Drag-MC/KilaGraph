@@ -3,6 +3,13 @@ package com.lowdragmc.kilagraph.graph.type;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandleHelpers;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -18,14 +25,13 @@ import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
-
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import org.joml.Vector2f;
+import org.joml.Vector3f;
+import org.joml.Vector4f;
 
 /**
  * KilaGraph-defined {@link TypeHandle}s and a {@code Type → TypeHandle} override registry shared
@@ -125,9 +131,9 @@ public final class KGTypeHandles {
     private static final Map<Type, TypeHandle> OVERRIDES = new ConcurrentHashMap<>();
 
     static {
-        VEC2 = vector(org.joml.Vector2f.class, "VEC2", "Vector2", 0xFF7ED3F0, org.joml.Vector2f::new);
-        VEC3 = vector(org.joml.Vector3f.class, "VEC3", "Vector3", 0xFFF3C13A, org.joml.Vector3f::new);
-        VEC4 = vector(org.joml.Vector4f.class, "VEC4", "Vector4", 0xFFE08A3C, org.joml.Vector4f::new);
+        VEC2 = vector(Vector2f.class, "VEC2", "Vector2", 0xFF7ED3F0, Vector2f::new);
+        VEC3 = vector(Vector3f.class, "VEC3", "Vector3", 0xFFF3C13A, Vector3f::new);
+        VEC4 = vector(Vector4f.class, "VEC4", "Vector4", 0xFFE08A3C, Vector4f::new);
 
         LIST = TypeHandleHelpers.customType(List.class, "LIST", "List");
         // No custom default value: LDLib2 would otherwise initialise the embedded constant with
@@ -166,9 +172,9 @@ public final class KGTypeHandles {
         PLAYER = TypeHandleHelpers.fromType(Player.class, "Player");
         BLOCK_ENTITY = TypeHandleHelpers.fromType(BlockEntity.class, "BlockEntity");
         CONTAINER = TypeHandleHelpers.fromType(
-                net.neoforged.neoforge.items.IItemHandler.class, "Container");
+                IItemHandler.class, "Container");
         FLUID_CONTAINER = TypeHandleHelpers.fromType(
-                net.neoforged.neoforge.fluids.capability.IFluidHandler.class, "FluidContainer");
+                IFluidHandler.class, "FluidContainer");
         NBT_COMPOUND = TypeHandleHelpers.fromType(CompoundTag.class, "CompoundTag");
         // Without this the NBT editor cannot open: Constant.init seeds the value from
         // getDefaultValue(), and TagAccessor has nothing to edit when that is null.
@@ -191,8 +197,8 @@ public final class KGTypeHandles {
 
         RESOURCE_LOCATION = mc(ResourceLocation.class, "ResourceLocation", 0xFFB48EAD,
                 () -> ResourceLocation.fromNamespaceAndPath("minecraft", "air"));
-        AABB = mc(net.minecraft.world.phys.AABB.class, "AABB", 0xFF88C0D0,
-                () -> new net.minecraft.world.phys.AABB(0, 0, 0, 1, 1, 1));
+        AABB = mc(AABB.class, "AABB", 0xFF88C0D0,
+                () -> new AABB(0, 0, 0, 1, 1, 1));
         CHUNK_POS = mc(ChunkPos.class, "ChunkPos", 0xFF81A1C1, () -> new ChunkPos(0, 0));
         TEXT = mc(Component.class, "Text", 0xFFEBCB8B, Component::empty);
         ROTATION = mc(Rotation.class, "Rotation", 0xFFA3BE8C, () -> Rotation.NONE);
@@ -214,7 +220,7 @@ public final class KGTypeHandles {
      * dereference the first time anyone drops the node.
      */
     private static TypeHandle vector(Class<?> javaType, String id, String display, int colour,
-                                     java.util.function.Supplier<Object> defaultValue) {
+                                     Supplier<Object> defaultValue) {
         TypeHandle handle = TypeHandleHelpers.customType(javaType, id, display);
         TypeHandleHelpers.setCustomColor(handle, colour);
         TypeHandleHelpers.setCustomDefaultValue(handle, defaultValue);
@@ -231,7 +237,7 @@ public final class KGTypeHandles {
      * {@link #handleFor} falls through to.
      */
     private static TypeHandle mc(Class<?> javaType, String display, int colour,
-                                java.util.function.Supplier<Object> defaultValue) {
+                                Supplier<Object> defaultValue) {
         TypeHandle handle = TypeHandleHelpers.fromType(javaType, display);
         TypeHandleHelpers.setCustomColor(handle, colour);
         TypeHandleHelpers.setCustomDefaultValue(handle, defaultValue);

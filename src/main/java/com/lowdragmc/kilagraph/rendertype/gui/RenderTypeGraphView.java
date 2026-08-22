@@ -2,6 +2,7 @@ package com.lowdragmc.kilagraph.rendertype.gui;
 
 import com.lowdragmc.kilagraph.editor.ExportShaderFunction;
 import com.lowdragmc.kilagraph.editor.ShaderFunctionGraphResource;
+import com.lowdragmc.kilagraph.graph.util.KGGraphView;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.preview.NodeShaderPreview;
 import com.lowdragmc.kilagraph.rendertype.preview.PreviewContentMenu;
@@ -15,18 +16,17 @@ import com.lowdragmc.lowdraglib2.gui.util.TreeBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.DockSlot;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.GraphPanel;
-import com.lowdragmc.kilagraph.graph.util.KGGraphView;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.GraphView;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.GraphElementModel;
 import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
 import dev.vfyjxf.taffy.style.TaffyDisplay;
-import lombok.Getter;
-import net.minecraft.nbt.CompoundTag;
-import org.jetbrains.annotations.Nullable;
-
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import lombok.Getter;
+import net.minecraft.nbt.CompoundTag;
+import org.jetbrains.annotations.Nullable;
 
 @MethodsReturnNonnullByDefault
 public class RenderTypeGraphView extends KGGraphView {
@@ -137,7 +137,7 @@ public class RenderTypeGraphView extends KGGraphView {
         if (rpc != null) rpc.addNewResource(tag);
     }
 
-    private java.util.List<GraphElementModel> selectedElementModels() {
+    private List<GraphElementModel> selectedElementModels() {
         return getSelected().stream()
                 .filter(GraphElementModel.class::isInstance)
                 .map(GraphElementModel.class::cast)

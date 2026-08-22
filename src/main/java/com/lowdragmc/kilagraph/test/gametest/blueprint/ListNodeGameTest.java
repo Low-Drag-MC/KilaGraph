@@ -1,9 +1,6 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListAppendNode;
@@ -11,6 +8,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListConcatNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListContainsNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListDistinctNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.list.ListGetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListIndexOfNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListInsertNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListIsEmptyNode;
@@ -25,9 +23,12 @@ import com.lowdragmc.kilagraph.blueprint.nodes.list.ListSortNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
-import net.minecraft.gametest.framework.GameTestHelper;
-
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import java.util.List;
+import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -58,7 +59,7 @@ public final class ListNodeGameTest {
     private ListNodeGameTest() {}
 
     /** Build a String-typed ListCombine with the given values; return its output port. */
-    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel
+    private static PortModel
             stringList(BlueprintGraph g, String... values) {
         NodeModel combine = addNode(g, ListCombineNode.class);
         setOption(combine, "type", TypeHandles.STRING.getIdentification());
@@ -68,10 +69,10 @@ public final class ListNodeGameTest {
     }
 
     /** A single String value via a 1-element list + ListGet (UNKNOWN typed). */
-    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel
+    private static PortModel
             stringScalar(BlueprintGraph g, String value) {
         var combine = stringList(g, value);
-        var get = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.list.ListGetNode.class);
+        var get = addNode(g, ListGetNode.class);
         setOption(get, "type", TypeHandles.STRING.getIdentification());
         setInputConstant(get, "index", 0);
         wire(g, get.getInputsById().get("list"), combine);

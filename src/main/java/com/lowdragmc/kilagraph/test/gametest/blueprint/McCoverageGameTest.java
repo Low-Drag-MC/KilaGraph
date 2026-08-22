@@ -17,6 +17,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import java.util.List;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -24,16 +26,16 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
-
-import java.util.List;
-import java.util.Map;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -73,7 +75,7 @@ public final class McCoverageGameTest {
         ServerLevel level = helper.getLevel();
         Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
         Entity arrow = helper.spawn(EntityType.ARROW, new BlockPos(2, 2, 2));
-        Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
 
         var asPlayer = probe(level, EntityCastNodes.AsPlayer.class, "entity", player);
         assertTrue(helper, "a player casts to Player", asPlayer.eval("ok", Boolean.class));
@@ -121,7 +123,7 @@ public final class McCoverageGameTest {
                 exec.evaluate(size.getOutputsById().get("slots"), Integer.class).intValue());
 
         // A pig also resolves — to its equipment, which is the part worth knowing.
-        pig.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
+        pig.setItemSlot(EquipmentSlot.MAINHAND,
                 new ItemStack(Items.GOLDEN_APPLE));
         var pigG = newGraph();
         var pigResolve = addNode(pigG, ContainerNodes.EntityContainer.class);
@@ -168,7 +170,7 @@ public final class McCoverageGameTest {
         assertEq(helper, "an empty stack lists nothing", List.of(), empty.eval("out", List.class));
 
         var water = probe(level, DataComponentNodes.FluidComponents.class,
-                "stack", new FluidStack(net.minecraft.world.level.material.Fluids.WATER, 1000));
+                "stack", new FluidStack(Fluids.WATER, 1000));
         // Plain water carries no components; the assertion is that the node answers with a list rather
         // than null, which is what a For Each downstream depends on.
         assertTrue(helper, "and water answers with a list", water.eval("out", List.class) != null);
@@ -180,7 +182,7 @@ public final class McCoverageGameTest {
     @PrefixGameTestTemplate(false)
     public static void giveItemAndSendMessage(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
 
         var give = action(level, EntityActionNodes.GiveItem.class,
                 "player", player, "stack", new ItemStack(Items.IRON_INGOT, 5));

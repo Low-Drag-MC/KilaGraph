@@ -4,9 +4,9 @@ import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
+import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
-
 import java.util.ArrayList;
 import java.util.Map;
 
@@ -16,7 +16,7 @@ public class MapValuesNode extends AnnotatedNode {
 
     @Override
     protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
-        ctx.addOutputPort("out", com.lowdragmc.kilagraph.graph.type.KGTypeHandles.LIST);
+        ctx.addOutputPort("out", KGTypeHandles.LIST);
     }
 
     @Override

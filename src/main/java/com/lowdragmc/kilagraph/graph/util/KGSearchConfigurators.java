@@ -1,17 +1,18 @@
 package com.lowdragmc.kilagraph.graph.util;
 
+import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.ui.SearchComponentConfigurator;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.IFieldValueConfigurable;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.ITypeConfigurable;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.utils.LocalizationUtils;
+import com.lowdragmc.lowdraglib2.utils.search.IResultHandler;
 import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
-import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.NotNull;
-
 import java.util.Collection;
 import java.util.function.Supplier;
+import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Reusable {@link SearchComponentConfigurator.ISearchConfigurator} factories for KilaGraph
@@ -38,7 +39,7 @@ public final class KGSearchConfigurators {
     public static ITypeConfigurable typeHandlePickerOption(
             Supplier<Collection<TypeHandle>> candidatesSupplier) {
         SearchComponentConfigurator.ISearchConfigurator<TypeHandle> search = typeHandleSearch(candidatesSupplier);
-        return (vc, th) -> com.lowdragmc.lowdraglib2.configurator.IConfigurable.create(group ->
+        return (vc, th) -> IConfigurable.create(group ->
                 group.addConfigurator(new SearchComponentConfigurator<>(
                         "",
                         () -> readIdAsHandle(vc),
@@ -69,7 +70,7 @@ public final class KGSearchConfigurators {
             }
 
             @Override
-            public void search(String word, com.lowdragmc.lowdraglib2.utils.search.IResultHandler<TypeHandle> handler) {
+            public void search(String word, IResultHandler<TypeHandle> handler) {
                 Collection<TypeHandle> candidates = candidatesSupplier.get();
                 if (candidates == null) return;
                 String lower = word == null ? "" : word.toLowerCase();

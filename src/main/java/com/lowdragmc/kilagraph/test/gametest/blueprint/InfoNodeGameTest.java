@@ -12,7 +12,9 @@ import com.lowdragmc.kilagraph.blueprint.nodes.mc.world.LevelInfoNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.ContextNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.UseWithContext;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -20,6 +22,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import org.joml.Vector3f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -161,7 +164,7 @@ public final class InfoNodeGameTest {
     @PrefixGameTestTemplate(false)
     public static void positionBlocksUseTheGraphVectorType(GameTestHelper helper) {
         Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
-        for (Class<? extends BlockNode> cls : java.util.List.of(
+        for (Class<? extends BlockNode> cls : List.of(
                 EntityInfoBlocks.Position.class,
                 EntityInfoBlocks.EyePosition.class,
                 EntityInfoBlocks.LookDirection.class,
@@ -174,13 +177,13 @@ public final class InfoNodeGameTest {
             assertEq(helper, cls.getSimpleName() + " outputs VEC3", KGTypeHandles.VEC3, port.getDataTypeHandle());
 
             Object value = new GraphExecutor(g).evaluate(port, Object.class);
-            assertTrue(helper, cls.getSimpleName() + " is a JOML vector", value instanceof org.joml.Vector3f);
+            assertTrue(helper, cls.getSimpleName() + " is a JOML vector", value instanceof Vector3f);
         }
         helper.succeed();
     }
 
     /** Whether {@code context} would accept {@code block}, without building a graph for it. */
-    private static boolean accepts(Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.ContextNode> context,
+    private static boolean accepts(Class<? extends ContextNode> context,
                                    Class<? extends BlockNode> block) {
         // Read the annotation directly: ContextNode.acceptsBlock consults @UseWithContext first and only
         // falls back to getSupportBlocks(), which needs a live graph model. The annotation is the

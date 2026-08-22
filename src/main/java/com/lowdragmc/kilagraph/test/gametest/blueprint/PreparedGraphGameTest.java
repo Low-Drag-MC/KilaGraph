@@ -5,23 +5,25 @@ import com.lowdragmc.kilagraph.blueprint.nodes.bitwise.BitAndNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.flow.SelectNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AbsNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.math.PowNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.LerpNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.PowNode;
 import com.lowdragmc.kilagraph.graph.exec.CycleException;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.exec.PreparedGraph;
-import net.minecraft.gametest.framework.GameTest;
-import net.minecraft.gametest.framework.GameTestHelper;
-import net.neoforged.neoforge.gametest.GameTestHolder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ISingleInputPortNodeModel;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ISingleOutputPortNodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.WirePortalEntryModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.WirePortalExitModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import java.util.List;
+import java.util.Map;
+import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
 
@@ -239,7 +241,7 @@ public final class PreparedGraphGameTest {
 
         // Repoint the same input at a different source, on the same live executor.
         var wires = sink.getInputsById().get("in1").getConnectedWires();
-        g.graphModel.deleteWires(java.util.List.copyOf(wires));
+        g.graphModel.deleteWires(List.copyOf(wires));
         wire(g, sink.getInputsById().get("in1"), nine.getOutputsById().get("out"));
 
         exec.clearCache();
@@ -275,7 +277,7 @@ public final class PreparedGraphGameTest {
         assertEq(helper, "wired to 5", 105.0f, orNaN(exec.evaluate(out, Float.class)), 1e-6f);
 
         // Edit the graph, with no run in between — so nothing has re-checked freshness yet.
-        g.graphModel.deleteWires(java.util.List.copyOf(sink.getInputsById().get("in1").getConnectedWires()));
+        g.graphModel.deleteWires(List.copyOf(sink.getInputsById().get("in1").getConnectedWires()));
         var nine = addNode(g, AddNode.class);
         setInputConstant(nine, "in1", 9.0f);
         setInputConstant(nine, "in2", 0.0f);
@@ -361,7 +363,7 @@ public final class PreparedGraphGameTest {
         var abs = addNode(g, AbsNode.class);
         wire(g, abs.getInputsById().get("in"), getNode.getOutputPort());
 
-        var exec = new GraphExecutor(g, EvaluationEnvironment.with(java.util.Map.of("big", big)));
+        var exec = new GraphExecutor(g, EvaluationEnvironment.with(Map.of("big", big)));
         Float got = exec.evaluate(abs.getOutputsById().get("out"), Float.class);
 
         float expected = Math.abs(Long.valueOf(big).floatValue());

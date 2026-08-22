@@ -7,9 +7,12 @@ import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosOffsetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.ChunkPosNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.DirectionNodes;
+import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
+import java.util.HashSet;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -21,8 +24,6 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector3f;
-
-import java.util.List;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -104,7 +105,7 @@ public final class McGeometryGameTest {
         assertFalse(helper, "8 positions is not truncated", eval(small, "truncated", Boolean.class));
         // every element distinct: betweenClosed reuses one mutable cursor, so a node that forgot to
         // copy would return N references to the last position
-        assertEq(helper, "positions are distinct copies", 8, new java.util.HashSet<>(positions).size());
+        assertEq(helper, "positions are distinct copies", 8, new HashSet<>(positions).size());
 
         var huge = node(BlockPosNodes.Between.class, "min", BlockPos.ZERO,
                 "max", new BlockPos(200, 200, 200));
@@ -252,7 +253,7 @@ public final class McGeometryGameTest {
     }
 
     private static void assertVec(GameTestHelper helper, String label, float[] expected, Object actual) {
-        float[] got = com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes.components(actual);
+        float[] got = VectorNodes.components(actual);
         for (int i = 0; i < expected.length; i++) {
             assertEq(helper, label + " component " + i, expected[i], got[i], EPS);
         }

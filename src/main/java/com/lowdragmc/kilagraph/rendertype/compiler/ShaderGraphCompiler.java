@@ -4,13 +4,12 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
+import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IConstantNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IVariableNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.IVariable;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableScope;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.AbstractNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.BlockNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ContextNodeModel;
@@ -18,20 +17,27 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.Nullable;
-
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableScope;
+import com.mojang.logging.LogUtils;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 /**
  * Compiles a {@link RenderTypeGraph} into GLSL vertex/fragment sources plus the material uniform
@@ -61,7 +67,7 @@ public class ShaderGraphCompiler {
          *  (a dependency registered first is declared first) before main(). */
         final Map<String, String> functions = new LinkedHashMap<>();
         final Map<PortModel, ShaderExpr> cache = new IdentityHashMap<>();
-        final Set<AbstractNodeModel> visiting = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+        final Set<AbstractNodeModel> visiting = Collections.newSetFromMap(new IdentityHashMap<>());
         int tempCounter;
         /** Whether this stage references the {@code KG_Gradient} struct (so its decl is emitted in the prelude). */
         boolean usesGradient;
@@ -78,7 +84,7 @@ public class ShaderGraphCompiler {
     private final StageScope fragment = new StageScope("f");
     private final MaterialUniformLayout layout = new MaterialUniformLayout();
     /** name -> type of varyings already built in the vertex shader. */
-    private final Map<String, GlslType> varyings = new java.util.LinkedHashMap<>();
+    private final Map<String, GlslType> varyings = new LinkedHashMap<>();
     /** Baked default values for EXPOSED variable uniforms: uniform field name -> std140 components. */
     private final Map<String, float[]> uniformDefaults = new LinkedHashMap<>();
     /** Baked default textures+params for Sampler2D samplers: sampler name -> {@link SamplerDefault}. */
@@ -132,13 +138,13 @@ public class ShaderGraphCompiler {
      */
     private final Deque<Map<UUID, ShaderExpr>> bindingStack = new ArrayDeque<>();
 
-    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     /** Fixed render state for per-node previews: opaque, depth-tested, no cull (so the quad always shows). */
     public static final RenderTypeGraph.Settings PREVIEW_SETTINGS = new RenderTypeGraph.Settings(
             // Includes Normal so node previews carry a real surface normal (the preview meshes supply it),
             // letting Fresnel / normal nodes read real geometry like Unity — see meshNormal()'s preview branch.
-            com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets.POSITION_COLOR_TEX_NORMAL,
+            VertexFormatPresets.POSITION_COLOR_TEX_NORMAL,
             RenderTypeGraph.Settings.VertexFormatMode.QUADS,
             RenderTypeGraph.Settings.BlendMode.OPAQUE,
             RenderTypeGraph.Settings.DepthTest.LEQUAL,
@@ -628,7 +634,7 @@ public class ShaderGraphCompiler {
      *  composed vertex format, or — in preview — the fixed preview vsh's {@code Position}+{@code UV0}. */
     private Set<String> availableAttributes() {
         if (preview) return Set.of(KGVertexElements.POSITION.key(), KGVertexElements.UV0.key());
-        return new java.util.HashSet<>(graph.getSettings().vertexFormatElements());
+        return new HashSet<>(graph.getSettings().vertexFormatElements());
     }
 
     /** Whether this is a per-node preview compile (single fragment quad; no real vertex stage). */
@@ -680,7 +686,7 @@ public class ShaderGraphCompiler {
      * {@code FragmentInputNode}s and {@link #meshUv()}.
      */
     protected ShaderExpr varyingInput(String name, GlslType type,
-                            java.util.function.Supplier<ShaderExpr> vshDefault, ShaderExpr previewDefault) {
+                            Supplier<ShaderExpr> vshDefault, ShaderExpr previewDefault) {
         if (preview) return previewDefault;
         if (current == vertex) return convert(vshDefault.get(), type);
         ensureVaryingWithDefault(name, type, vshDefault);
@@ -688,7 +694,7 @@ public class ShaderGraphCompiler {
     }
 
     private void ensureVaryingWithDefault(String name, GlslType type,
-                                          java.util.function.Supplier<ShaderExpr> vshDefault) {
+                                          Supplier<ShaderExpr> vshDefault) {
         if (varyings.containsKey(name)) return; // already built (by a block or a prior reader)
         varyings.put(name, type);
         StageScope saved = current;
@@ -1024,7 +1030,7 @@ public class ShaderGraphCompiler {
         if (!(owner instanceof NodeModel nm)) return;
         // NGT built-in constant node (the generic "Constant" you drag a value into): not a ShaderNode,
         // so read its value and emit it as a GLSL literal. Mirrors GraphExecutor's IConstantNode case.
-        if (owner instanceof com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IConstantNode constant) {
+        if (owner instanceof IConstantNode constant) {
             Object value = constant.tryGetValue(constant.getDataType()).result().orElse(null);
             for (PortModel outp : nm.getOutputsByDisplayOrder()) {
                 GlslType decl = GlslType.of(outp.getDataTypeHandle());
@@ -1190,7 +1196,7 @@ public class ShaderGraphCompiler {
             }
             if (vn == null) continue;
             IVariable ref = vn.getVariable();
-            if (ref == null || !java.util.Objects.equals(ref.getName(), v.getName())) continue;
+            if (ref == null || !Objects.equals(ref.getName(), v.getName())) continue;
             var inputs = n.getInputsById();
             if (inputs.isEmpty()) continue; // not the "set" form
             return pullInput(inputs.values().iterator().next(), target);
@@ -1554,11 +1560,11 @@ public class ShaderGraphCompiler {
      * the name {@link com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat} binds the element under, so
      * the shader's inputs line up with the pipeline layout. Unknown keys are skipped.
      */
-    private static String vertexAttributes(java.util.List<String> elementKeys) {
+    private static String vertexAttributes(List<String> elementKeys) {
         StringBuilder sb = new StringBuilder();
-        var seen = new java.util.HashSet<String>();
+        var seen = new HashSet<String>();
         for (String key : elementKeys) {
-            var e = com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.get(key);
+            var e = KGVertexElements.get(key);
             if (e == null) continue;
             if (!seen.add(e.attribName())) continue; // never declare the same `in` twice
             sb.append("in ").append(e.glslType()).append(' ').append(e.attribName()).append(";\n");

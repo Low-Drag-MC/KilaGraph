@@ -19,10 +19,9 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.VariableNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import java.util.Objects;
 import net.minecraft.gametest.framework.GameTestHelper;
 import org.joml.Vector2f;
-
-import java.util.Objects;
 
 /**
  * Programmatic graph-construction helpers for GameTests. Same shape as the legacy
@@ -50,7 +49,7 @@ public final class KGGameTestHelpers {
      * {@code graphModel.getNodeModels()} (orphan nodes don't), e.g. for graph-wide validation tests. */
     public static NodeModel addRegisteredNode(Graph graph, Class<? extends Node> nodeClass) {
         CustomGraphModelImpl model = graph.graphModel;
-        var data = new GraphNodeCreationData(model, new org.joml.Vector2f(), SpawnFlags.DEFAULT, null);
+        var data = new GraphNodeCreationData(model, new Vector2f(), SpawnFlags.DEFAULT, null);
         AbstractNodeModel created = CustomGraphModelImpl.createNodeFromData(data, nodeClass);
         return (NodeModel) created;
     }

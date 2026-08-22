@@ -1,12 +1,14 @@
 package com.lowdragmc.kilagraph.rendertype.compiler;
 
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
+import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
-import org.jetbrains.annotations.Nullable;
-
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Per-node compilation context, mirroring {@code EvalContext} but emitting GLSL instead of values.
@@ -80,13 +82,13 @@ public final class ShaderCompileContext {
      * to a safe constant instead of producing undefined-variable GLSL. The substitution is recorded and
      * surfaced as an editor warning.
      */
-    public ShaderExpr attribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElement element,
+    public ShaderExpr attribute(KGVertexElement element,
                                 GlslType type, ShaderExpr fallback) {
         return compiler.attribute(element, type, fallback);
     }
 
     /** Whether the given vertex element is declared in the active vertex format. */
-    public boolean hasAttribute(com.lowdragmc.kilagraph.rendertype.format.KGVertexElement element) {
+    public boolean hasAttribute(KGVertexElement element) {
         return compiler.hasAttribute(element);
     }
 
@@ -180,7 +182,7 @@ public final class ShaderCompileContext {
      * shared sample helper + a per-gradient builder, and return a GRADIENT-typed expression. Used by the
      * Gradient node. A {@code SampleGradient} node turns the result + a float position into a {@code vec4}.
      */
-    public ShaderExpr constantGradient(com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.GradientValue value) {
+    public ShaderExpr constantGradient(RenderTypeGraphTypes.GradientValue value) {
         return compiler.constantGradient(value);
     }
 
@@ -200,7 +202,7 @@ public final class ShaderCompileContext {
      * shared sample helper + a per-curve builder, and return a CURVE-typed expression. Used by the Curve
      * node. A {@code SampleCurve} node turns the result + a float position into a {@code float}.
      */
-    public ShaderExpr constantCurve(com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.CurveValue value) {
+    public ShaderExpr constantCurve(RenderTypeGraphTypes.CurveValue value) {
         return compiler.constantCurve(value);
     }
 
@@ -285,7 +287,7 @@ public final class ShaderCompileContext {
 
     /** The interpolated mesh uv for a specific channel (UV0/UV1/UV2). UV0 is the texture uv; UV1/UV2 are
      *  the overlay/lightmap coords (cast to vec2). See {@link #meshUv()}. */
-    public ShaderExpr meshUv(com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.UvChannel channel) {
+    public ShaderExpr meshUv(RenderTypeGraphTypes.UvChannel channel) {
         return compiler.meshUv(channel);
     }
 
@@ -420,7 +422,7 @@ public final class ShaderCompileContext {
      * (no vertex stage) returns {@code previewDefault}. Used by {@code FragmentInputNode}s.
      */
     public ShaderExpr varyingInput(String name, GlslType type,
-                                   java.util.function.Supplier<ShaderExpr> vshDefault, ShaderExpr previewDefault) {
+                                   Supplier<ShaderExpr> vshDefault, ShaderExpr previewDefault) {
         return compiler.varyingInput(name, type, vshDefault, previewDefault);
     }
 

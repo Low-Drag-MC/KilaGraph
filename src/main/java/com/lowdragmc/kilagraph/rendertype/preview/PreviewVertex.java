@@ -1,8 +1,8 @@
 package com.lowdragmc.kilagraph.rendertype.preview;
 
-import org.jetbrains.annotations.Nullable;
-
+import java.util.HashMap;
 import java.util.Map;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One preview vertex in a format-agnostic, <b>client-safe</b> form: position + the attributes any preview
@@ -45,7 +45,7 @@ public final class PreviewVertex {
 
     /** Store a custom element's per-vertex value (keyed by its registry key). */
     public PreviewVertex setAttribute(String elementKey, float... value) {
-        if (custom == null) custom = new java.util.HashMap<>();
+        if (custom == null) custom = new HashMap<>();
         custom.put(elementKey, value);
         return this;
     }
@@ -60,7 +60,7 @@ public final class PreviewVertex {
     public PreviewVertex copy() {
         var c = new PreviewVertex(x, y, z, u, v, nx, ny, nz);
         c.color = color; c.light = light; c.overlay = overlay;
-        if (custom != null) c.custom = new java.util.HashMap<>(custom);
+        if (custom != null) c.custom = new HashMap<>(custom);
         return c;
     }
 }

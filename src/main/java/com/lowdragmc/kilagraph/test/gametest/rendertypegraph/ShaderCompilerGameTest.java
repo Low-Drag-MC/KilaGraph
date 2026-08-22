@@ -1,112 +1,138 @@
 package com.lowdragmc.kilagraph.test.gametest.rendertypegraph;
 
 
+import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.editor.ExportShaderFunction;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
+import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
+import com.lowdragmc.kilagraph.rendertype.compiler.KGSamplerGl;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.AbsNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.range.ClampNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.CrossNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.DotNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.FresnelNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.SphereMaskNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.fog.ApplyFogNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.fog.TotalFogValueNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogSphericalDistanceNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomFloatBlock;
+import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
+import com.lowdragmc.kilagraph.rendertype.nodes.artistic.curve.SampleCurveNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.artistic.gradient.SampleGradientNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.CombineNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.FlipNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.channel.SwizzleNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.TilingAndOffsetNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.RotateNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.TwirlNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.SpherizeNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.RadialShearNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.PolarCoordinatesNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.FlipbookNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.TriplanarNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.scene.ScreenPositionNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.scene.SceneColorNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.scene.SceneDepthNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.transform.CameraNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.logic.BranchNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.logic.CompareNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.logic.AndNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.logic.OrNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.logic.NotNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.logic.ExpressionNode;
-import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
-import com.lowdragmc.kilagraph.editor.ExportShaderFunction;
-import com.lowdragmc.lowdraglib2.Platform;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.GraphElementModel;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec2Block;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec2Node;
-import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
+import com.lowdragmc.kilagraph.rendertype.nodes.channel.SwizzleNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.constant.CurveNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.constant.GradientNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.constant.TimeNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.ApplyFogNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogSphericalDistanceNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.TotalFogValueNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaDiscardBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentBaseColorBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentEmissionBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.NormalNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.PositionNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.ViewDirectionNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec2Node;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec4Node;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.FragmentCoordinateNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.FrontFacingNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.PrimitiveIdNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceIdNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexIdNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.AndNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.BranchNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.CompareNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.ExpressionNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.NotNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.logic.OrNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.AbsNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.ExpNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.LengthNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.interpolation.LerpNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.range.MinNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.LogNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.NormalizeNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.PosterizeNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.AddNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.PowNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.derivative.DDXNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.interpolation.LerpNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4ConstructNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4SplitNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4TransformNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.range.ClampNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.range.FractNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.range.MinNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.trigonometry.SinNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.CrossNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.DotNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.FresnelNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.SphereMaskNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.wave.SawtoothWaveNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.procedural.CheckerboardNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.GradientNoiseNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.SimpleNoiseNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.VoronoiNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.EllipseNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.PolygonNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.RectangleNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.RoundedPolygonNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.RoundedRectangleNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.scene.SceneColorNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.scene.SceneDepthNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.scene.ScreenPositionNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.LightMapTextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.OverlayTextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.PositionNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.NormalNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.ViewDirectionNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexIdNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceIdNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.FrontFacingNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.FragmentCoordinateNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.PrimitiveIdNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.AddNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4ConstructNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4SplitNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4TransformNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.derivative.DDXNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.trigonometry.SinNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.transform.CameraNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.transform.KGTransformsUboNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.FlipbookNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.PolarCoordinatesNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.RadialShearNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.RotateNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.SpherizeNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.uv.TilingAndOffsetNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.constant.TimeNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.constant.GradientNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.constant.CurveNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.artistic.gradient.SampleGradientNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.artistic.curve.SampleCurveNode;
-import com.lowdragmc.lowdraglib2.math.GradientColor;
-import com.lowdragmc.lowdraglib2.math.curve.ExplicitCubicBezierCurve2;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec2Node;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec4Node;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec4Block;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.TriplanarNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.TwirlNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomFloatBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec2Block;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec3Block;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec4Block;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
+import com.lowdragmc.kilagraph.rendertype.runtime.KGShaderManifest;
+import com.lowdragmc.lowdraglib2.Platform;
+import com.lowdragmc.lowdraglib2.math.GradientColor;
+import com.lowdragmc.lowdraglib2.math.curve.ExplicitCubicBezierCurve2;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.GraphElementModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableScope;
-import net.minecraft.core.Holder;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.gametest.framework.GameTestHelper;
-import com.lowdragmc.kilagraph.Kilagraph;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
+import org.joml.Vector3f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -194,7 +220,7 @@ public final class ShaderCompilerGameTest {
     }
 
     /** Compile a graph with a single boolean-logic node wired into emission, returning the fragment GLSL. */
-    private static String logicOpFsh(Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node> nodeClass) {
+    private static String logicOpFsh(Class<? extends Node> nodeClass) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
         NodeModel node = addNode(graph, nodeClass);
@@ -211,8 +237,8 @@ public final class ShaderCompilerGameTest {
         NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
         NodeModel expr = addNode(graph, ExpressionNode.class);
         String json = ExpressionNode.toJson(new ExpressionNode.ExpressionSpec(
-                java.util.List.of(new ExpressionNode.PortSpec("a", "FLOAT"), new ExpressionNode.PortSpec("b", "VEC3")),
-                java.util.List.of(new ExpressionNode.PortSpec("result", "VEC3"), new ExpressionNode.PortSpec("scalar", "FLOAT")),
+                List.of(new ExpressionNode.PortSpec("a", "FLOAT"), new ExpressionNode.PortSpec("b", "VEC3")),
+                List.of(new ExpressionNode.PortSpec("result", "VEC3"), new ExpressionNode.PortSpec("scalar", "FLOAT")),
                 "result = b * a;\nscalar = a;"));
         setOption(expr, "spec", json); // setOption calls defineNode() → ports re-derived from the spec
         assertEq(helper, "expression inputs (a,b)", 2, expr.getInputsById().size());
@@ -245,15 +271,15 @@ public final class ShaderCompilerGameTest {
         wire(graph, baseColor.getInputsById().get("color"), add.getOutputsById().get("out"));
 
         int sourceNodesBefore = graph.graphModel.getNodeModels().size();
-        long sourceVarsBefore = graph.graphModel.getGraphVariableModels().stream().filter(java.util.Objects::nonNull).count();
+        long sourceVarsBefore = graph.graphModel.getGraphVariableModels().stream().filter(Objects::nonNull).count();
 
         // Select {vecA, add}: vecB→add.b crosses in (READ), add→baseColor crosses out (WRITE), vecA→add internal.
-        java.util.List<GraphElementModel> selection = java.util.List.of(
+        List<GraphElementModel> selection = List.of(
                 (GraphElementModel) vecA, (GraphElementModel) add);
         ShaderFunctionGraph fn = ExportShaderFunction.build(graph.graphModel, selection, Platform.getFrozenRegistry());
         assertTrue(helper, "export produced a function graph", fn != null);
 
-        var vars = fn.graphModel.getGraphVariableModels().stream().filter(java.util.Objects::nonNull).toList();
+        var vars = fn.graphModel.getGraphVariableModels().stream().filter(Objects::nonNull).toList();
         long reads = vars.stream().filter(v -> v.getModifiers() != null && v.getModifiers().hasFlag(ModifierFlags.READ)).count();
         long writes = vars.stream().filter(v -> v.getModifiers() != null && v.getModifiers().hasFlag(ModifierFlags.WRITE)).count();
         assertEq(helper, "one READ (input) boundary var", 1L, reads);
@@ -266,7 +292,7 @@ public final class ShaderCompilerGameTest {
 
         assertEq(helper, "source nodes unchanged", sourceNodesBefore, graph.graphModel.getNodeModels().size());
         assertEq(helper, "source has no new variables", (int) sourceVarsBefore,
-                (int) graph.graphModel.getGraphVariableModels().stream().filter(java.util.Objects::nonNull).count());
+                (int) graph.graphModel.getGraphVariableModels().stream().filter(Objects::nonNull).count());
         helper.succeed();
     }
 
@@ -286,14 +312,14 @@ public final class ShaderCompilerGameTest {
 
         // Output named "out" is a GLSL reserved word → flagged.
         setOption(exprModel, "spec", ExpressionNode.toJson(new ExpressionNode.ExpressionSpec(
-                java.util.List.of(new ExpressionNode.PortSpec("a", "FLOAT")),
-                java.util.List.of(new ExpressionNode.PortSpec("out", "FLOAT")), "out = a;")));
+                List.of(new ExpressionNode.PortSpec("a", "FLOAT")),
+                List.of(new ExpressionNode.PortSpec("out", "FLOAT")), "out = a;")));
         assertTrue(helper, "reserved output name flagged", !expr.validationErrors().isEmpty());
 
         // Valid identifiers → no validation errors.
         setOption(exprModel, "spec", ExpressionNode.toJson(new ExpressionNode.ExpressionSpec(
-                java.util.List.of(new ExpressionNode.PortSpec("a", "FLOAT")),
-                java.util.List.of(new ExpressionNode.PortSpec("result", "FLOAT")), "result = a;")));
+                List.of(new ExpressionNode.PortSpec("a", "FLOAT")),
+                List.of(new ExpressionNode.PortSpec("result", "FLOAT")), "result = a;")));
         assertTrue(helper, "valid spec has no errors", expr.validationErrors().isEmpty());
         helper.succeed();
     }
@@ -399,7 +425,7 @@ public final class ShaderCompilerGameTest {
     }
 
     /** Compile an input node with one option set, wired into fragment emission, and return the fragment GLSL. */
-    private static String inputNodeFsh(Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node> nodeClass,
+    private static String inputNodeFsh(Class<? extends Node> nodeClass,
                                        String option, String value) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
@@ -743,9 +769,9 @@ public final class ShaderCompilerGameTest {
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void samplerParamsResolveToGlBindings(GameTestHelper helper) {
-        var loc = net.minecraft.resources.ResourceLocation.withDefaultNamespace("dummy");
-        java.util.List<String> samplerNames = java.util.List.of("Sampler0", "kg_tex_a", "Sampler2", "kg_tex_b");
-        java.util.Map<String, SamplerDefault> bindings = new java.util.LinkedHashMap<>();
+        var loc = ResourceLocation.withDefaultNamespace("dummy");
+        List<String> samplerNames = List.of("Sampler0", "kg_tex_a", "Sampler2", "kg_tex_b");
+        Map<String, SamplerDefault> bindings = new LinkedHashMap<>();
         bindings.put("kg_tex_a", new SamplerDefault(loc, RenderTypeGraphTypes.SamplerFilter.LINEAR,
                 RenderTypeGraphTypes.SamplerAddress.REPEAT, false));
         bindings.put("kg_tex_b", new SamplerDefault(loc, RenderTypeGraphTypes.SamplerFilter.NEAREST,
@@ -753,7 +779,7 @@ public final class ShaderCompilerGameTest {
         bindings.put("kg_absent", new SamplerDefault(loc, RenderTypeGraphTypes.SamplerFilter.LINEAR,
                 RenderTypeGraphTypes.SamplerAddress.REPEAT, false)); // not in samplerNames -> not bound
 
-        var resolved = com.lowdragmc.kilagraph.rendertype.compiler.KGSamplerGl.resolveBindings(samplerNames, bindings);
+        var resolved = KGSamplerGl.resolveBindings(samplerNames, bindings);
 
         assertTrue(helper, "absent sampler is skipped", resolved.size() == 2);
         var a = resolved.stream().filter(b -> b.unit() == 1).findFirst().orElse(null);
@@ -837,7 +863,7 @@ public final class ShaderCompilerGameTest {
                 compiled.uniformFields().containsKey("Ramp"));
         // The manifest must declare every struct member the GLSL uses, else ShaderInstance creates no Uniform
         // for it and the gradient stays zero at runtime (the systemic manifest-consistency invariant).
-        String manifest = com.lowdragmc.kilagraph.rendertype.runtime.KGShaderManifest.json(compiled, "test");
+        String manifest = KGShaderManifest.json(compiled, "test");
         assertTrue(helper, "manifest declares gradient header member", manifest.contains("\"kg_Ramp.header\""));
         assertTrue(helper, "manifest declares first colour key", manifest.contains("\"kg_Ramp.colors[0]\""));
         assertTrue(helper, "manifest declares last alpha key", manifest.contains("\"kg_Ramp.alphas[7]\""));
@@ -917,7 +943,7 @@ public final class ShaderCompilerGameTest {
         assertEq(helper, "curve packs 68 floats", 68, compiled.uniformDefaults().get("kg_Fade").length);
         assertTrue(helper, "variable name maps to its field for set-by-name",
                 compiled.uniformFields().containsKey("Fade"));
-        String manifest = com.lowdragmc.kilagraph.rendertype.runtime.KGShaderManifest.json(compiled, "test");
+        String manifest = KGShaderManifest.json(compiled, "test");
         assertTrue(helper, "manifest declares curve header member", manifest.contains("\"kg_Fade.header\""));
         assertTrue(helper, "manifest declares first segment", manifest.contains("\"kg_Fade.segments[0]\""));
         assertTrue(helper, "manifest declares last segment", manifest.contains("\"kg_Fade.segments[15]\""));
@@ -929,7 +955,7 @@ public final class ShaderCompilerGameTest {
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void curveValueCodecRoundTrips(GameTestHelper helper) {
-        var segments = new java.util.ArrayList<ExplicitCubicBezierCurve2>();
+        var segments = new ArrayList<ExplicitCubicBezierCurve2>();
         segments.add(new ExplicitCubicBezierCurve2(
                 new Vector2f(0.2f, 0.1f), new Vector2f(0.4f, 0.9f),
                 new Vector2f(0.6f, 0.9f), new Vector2f(0.8f, 0.3f)));
@@ -965,7 +991,7 @@ public final class ShaderCompilerGameTest {
         // Wire vec3 -> emission, then convert that wire into a portal pair (entry on vec3, exit on emission).
         var w = graph.graphModel.createWire(emission.getInputsById().get("color"), vec3.getOutputsById().get("out"));
         graph.graphModel.createPortalsFromWire(w, new Vector2f(0, 0), new Vector2f(0, 0), 12,
-                new java.util.HashMap<>(), new java.util.HashMap<>());
+                new HashMap<>(), new HashMap<>());
 
         String fsh = compile(graph).fragmentSource();
         assertTrue(helper, "portal-routed vec3 value reaches emission (0.25 present)", fsh.contains("0.25"));
@@ -978,7 +1004,7 @@ public final class ShaderCompilerGameTest {
     public static void timeNodeUsesEngineGlobals(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
-        NodeModel alpha = addBlock(graph, fragment, com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaBlock.class);
+        NodeModel alpha = addBlock(graph, fragment, FragmentAlphaBlock.class);
         NodeModel time = addNode(graph, TimeNode.class);
         wire(graph, alpha.getInputsById().get("alpha"), time.getOutputsById().get("time"));
 
@@ -1081,12 +1107,12 @@ public final class ShaderCompilerGameTest {
                 "Tint", TypeHandles.FLOAT, 0.5f, VariableKind.INPUT);
         tintVar.setScope(VariableScope.EXPOSED);
         var tintNode = graph.graphModel.createVariableNode(tintVar, new Vector2f(0, 0), null, null);
-        NodeModel alpha = addBlock(graph, fragment, com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaBlock.class);
+        NodeModel alpha = addBlock(graph, fragment, FragmentAlphaBlock.class);
         wire(graph, alpha.getInputsById().get("alpha"), tintNode.getOutputPort());
 
         // LOCAL vec3 "Glow" (default (0.1,0.2,0.3)) -> inlined literal, wired into the base color block.
         var glowVar = (VariableDeclarationModelBase) graph.graphModel.createVariable(
-                "Glow", RenderTypeGraphTypes.VEC3, new org.joml.Vector3f(0.1f, 0.2f, 0.3f),
+                "Glow", RenderTypeGraphTypes.VEC3, new Vector3f(0.1f, 0.2f, 0.3f),
                 VariableKind.INPUT);
         glowVar.setScope(VariableScope.LOCAL);
         var glowNode = graph.graphModel.createVariableNode(glowVar, new Vector2f(0, 200), null, null);
@@ -1155,7 +1181,7 @@ public final class ShaderCompilerGameTest {
         int argb = 0x80FF8040;
         var colorVar = (VariableDeclarationModelBase) graph.graphModel.createVariable(
                 "Accent",
-                com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.COLOR, argb,
+                TypeHandles.COLOR, argb,
                 VariableKind.INPUT);
         colorVar.setScope(VariableScope.EXPOSED);
         var colorNode = graph.graphModel.createVariableNode(colorVar, new Vector2f(0, 0), null, null);
@@ -1192,12 +1218,12 @@ public final class ShaderCompilerGameTest {
                 "Tint", TypeHandles.FLOAT, 0.5f, VariableKind.INPUT);
         tintVar.setScope(VariableScope.EXPOSED);
         var tintNode = graph.graphModel.createVariableNode(tintVar, new Vector2f(0, 0), null, null);
-        NodeModel alpha = addBlock(graph, fragment, com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaBlock.class);
+        NodeModel alpha = addBlock(graph, fragment, FragmentAlphaBlock.class);
         wire(graph, alpha.getInputsById().get("alpha"), tintNode.getOutputPort());
 
         // EXPOSED COLOR "Accent" → kg_Accent (VEC4), wired into base color.
         var accentVar = (VariableDeclarationModelBase) graph.graphModel.createVariable(
-                "Accent", com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.COLOR, 0xFFFFFFFF,
+                "Accent", TypeHandles.COLOR, 0xFFFFFFFF,
                 VariableKind.INPUT);
         accentVar.setScope(VariableScope.EXPOSED);
         var accentNode = graph.graphModel.createVariableNode(accentVar, new Vector2f(0, 120), null, null);
@@ -1222,13 +1248,13 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "Tint mapped to a uniform field", tintField != null);
         assertEq(helper, "Tint field name", "kg_Tint", tintField.name());
         assertTrue(helper, "Tint field type is FLOAT",
-                tintField.type() == com.lowdragmc.kilagraph.rendertype.compiler.GlslType.FLOAT);
+                tintField.type() == GlslType.FLOAT);
 
         var accentField = compiled.uniformFields().get("Accent");
         assertTrue(helper, "Accent mapped to a uniform field", accentField != null);
         assertEq(helper, "Accent field name", "kg_Accent", accentField.name());
         assertTrue(helper, "Accent field type is VEC4",
-                accentField.type() == com.lowdragmc.kilagraph.rendertype.compiler.GlslType.VEC4);
+                accentField.type() == GlslType.VEC4);
 
         assertTrue(helper, "Albedo mapped to a sampler", compiled.variableSamplers().containsKey("Albedo"));
         assertEq(helper, "Albedo sampler name", "kg_Albedo", compiled.variableSamplers().get("Albedo"));
@@ -1390,10 +1416,10 @@ public final class ShaderCompilerGameTest {
     public static void extraMathNodesEmitGlsl(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
-        NodeModel poster = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.PosterizeNode.class);
-        NodeModel saw = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.wave.SawtoothWaveNode.class);
+        NodeModel poster = addNode(graph, PosterizeNode.class);
+        NodeModel saw = addNode(graph, SawtoothWaveNode.class);
         wire(graph, poster.getInputsById().get("in"), saw.getOutputsById().get("out"));
-        NodeModel mask = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.vector.SphereMaskNode.class);
+        NodeModel mask = addNode(graph, SphereMaskNode.class);
         NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
         wire(graph, emission.getInputsById().get("color"), poster.getOutputsById().get("out"));
         NodeModel alpha = addBlock(graph, fragment, FragmentAlphaBlock.class);
@@ -1418,7 +1444,7 @@ public final class ShaderCompilerGameTest {
     public static void transformNodeUsesSpaceMatrices(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
-        NodeModel transform = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode.class);
+        NodeModel transform = addNode(graph, TransformNode.class);
         // defaults: from=object, to=world, type=position
         NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
         wire(graph, emission.getInputsById().get("color"), transform.getOutputsById().get("out"));
@@ -1437,7 +1463,7 @@ public final class ShaderCompilerGameTest {
         // clip→view uses the precomputed inverse projection (kg_IProjMat), not a per-pixel inverse.
         RenderTypeGraph clipGraph = new RenderTypeGraph();
         NodeModel clipFrag = clipGraph.getFragmentStageModel();
-        NodeModel clipT = addNode(clipGraph, com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode.class);
+        NodeModel clipT = addNode(clipGraph, TransformNode.class);
         setOption(clipT, "from", "clip");
         setOption(clipT, "to", "view");
         NodeModel clipEmit = addBlock(clipGraph, clipFrag, FragmentEmissionBlock.class);
@@ -1451,7 +1477,7 @@ public final class ShaderCompilerGameTest {
         // the camera position. Without the divide the result would be wrong under perspective.
         RenderTypeGraph clipWorldGraph = new RenderTypeGraph();
         NodeModel cwFrag = clipWorldGraph.getFragmentStageModel();
-        NodeModel cwT = addNode(clipWorldGraph, com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode.class);
+        NodeModel cwT = addNode(clipWorldGraph, TransformNode.class);
         setOption(cwT, "from", "clip");
         setOption(cwT, "to", "world"); // type defaults to position
         NodeModel cwEmit = addBlock(clipWorldGraph, cwFrag, FragmentEmissionBlock.class);
@@ -1480,7 +1506,7 @@ public final class ShaderCompilerGameTest {
 
     private static String expFsh(String base) {
         RenderTypeGraph graph = new RenderTypeGraph();
-        NodeModel exp = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.ExpNode.class);
+        NodeModel exp = addNode(graph, ExpNode.class);
         if (base != null) setOption(exp, "base", base);
         NodeModel alpha = addBlock(graph, graph.getFragmentStageModel(), FragmentAlphaBlock.class);
         wire(graph, alpha.getInputsById().get("alpha"), exp.getOutputsById().get("out"));
@@ -1489,7 +1515,7 @@ public final class ShaderCompilerGameTest {
 
     private static String logFsh(String base) {
         RenderTypeGraph graph = new RenderTypeGraph();
-        NodeModel log = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.LogNode.class);
+        NodeModel log = addNode(graph, LogNode.class);
         if (base != null) setOption(log, "base", base);
         NodeModel alpha = addBlock(graph, graph.getFragmentStageModel(), FragmentAlphaBlock.class);
         wire(graph, alpha.getInputsById().get("alpha"), log.getOutputsById().get("out"));
@@ -1509,13 +1535,13 @@ public final class ShaderCompilerGameTest {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel vertexStage = graph.getVertexStageModel();
         NodeModel posAttr = addNode(graph, VertexAttributeInputNode.class); // default element = position
-        NodeModel transform = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode.class);
+        NodeModel transform = addNode(graph, TransformNode.class);
         setOption(transform, "from", "object");
         setOption(transform, "to", "world");
-        NodeModel varying = addBlock(graph, vertexStage, com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec3Block.class);
+        NodeModel varying = addBlock(graph, vertexStage, VaryingCustomVec3Block.class);
         wire(graph, transform.getInputsById().get("in"), posAttr.getOutputsById().get("out"));
         wire(graph, varying.getInputsById().get("value"), transform.getOutputsById().get("out"));
-        NodeModel fract = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.range.FractNode.class);
+        NodeModel fract = addNode(graph, FractNode.class);
         wire(graph, fract.getInputsById().get("a"), varying.getOutputsById().get("value"));
         NodeModel baseColor = addBlock(graph, graph.getFragmentStageModel(), FragmentBaseColorBlock.class);
         wire(graph, baseColor.getInputsById().get("color"), fract.getOutputsById().get("out"));
@@ -1541,19 +1567,19 @@ public final class ShaderCompilerGameTest {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
 
-        NodeModel simple = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.SimpleNoiseNode.class);
-        NodeModel simple2 = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.SimpleNoiseNode.class);
-        NodeModel gradient = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.GradientNoiseNode.class);
-        NodeModel voronoi = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.VoronoiNode.class);
-        NodeModel ellipse = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.EllipseNode.class);
-        NodeModel polygon = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.PolygonNode.class);
-        NodeModel rect = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.RectangleNode.class);
-        NodeModel rrect = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.RoundedRectangleNode.class);
-        NodeModel rpoly = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.RoundedPolygonNode.class);
-        NodeModel checker = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.CheckerboardNode.class);
+        NodeModel simple = addNode(graph, SimpleNoiseNode.class);
+        NodeModel simple2 = addNode(graph, SimpleNoiseNode.class);
+        NodeModel gradient = addNode(graph, GradientNoiseNode.class);
+        NodeModel voronoi = addNode(graph, VoronoiNode.class);
+        NodeModel ellipse = addNode(graph, EllipseNode.class);
+        NodeModel polygon = addNode(graph, PolygonNode.class);
+        NodeModel rect = addNode(graph, RectangleNode.class);
+        NodeModel rrect = addNode(graph, RoundedRectangleNode.class);
+        NodeModel rpoly = addNode(graph, RoundedPolygonNode.class);
+        NodeModel checker = addNode(graph, CheckerboardNode.class);
 
         // Sum every float output (incl. both Voronoi outputs) through an Add chain into the alpha channel.
-        java.util.List<com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel> outs = java.util.List.of(
+        List<PortModel> outs = List.of(
                 simple.getOutputsById().get("out"), simple2.getOutputsById().get("out"),
                 gradient.getOutputsById().get("out"),
                 voronoi.getOutputsById().get("out"), voronoi.getOutputsById().get("cells"),
@@ -1599,15 +1625,15 @@ public final class ShaderCompilerGameTest {
     }
 
     /** A standalone Ellipse node's preview output port (separate graph; preview is a flat quad). */
-    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel ellipsePreviewPort() {
+    private static PortModel ellipsePreviewPort() {
         RenderTypeGraph graph = new RenderTypeGraph();
-        NodeModel ellipse = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.shapes.EllipseNode.class);
+        NodeModel ellipse = addNode(graph, EllipseNode.class);
         return ellipse.getOutputsById().get("out");
     }
 
     private static String noisePreviewFsh() {
         RenderTypeGraph graph = new RenderTypeGraph();
-        NodeModel simple = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.procedural.noise.SimpleNoiseNode.class);
+        NodeModel simple = addNode(graph, SimpleNoiseNode.class);
         return new ShaderGraphCompiler(graph).compilePreview(simple.getOutputsById().get("out")).fragmentSource();
     }
 
@@ -1698,7 +1724,7 @@ public final class ShaderCompilerGameTest {
     private static NodeModel addArtistic(RenderTypeGraph graph, String className) {
         try {
             @SuppressWarnings("unchecked")
-            var cls = (Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node>)
+            var cls = (Class<? extends Node>)
                     Class.forName(className);
             return addNode(graph, cls);
         } catch (ClassNotFoundException e) {
@@ -1712,7 +1738,7 @@ public final class ShaderCompilerGameTest {
     public static void cameraNodeReadsGlobals(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
         NodeModel fragment = graph.getFragmentStageModel();
-        NodeModel camera = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.transform.CameraNode.class);
+        NodeModel camera = addNode(graph, CameraNode.class);
         NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
         wire(graph, emission.getInputsById().get("color"), camera.getOutputsById().get("Position"));
 
@@ -1725,7 +1751,7 @@ public final class ShaderCompilerGameTest {
 
         // The camera basis vectors (Up/Right) derive from the inverse view matrix, like Direction.
         RenderTypeGraph upGraph = new RenderTypeGraph();
-        NodeModel upCam = addNode(upGraph, com.lowdragmc.kilagraph.rendertype.nodes.transform.CameraNode.class);
+        NodeModel upCam = addNode(upGraph, CameraNode.class);
         NodeModel upEmit = addBlock(upGraph, upGraph.getFragmentStageModel(), FragmentEmissionBlock.class);
         wire(upGraph, upEmit.getInputsById().get("color"), upCam.getOutputsById().get("Up"));
         CompiledShaderGraph upCompiled = compile(upGraph);
@@ -1739,9 +1765,9 @@ public final class ShaderCompilerGameTest {
     @PrefixGameTestTemplate(false)
     public static void kgTransformsUboNodeExposesMatrices(GameTestHelper helper) {
         RenderTypeGraph graph = new RenderTypeGraph();
-        NodeModel ubo = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.transform.KGTransformsUboNode.class);
+        NodeModel ubo = addNode(graph, KGTransformsUboNode.class);
         // The node's outputs are mat4s; transform a vec4 by ViewMat so the result reaches a color block.
-        NodeModel xform = addNode(graph, com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4TransformNode.class);
+        NodeModel xform = addNode(graph, Mat4TransformNode.class);
         wire(graph, xform.getInputsById().get("m"), ubo.getOutputsById().get("ViewMat"));
         NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
         wire(graph, emission.getInputsById().get("color"), xform.getOutputsById().get("out"));

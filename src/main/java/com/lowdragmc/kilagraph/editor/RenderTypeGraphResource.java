@@ -1,19 +1,21 @@
 package com.lowdragmc.kilagraph.editor;
 
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
+import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
+import com.lowdragmc.kilagraph.rendertype.gui.RenderTypeGraphView;
 import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.editor.resource.IResourceProvider;
 import com.lowdragmc.lowdraglib2.editor.ui.resource.ResourceProviderContainer;
-import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
-import com.lowdragmc.kilagraph.rendertype.gui.RenderTypeGraphView;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.editor.IGraphReferenceResolver;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.texture.Icons;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.editor.GraphResource;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.editor.IGraphReferenceResolver;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.GraphView;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Supplier;
 import net.minecraft.nbt.CompoundTag;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.function.Supplier;
 
 public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
     private static final String GRAPH_TAG = "graph";
@@ -37,7 +39,7 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
 
     @Override
     public RenderTypeGraph deserializeGraphResource(CompoundTag tag,
-            @Nullable com.lowdragmc.lowdraglib2.nodegraphtookit.editor.IGraphReferenceResolver resolver) {
+            @Nullable IGraphReferenceResolver resolver) {
         return deserializeGraph(tag, resolver);
     }
 
@@ -119,10 +121,10 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
      * Read the composed vertex-format element keys, upgrading saves from the old single
      * {@code vertexFormatPreset} enum string to the equivalent preset key list when needed.
      */
-    private static java.util.List<String> readVertexFormatElements(CompoundTag tag, java.util.List<String> fallback) {
+    private static List<String> readVertexFormatElements(CompoundTag tag, List<String> fallback) {
         var joined = tag.getString("vertexFormatElements");
         if (!joined.isBlank()) {
-            var keys = new java.util.ArrayList<String>();
+            var keys = new ArrayList<String>();
             for (var part : joined.split(",")) {
                 if (!part.isBlank()) keys.add(part.trim());
             }
@@ -132,9 +134,9 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
         var legacy = tag.contains("vertexFormatPreset") ? tag.getString("vertexFormatPreset") : null;
         if (legacy != null) {
             return switch (legacy) {
-                case "BLOCK" -> com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets.BLOCK;
-                case "POSITION_COLOR_TEX" -> com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets.POSITION_COLOR_TEX;
-                default -> com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets.ENTITY; // ENTITY, CUSTOM, unknown
+                case "BLOCK" -> VertexFormatPresets.BLOCK;
+                case "POSITION_COLOR_TEX" -> VertexFormatPresets.POSITION_COLOR_TEX;
+                default -> VertexFormatPresets.ENTITY; // ENTITY, CUSTOM, unknown
             };
         }
         return fallback;

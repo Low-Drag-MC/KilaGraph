@@ -7,6 +7,8 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.Fluid;
@@ -80,13 +82,13 @@ public final class FluidNodes {
         }
 
         @InputPort public Fluid in = Fluids.WATER;
-        @OutputPort public net.minecraft.world.item.Item out;
+        @OutputPort public Item out;
 
         @Override
         public void evaluate(EvalContext ctx) {
             Fluid f = ctx.getInput("in", Fluid.class, Fluids.WATER);
             ctx.setOutput("out", f == null || f == Fluids.EMPTY
-                    ? net.minecraft.world.item.Items.AIR
+                    ? Items.AIR
                     : f.getBucket());
         }
     }

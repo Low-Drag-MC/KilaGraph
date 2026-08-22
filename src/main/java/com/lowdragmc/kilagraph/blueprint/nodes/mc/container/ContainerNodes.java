@@ -10,11 +10,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.wrapper.InvWrapper;
 
 /**
  * Finding an inventory, and reading what is in it.
@@ -130,16 +132,16 @@ public final class ContainerNodes {
             return Component.translatable("kg.node.mc_player_container.tooltip");
         }
 
-        @InputPort public net.minecraft.world.entity.player.Player player;
+        @InputPort public Player player;
         @OutputPort public IItemHandler out;
         @OutputPort public boolean found;
 
         @Override
         public void evaluate(EvalContext ctx) {
-            var p = ctx.getInput("player", net.minecraft.world.entity.player.Player.class, null);
+            var p = ctx.getInput("player", Player.class, null);
             IItemHandler handler = p == null
                     ? null
-                    : new net.neoforged.neoforge.items.wrapper.InvWrapper(p.getInventory());
+                    : new InvWrapper(p.getInventory());
             ctx.setOutput("out", handler);
             ctx.setOutput("found", handler != null);
         }

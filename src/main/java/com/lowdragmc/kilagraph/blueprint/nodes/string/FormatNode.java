@@ -1,14 +1,15 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.string;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
-import com.lowdragmc.kilagraph.graph.core.PortIds;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
+import com.lowdragmc.kilagraph.graph.core.PortIds;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
+import java.util.IllegalFormatException;
 
 /**
  * {@link String#format} with N argument inputs. Malformed pattern → returns the pattern unchanged.
@@ -33,7 +34,7 @@ public class FormatNode extends AnnotatedNode {
         String p = ctx.getOption("pattern", String.class, "%s");
         try {
             ctx.setOutput("out", String.format(p, args));
-        } catch (java.util.IllegalFormatException e) {
+        } catch (IllegalFormatException e) {
             ctx.setOutput("out", p);
         }
     }

@@ -29,9 +29,13 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -130,7 +134,7 @@ public final class McInfoBlockGameTest {
         assertEq(helper, "blockPosition", pig.blockPosition(),
                 probe.read(EntityInfoBlocks.BlockPosition.class, "value", BlockPos.class));
         assertEq(helper, "boundingBox", pig.getBoundingBox(),
-                probe.read(EntityInfoBlocks.BoundingBox.class, "value", net.minecraft.world.phys.AABB.class));
+                probe.read(EntityInfoBlocks.BoundingBox.class, "value", AABB.class));
         assertEq(helper, "type", pig.getType(),
                 probe.read(EntityInfoBlocks.Type.class, "value", EntityType.class));
 
@@ -186,7 +190,7 @@ public final class McInfoBlockGameTest {
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void playerBlocks(GameTestHelper helper) {
-        Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
         player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_SWORD));
         var probe = new Probe(PlayerInfoNode.class, player);
 
@@ -241,7 +245,7 @@ public final class McInfoBlockGameTest {
         var containing = probe.block(BlockEntityInfoBlocks.ContainingLevel.class);
         assertTrue(helper, "level is present", containing.get("present", Boolean.class));
         assertEq(helper, "and is the test's level", helper.getLevel(),
-                containing.get("value", net.minecraft.world.level.Level.class));
+                containing.get("value", Level.class));
 
         var identity = probe.block(BlockEntityInfoBlocks.Identity.class);
         assertEq(helper, "type id", BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(chest.getType()),
@@ -287,7 +291,7 @@ public final class McInfoBlockGameTest {
 
     /** The block's JOML vector against the Vec3 it came from, at float precision. */
     private static void assertVector(GameTestHelper helper, String label,
-                                     net.minecraft.world.phys.Vec3 expected, Object actual) {
+                                     Vec3 expected, Object actual) {
         float[] c = VectorNodes.components(actual);
         assertEq(helper, label + " x", (float) expected.x, c[0], EPS);
         assertEq(helper, label + " y", (float) expected.y, c[1], EPS);

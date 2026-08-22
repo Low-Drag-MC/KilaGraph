@@ -4,6 +4,7 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.Sampler2DValue;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerAddress;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerFilter;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerMode;
+import com.lowdragmc.lowdraglib2.LDLib2;
 import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.accessors.EnumAccessor;
 import com.lowdragmc.lowdraglib2.configurator.ui.BooleanConfigurator;
@@ -18,16 +19,15 @@ import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Dialog;
 import com.lowdragmc.lowdraglib2.gui.ui.utils.UIElementProvider;
-import com.lowdragmc.lowdraglib2.LDLib2;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.IFieldValueConfigurable;
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * The editor configurator for a {@code SAMPLER2D} value ({@link Sampler2DValue}). Registered via
@@ -144,8 +144,8 @@ public final class Sampler2DConfigurator {
         List<ResourceLocation> ids = new ArrayList<>();
         // TODO(1.21-backport milestone 2): 1.21.1 has no Minecraft.getAtlasManager() to enumerate the loaded
         // atlases; offer the common atlas texture locations so the picker still works for the usual cases.
-        ids.add(net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS);
-        ids.add(net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_PARTICLES);
+        ids.add(TextureAtlas.LOCATION_BLOCKS);
+        ids.add(TextureAtlas.LOCATION_PARTICLES);
         for (ResourceLocation id : ids) {
             if (Thread.interrupted()) return;
             if (id.toString().toLowerCase().contains(lower)) found.accept(id);
@@ -154,6 +154,6 @@ public final class Sampler2DConfigurator {
 
     private static ResourceLocation firstAtlasId() {
         // A stable, commonly-present atlas as the search default (block textures).
-        return net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS;
+        return TextureAtlas.LOCATION_BLOCKS;
     }
 }

@@ -27,8 +27,8 @@ import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtSetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtValueType;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.FormatNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
-
 import java.util.List;
 
 /**
@@ -209,7 +209,7 @@ public final class KGGraphFixtures {
      * <p>All eight classes map 0 to 0, so this chain also stays at 0 and the two are comparable.</p>
      */
     public static KGGraphBuilder polymorphicChain(int length) {
-        List<Class<? extends com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node>> cycle = List.of(
+        List<Class<? extends Node>> cycle = List.of(
                 AbsNode.class, SqrtNode.class, RoundNode.class, SignNode.class,
                 FractNode.class, NegateNode.class, TrigNode.class, AngleConvertNode.class);
         var b = KGGraphBuilder.blueprint();

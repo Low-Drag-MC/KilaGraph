@@ -1,22 +1,23 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
-import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.editor.resource.FilePath;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.itemlibrary.GraphNodeCreationData;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.SpawnFlags;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
-
-import java.util.Map;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -58,10 +59,10 @@ public final class SubgraphGameTest {
         if (vOutNode.getInputPort() == null) { helper.fail("inner vOut set-node missing input port"); return; }
 
         // Inner: AddNode pulling vIn and 10, output → vOut
-        com.lowdragmc.lowdraglib2.nodegraphtookit.gui.itemlibrary.GraphNodeCreationData innerAddData =
-                com.lowdragmc.lowdraglib2.nodegraphtookit.gui.itemlibrary.GraphNodeCreationData.ofOrphan(inner);
-        var innerAdd = (com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel)
-                com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl
+        GraphNodeCreationData innerAddData =
+                GraphNodeCreationData.ofOrphan(inner);
+        var innerAdd = (NodeModel)
+                CustomGraphModelImpl
                         .createNodeFromData(innerAddData, AddNode.class);
         inner.createWire(innerAdd.getInputsById().get("in1"), vInNode.getOutputPort());
         var in2Constant = innerAdd.getInputConstantsById().get("in2");
@@ -149,7 +150,7 @@ public final class SubgraphGameTest {
         var vInNode = inner.createVariableNode(vIn, new Vector2f(0, 0), null, null);
         var vOutNode = inner.createVariableNode(vOut, new Vector2f(0, 0), null, null);
         // Inner: just pass through (vIn → vOut directly via AddNode +0)
-        var add = addNode(inner.getGraph() instanceof com.lowdragmc.kilagraph.blueprint.BlueprintGraph bg ? bg : null, AddNode.class);
+        var add = addNode(inner.getGraph() instanceof BlueprintGraph bg ? bg : null, AddNode.class);
         if (add == null) {
             // Inner graph is a separate BlueprintGraph already — fall through with a manual path
             helper.fail("inner graph is not a BlueprintGraph instance — unexpected");
@@ -196,7 +197,7 @@ public final class SubgraphGameTest {
         var vOut2 = (VariableDeclarationModelBase) inner2.createVariable("vOut2", int.class, 0, VariableKind.OUTPUT);
         var vIn2Node = inner2.createVariableNode(vIn2, new Vector2f(0, 0), null, null);
         var vOut2Node = inner2.createVariableNode(vOut2, new Vector2f(400, 0), null, null);
-        if (!(inner2.getGraph() instanceof com.lowdragmc.kilagraph.blueprint.BlueprintGraph bg2)) {
+        if (!(inner2.getGraph() instanceof BlueprintGraph bg2)) {
             helper.fail("inner2 graph is not a BlueprintGraph"); return;
         }
         var add2 = addNode(bg2, AddNode.class);

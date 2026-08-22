@@ -20,10 +20,9 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.WirePortalModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import org.jetbrains.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -33,6 +32,7 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Pull-based evaluator for a {@link Graph}. Demand-driven: callers request the value of an
@@ -1672,7 +1672,7 @@ public final class GraphExecutor {
         return null;
     }
 
-    private static boolean hasExecPort(java.util.Collection<PortModel> ports) {
+    private static boolean hasExecPort(Collection<PortModel> ports) {
         for (PortModel p : ports) {
             if (TypeHandles.EXECUTION_FLOW.equals(p.getDataTypeHandle())) return true;
         }

@@ -1,24 +1,26 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
-import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-import net.neoforged.neoforge.gametest.GameTestHolder;
-import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.blueprint.nodes.compare.GreaterEqualNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BranchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BreakNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.ContinueNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.ForEachNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.ForNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.exec.PrintNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.exec.NoopNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.WhileNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -51,19 +53,19 @@ public final class ExecLoopsGameTest {
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void aFinishedLoopStillReportsItsLastIndex(GameTestHelper helper) {
-        var b = com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder.blueprint();
-        b.add("entry", com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode.class);
-        b.add("loop", com.lowdragmc.kilagraph.blueprint.nodes.exec.ForNode.class)
+        var b = KGGraphBuilder.blueprint();
+        b.add("entry", EntryNode.class);
+        b.add("loop", ForNode.class)
                 .constant("loop.count", 4);
-        b.add("body", com.lowdragmc.kilagraph.blueprint.nodes.exec.NoopNode.class);
-        b.add("after", com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode.class)
+        b.add("body", NoopNode.class);
+        b.add("after", SetVarNode.class)
                 .option("after", "varName", "lastIndex")
                 .wire("after.value", "loop.index");
         b.wire("loop.in", "entry");
         b.wire("body.in", "loop.body");
         b.wire("after.trigger", "loop.completed");
 
-        var exec = new com.lowdragmc.kilagraph.graph.exec.GraphExecutor(b.graph());
+        var exec = new GraphExecutor(b.graph());
         exec.executeFrom(b.node("entry"));
         Object seen = exec.getEnvironment().variables().get("lastIndex");
         if (!(seen instanceof Number n) || Math.abs(n.floatValue() - 3f) > 1e-5f) {
@@ -124,7 +126,7 @@ public final class ExecLoopsGameTest {
         setInputConstant(fr, "count", 5);
 
         // Need: condition = (index == 3). Use a "greater equal 3" via GreaterEqual + index.
-        var ge = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.compare.GreaterEqualNode.class);
+        var ge = addNode(g, GreaterEqualNode.class);
         setInputConstant(ge, "b", 3.0f);
         wire(g, ge.getInputsById().get("a"), fr.getOutputsById().get("index"));
 
@@ -164,7 +166,7 @@ public final class ExecLoopsGameTest {
         var fr = addNode(g, ForNode.class);
         setInputConstant(fr, "count", 5);
 
-        var ge = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.compare.GreaterEqualNode.class);
+        var ge = addNode(g, GreaterEqualNode.class);
         setInputConstant(ge, "b", 2.0f);
         wire(g, ge.getInputsById().get("a"), fr.getOutputsById().get("index"));
 
