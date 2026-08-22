@@ -39,7 +39,7 @@ public final class BlockEntityInfoBlocks {
     }
 
     /** Where it is. */
-    @NodeAttribute(name = "block_entity_position", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_block_entity_position", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(BlockEntityInfoNode.class)
     public static class Position extends BeBlock {
         @OutputPort public BlockPos value;
@@ -51,7 +51,7 @@ public final class BlockEntityInfoBlocks {
     }
 
     /** The state of the block it belongs to — its properties, not just its type. */
-    @NodeAttribute(name = "block_entity_state", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_block_entity_state", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(BlockEntityInfoNode.class)
     public static class State extends BeBlock {
         @OutputPort public BlockState value;
@@ -69,7 +69,7 @@ public final class BlockEntityInfoBlocks {
      * hand its own level back, which then feeds a Level Info context or another world query — without the
      * graph having to carry the level along beside it.</p>
      */
-    @NodeAttribute(name = "block_entity_level", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_block_entity_level", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(BlockEntityInfoNode.class)
     public static class ContainingLevel extends BeBlock {
         @OutputPort public Level value;
@@ -84,7 +84,7 @@ public final class BlockEntityInfoBlocks {
     }
 
     /** Which kind of block entity this is, as a registry id, and whether it has been removed. */
-    @NodeAttribute(name = "block_entity_identity", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_block_entity_identity", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(BlockEntityInfoNode.class)
     public static class Identity extends BeBlock {
         @OutputPort public ResourceLocation type;

@@ -48,7 +48,7 @@ public final class EntityInfoBlocks {
     // ---- position and motion -----------------------------------------------------------------
 
     /** Where the entity is — its feet, which is what the game treats as its position. */
-    @NodeAttribute(name = "entity_position", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_position", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class Position extends EntityBlock {
         @OutputPort public Vector3f value;
@@ -60,7 +60,7 @@ public final class EntityInfoBlocks {
     }
 
     /** Where the entity is looking from — its eyes. The start of a line of sight. */
-    @NodeAttribute(name = "entity_eye_position", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_eye_position", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class EyePosition extends EntityBlock {
         @OutputPort public Vector3f value;
@@ -72,7 +72,7 @@ public final class EntityInfoBlocks {
     }
 
     /** The unit vector the entity is facing. Combine with the eye position to cast a ray. */
-    @NodeAttribute(name = "entity_look_direction", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_look_direction", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class LookDirection extends EntityBlock {
         @OutputPort public Vector3f value;
@@ -84,7 +84,7 @@ public final class EntityInfoBlocks {
     }
 
     /** How fast the entity is moving, per tick, as a vector. */
-    @NodeAttribute(name = "entity_velocity", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_velocity", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class Velocity extends EntityBlock {
         @OutputPort public Vector3f value;
@@ -96,7 +96,7 @@ public final class EntityInfoBlocks {
     }
 
     /** The block the entity is standing in. */
-    @NodeAttribute(name = "entity_block_position", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_block_position", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class BlockPosition extends EntityBlock {
         @OutputPort public BlockPos value;
@@ -108,7 +108,7 @@ public final class EntityInfoBlocks {
     }
 
     /** The entity's hitbox in world space. */
-    @NodeAttribute(name = "entity_bounding_box", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_bounding_box", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class BoundingBox extends EntityBlock {
         @OutputPort public AABB value;
@@ -123,10 +123,10 @@ public final class EntityInfoBlocks {
      * Where the entity is pointed, in degrees.
      *
      * <p>{@code yaw} turns about the vertical axis and {@code pitch} tilts up and down, negative being
-     * up — the game's convention, not a mistake. Use {@code entity_look_direction} instead unless the
+     * up — the game's convention, not a mistake. Use {@code mc_entity_look_direction} instead unless the
      * angles themselves are wanted.</p>
      */
-    @NodeAttribute(name = "entity_rotation", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_rotation", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class Rotation extends EntityBlock {
         @OutputPort public float yaw;
@@ -147,7 +147,7 @@ public final class EntityInfoBlocks {
      * <p>{@code id} is the network id: unique within a running world and <b>not</b> stable across a
      * restart. {@code uuid} is stable and is what to store. {@code name} is for showing to a player.</p>
      */
-    @NodeAttribute(name = "entity_identity", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_identity", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class Identity extends EntityBlock {
         @OutputPort public int id;
@@ -163,7 +163,7 @@ public final class EntityInfoBlocks {
     }
 
     /** What kind of entity this is. Feed it to Entity Type Properties, or compare it to a constant. */
-    @NodeAttribute(name = "entity_type", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_type", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class Type extends EntityBlock {
         @OutputPort public EntityType<?> value;
@@ -183,7 +183,7 @@ public final class EntityInfoBlocks {
      * once, and a block per flag would mean six blocks stacked in the same context to answer one
      * question.</p>
      */
-    @NodeAttribute(name = "entity_state", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_state", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class State extends EntityBlock {
         @OutputPort public boolean alive;
@@ -205,7 +205,7 @@ public final class EntityInfoBlocks {
     }
 
     /** How long the entity has existed, in ticks, and how far it has fallen. */
-    @NodeAttribute(name = "entity_age", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_age", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class Age extends EntityBlock {
         @OutputPort public int tickCount;
@@ -226,7 +226,7 @@ public final class EntityInfoBlocks {
      * than the block refusing to evaluate. This is the property that a reflective context could not
      * reach at all, because it declared its target as {@code Entity}.</p>
      */
-    @NodeAttribute(name = "entity_health", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_entity_health", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext({EntityInfoNode.class, PlayerInfoNode.class})
     public static class Health extends EntityBlock {
         @OutputPort public float value;

@@ -31,7 +31,7 @@ public final class LevelInfoBlocks {
     // ---- weather -----------------------------------------------------------------------------
 
     /** How hard it is raining, 0 to 1. */
-    @NodeAttribute(name = "level_rain_level", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_level_rain_level", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(LevelInfoNode.class)
     public static class RainLevel extends InfoPropertyBlock<Level> {
         @OutputPort public float value;
@@ -48,7 +48,7 @@ public final class LevelInfoBlocks {
     }
 
     /** How hard it is thundering, 0 to 1. */
-    @NodeAttribute(name = "level_thunder_level", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_level_thunder_level", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(LevelInfoNode.class)
     public static class ThunderLevel extends InfoPropertyBlock<Level> {
         @OutputPort public float value;
@@ -70,7 +70,7 @@ public final class LevelInfoBlocks {
      * <p>Both in one block because they are one question with two answers, and because they are not
      * independent — a thunderstorm rains. Testing {@code raining} alone is the usual mistake.</p>
      */
-    @NodeAttribute(name = "level_weather", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_level_weather", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(LevelInfoNode.class)
     public static class Weather extends InfoPropertyBlock<Level> {
         @OutputPort public boolean raining;
@@ -97,7 +97,7 @@ public final class LevelInfoBlocks {
      * wraps every 24000 ticks. {@code gameTime} is the total age of the world and never wraps — it is
      * the one to use for anything that has to keep counting.</p>
      */
-    @NodeAttribute(name = "level_time", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_level_time", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(LevelInfoNode.class)
     public static class Time extends InfoPropertyBlock<Level> {
         @OutputPort public long dayTime;
@@ -122,7 +122,7 @@ public final class LevelInfoBlocks {
     // ---- identity and shape ------------------------------------------------------------------
 
     /** Which dimension this is, as an identifier — {@code minecraft:overworld} and friends. */
-    @NodeAttribute(name = "level_dimension", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_level_dimension", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(LevelInfoNode.class)
     public static class Dimension extends InfoPropertyBlock<Level> {
         @OutputPort public ResourceLocation value;
@@ -144,7 +144,7 @@ public final class LevelInfoBlocks {
      * <p>Not constants: a datapack can move them, and the Nether and End already differ from the
      * Overworld. A graph that iterates a column should read them rather than assume −64 to 320.</p>
      */
-    @NodeAttribute(name = "level_bounds", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_level_bounds", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(LevelInfoNode.class)
     public static class Bounds extends InfoPropertyBlock<Level> {
         @OutputPort public int minBuildHeight;
@@ -165,7 +165,7 @@ public final class LevelInfoBlocks {
     }
 
     /** The world's difficulty, as its lower-case name — {@code peaceful} to {@code hard}. */
-    @NodeAttribute(name = "level_difficulty", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_level_difficulty", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(LevelInfoNode.class)
     public static class Difficulty extends InfoPropertyBlock<Level> {
         @OutputPort public String value;
@@ -191,7 +191,7 @@ public final class LevelInfoBlocks {
      * approximation — entity lists are incomplete and block entities may be stubs — so writing game
      * state from one is how desyncs are made.</p>
      */
-    @NodeAttribute(name = "level_is_client", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_level_is_client", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(LevelInfoNode.class)
     public static class IsClient extends InfoPropertyBlock<Level> {
         @OutputPort public boolean value;

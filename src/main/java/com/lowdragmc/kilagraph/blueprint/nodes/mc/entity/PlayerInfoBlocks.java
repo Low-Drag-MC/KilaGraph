@@ -42,7 +42,7 @@ public final class PlayerInfoBlocks {
      * the bar does, which is why a player who just ate looks unchanged for a while. {@code exhaustion}
      * is the counter that consumes saturation as the player acts.</p>
      */
-    @NodeAttribute(name = "player_food", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_player_food", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(PlayerInfoNode.class)
     public static class Food extends PlayerBlock {
         @OutputPort public int food;
@@ -65,7 +65,7 @@ public final class PlayerInfoBlocks {
      * 1; {@code total} is the lifetime points, which is what the score screen shows and is not the sum of
      * the other two.</p>
      */
-    @NodeAttribute(name = "player_experience", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_player_experience", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(PlayerInfoNode.class)
     public static class Experience extends PlayerBlock {
         @OutputPort public int level;
@@ -81,7 +81,7 @@ public final class PlayerInfoBlocks {
     }
 
     /** What the player is holding, in each hand. */
-    @NodeAttribute(name = "player_held_items", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_player_held_items", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(PlayerInfoNode.class)
     public static class HeldItems extends PlayerBlock {
         @OutputPort public ItemStack mainHand = ItemStack.EMPTY;
@@ -101,7 +101,7 @@ public final class PlayerInfoBlocks {
      * always "may this player be affected by what I am about to do", and creative and spectator are the
      * two answers that change it. Adventure reads as none of the three.</p>
      */
-    @NodeAttribute(name = "player_game_mode", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_player_game_mode", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(PlayerInfoNode.class)
     public static class GameMode extends PlayerBlock {
         @OutputPort public boolean creative;
@@ -117,7 +117,7 @@ public final class PlayerInfoBlocks {
     }
 
     /** Whether the player is asleep, and whether they are crouching. */
-    @NodeAttribute(name = "player_posture", group = GROUP, graphTypes = BlueprintGraph.class)
+    @NodeAttribute(name = "mc_player_posture", group = GROUP, graphTypes = BlueprintGraph.class)
     @UseWithContext(PlayerInfoNode.class)
     public static class Posture extends PlayerBlock {
         @OutputPort public boolean sleeping;

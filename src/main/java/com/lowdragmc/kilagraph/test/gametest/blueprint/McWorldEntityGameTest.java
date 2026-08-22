@@ -146,31 +146,14 @@ public final class McWorldEntityGameTest {
         assertTrue(helper, "but not as a cow", wrongType.eval("out", List.class).isEmpty());
 
         // --- its own data ---
-        var pos = probe(level, EntityDataNodes.Position.class, "entity", pig);
-        Object v = pos.eval("out", Object.class);
-        float[] c = com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes.components(v);
-        assertEq(helper, "position x matches the entity", (float) pig.getX(), c[0], EPS);
-        assertEq(helper, "position y matches the entity", (float) pig.getY(), c[1], EPS);
-
-        assertEq(helper, "block pos", pig.blockPosition(),
-                probe(level, EntityDataNodes.EntityBlockPos.class, "entity", pig)
-                        .eval("out", BlockPos.class));
-
-        assertEq(helper, "bounding box", pig.getBoundingBox(),
-                probe(level, EntityDataNodes.BoundingBox.class, "entity", pig).eval("out", AABB.class));
-
+        // Position, block position and hitbox are property blocks now, asserted in McInfoBlockGameTest;
+        // what is left here is the queries that take a second argument, which no block can express.
         assertTrue(helper, "is a pig",
                 probe(level, EntityDataNodes.IsType.class, "entity", pig, "type", EntityType.PIG)
                         .eval("out", Boolean.class));
         assertFalse(helper, "is not a cow",
                 probe(level, EntityDataNodes.IsType.class, "entity", pig, "type", EntityType.COW)
                         .eval("out", Boolean.class));
-
-        // a look direction is a unit vector
-        float[] look = com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes.components(
-                probe(level, EntityDataNodes.LookDirection.class, "entity", pig).eval("out", Object.class));
-        float len = (float) Math.sqrt(look[0] * look[0] + look[1] * look[1] + look[2] * look[2]);
-        assertEq(helper, "look direction is a unit vector", 1f, len, 1e-2f);
 
         // a pig holds nothing, and asking is not an error
         assertTrue(helper, "a pig's main hand is empty",

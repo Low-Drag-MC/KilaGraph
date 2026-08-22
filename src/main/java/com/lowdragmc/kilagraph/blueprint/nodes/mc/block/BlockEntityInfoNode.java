@@ -14,11 +14,11 @@ import net.minecraft.world.level.block.entity.BlockEntity;
  * subclasses that no shared block could reach. Those go through {@code mc_nbt_block_entity} and the NBT
  * nodes.
  */
-@NodeAttribute(name = "info_block_entity", group = "mc_block", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_block_entity_info", group = "mc_block", graphTypes = BlueprintGraph.class)
 public class BlockEntityInfoNode extends InfoContextNode<BlockEntity> {
     @Override
     protected Component getNodeTooltip() {
-        return Component.translatable("kg.node.info_block_entity.tooltip");
+        return Component.translatable("kg.node.mc_block_entity_info.tooltip");
     }
 
     @Override

@@ -16,11 +16,11 @@ import net.minecraft.world.entity.player.Player;
  *
  * <p>{@code mc_entity_as_player} is how an {@code Entity} becomes a {@code Player} to feed this.
  */
-@NodeAttribute(name = "info_player", group = "mc_entity", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_player_info", group = "mc_entity", graphTypes = BlueprintGraph.class)
 public class PlayerInfoNode extends InfoContextNode<Player> {
     @Override
     protected Component getNodeTooltip() {
-        return Component.translatable("kg.node.info_player.tooltip");
+        return Component.translatable("kg.node.mc_player_info.tooltip");
     }
 
     @Override

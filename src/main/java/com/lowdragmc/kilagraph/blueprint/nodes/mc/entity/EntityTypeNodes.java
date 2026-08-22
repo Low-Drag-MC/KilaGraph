@@ -12,16 +12,13 @@ import net.minecraft.world.entity.EntityType;
 /**
  * What an entity <em>type</em> is, as opposed to what a live entity is doing.
  *
- * <p>The distinction is the point. {@code info_entity} stays a reflective context because a live
- * {@code Entity} has 200 readable members and a genuine long tail — every subclass adds more, and no
- * hand-written node set could keep up. An {@code EntityType} is the opposite: a registry singleton with
- * a handful of static facts, most of its reflective surface being spawning internals
- * ({@code clientTrackingRange}, {@code updateInterval}, {@code trackDeltas}, {@code canSerialize},
- * {@code baseClass}) that mean nothing inside a blueprint.
+ * <p>The distinction is the point. A live {@code Entity} has a large, constantly changing state that
+ * every subclass adds to, which is why it gets a context with a stack of property blocks. An
+ * {@code EntityType} is the opposite: a registry singleton with a handful of static facts that never
+ * change, so a single node with five outputs says everything worth saying about one.
  *
- * <p>So the type's facts are a node and the entity's state is a context. Getting from one to the other
- * is {@code mc_entity_is_type} in the testing direction and {@code info_entity}'s {@code type} property
- * in the reading direction.
+ * <p>Getting from one to the other is {@code mc_entity_is_type} in the testing direction and
+ * {@code mc_entity_type} — a block inside the entity context — in the reading direction.
  */
 public final class EntityTypeNodes {
 

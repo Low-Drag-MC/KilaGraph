@@ -4,6 +4,7 @@ import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.AabbNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosNodes;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosOffsetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.ChunkPosNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.DirectionNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
@@ -255,5 +256,39 @@ public final class McGeometryGameTest {
         for (int i = 0; i < expected.length; i++) {
             assertEq(helper, label + " component " + i, expected[i], got[i], EPS);
         }
+    }
+
+    /**
+     * The three direction nodes that had no coverage: opposite, axis, and offset.
+     *
+     * <p>All three are exhaustive over the six directions rather than spot-checked, because they are
+     * total functions on a six-element enum — checking every case costs the same as checking one and
+     * cannot miss the case someone forgot.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void directionOppositeAxisAndOffset(GameTestHelper helper) {
+        for (Direction d : Direction.values()) {
+            assertEq(helper, d + " opposite",
+                    d.getOpposite(),
+                    eval(node(DirectionNodes.Opposite.class, "in", d), "out", Direction.class));
+            assertEq(helper, d + " axis",
+                    d.getAxis(),
+                    eval(node(DirectionNodes.Axis.class, "in", d), "out", Direction.Axis.class));
+            // Offsetting by a direction lands exactly one block that way.
+            assertEq(helper, d + " offset",
+                    BlockPos.ZERO.relative(d),
+                    eval(node(BlockPosOffsetNode.class, "pos", BlockPos.ZERO, "direction", d, "amount", 1),
+                            "out", BlockPos.class));
+        }
+        // Opposite is an involution, and offsetting by a distance scales.
+        assertEq(helper, "opposite of opposite is identity", Direction.NORTH,
+                eval(node(DirectionNodes.Opposite.class, "in",
+                        eval(node(DirectionNodes.Opposite.class, "in", Direction.NORTH), "out", Direction.class)),
+                        "out", Direction.class));
+        assertEq(helper, "offset by three", new BlockPos(0, 3, 0),
+                eval(node(BlockPosOffsetNode.class, "pos", BlockPos.ZERO,
+                        "direction", Direction.UP, "amount", 3), "out", BlockPos.class));
+        helper.succeed();
     }
 }

@@ -20,6 +20,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
+import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertTrue;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.newGraph;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputConstant;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
@@ -185,5 +186,75 @@ public final class ConvertNodeGameTest {
         assertEq(helper, "fixed 4dp", "1.0000",
                 new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), String.class));
         helper.succeed();
+    }
+
+    /**
+     * Cast: the promise that a loosely-typed value really is a given type.
+     *
+     * <p>Cast does not convert — it re-labels, so the output port carries the promised type and the wire
+     * rules downstream accept it. What it actually does at runtime is the same liberal coercion
+     * {@code getInput} applies, which is why a number promised as text arrives as text and a value that
+     * cannot be represented arrives as nothing rather than as an exception.
+     *
+     * <p>It is <b>strict</b>: a promise that cannot be honoured throws rather than yielding nothing. That
+     * is the right call for this node specifically — everything downstream trusts the output's declared
+     * type, so a silent null would push the failure somewhere it cannot be diagnosed. A null <em>input</em>
+     * is different and passes through, because "no value yet" is not a broken promise.
+     *
+     * <h2>The value has to be wired, not typed in</h2>
+     * Cast's input is {@code UNKNOWN}, and LDLib2 deliberately gives an {@code UNKNOWN} port no embedded
+     * constant — there is no editor for a value whose type is not yet decided. So the test feeds it from
+     * a real producer, which is also the only way a graph can use it.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void castRelabelsAndCoerces(GameTestHelper helper) {
+        // An int, produced by unpacking a block position.
+        assertEq(helper, "int stays an int", 7, castInt(TypeHandles.INT, Integer.class).intValue());
+        assertEq(helper, "int promised as float", 7f,
+                castInt(TypeHandles.FLOAT, Float.class).floatValue(), 1e-6f);
+        assertEq(helper, "int promised as text", "7", castInt(TypeHandles.STRING, String.class));
+
+        assertEq(helper, "text cast to text is itself", "not_a_number",
+                castText(TypeHandles.STRING, String.class));
+
+        // A promise that cannot be honoured throws, and the message names both types.
+        boolean threw = false;
+        try {
+            castText(TypeHandles.INT, Integer.class);
+        } catch (com.lowdragmc.kilagraph.graph.exec.TypeMismatchException expected) {
+            threw = true;
+        }
+        assertTrue(helper, "non-numeric text promised as int throws", threw);
+        helper.succeed();
+    }
+
+    /** Casts the int 7, sourced from a Block Pos Unpack so the value arrives over a wire. */
+    private static <T> T castInt(com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle target,
+                                 Class<T> type) {
+        var g = newGraph();
+        var src = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosNodes.Unpack.class);
+        setInputConstant(src, "in", new net.minecraft.core.BlockPos(7, 0, 0));
+        return runCast(g, src.getOutputsById().get("x"), target, type);
+    }
+
+    /** Casts the text "not_a_number", sourced from an Identifier Unpack. */
+    private static <T> T castText(com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle target,
+                                  Class<T> type) {
+        var g = newGraph();
+        var src = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.mc.id.McIdNodes.Unpack.class);
+        setInputConstant(src, "in",
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("minecraft", "not_a_number"));
+        return runCast(g, src.getOutputsById().get("path"), target, type);
+    }
+
+    private static <T> T runCast(com.lowdragmc.kilagraph.blueprint.BlueprintGraph g,
+                                 com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel source,
+                                 com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle target,
+                                 Class<T> type) {
+        var n = addNode(g, com.lowdragmc.kilagraph.blueprint.nodes.convert.CastNode.class);
+        setOption(n, "targetType", target.getIdentification());
+        wire(g, n.getInputsById().get("in"), source);
+        return new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), type);
     }
 }

@@ -69,6 +69,8 @@ public class BlueprintGraph extends Graph {
         types.add(KGTypeHandles.ENTITY);
         types.add(KGTypeHandles.PLAYER);
         types.add(KGTypeHandles.BLOCK_ENTITY);
+        types.add(KGTypeHandles.CONTAINER);
+        types.add(KGTypeHandles.FLUID_CONTAINER);
         types.add(KGTypeHandles.NBT_COMPOUND);
         types.add(KGTypeHandles.RESOURCE_LOCATION);
         types.add(KGTypeHandles.AABB);

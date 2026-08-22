@@ -118,8 +118,12 @@ public final class McInfoBlockGameTest {
                 probe.read(EntityInfoBlocks.Position.class, "value", Object.class));
         assertVector(helper, "eyePosition", pig.getEyePosition(),
                 probe.read(EntityInfoBlocks.EyePosition.class, "value", Object.class));
-        assertVector(helper, "lookAngle", pig.getLookAngle(),
-                probe.read(EntityInfoBlocks.LookDirection.class, "value", Object.class));
+        Object look = probe.read(EntityInfoBlocks.LookDirection.class, "value", Object.class);
+        assertVector(helper, "lookAngle", pig.getLookAngle(), look);
+        // And it really is normalised, which is what makes it safe to scale by a reach distance.
+        float[] l = VectorNodes.components(look);
+        assertEq(helper, "look direction is a unit vector", 1f,
+                (float) Math.sqrt(l[0] * l[0] + l[1] * l[1] + l[2] * l[2]), 1e-2f);
         assertVector(helper, "velocity", pig.getDeltaMovement(),
                 probe.read(EntityInfoBlocks.Velocity.class, "value", Object.class));
 

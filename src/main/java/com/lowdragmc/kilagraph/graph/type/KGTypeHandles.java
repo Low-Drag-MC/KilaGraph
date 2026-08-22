@@ -70,6 +70,25 @@ public final class KGTypeHandles {
     public static final TypeHandle PLAYER;
     public static final TypeHandle BLOCK_ENTITY;
     /**
+     * An item inventory, as NeoForge's {@code IItemHandler}.
+     *
+     * <p>The capability interface rather than vanilla's {@code Container} on purpose: it is the one
+     * abstraction that covers a chest, a furnace's three slots, a player's inventory, an entity's
+     * inventory and any modded machine alike, and it is what hoppers and pipes already speak. A node
+     * set built on {@code Container} would work on vanilla blocks and silently fail on every modded
+     * one, which is the opposite of what a scripting layer wants.
+     *
+     * <p>Wire-only, like the other live-object handles — an inventory is resolved from the world by
+     * {@code mc_block_container} / {@code mc_entity_container}, never authored as a literal.</p>
+     */
+    public static final TypeHandle CONTAINER;
+    /**
+     * A fluid tank, as NeoForge's {@code IFluidHandler} — the same idea as {@link #CONTAINER} for the
+     * other thing blocks store. Vanilla has no fluid-storage abstraction at all, so this one is entirely
+     * NeoForge's, which is also why every tank in the game that a graph might care about speaks it.
+     */
+    public static final TypeHandle FLUID_CONTAINER;
+    /**
      * NBT compound tag. LDLib2 has a {@code Tag} accessor and a {@code TagAccessor} widget, so unlike
      * LEVEL/ENTITY this one is a real editable value — it just needed a default before the editor
      * could build a constant for it.
@@ -146,6 +165,10 @@ public final class KGTypeHandles {
         ENTITY = TypeHandleHelpers.fromType(Entity.class, "Entity");
         PLAYER = TypeHandleHelpers.fromType(Player.class, "Player");
         BLOCK_ENTITY = TypeHandleHelpers.fromType(BlockEntity.class, "BlockEntity");
+        CONTAINER = TypeHandleHelpers.fromType(
+                net.neoforged.neoforge.items.IItemHandler.class, "Container");
+        FLUID_CONTAINER = TypeHandleHelpers.fromType(
+                net.neoforged.neoforge.fluids.capability.IFluidHandler.class, "FluidContainer");
         NBT_COMPOUND = TypeHandleHelpers.fromType(CompoundTag.class, "CompoundTag");
         // Without this the NBT editor cannot open: Constant.init seeds the value from
         // getDefaultValue(), and TagAccessor has nothing to edit when that is null.
