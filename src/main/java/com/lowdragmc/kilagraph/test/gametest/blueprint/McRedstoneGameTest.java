@@ -216,6 +216,25 @@ public final class McRedstoneGameTest {
                 probe(level, EnchantmentNodes.Add.class, "stack", sword,
                         "enchantment", ResourceLocation.parse("kilagraph:nope"))
                         .eval("ok", Boolean.class));
+
+        // ---- and back off again ----
+        var remove = probe(level, EnchantmentNodes.Remove.class,
+                "stack", enchanted, "enchantment", sharpness);
+        assertTrue(helper, "removing reported success", remove.eval("ok", Boolean.class));
+        ItemStack plain = remove.eval("out", ItemStack.class);
+        assertFalse(helper, "the copy is no longer enchanted", plain.isEnchanted());
+        assertTrue(helper, "and the input still is", enchanted.isEnchanted());
+        assertEq(helper, "with nothing left to list", 0,
+                probe(level, EnchantmentNodes.All.class, "stack", plain)
+                        .eval("count", Integer.class).intValue());
+
+        assertFalse(helper, "removing what was not there changes nothing",
+                probe(level, EnchantmentNodes.Remove.class, "stack", plain, "enchantment", sharpness)
+                        .eval("ok", Boolean.class));
+        assertFalse(helper, "and an unknown id is refused",
+                probe(level, EnchantmentNodes.Remove.class, "stack", enchanted,
+                        "enchantment", ResourceLocation.parse("kilagraph:nope"))
+                        .eval("ok", Boolean.class));
         helper.succeed();
     }
 

@@ -162,6 +162,53 @@ public final class EnchantmentNodes {
     }
 
     /**
+     * A copy of the stack with one enchantment taken off.
+     *
+     * <p>The other half of {@code mc_add_enchantment}, which had no counterpart: a graph could enchant a
+     * tool and never un-enchant it. A data node like its opposite — it returns a new stack and changes
+     * nothing.
+     *
+     * <p>{@code ok} reports what changed, not what was attempted: removing an enchantment the item did not
+     * have is false, and so is an unknown id, because neither altered the stack. That distinction is what a
+     * graph checking "was it enchanted" reads.
+     *
+     * <p>Removing the last enchantment leaves a plain item, not an item with an empty enchantment list —
+     * the game drops the component when nothing is left, so the result compares equal to a never-enchanted
+     * stack.</p>
+     */
+    @NodeAttribute(name = "mc_remove_enchantment", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class Remove extends AnnotatedNode {
+        @Override
+        protected Component getNodeTooltip() {
+            return Component.translatable("kg.node.mc_remove_enchantment.tooltip");
+        }
+
+        @InputPort public ItemStack stack = ItemStack.EMPTY;
+        @InputPort public ResourceLocation enchantment;
+        @InputPort public Level level;
+        @OutputPort public ItemStack out = ItemStack.EMPTY;
+        @OutputPort public boolean ok;
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            ItemStack s = ctx.getInput("stack", ItemStack.class, ItemStack.EMPTY);
+            Holder<Enchantment> holder = resolve(ctx);
+            if (s == null || s.isEmpty() || holder == null
+                    || EnchantmentHelper.getItemEnchantmentLevel(holder, s) <= 0) {
+                ctx.setOutput("out", s == null ? ItemStack.EMPTY : s);
+                ctx.setOutput("ok", false);
+                return;
+            }
+            // Copy first: updateEnchantments writes to the stack it is given, and the input may already
+            // have been read by another branch of this run.
+            ItemStack copy = s.copy();
+            EnchantmentHelper.updateEnchantments(copy, mutable -> mutable.removeIf(holder::is));
+            ctx.setOutput("out", copy);
+            ctx.setOutput("ok", true);
+        }
+    }
+
+    /**
      * The registry holder for the enchantment id on the {@code enchantment} port, or null.
      *
      * <p>Goes through the world's registry access because enchantments are a datapack registry — see the

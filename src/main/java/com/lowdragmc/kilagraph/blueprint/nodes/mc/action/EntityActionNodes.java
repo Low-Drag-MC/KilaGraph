@@ -287,6 +287,79 @@ public final class EntityActionNodes {
     }
 
     /**
+     * Takes one status effect away.
+     *
+     * <p>{@code ok = false} when the entity did not have the effect, so this reports what it changed
+     * rather than what it attempted — a graph that clears a buff before reapplying it can tell whether the
+     * buff was there. An unknown effect id reads the same way, since neither case changed anything.</p>
+     */
+    @NodeAttribute(name = "mc_remove_effect", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class RemoveEffect extends AnnotatedNode {
+        @Override
+        protected Component getNodeTooltip() {
+            return Component.translatable("kg.node.mc_remove_effect.tooltip");
+        }
+
+        @ExecInputPort public ExecutionFlow trigger;
+        @ExecOutputPort public ExecutionFlow next;
+
+        @InputPort public Entity entity;
+        @InputPort public ResourceLocation effect;
+        @OutputPort public boolean ok;
+
+        @Override
+        public void execute(ExecContext ctx) {
+            Entity e = ctx.getInput("entity", Entity.class, null);
+            ResourceLocation id = ctx.getInput("effect", ResourceLocation.class, null);
+            if (!(e instanceof LivingEntity living) || e.level().isClientSide || id == null) {
+                McActions.done(ctx, false);
+                return;
+            }
+            var holder = BuiltInRegistries.MOB_EFFECT.getHolder(
+                    ResourceKey.create(Registries.MOB_EFFECT, id)).orElse(null);
+            McActions.done(ctx, holder != null && living.removeEffect(holder));
+        }
+    }
+
+    /**
+     * Takes every status effect away, good and bad alike.
+     *
+     * <p>{@code removed} is counted before the call because the game only answers yes/no, and "how many
+     * buffs did I just wipe" is the question a graph doing this actually has.
+     *
+     * <p>This is milk-bucket behaviour, not a cure: nothing is filtered by whether it is beneficial, so a
+     * graph that means "remove the debuffs" wants {@code mc_remove_effect} in a loop instead.</p>
+     */
+    @NodeAttribute(name = "mc_clear_effects", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class ClearEffects extends AnnotatedNode {
+        @Override
+        protected Component getNodeTooltip() {
+            return Component.translatable("kg.node.mc_clear_effects.tooltip");
+        }
+
+        @ExecInputPort public ExecutionFlow trigger;
+        @ExecOutputPort public ExecutionFlow next;
+
+        @InputPort public Entity entity;
+        @OutputPort public int removed;
+        @OutputPort public boolean ok;
+
+        @Override
+        public void execute(ExecContext ctx) {
+            Entity e = ctx.getInput("entity", Entity.class, null);
+            if (!(e instanceof LivingEntity living) || e.level().isClientSide) {
+                ctx.setOutput("removed", 0);
+                McActions.done(ctx, false);
+                return;
+            }
+            int had = living.getActiveEffects().size();
+            boolean changed = living.removeAllEffects();
+            ctx.setOutput("removed", changed ? had : 0);
+            McActions.done(ctx, changed);
+        }
+    }
+
+    /**
      * Puts an item into a player's inventory.
      *
      * <p>{@code ok} is false when the inventory had no room, and {@code remainder} is what would not fit —

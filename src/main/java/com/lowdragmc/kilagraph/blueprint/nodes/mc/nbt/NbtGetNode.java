@@ -41,7 +41,7 @@ public class NbtGetNode extends AnnotatedNode {
         String k = ctx.getInput("key", String.class, "");
         NbtValueType vt = ctx.getOption("valueType", NbtValueType.class, NbtValueType.STRING);
         if (t == null || k.isEmpty() || !t.contains(k)) {
-            ctx.setOutput("out", defaultFor(vt));
+            ctx.setOutput("out", vt.defaultValue());
             return;
         }
         Object v = switch (vt) {
@@ -56,20 +56,8 @@ public class NbtGetNode extends AnnotatedNode {
         ctx.setOutput("out", v);
     }
 
-    private static Object defaultFor(NbtValueType vt) {
-        return switch (vt) {
-            case INT -> 0;
-            case LONG -> 0L;
-            case FLOAT -> 0f;
-            case DOUBLE -> 0d;
-            case BOOL -> false;
-            case COMPOUND -> new CompoundTag();
-            default -> "";
-        };
-    }
-
     @Override
     public List<String> optionChoices(String optionId) {
-        return "valueType".equals(optionId) ? List.of("STRING", "INT", "LONG", "FLOAT", "DOUBLE", "BOOL", "COMPOUND") : List.of();
+        return "valueType".equals(optionId) ? NbtValueType.CHOICES : List.of();
     }
 }

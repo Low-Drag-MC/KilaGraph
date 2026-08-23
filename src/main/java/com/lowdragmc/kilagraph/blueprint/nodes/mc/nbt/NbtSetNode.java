@@ -62,6 +62,6 @@ public class NbtSetNode extends AnnotatedNode {
 
     @Override
     public List<String> optionChoices(String optionId) {
-        return "valueType".equals(optionId) ? List.of("STRING", "INT", "LONG", "FLOAT", "DOUBLE", "BOOL", "COMPOUND") : List.of();
+        return "valueType".equals(optionId) ? NbtValueType.CHOICES : List.of();
     }
 }

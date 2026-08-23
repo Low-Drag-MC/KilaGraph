@@ -18,6 +18,12 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.trading.Merchant;
+import net.minecraft.world.item.trading.MerchantOffer;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Entity queries that take an argument, and so cannot be a property block.
@@ -152,6 +158,100 @@ public final class EntityDataNodes {
                     : null;
             ctx.setOutput("value", instance == null ? 0d : instance.getValue());
             ctx.setOutput("found", instance != null);
+        }
+    }
+
+    // ---- tags and trades ---------------------------------------------------------------------
+
+    /**
+     * The scoreboard tags on an entity — the ones {@code /tag} adds.
+     *
+     * <p>The read half of a pair that was previously half-open: the game has {@code /tag add} and
+     * {@code /tag list}, but the second answers in chat, so a graph could write tags and never see them.
+     * These are the closest thing an entity has to a free-form flag, which makes them how a blueprint marks
+     * an entity as its own.
+     *
+     * <p>Nothing to do with the entity-type tags {@code mc_entity_type_in_tag} asks about: those are
+     * datapack groupings of kinds of entity, these are labels on one individual.
+     *
+     * <p>Sorted, because the game keeps them in a hash set and a graph that reads {@code out[0]} would
+     * otherwise get a different one on a different launch.</p>
+     */
+    @NodeAttribute(name = "mc_entity_tags", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class Tags extends AnnotatedNode {
+        @Override
+        protected Component getNodeTooltip() {
+            return Component.translatable("kg.node.mc_entity_tags.tooltip");
+        }
+
+        @InputPort public Entity entity;
+        @OutputPort public List<?> out;
+        @OutputPort public int count;
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            Entity e = entity(ctx);
+            List<String> tags = e == null ? new ArrayList<>() : new ArrayList<>(e.getTags());
+            tags.sort(Comparator.naturalOrder());
+            ctx.setOutput("out", tags);
+            ctx.setOutput("count", tags.size());
+        }
+    }
+
+    /**
+     * What a villager or wandering trader is offering.
+     *
+     * <p>No command reads trades. {@code /data get entity} produces the raw {@code Offers} NBT, which a
+     * graph would then have to walk item by item; this hands back the stacks.
+     *
+     * <p>Four parallel lists, same shape as {@code mc_enchantments}: {@code costA} and {@code costB} are
+     * what the trade takes — {@code costB} is empty for a one-item trade — {@code result} is what it gives,
+     * and {@code outOfStock} says whether it can still be used today.
+     *
+     * <p>{@code costA} is the current price, not the listed one, so it already includes demand, the
+     * Hero of the Village discount and any reputation adjustment — the number a player would actually pay
+     * right now rather than the number the trade was created with.
+     *
+     * <p>Reading a villager's offers is what makes it generate them if it has not yet, so this is not
+     * quite free the first time and does change the entity. That is the game's own design, not a choice
+     * made here.</p>
+     */
+    @NodeAttribute(name = "mc_villager_trades", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class Trades extends AnnotatedNode {
+        @Override
+        protected Component getNodeTooltip() {
+            return Component.translatable("kg.node.mc_villager_trades.tooltip");
+        }
+
+        @InputPort public Entity entity;
+        @OutputPort public List<?> costA;
+        @OutputPort public List<?> costB;
+        @OutputPort public List<?> result;
+        @OutputPort public List<?> outOfStock;
+        @OutputPort public int count;
+        @OutputPort public boolean found;
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            List<ItemStack> costA = new ArrayList<>();
+            List<ItemStack> costB = new ArrayList<>();
+            List<ItemStack> result = new ArrayList<>();
+            List<Boolean> outOfStock = new ArrayList<>();
+            Merchant merchant = entity(ctx) instanceof Merchant m ? m : null;
+            if (merchant != null) {
+                for (MerchantOffer offer : merchant.getOffers()) {
+                    costA.add(offer.getCostA());
+                    costB.add(offer.getCostB());
+                    result.add(offer.getResult());
+                    outOfStock.add(offer.isOutOfStock());
+                }
+            }
+            ctx.setOutput("costA", costA);
+            ctx.setOutput("costB", costB);
+            ctx.setOutput("result", result);
+            ctx.setOutput("outOfStock", outOfStock);
+            ctx.setOutput("count", result.size());
+            ctx.setOutput("found", merchant != null);
         }
     }
 

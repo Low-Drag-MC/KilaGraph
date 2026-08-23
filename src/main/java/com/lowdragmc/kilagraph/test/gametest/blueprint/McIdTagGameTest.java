@@ -4,6 +4,7 @@ import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.id.McIdNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.tag.McTagNodes;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.tag.TagContentsNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
@@ -12,6 +13,7 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -133,6 +135,60 @@ public final class McIdTagGameTest {
         var missing = node(McTagNodes.BlockInTag.class, "block", Blocks.STONE,
                 "tag", id("kilagraph:no_such_tag"));
         assertFalse(helper, "an unknown tag is false", eval(missing, "out", Boolean.class));
+        helper.succeed();
+    }
+
+    /**
+     * Tag contents, cross-checked against tag membership.
+     *
+     * <p>The load-bearing assertion is the loop: every item the contents node lists is fed back through
+     * {@code mc_item_in_tag}. A hard-coded or stale list would pass a "contains oak planks" check and fail
+     * this one, and the two nodes reach the tag by different routes — one through the registry's tag map,
+     * one through the holder's own bindings — so agreement between them is worth something.
+     *
+     * <p>These tags are also datapack-loaded rather than hard-coded, so a non-empty result is what proves
+     * the no-world lookup in {@code TagContentsNodes} actually sees a loaded server's tags.</p>
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void tagContentsAreListedPerRegistry(GameTestHelper helper) {
+        var planks = node(TagContentsNodes.ItemsInTag.class, "tag", id("minecraft:planks"));
+        assertTrue(helper, "the planks tag exists", eval(planks, "found", Boolean.class));
+        List<?> items = eval(planks, "out", List.class);
+        assertTrue(helper, "and holds several items, got " + items.size(), items.size() > 1);
+        assertEq(helper, "count matches the list", items.size(), eval(planks, "count", Integer.class).intValue());
+        assertTrue(helper, "oak planks are among them", items.contains(Items.OAK_PLANKS));
+        assertFalse(helper, "stone is not", items.contains(Items.STONE));
+        for (Object item : items) {
+            var member = node(McTagNodes.ItemStackInTag.class, "stack", new ItemStack((Item) item),
+                    "tag", id("minecraft:planks"));
+            assertTrue(helper, item + " is listed but not a member", eval(member, "out", Boolean.class));
+        }
+
+        var blocks = node(TagContentsNodes.BlocksInTag.class, "tag", id("minecraft:planks"));
+        assertTrue(helper, "the block planks tag exists", eval(blocks, "found", Boolean.class));
+        assertTrue(helper, "and holds oak planks",
+                eval(blocks, "out", List.class).contains(Blocks.OAK_PLANKS));
+
+        var skeletons = node(TagContentsNodes.EntityTypesInTag.class, "tag", id("minecraft:skeletons"));
+        assertTrue(helper, "the skeletons tag exists", eval(skeletons, "found", Boolean.class));
+        assertTrue(helper, "and holds the skeleton",
+                eval(skeletons, "out", List.class).contains(EntityType.SKELETON));
+
+        var water = node(TagContentsNodes.FluidsInTag.class, "tag", id("minecraft:water"));
+        assertTrue(helper, "the water tag exists", eval(water, "found", Boolean.class));
+        assertTrue(helper, "and holds still water",
+                eval(water, "out", List.class).contains(Fluids.WATER));
+
+        // An unknown tag is an empty list and found = false, which is how a graph tells "nothing in it"
+        // from "no such tag" — both iterate zero times.
+        var unknown = node(TagContentsNodes.ItemsInTag.class, "tag", id("kilagraph:no_such_tag"));
+        assertFalse(helper, "an unknown tag is not found", eval(unknown, "found", Boolean.class));
+        assertEq(helper, "and lists nothing", 0, eval(unknown, "count", Integer.class).intValue());
+        assertTrue(helper, "with an empty list", eval(unknown, "out", List.class).isEmpty());
+
+        var noId = node(TagContentsNodes.ItemsInTag.class);
+        assertFalse(helper, "no tag id at all is not found", eval(noId, "found", Boolean.class));
         helper.succeed();
     }
 

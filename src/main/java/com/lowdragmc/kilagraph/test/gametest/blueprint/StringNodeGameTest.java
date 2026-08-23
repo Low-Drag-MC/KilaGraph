@@ -2,23 +2,29 @@ package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
 import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.CaseNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.ConcatNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.ContainsNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.EndsWithNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.string.FindNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.FormatNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.IndexOfNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.JoinNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.LengthNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.string.MatchesNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.ReplaceNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.string.ReplaceRegexNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.SplitNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.StartsWithNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.SubstringNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.TrimNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import java.util.List;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -306,5 +312,128 @@ public final class StringNodeGameTest {
         assertEq(helper, "ends World", Boolean.TRUE,
                 new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Boolean.class));
         helper.succeed();
+    }
+
+    // ---- regex ---------------------------------------------------------------------------------
+
+    /**
+     * {@code string_matches} is whole-string, which is the thing about it people get wrong.
+     *
+     * <p>The {@code x42} pair is the whole point of the test: if this node ever became "contains a match"
+     * both halves would still look reasonable in isolation, and only the pair pins the rule.</p>
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void regexMatchesWholeString(GameTestHelper helper) {
+        var digits = node(MatchesNode.class, "in", "42", "pattern", "\\d+");
+        assertEq(helper, "42 is all digits", Boolean.TRUE, eval(digits, "out", Boolean.class));
+        assertEq(helper, "and the pattern was valid", Boolean.TRUE, eval(digits, "ok", Boolean.class));
+
+        var partial = node(MatchesNode.class, "in", "x42", "pattern", "\\d+");
+        assertEq(helper, "x42 is not ALL digits", Boolean.FALSE, eval(partial, "out", Boolean.class));
+
+        var anchored = node(MatchesNode.class, "in", "x42", "pattern", ".*\\d+");
+        assertEq(helper, "but it does end in digits", Boolean.TRUE, eval(anchored, "out", Boolean.class));
+
+        // A pattern is user input, so a syntax error is a false answer with ok = false, not a crash.
+        var broken = node(MatchesNode.class, "in", "42", "pattern", "[");
+        assertEq(helper, "a broken pattern does not match", Boolean.FALSE, eval(broken, "out", Boolean.class));
+        assertEq(helper, "and says the pattern was bad", Boolean.FALSE, eval(broken, "ok", Boolean.class));
+        helper.succeed();
+    }
+
+    /**
+     * {@code string_find} against the text a command actually produces.
+     *
+     * <p>The input is the shape of {@code /list} output on purpose — turning that line back into two
+     * numbers is the reason these nodes exist, and a test on {@code "abc"} would not show it.</p>
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void regexFindsAndCaptures(GameTestHelper helper) {
+        String line = "There are 3 of a max of 20 players online";
+        var hit = node(FindNode.class, "in", line, "pattern", "(\\d+) of a max of (\\d+)");
+        assertEq(helper, "found the phrase", Boolean.TRUE, eval(hit, "found", Boolean.class));
+        assertEq(helper, "matched text", "3 of a max of 20", eval(hit, "match", String.class));
+        assertEq(helper, "captured both numbers", List.of("3", "20"), eval(hit, "groups", List.class));
+
+        int start = eval(hit, "start", Integer.class);
+        int end = eval(hit, "end", Integer.class);
+        assertEq(helper, "match starts where the first number is", 10, start);
+        assertEq(helper, "and the indices really cut out the match", "3 of a max of 20",
+                line.substring(start, end));
+
+        // No match: the indices are -1 rather than 0, because 0 is a real position.
+        var miss = node(FindNode.class, "in", line, "pattern", "zzz(\\d+)");
+        assertEq(helper, "no match", Boolean.FALSE, eval(miss, "found", Boolean.class));
+        assertEq(helper, "empty match text", "", eval(miss, "match", String.class));
+        assertEq(helper, "no groups", 0, eval(miss, "groups", List.class).size());
+        assertEq(helper, "start is -1, not 0", -1, eval(miss, "start", Integer.class).intValue());
+        assertEq(helper, "end is -1, not 0", -1, eval(miss, "end", Integer.class).intValue());
+        assertEq(helper, "but the pattern itself was fine", Boolean.TRUE, eval(miss, "ok", Boolean.class));
+
+        // A group that did not take part comes back as an empty string, not as a hole in the list.
+        var optional = node(FindNode.class, "in", "b", "pattern", "(a)?(b)");
+        assertEq(helper, "optional group absent", List.of("", "b"), eval(optional, "groups", List.class));
+
+        var broken = node(FindNode.class, "in", line, "pattern", "(");
+        assertEq(helper, "a broken pattern finds nothing", Boolean.FALSE, eval(broken, "found", Boolean.class));
+        assertEq(helper, "and reports itself", Boolean.FALSE, eval(broken, "ok", Boolean.class));
+        helper.succeed();
+    }
+
+    /** {@code string_replace_regex}, including the two ways the replacement text itself can be wrong. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void regexReplacesWithGroups(GameTestHelper helper) {
+        var swap = node(ReplaceRegexNode.class, "in", "x=1, y=2",
+                "pattern", "(\\w+)=(\\w+)", "replacement", "$2=$1");
+        assertEq(helper, "groups were substituted", "1=x, 2=y", eval(swap, "out", String.class));
+        assertEq(helper, "twice", 2, eval(swap, "count", Integer.class).intValue());
+        assertEq(helper, "and it worked", Boolean.TRUE, eval(swap, "ok", Boolean.class));
+
+        // Matching nothing is a success that changed nothing — count is what tells them apart.
+        var none = node(ReplaceRegexNode.class, "in", "x=1", "pattern", "zzz", "replacement", "q");
+        assertEq(helper, "unchanged", "x=1", eval(none, "out", String.class));
+        assertEq(helper, "nothing replaced", 0, eval(none, "count", Integer.class).intValue());
+        assertEq(helper, "yet the pattern was valid", Boolean.TRUE, eval(none, "ok", Boolean.class));
+
+        var badPattern = node(ReplaceRegexNode.class, "in", "x=1", "pattern", "(", "replacement", "q");
+        assertEq(helper, "a broken pattern leaves the text alone", "x=1", eval(badPattern, "out", String.class));
+        assertEq(helper, "and reports failure", Boolean.FALSE, eval(badPattern, "ok", Boolean.class));
+
+        // $9 names a group the pattern does not have: a mistake in the replacement, reported the same way.
+        var badGroup = node(ReplaceRegexNode.class, "in", "x=1",
+                "pattern", "(\\w+)=(\\w+)", "replacement", "$9");
+        assertEq(helper, "a missing group leaves the text alone", "x=1", eval(badGroup, "out", String.class));
+        assertEq(helper, "and reports failure", Boolean.FALSE, eval(badGroup, "ok", Boolean.class));
+        assertEq(helper, "having replaced nothing", 0, eval(badGroup, "count", Integer.class).intValue());
+
+        // A trailing backslash is the other malformed-replacement case, and it throws a different type.
+        var badEscape = node(ReplaceRegexNode.class, "in", "x=1", "pattern", "x", "replacement", "\\");
+        assertEq(helper, "a dangling escape is refused", "x=1", eval(badEscape, "out", String.class));
+        assertEq(helper, "and reports failure", Boolean.FALSE, eval(badEscape, "ok", Boolean.class));
+        helper.succeed();
+    }
+
+    // ---- helpers -------------------------------------------------------------------------------
+
+    /** One node in its own graph, carried with the graph so it can be evaluated. */
+    private record Probe(BlueprintGraph graph, NodeModel model) {
+    }
+
+    /** A node in its own graph with the given input constants applied, as {@code id, value} pairs. */
+    private static Probe node(Class<? extends Node> cls, Object... inputs) {
+        var g = newGraph();
+        NodeModel n = addNode(g, cls);
+        for (int i = 0; i + 1 < inputs.length; i += 2) {
+            setInputConstant(n, (String) inputs[i], inputs[i + 1]);
+        }
+        return new Probe(g, n);
+    }
+
+    private static <T> T eval(Probe probe, String output, Class<T> type) {
+        return new GraphExecutor(probe.graph())
+                .evaluate(probe.model().getOutputsById().get(output), type);
     }
 }

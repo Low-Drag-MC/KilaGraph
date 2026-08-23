@@ -108,6 +108,51 @@ public final class ItemStackNodes {
         }
     }
 
+    /**
+     * A copy of the stack with its durability set.
+     *
+     * <p>The write half of {@code mc_item_stack_damage}, and counted the same way: {@code damage} is wear,
+     * so 0 is a fresh tool and {@code maxDamage} is one about to break. A graph that thinks in remaining
+     * durability has to subtract.
+     *
+     * <p>Out of range is clamped rather than refused, which is the game's own behaviour and keeps a
+     * subtraction that went negative from failing the node.
+     *
+     * <p>An item with no durability — a diamond, a block — is {@code ok = false} and passes through
+     * unchanged. It is not that the write failed; there is nothing there to write to.</p>
+     */
+    @NodeAttribute(name = "mc_item_stack_set_damage", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class SetDamage extends AnnotatedNode {
+        @Override
+        protected Component getNodeTooltip() {
+            return Component.translatable("kg.node.mc_item_stack_set_damage.tooltip");
+        }
+
+        @InputPort public ItemStack stack = ItemStack.EMPTY;
+        @InputPort public int damage;
+        @OutputPort public ItemStack out = ItemStack.EMPTY;
+        @OutputPort public boolean broken;
+        @OutputPort public boolean ok;
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            ItemStack s = stack(ctx, "stack");
+            if (s.isEmpty() || !s.isDamageableItem()) {
+                ctx.setOutput("out", s);
+                ctx.setOutput("broken", false);
+                ctx.setOutput("ok", false);
+                return;
+            }
+            // Copy first: the input stack may already have been read by another branch of this run.
+            ItemStack copy = s.copy();
+            copy.setDamageValue(ctx.getInt("damage", 0));
+            ctx.setOutput("out", copy);
+            // At exactly maxDamage the item still exists — the game destroys it on the next use, not here.
+            ctx.setOutput("broken", copy.getDamageValue() >= copy.getMaxDamage());
+            ctx.setOutput("ok", true);
+        }
+    }
+
     /** How large a stack may get, and whether it carries an enchantment. */
     @NodeAttribute(name = "mc_item_stack_limits", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Limits extends AnnotatedNode {

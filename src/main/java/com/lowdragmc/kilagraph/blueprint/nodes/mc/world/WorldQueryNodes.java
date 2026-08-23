@@ -322,6 +322,44 @@ public final class WorldQueryNodes {
         }
     }
 
+    /**
+     * Whether a position's chunk is loaded, and whether the position exists at all.
+     *
+     * <p>Everything else in this file returns a neutral answer for an unloaded chunk — air, light zero, no
+     * entities — which is indistinguishable from a real one. This is the node that tells the difference, and
+     * a graph scanning far-off positions should check it before believing what it read.
+     *
+     * <p>Deliberately does not load the chunk. Asking a question must not change the world, and a graph
+     * sweeping a region would otherwise drag the whole thing into memory a block at a time.
+     *
+     * <p>{@code inBounds} separates the two ways this can be false. Above the build height or past the
+     * world's horizontal limit there is nothing to load and never will be, so both outputs are false and the
+     * answer is "look somewhere else". A position that is in bounds but not loaded is "try again later".
+     * There is no fourth combination: a position out of bounds is never readable.</p>
+     */
+    @NodeAttribute(name = "mc_is_chunk_loaded", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class IsChunkLoaded extends AnnotatedNode {
+        @Override
+        protected Component getNodeTooltip() {
+            return Component.translatable("kg.node.mc_is_chunk_loaded.tooltip");
+        }
+
+        @InputPort public Level level;
+        @InputPort public BlockPos pos = BlockPos.ZERO;
+        @OutputPort public boolean out;
+        @OutputPort public boolean inBounds;
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            Level l = level(ctx);
+            BlockPos p = pos(ctx);
+            // isLoaded rather than the deprecated hasChunkAt: it asks the chunk source directly and folds
+            // in the build-height check, which is the behaviour these two outputs describe.
+            ctx.setOutput("out", l != null && l.isLoaded(p));
+            ctx.setOutput("inBounds", l != null && l.isInWorldBounds(p));
+        }
+    }
+
     private static Level level(EvalContext ctx) {
         return ctx.getInput("level", Level.class, null);
     }
