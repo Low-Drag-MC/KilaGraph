@@ -191,6 +191,8 @@ public final class NodeDescriptionUI {
                 .textColor(color));
         label.setText(content);
         label.layout(layout -> layout.widthPercent(100));
+        label.moveInlineAsDefault();
+        label.addClass("__node_description_text__");
         return label;
     }
 
@@ -201,6 +203,8 @@ public final class NodeDescriptionUI {
             layout.height(1);
         });
         line.style(style -> style.backgroundTexture(new ColorRectTexture(COLOR_DIVIDER)));
+        line.moveInlineAsDefault();
+        line.addClass("__node_description_divider__");
         return line;
     }
 
