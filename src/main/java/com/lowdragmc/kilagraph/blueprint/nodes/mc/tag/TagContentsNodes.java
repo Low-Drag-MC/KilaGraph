@@ -49,7 +49,7 @@ import java.util.List;
  */
 public final class TagContentsNodes {
 
-    private static final String GROUP = "mc_tag";
+    private static final String GROUP = "mc/tag";
 
     private TagContentsNodes() {
     }

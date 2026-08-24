@@ -30,7 +30,7 @@ import java.util.List;
  */
 public final class DirectionNodes {
 
-    private static final String GROUP = "mc_geometry";
+    private static final String GROUP = "mc/geometry";
 
     private DirectionNodes() {
     }

@@ -28,6 +28,12 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.IntrinsicParityGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.KGGraphBuilderGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.KGTypeHandlesGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.LazinessGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.Ldlib2UiDeterminismGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.Ldlib2UiDocGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.Ldlib2UiElementGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.Ldlib2UiEventGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.Ldlib2UiStyleGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.Ldlib2UiSyncGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ListNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.LogicNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.MapNodeGameTest;
@@ -160,6 +166,12 @@ public final class KGGameTests {
             new Group(KGGraphBuilderGameTest::registerFunctions, KGGraphBuilderGameTest::register),
             new Group(KGTypeHandlesGameTest::registerFunctions, KGTypeHandlesGameTest::register),
             new Group(LazinessGameTest::registerFunctions, LazinessGameTest::register),
+            new Group(Ldlib2UiDeterminismGameTest::registerFunctions, Ldlib2UiDeterminismGameTest::register),
+            new Group(Ldlib2UiDocGameTest::registerFunctions, Ldlib2UiDocGameTest::register),
+            new Group(Ldlib2UiElementGameTest::registerFunctions, Ldlib2UiElementGameTest::register),
+            new Group(Ldlib2UiEventGameTest::registerFunctions, Ldlib2UiEventGameTest::register),
+            new Group(Ldlib2UiStyleGameTest::registerFunctions, Ldlib2UiStyleGameTest::register),
+            new Group(Ldlib2UiSyncGameTest::registerFunctions, Ldlib2UiSyncGameTest::register),
             new Group(McActionGameTest::registerFunctions, McActionGameTest::register),
             new Group(McContainerGameTest::registerFunctions, McContainerGameTest::register),
             new Group(McCoverageGameTest::registerFunctions, McCoverageGameTest::register),

@@ -18,7 +18,7 @@ import net.minecraft.world.item.Items;
  * {@code minecraft:planks}). Malformed tag id → false. Full {@code TagKey} typing is deferred — for
  * now the tag is a plain string id.
  */
-@NodeAttribute(name = "mc_item_in_tag", group = "mc_tag", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_item_in_tag", group = "mc/tag", graphTypes = BlueprintGraph.class)
 public class ItemInTagNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

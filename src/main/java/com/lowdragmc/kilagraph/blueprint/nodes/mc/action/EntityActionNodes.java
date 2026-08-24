@@ -35,7 +35,7 @@ import net.minecraft.server.level.ServerLevel;
  */
 public final class EntityActionNodes {
 
-    private static final String GROUP = "mc_action";
+    private static final String GROUP = "mc/action";
 
     private EntityActionNodes() {
     }

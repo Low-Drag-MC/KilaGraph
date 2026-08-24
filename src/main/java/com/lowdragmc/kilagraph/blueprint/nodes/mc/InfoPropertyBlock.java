@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
  * property affordable.
  *
  * <pre>{@code
- * @NodeAttribute(name = "mc_level_rain_level", group = "mc_world", graphTypes = BlueprintGraph.class)
+ * @NodeAttribute(name = "mc_level_rain_level", group = "mc/world", graphTypes = BlueprintGraph.class)
  * @UseWithContext(LevelInfoNode.class)
  * public static class RainLevel extends InfoPropertyBlock<Level> {
  *     @OutputPort public float value;

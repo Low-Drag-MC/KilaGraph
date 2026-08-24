@@ -28,7 +28,7 @@ import static com.lowdragmc.kilagraph.blueprint.nodes.mc.container.Containers.ha
  */
 public final class ContainerActionNodes {
 
-    private static final String GROUP = "mc_container";
+    private static final String GROUP = "mc/container";
 
     private ContainerActionNodes() {
     }

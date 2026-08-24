@@ -10,18 +10,20 @@
   "map": "映射",
   "math": "数学",
   "bitwise": "位运算",
-  "mc_entity": "MC 实体",
-  "mc_nbt": "MC NBT",
-  "mc_world": "MC 世界",
-  "mc_action": "MC 动作",
+  "mc": "MC",
+  "ui": "UI",
+  "entity": "实体",
+  "nbt": "NBT",
+  "world": "世界",
+  "action": "动作",
 
-  "mc_container": "MC 容器",
+  "container": "容器",
 
-  "mc_redstone": "MC 红石",
+  "redstone": "红石",
 
-  "mc_recipe": "MC 配方",
+  "recipe": "配方",
 
-  "mc_loot": "MC 战利品",
+  "loot": "战利品",
 
   "mc_redstone_power": "红石信号强度",
   "kg.node.mc_redstone_power.tooltip": "到达某位置的最强信号,不分方向。",
@@ -839,14 +841,14 @@
   "vector_flatten": "压平向量",
   "vector_yaw_between": "偏航角差",
 
-  "mc_id": "MC 标识符",
-  "mc_tag": "MC 标签",
-  "mc_geometry": "MC 几何",
-  "mc_block": "MC 方块",
-  "mc_item": "MC 物品",
-  "mc_fluid": "MC 流体",
-  "mc_text": "MC 文本",
-  "mc_gameplay": "MC 玩法",
+  "id": "标识符",
+  "tag": "标签",
+  "geometry": "几何",
+  "block": "方块",
+  "item": "物品",
+  "fluid": "流体",
+  "text": "文本",
+  "gameplay": "玩法",
   "mc_id_create": "构造标识符",
   "mc_id_parse": "解析标识符",
   "mc_item_from_id": "由 id 取物品",
@@ -935,7 +937,7 @@
   "mc_enchantment_exists": "附魔是否存在",
   "mc_block_entity_info": "方块实体信息",
 
-  "mc_component": "MC 组件",
+  "component": "组件",
   "convert_instanceof": "是否为该类型",
   "mc_item_components": "物品堆组件列表",
   "mc_fluid_components": "流体堆组件列表",
@@ -1030,6 +1032,7 @@
   "string_contains": "包含",
   "string_starts_with": "开头为",
   "string_ends_with": "结尾为",
+  "string_multiline": "多行文本",
 
   "List": "列表",
   "Map": "映射",
@@ -2675,6 +2678,12 @@
   "kg.node.string_case.option.op.tooltip.TITLE": "TITLE：每个单词首字母大写，其余小写。",
   "kg.node.string_case.in.in": "要转换的文本。",
   "kg.node.string_case.out.out": "转换为所选大小写形式的文本。",
+  "kg.node.string_multiline.tooltip": "在真正的文本编辑框里写出来的字符串常量。",
+  "kg.node.string_multiline.desc.1": "普通的 STRING 常量只给一行输入框，而图里真正想粘进去的东西并不是这个形状——一份 UI XML、一整串命令、一页书、一段 JSON。这个节点存的还是同一个字符串值，只是配了个像样的编辑器：回车是换行，而不是提交。",
+  "kg.node.string_multiline.desc.2": "值就是行与行之间夹着换行符的普通字符串，下游不需要知道它从哪来。想按行拿到列表，用换行符作分隔符接一个「拆分」即可。",
+  "kg.node.string_multiline.note.1": "文本存在节点上，不走连线——它在编辑器里写好、随图一起保存，所以没有输入端口可以在运行时覆盖它。",
+  "kg.node.string_multiline.option.text.tooltip": "文本内容。各行之间以换行符连接。",
+  "kg.node.string_multiline.out.out": "整段文本，作为一个字符串。",
 
   "kg.node.mc_block_to_item.desc.1": "方块被拿在手上时对应的物品。没有物品形态的方块 —— 火，以及各种技术性方块 —— 会得到空气。",
   "kg.node.mc_item_to_block.desc.1": "物品放置出来的方块。放不出方块的物品会得到空气方块，因此使用结果前请先判断。",
@@ -4119,5 +4128,503 @@
   "rendertypegraph.preview.sphere": "球体",
   "rendertypegraph.error.missing_vertex_element": "顶点属性节点需要 '%s'，但它不在顶点格式中",
   "rendertypegraph.warn.vertex_element_defaulted": "默认值使用了顶点属性 '%s'（不在格式中），将使用常量",
-  "rendertypegraph.error.stage_affinity": "%s：%s 节点被用于 %s 阶段"
+  "rendertypegraph.error.stage_affinity": "%s：%s 节点被用于 %s 阶段",
+
+  "doc": "文档",
+  "element": "元素",
+  "style": "样式",
+  "event": "事件",
+  "sync": "同步",
+  "context": "上下文",
+
+  "ldlib2_ui_load_xml": "加载 UI Xml",
+
+  "ldlib2_ui_parse_xml": "解析 UI Xml",
+
+  "ldlib2_ui_create": "创建 UI",
+
+  "ldlib2_ui_create_sized": "创建自适应 UI",
+
+  "ldlib2_ui_unpack": "拆解 UI",
+
+  "ldlib2_ui_to_template": "转为模板",
+
+  "ldlib2_ui_template_load": "加载模板",
+
+  "ldlib2_ui_template_create_ui": "模板转 UI",
+
+  "ldlib2_ui_template_init": "应用模板",
+  "ldlib2_ui_template_styles": "模板样式",
+  "ldlib2_ui_template_copy": "复制模板",
+
+  "ldlib2_ui_modular_create": "创建 Modular UI",
+
+  "ldlib2_ui_element_new": "新建元素",
+
+  "ldlib2_ui_element_from_xml": "从 Xml 建元素",
+
+  "ldlib2_ui_add_child": "添加子元素",
+  "ldlib2_ui_add_children": "批量添加子元素",
+
+  "ldlib2_ui_remove_child": "移除子元素",
+  "ldlib2_ui_remove_self": "移除自身",
+
+  "ldlib2_ui_clear_children": "清空子元素",
+
+  "ldlib2_ui_copy": "复制元素",
+  "ldlib2_ui_serialize": "元素转 Nbt",
+  "ldlib2_ui_deserialize": "从 Nbt 读元素",
+  "ldlib2_ui_parent": "父元素",
+  "ldlib2_ui_children": "子元素",
+  "ldlib2_ui_descendants": "所有后代",
+
+  "ldlib2_ui_child_at": "指定索引子元素",
+
+  "ldlib2_ui_ancestor_of_type": "指定类型祖先",
+
+  "ldlib2_ui_select": "选择器查找",
+
+  "ldlib2_ui_select_id": "按 Id 查找",
+  "ldlib2_ui_select_regex": "按正则查找",
+
+  "ldlib2_ui_find_by_id": "索引查 Id",
+
+
+  "ldlib2_ui_set_id": "设置 Id",
+  "ldlib2_ui_set_flag": "设置状态开关",
+
+
+  "ldlib2_ui_focus": "焦点",
+
+  "ldlib2_ui_set_text": "设置文本",
+
+  "ldlib2_ui_get_text": "读取文本",
+  "ldlib2_ui_get_value": "读取值",
+
+  "ldlib2_ui_set_value": "设置值",
+  "ldlib2_ui_set_property": "设置属性",
+
+  "ldlib2_ui_get_property": "读取属性",
+
+  "ldlib2_ui_list_properties": "列出属性",
+
+  "ldlib2_ui_element_info": "元素信息",
+
+  "ldlib2_ui_info_identity": "标识",
+  "ldlib2_ui_info_state": "状态",
+  "ldlib2_ui_info_interaction": "交互状态",
+  "ldlib2_ui_info_structure": "结构",
+  "ldlib2_ui_info_position": "位置",
+  "ldlib2_ui_info_size": "尺寸",
+
+  "ldlib2_ui_info_content_box": "内容框",
+
+  "ldlib2_ui_info_margin": "外边距",
+
+  "ldlib2_ui_lss_set": "设置 Lss",
+  "ldlib2_ui_lss_remove": "移除 Lss",
+  "ldlib2_ui_lss_block": "Lss 声明块",
+  "ldlib2_ui_lss_get": "读取 Lss",
+
+  "ldlib2_ui_class": "样式类",
+
+  "ldlib2_ui_has_class": "是否含样式类",
+
+  "ldlib2_ui_stylesheet_parse": "解析样式表",
+  "ldlib2_ui_stylesheet_load": "加载样式表",
+  "ldlib2_ui_stylesheet_builtin": "内置样式表",
+  "ldlib2_ui_stylesheet_merge": "合并样式表",
+  "ldlib2_ui_stylesheet_register": "注册样式表",
+
+  "ldlib2_ui_local_stylesheet": "局部样式表",
+
+  "ldlib2_ui_global_stylesheet": "全局样式表",
+
+  "ldlib2_ui_apply_stylesheet": "手动应用样式表",
+
+  "ldlib2_ui_animate": "样式动画",
+  "ldlib2_ui_tooltip": "设置提示文本",
+
+  "ldlib2_ui_on_event": "当事件发生",
+
+  "ldlib2_ui_on_server_event": "当服务端事件发生",
+
+  "ldlib2_ui_on_tick": "每 Tick",
+
+  "ldlib2_ui_event_info": "事件信息",
+  "ldlib2_ui_event_stop": "阻止事件传播",
+  "ldlib2_ui_event_dispatch": "派发事件",
+
+  "ldlib2_ui_sync_value": "同步值",
+  "ldlib2_ui_sync_get": "读取同步值",
+  "ldlib2_ui_sync_set": "写入同步值",
+
+  "ldlib2_ui_binding": "创建绑定",
+  "ldlib2_ui_bind": "绑定",
+  "ldlib2_ui_unbind": "解绑",
+
+  "ldlib2_ui_rpc_define": "定义 Rpc",
+  "ldlib2_ui_rpc_return": "Rpc 返回",
+  "ldlib2_ui_rpc_send": "发送 Rpc",
+
+  "ldlib2_ui_on_message": "当收到消息",
+
+  "ldlib2_ui_send_message": "发送消息",
+
+  "ldlib2_ui_side": "当前端",
+
+  "ldlib2_ui_modular_of": "所属 Modular UI",
+
+  "ldlib2_ui_mui_info": "Modular UI 信息",
+
+  "ldlib2_ui_close": "关闭 UI",
+
+  "kg.node.ldlib2_ui_load_xml.tooltip": "按资源 id 加载一个 UI xml 文件。",
+  "kg.node.ldlib2_ui_load_xml.desc.1": "文件可以包含 <root> 元素树、内联 <style> 块与 <stylesheet> 引用 —— 完整的文档格式。",
+  "kg.node.ldlib2_ui_load_xml.in.location": "xml 文件的资源 id。",
+  "kg.node.ldlib2_ui_load_xml.out.ui": "加载出的 UI。文件不存在时为空 UI。",
+  "kg.node.ldlib2_ui_load_xml.out.root": "该 UI 的根元素，省一个拆解节点。",
+  "kg.node.ldlib2_ui_load_xml.note.1": "客户端从 assets 找，服务端从数据包找。双端都要构建的 UI，xml 必须放在 data/ 下，否则服务端会静默地建出一棵空树。",
+
+  "kg.node.ldlib2_ui_parse_xml.tooltip": "内联手写 UI xml，能省的都能省。",
+  "kg.node.ldlib2_ui_parse_xml.desc.1": "下面三种写法等价：完整的 <ui><root>…</root></ui>、只写 <root>…</root>、以及直接写 <button id=\"ok\"/> 这样的裸元素。",
+  "kg.node.ldlib2_ui_parse_xml.in.xml": "xml 文本。",
+  "kg.node.ldlib2_ui_parse_xml.example.1": "<button id=\"save\" class=\"primary\"/> 就能建出一个带 id 和 class 的按钮 —— 足够让样式表和选择器找到它。",
+
+  "kg.node.ldlib2_ui_create.tooltip": "由根元素和样式表组装成一个 UI。",
+  "kg.node.ldlib2_ui_create.in.root": "根元素。",
+  "kg.node.ldlib2_ui_create.in.stylesheets": "作用于整棵树的样式表。",
+  "kg.node.ldlib2_ui_create.note.1": "UI 一旦创建就不可变。想在之后加样式表，用「全局样式表」作用于 Modular UI。",
+
+  "kg.node.ldlib2_ui_create_sized.tooltip": "尺寸随屏幕变化的 UI。",
+  "kg.node.ldlib2_ui_create_sized.desc.1": "每次屏幕初始化都会重算，所以窗口缩放后依然正确 —— 写死的布局宽度做不到这点。",
+  "kg.node.ldlib2_ui_create_sized.option.mode.tooltip": "宽高怎么解读。",
+  "kg.node.ldlib2_ui_create_sized.option.mode.tooltip.fixed": "像素，与屏幕无关。",
+  "kg.node.ldlib2_ui_create_sized.option.mode.tooltip.percent_of_screen": "屏幕百分比，0-100。",
+  "kg.node.ldlib2_ui_create_sized.option.mode.tooltip.screen_minus": "从屏幕尺寸中减去的像素 —— 相当于每个轴上的留白。",
+
+  "kg.node.ldlib2_ui_unpack.tooltip": "取出 UI 的根元素和样式表。",
+
+  "kg.node.ldlib2_ui_to_template.tooltip": "把 UI 拍成快照，得到模板。",
+  "kg.node.ldlib2_ui_to_template.desc.1": "接 UI 或裸元素都行，哪个接了用哪个。模板是能存进存档、能过网络的那种形态。",
+  "kg.node.ldlib2_ui_to_template.note.1": "模板保存树结构、id、class 和持久化字段。事件监听器、同步值和 RPC 是 Java 对象，不会被保存。",
+
+  "kg.node.ldlib2_ui_template_load.tooltip": "从 LDLib2 的 UI 资源库里取一个模板。",
+  "kg.node.ldlib2_ui_template_load.in.path": "带类型的路径，例如 builtin(ldlib2:missing)、file(/my_ui.ui)、pack(mymod:ui/machine)。",
+  "kg.node.ldlib2_ui_template_load.out.ok": "路径无法解析时为 false，此时模板输出是那个红色的 Missing 占位。",
+
+  "kg.node.ldlib2_ui_template_create_ui.tooltip": "用模板压出一个全新的 UI。",
+  "kg.node.ldlib2_ui_template_create_ui.desc.1": "每次流经都会建一棵新树，所以放在循环里就是每轮一个。",
+
+  "kg.node.ldlib2_ui_template_init.tooltip": "把模板铺进一个已经存在的元素里。",
+  "kg.node.ldlib2_ui_template_init.desc.1": "和「模板转 UI」不同：它填充你已经拿在手上的根元素 —— 当这个元素已经挂在更大的树里时，你要的是这个。",
+
+  "kg.node.ldlib2_ui_template_styles.tooltip": "替换模板的样式。",
+  "kg.node.ldlib2_ui_template_styles.in.builtinStyles": "存在模板内部的内联 LSS 块。",
+  "kg.node.ldlib2_ui_template_styles.in.stylesheets": "模板引用的样式表资源 id。",
+
+  "kg.node.ldlib2_ui_template_copy.tooltip": "得到模板的独立副本。",
+  "kg.node.ldlib2_ui_template_copy.desc.1": "模板的 NBT 是可变的，所以用同一个模板压出两个 UI、中间又被图改过，两者对「自己是从什么压出来的」会有分歧。",
+
+  "kg.node.ldlib2_ui_modular_create.tooltip": "为玩家创建一个活的 UI 实例。",
+  "kg.node.ldlib2_ui_modular_create.desc.1": "它并不会挂载树。这一步准备好同步管理器、样式引擎和布局树；真正把根挂上去的是宿主 —— 服务端是菜单，客户端是屏幕初始化。在那之前没有元素持有 Modular UI，也没有任何东西到达同步管理器。",
+  "kg.node.ldlib2_ui_modular_create.note.1": "因此同步值到达管理器的顺序，是挂载时遍历树的顺序，而不是图里声明它们的顺序。这依然是确定的，也依然要求双端构建同一棵树。",
+
+  "kg.node.ldlib2_ui_element_new.tooltip": "新建一个已注册类型的元素。",
+  "kg.node.ldlib2_ui_element_new.desc.1": "类型列表就是 LDLib2 的元素注册表 —— 和 xml 标签名解析用的是同一张表，所以这里选 button 和 xml 里写 <button/> 建出来的是同一个东西。",
+  "kg.node.ldlib2_ui_element_new.in.id": "id，供选择器和样式表定位。可留空。",
+  "kg.node.ldlib2_ui_element_new.in.classes": "空格分隔的 class 名，和 class=\"a b\" 属性一样。",
+  "kg.node.ldlib2_ui_element_new.option.type.tooltip": "要创建哪种已注册元素。",
+  "kg.node.ldlib2_ui_element_new.note.1": "它是 exec 节点而不是纯数据节点：元素有身份，所以「何时创建」必须由图明确说出来。放在循环里每轮建一个新的；放在循环外只建一个，事件处理器之后还能找到它。",
+
+  "kg.node.ldlib2_ui_element_from_xml.tooltip": "用 xml 写元素 —— <button id=\"ok\"/> 就够了。",
+  "kg.node.ldlib2_ui_element_from_xml.out.element": "第一个元素，也是最常用的那个。",
+  "kg.node.ldlib2_ui_element_from_xml.out.elements": "全部元素，所以写了多个并列元素也不会丢。",
+
+  "kg.node.ldlib2_ui_add_child.tooltip": "把子元素挂到父元素下。",
+  "kg.node.ldlib2_ui_add_child.in.index": "插入位置，-1 表示追加到末尾。兄弟顺序就是 flex 布局的排列顺序。",
+  "kg.node.ldlib2_ui_add_child.out.out": "把父元素原样输出，方便构建链一路往下串。",
+  "kg.node.ldlib2_ui_add_child.note.1": "拒绝成环 —— 把元素挂到自己的后代下会让命中测试无限循环。",
+
+  "kg.node.ldlib2_ui_add_children.tooltip": "按列表顺序把一批元素挂到父元素下。",
+  "kg.node.ldlib2_ui_add_children.out.added": "实际挂上去了几个。",
+
+  "kg.node.ldlib2_ui_remove_child.tooltip": "把子元素从父元素上摘掉。",
+
+  "kg.node.ldlib2_ui_remove_self.tooltip": "把元素从它当前的父元素上摘掉。",
+
+  "kg.node.ldlib2_ui_clear_children.tooltip": "清空元素的子元素。",
+  "kg.node.ldlib2_ui_clear_children.in.keepInternal": "保留元素自带的内部子元素。默认开启，而且通常是对的：Button 自带文本、Scroller 自带滑块，把这些清掉之后该控件就永远显示不出东西了。",
+
+  "kg.node.ldlib2_ui_copy.tooltip": "复制元素及其下的整棵子树。",
+  "kg.node.ldlib2_ui_copy.note.1": "副本带有树结构、id、class 和持久化字段，但**不带**事件监听器、同步值和 RPC —— NBT 装不下它们。所以要先复制再挂行为，不能反过来。",
+
+  "kg.node.ldlib2_ui_serialize.tooltip": "把元素的树导出成 NBT。",
+
+  "kg.node.ldlib2_ui_deserialize.tooltip": "把 NBT 树读进元素，覆盖原有内容。",
+
+  "kg.node.ldlib2_ui_parent.tooltip": "元素的父元素。",
+
+  "kg.node.ldlib2_ui_children.tooltip": "元素的直接子元素。",
+
+  "kg.node.ldlib2_ui_descendants.tooltip": "该元素下的所有后代，深度优先。",
+  "kg.node.ldlib2_ui_descendants.in.includeSelf": "结果里是否包含元素本身。",
+
+  "kg.node.ldlib2_ui_child_at.tooltip": "指定索引处的子元素。",
+
+  "kg.node.ldlib2_ui_ancestor_of_type.tooltip": "最近的指定类型祖先。",
+  "kg.node.ldlib2_ui_ancestor_of_type.desc.1": "让子元素能找到自己所在的面板，而不必让图把一根线从上面一路拉下来。",
+
+  "kg.node.ldlib2_ui_select.tooltip": "从根往下按选择器查找元素。",
+  "kg.node.ldlib2_ui_select.in.selector": "和 LSS 同一套语法：#id、.class、裸类型名，以及它们的组合。",
+  "kg.node.ldlib2_ui_select.out.first": "第一个匹配项 —— 大多数选择器本来就只想找一个。",
+  "kg.node.ldlib2_ui_select.note.1": "它遍历树，所以在 UI 挂载之前也能用，而构建期正需要这一点。「索引查 Id」更快，但只看得见已挂载的元素。",
+
+  "kg.node.ldlib2_ui_select_id.tooltip": "按 id 精确查找元素。",
+
+  "kg.node.ldlib2_ui_select_regex.tooltip": "按正则匹配 id 查找元素。",
+  "kg.node.ldlib2_ui_select_regex.desc.1": "模板生成的行往往叫 slot_0、slot_1……用 slot_\\d+ 就能一次拿全，不用事先知道有几行。",
+
+  "kg.node.ldlib2_ui_find_by_id.tooltip": "通过活 UI 的索引按 id 取元素。",
+  "kg.node.ldlib2_ui_find_by_id.note.1": "是一次哈希查表而不是遍历，但只看得见已经加入 UI 的元素。构建期什么也查不到。",
+
+
+  "kg.node.ldlib2_ui_set_id.tooltip": "设置元素的 id。",
+  "kg.node.ldlib2_ui_set_id.desc.1": "id 是选择器、样式表规则和「索引查 Id」共同使用的把手。",
+
+  "kg.node.ldlib2_ui_set_flag.tooltip": "翻转元素的某个状态开关。",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip": "要设置哪个开关。",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.visible": "是否绘制。不可见的元素仍然占据布局空间，也仍然接收事件。",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.active": "是否接收事件。关掉就是「禁用」的含义。",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.focusable": "能否获得键盘焦点。",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.display": "是否参与布局。关掉是彻底移除，兄弟元素会把空位补上。",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.overflow_visible": "超出自身范围的内容是绘制出来还是被裁掉。",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.hit_test": "鼠标能否命中它。关掉就是点击穿透。",
+
+
+  "kg.node.ldlib2_ui_focus.tooltip": "移动键盘焦点。",
+  "kg.node.ldlib2_ui_focus.option.op.tooltip": "对焦点做什么。",
+  "kg.node.ldlib2_ui_focus.option.op.tooltip.focus": "让该元素获得焦点，前提是它 focusable。",
+  "kg.node.ldlib2_ui_focus.option.op.tooltip.blur": "如果该元素持有焦点，就让它失去。",
+  "kg.node.ldlib2_ui_focus.option.op.tooltip.clear": "彻底清空焦点，无论当前在谁身上。",
+  "kg.node.ldlib2_ui_focus.note.1": "焦点属于活 UI，所以对尚未挂载的元素无效。设置焦点几乎总是处理器该做的事，而不是构建期。",
+
+  "kg.node.ldlib2_ui_set_text.tooltip": "设置任何能显示文字的元素的文本。",
+  "kg.node.ldlib2_ui_set_text.desc.1": "覆盖 Label、Text、Button 和 Text Field。对 Text Field 会把 Component 压平成纯字符串。",
+
+  "kg.node.ldlib2_ui_get_text.tooltip": "读取元素的文本。",
+
+  "kg.node.ldlib2_ui_get_value.tooltip": "元素自身的值 —— Toggle 的布尔、Slider 的浮点、Item Slot 的物品堆。",
+  "kg.node.ldlib2_ui_get_value.option.valueType.tooltip": "决定输出针脚的类型。保持 unknown 就是万能针脚，一样能用。",
+
+  "kg.node.ldlib2_ui_set_value.tooltip": "通过元素自己的 setter 写值，因此监听器和绑定都能收到。",
+  "kg.node.ldlib2_ui_set_value.in.notify": "是否通知监听器。关掉它，就能把值写回产生它的控件而不会再次触发自己的变更处理器。",
+
+  "kg.node.ldlib2_ui_set_property.tooltip": "写入元素的某个可配置字段。",
+  "kg.node.ldlib2_ui_set_property.desc.1": "属性列表正是 LDLib2 自家 UI 编辑器 Inspector 里显示的那一份，而且值针脚会自动变成该字段的声明类型 —— 选 progress-bar 再选 value，针脚就是 float。",
+  "kg.node.ldlib2_ui_set_property.option.elementType.tooltip": "按哪个元素类型列出属性。它只是选择器的取景框 —— 实际写入用的是真正流进来的那个元素。",
+  "kg.node.ldlib2_ui_set_property.option.property.tooltip": "写哪个属性。",
+  "kg.node.ldlib2_ui_set_property.note.1": "有标注 setter 时会走 setter，行为都在那里 —— 比如把进度值夹到范围内、通知 Toggle 的监听器。",
+  "kg.node.ldlib2_ui_set_property.note.2": "外观不在这里。一切视觉表现都走「设置 Lss」和「样式类」。",
+
+  "kg.node.ldlib2_ui_get_property.tooltip": "读取元素的某个可配置字段。",
+
+  "kg.node.ldlib2_ui_list_properties.tooltip": "列出元素有哪些可配置属性名。",
+
+  "kg.node.ldlib2_ui_element_info.tooltip": "持有一个元素，供放进来的属性块读取。",
+  "kg.node.ldlib2_ui_element_info.desc.1": "元素只接一次线，然后想读多少属性就叠多少块 —— 而不是把同一个元素接进十几个独立节点。",
+
+  "kg.node.ldlib2_ui_info_identity.tooltip": "元素的 id、类型名和 class。",
+
+  "kg.node.ldlib2_ui_info_state.tooltip": "可见性与交互开关。",
+
+  "kg.node.ldlib2_ui_info_interaction.tooltip": "鼠标是否悬停在它上面、它是否持有焦点。",
+  "kg.node.ldlib2_ui_info_interaction.out.selfOrChildHover": "鼠标在它自己或它内部任何元素上时都为 true —— 容器通常想知道的是这个。",
+
+  "kg.node.ldlib2_ui_info_structure.tooltip": "元素在树中的位置。",
+
+
+  "kg.node.ldlib2_ui_info_position.tooltip": "元素的位置，相对于父元素的内容框。",
+
+  "kg.node.ldlib2_ui_info_size.tooltip": "元素自身的宽高，含边框。",
+
+  "kg.node.ldlib2_ui_info_content_box.tooltip": "子元素排布所在的框：padding 以内。",
+
+  "kg.node.ldlib2_ui_info_margin.tooltip": "元素四边的外边距。",
+
+  "kg.node.ldlib2_ui_info_position.note.1": "布局数值只有在客户端排过版之后才存在。服务端上、以及首次排版之前，它们都读作 0 —— 所以要在悬停或 tick 处理器里读，不要在构建期读。",
+
+  "kg.node.ldlib2_ui_lss_set.tooltip": "在一个元素上设置一条 LSS 属性。",
+  "kg.node.ldlib2_ui_lss_set.desc.1": "值按 LSS 的写法写，因为读它的就是同一个解析器：#ff5555、50%、12、center。接进来的数字会平铺成十进制；接进颜色属性的整数会被格式化成 #AARRGGBB。",
+  "kg.node.ldlib2_ui_lss_set.option.property.tooltip": "哪一条 LSS 属性。",
+  "kg.node.ldlib2_ui_lss_set.option.origin.tooltip": "值属于层叠的哪一层。层级越高越优先：default < stylesheet < inline < animation < important。",
+  "kg.node.ldlib2_ui_lss_set.note.1": "只要样式表能描述的外观，优先用「样式类」。这个节点留给只有图才知道的值 —— 比如由某个数字算出来的进度条宽度。",
+
+  "kg.node.ldlib2_ui_lss_remove.tooltip": "移除图设过的属性，让底下的值重新露出来。",
+  "kg.node.ldlib2_ui_lss_remove.desc.1": "只移除图自己在该层写的值 —— 样式表里同名的规则不受影响。悬停效果就是这样撤销的，不会顺手把元素的常态外观也擦掉。",
+
+  "kg.node.ldlib2_ui_lss_block.tooltip": "一次写一整段 LSS 声明：color: #ff5555; opacity: 0.5;",
+  "kg.node.ldlib2_ui_lss_block.desc.1": "语义等同于 UI xml 里的 style=\"…\" 属性，解析代码也是同一份。不认识的属性名会被跳过而不是让整段失败。",
+  "kg.node.ldlib2_ui_lss_block.out.applied": "有几条声明被识别并应用了。",
+
+  "kg.node.ldlib2_ui_lss_get.tooltip": "元素某条样式当前解析出来的值。",
+  "kg.node.ldlib2_ui_lss_get.desc.1": "给的是层叠之后的结果 —— 来自样式表的颜色和内联设的颜色读起来一样。适合用来检查样式，不适合拿来存图自己的状态。",
+
+  "kg.node.ldlib2_ui_class.tooltip": "增删改或切换 class 名。",
+  "kg.node.ldlib2_ui_class.desc.1": "交互逻辑最该用的管线。处理器只加一个 .selected，「选中长什么样」留给设计师；规则命中的每个元素都能用；撤销时只要去掉一个名字。",
+  "kg.node.ldlib2_ui_class.in.classes": "空格分隔的名字，和 class=\"a b\" 属性一样。",
+  "kg.node.ldlib2_ui_class.option.op.tooltip": "对这些名字做什么。",
+  "kg.node.ldlib2_ui_class.option.op.tooltip.add": "添加。",
+  "kg.node.ldlib2_ui_class.option.op.tooltip.remove": "移除。",
+  "kg.node.ldlib2_ui_class.option.op.tooltip.set": "用它们替换整个 class 列表。不给名字就是清空所有 class。",
+  "kg.node.ldlib2_ui_class.option.op.tooltip.toggle": "没有的加上，有的去掉。",
+
+  "kg.node.ldlib2_ui_has_class.tooltip": "元素是否带有某个 class。",
+
+  "kg.node.ldlib2_ui_stylesheet_parse.tooltip": "把 LSS 文本解析成样式表。",
+  "kg.node.ldlib2_ui_stylesheet_parse.in.name": "样式表的名字，会显示在 UI 调试器里。",
+
+  "kg.node.ldlib2_ui_stylesheet_load.tooltip": "按资源 id 取样式表。",
+  "kg.node.ldlib2_ui_stylesheet_load.desc.1": "ldlib2:lss/mc.lss 指那一个文件；ldlib2:lss/mc（不带扩展名）指所有已加载包中该路径下 lss/mc.lss 的合并结果。",
+
+  "kg.node.ldlib2_ui_stylesheet_builtin.tooltip": "LDLib2 自带的样式表之一。",
+  "kg.node.ldlib2_ui_stylesheet_builtin.option.sheet.tooltip": "选哪一个。带 merged 的变体还会吸收其它资源包在同一路径下贡献的规则，主题的可扩展性就来自这里。",
+
+  "kg.node.ldlib2_ui_stylesheet_merge.tooltip": "把一个样式表的规则原地并入另一个。",
+  "kg.node.ldlib2_ui_stylesheet_merge.note.1": "会修改 target。并进管理器持有的样式表等于改了全游戏所有 UI —— 请并进本图自己解析出来的那一个。",
+
+  "kg.node.ldlib2_ui_stylesheet_register.tooltip": "把样式表注册到某个资源 id 下，之后任何地方都能按名字加载。",
+  "kg.node.ldlib2_ui_stylesheet_register.note.1": "全局且在本次游戏会话内持久。会多次运行的图应该每次都注册同一个 id，不要动态生成名字。",
+
+  "kg.node.ldlib2_ui_local_stylesheet.tooltip": "只作用于某个元素及其后代的样式表。",
+  "kg.node.ldlib2_ui_local_stylesheet.in.lss": "直接给 LSS 文本，省掉先建样式表这一步。两个输入都接了时，解析好的样式表优先。",
+  "kg.node.ldlib2_ui_local_stylesheet.option.op.tooltip": "挂上、摘掉，或清空全部局部样式表。",
+
+  "kg.node.ldlib2_ui_global_stylesheet.tooltip": "在活 UI 上增删样式表。",
+  "kg.node.ldlib2_ui_global_stylesheet.desc.1": "UI 本身不可变，所以这是构建之后唯一能加样式表的通道，运行时换主题只能走这里。",
+  "kg.node.ldlib2_ui_global_stylesheet.note.1": "仅客户端 —— 服务端没有样式引擎。",
+
+  "kg.node.ldlib2_ui_apply_stylesheet.tooltip": "手动把样式表与元素做匹配，并把命中的规则写上去。",
+  "kg.node.ldlib2_ui_apply_stylesheet.desc.1": "元素加入客户端 UI 时样式引擎自动做的那一步。手动做它在两种场合有用：服务端上根本没有引擎，以及 UI 尚未挂载时还没有引擎。",
+  "kg.node.ldlib2_ui_apply_stylesheet.in.recursive": "是否同时匹配后代。默认开启，毕竟样式表的选择器本来就是为了在整棵子树里找东西。",
+
+  "kg.node.ldlib2_ui_animate.tooltip": "把某条样式属性从当前值插值到目标值。",
+  "kg.node.ldlib2_ui_animate.in.duration": "秒。",
+  "kg.node.ldlib2_ui_animate.in.delay": "开始前等待的秒数。",
+  "kg.node.ldlib2_ui_animate.option.ease.tooltip": "缓动曲线。",
+  "kg.node.ldlib2_ui_animate.note.1": "仅客户端，且元素必须已挂载 —— 动画引擎在活 UI 上。",
+  "kg.node.ldlib2_ui_animate.note.2": "动画运行期间的优先级高于样式表和内联值，结束后会把终值以内联层留下。想把这条属性还给样式表，之后用「移除 Lss」在 inline 层删掉它。",
+
+  "kg.node.ldlib2_ui_tooltip.tooltip": "设置元素悬停时显示的提示文本。",
+  "kg.node.ldlib2_ui_tooltip.in.line": "单行 —— 最常见的情况，比建一个列表短。",
+  "kg.node.ldlib2_ui_tooltip.in.lines": "更多行，接在单行之后。",
+  "kg.node.ldlib2_ui_tooltip.desc.1": "给空列表就是清空提示，提示不再适用时就这样关掉它。",
+
+  "kg.node.ldlib2_ui_on_event.tooltip": "事件抵达元素时运行一段链。",
+  "kg.node.ldlib2_ui_on_event.desc.1": "两个 exec 出口。next 立刻继续往下搭 UI；onEvent 则在玩家每次触发该事件时运行，不管那是多久以后。",
+  "kg.node.ldlib2_ui_on_event.desc.2": "处理器每次都是重新求值的，所以它从 UI 读到的都是当下的值，而不是搭树时的那一份。",
+  "kg.node.ldlib2_ui_on_event.in.useCapture": "改为在下行阶段监听。事件先从根走到目标、触发、再走回根 —— 捕获监听器比任何后代都先看到它，弹窗就是这样拦下本该落到下层的点击的。",
+  "kg.node.ldlib2_ui_on_event.option.eventType.tooltip": "监听哪个事件。列表是 LDLib2 的内置类型，但也接受自由输入 —— 另一张图派发的自定义类型不在任何注册表里。",
+  "kg.node.ldlib2_ui_on_event.example.1": "新建元素(button) → 当事件发生(mouseClick) → onEvent → 样式类(toggle 'selected')。一个节点负责注册，一个负责响应。",
+
+  "kg.node.ldlib2_ui_on_server_event.tooltip": "客户端事件抵达元素时，在服务端运行一段链。",
+  "kg.node.ldlib2_ui_on_server_event.desc.1": "用于必须改变世界的响应 —— 扣物品、启动机器 —— 这些事客户端上没有真实对象可改。",
+  "kg.node.ldlib2_ui_on_server_event.note.1": "事件是从网络重建的：坐标、按键、按钮数据会保留；拖拽状态和自定义数据不会。",
+  "kg.node.ldlib2_ui_on_server_event.note.2": "有一次往返，所以服务端会晚一 tick 左右才响应。玩家必须立刻看到的反馈应该放在客户端处理器里。",
+  "kg.node.ldlib2_ui_on_server_event.note.3": "它会注册一个 RPC，所以双端到达这个节点的顺序必须和其它同步注册一致。请双端构建同一棵树。",
+
+  "kg.node.ldlib2_ui_on_tick.tooltip": "元素处于激活且显示状态时，每 tick 运行一段链。",
+  "kg.node.ldlib2_ui_on_tick.desc.1": "一切需要轮询的东西的钩子：倒计时、不靠输入事件驱动的变化。",
+  "kg.node.ldlib2_ui_on_tick.note.1": "每秒二十次，而且每次都会重算整条链。挂在它下面的东西要小 —— 变化不频繁的值应该改用同步值的 onReceived。",
+
+  "kg.node.ldlib2_ui_event_info.tooltip": "事件携带的全部信息。",
+  "kg.node.ldlib2_ui_event_info.out.x": "水平位置，在目标元素自己的坐标系里 —— 因此可以直接和元素的内容框比较，不用做任何变换。",
+  "kg.node.ldlib2_ui_event_info.out.y": "垂直位置，在目标元素自己的坐标系里。",
+  "kg.node.ldlib2_ui_event_info.out.character": "charTyped 事件输入的字符，没有则为空串。",
+  "kg.node.ldlib2_ui_event_info.out.relatedTarget": "相关的另一个元素：focus 时是失去焦点的那个，blur 时是获得焦点的那个。",
+
+  "kg.node.ldlib2_ui_event_stop.tooltip": "阻止事件继续传播。",
+  "kg.node.ldlib2_ui_event_stop.desc.1": "处理器用它宣告「我处理过了」。不加的话，滚动面板里按钮上的点击也会继续传到面板本身。",
+  "kg.node.ldlib2_ui_event_stop.option.mode.tooltip": "拦到什么程度。",
+  "kg.node.ldlib2_ui_event_stop.option.mode.tooltip.propagation": "两个方向上都不再有别的元素收到它。",
+  "kg.node.ldlib2_ui_event_stop.option.mode.tooltip.immediate": "在上一条基础上，本元素的其它监听器也不再运行。",
+  "kg.node.ldlib2_ui_event_stop.option.mode.tooltip.later": "本元素的其它监听器照常运行；本阶段之后的都不再运行。",
+
+  "kg.node.ldlib2_ui_event_dispatch.tooltip": "构造一个事件并派发到元素上，就像玩家真的做了那件事。",
+  "kg.node.ldlib2_ui_event_dispatch.desc.1": "两种用途：合成输入；以及把自定义事件类型当消息总线 —— 在根上派发 mymod:refresh，让所有关心它的部分各自监听，而不是把每一个都接到发生变化的那个东西上。",
+  "kg.node.ldlib2_ui_event_dispatch.in.sendServer": "是否也通知服务端监听器。默认关闭：一个宣称玩家做了某事的合成事件，在到达服务端之前值得想一想。",
+  "kg.node.ldlib2_ui_event_dispatch.out.handled": "是否有监听器真的运行了。",
+
+  "kg.node.ldlib2_ui_sync_value.tooltip": "由 LDLib2 在双端保持一致的一个值。",
+  "kg.node.ldlib2_ui_sync_value.desc.1": "状态用同步值（「现在是多少」），瞬间用 RPC（「刚刚发生了什么」）。",
+  "kg.node.ldlib2_ui_sync_value.desc.2": "给 source 接上表达式，发送端每 tick 拉取一次，值就会跟着它走；不接 source 就改用「写入同步值」主动推。",
+  "kg.node.ldlib2_ui_sync_value.in.element": "持有它的元素。元素在 UI 里多久，它就活多久。",
+  "kg.node.ldlib2_ui_sync_value.in.name": "名字，仅用于调试。网络上不传这个。",
+  "kg.node.ldlib2_ui_sync_value.option.valueType.tooltip": "同步的是什么类型。必须是具体类型 —— 同步层需要一个访问器才能把它变成字节。",
+  "kg.node.ldlib2_ui_sync_value.option.direction.tooltip": "往哪个方向传。",
+  "kg.node.ldlib2_ui_sync_value.option.direction.tooltip.s2c": "服务端到客户端。最常见：服务端持有真相，客户端负责显示。",
+  "kg.node.ldlib2_ui_sync_value.option.direction.tooltip.c2s": "客户端到服务端。用于玩家编辑的内容。",
+  "kg.node.ldlib2_ui_sync_value.option.direction.tooltip.both": "双向。",
+  "kg.node.ldlib2_ui_sync_value.option.strategy.tooltip": "发送频率策略。",
+  "kg.node.ldlib2_ui_sync_value.note.1": "网络上是靠**注册顺序**而不是名字来识别同步值的。双端必须以完全相同的顺序注册同一批值 —— 所以请双端构建同一棵树，绝不要用「当前端」去分支 UI 的结构。",
+
+  "kg.node.ldlib2_ui_sync_get.tooltip": "同步值当前持有的内容，两端都能读。",
+
+  "kg.node.ldlib2_ui_sync_set.tooltip": "写入同步值，下一 tick 对端就能看到。",
+  "kg.node.ldlib2_ui_sync_set.in.markChanged": "即使看起来没变也强制发送。对原地修改的值（列表、Tag）是必需的 —— 脏检查比对的就是那个被就地改掉的实例。",
+
+  "kg.node.ldlib2_ui_binding.tooltip": "服务端数据与元素之间的双向绑定。",
+  "kg.node.ldlib2_ui_binding.desc.1": "比同步值更进一步：绑上元素之后，Item Slot 直接显示服务端的物品堆、Text Field 直接把玩家输入送回去，中间不需要任何处理器。",
+  "kg.node.ldlib2_ui_binding.desc.2": "对某些元素这是唯一的入口 —— Item Slot 真正的内容不是可配置字段，「设置属性」够不着它。",
+  "kg.node.ldlib2_ui_binding.in.serverValue": "服务端一侧提供的值。每 tick 拉取一次，所以绑定会跟着这里接的表达式走。",
+  "kg.node.ldlib2_ui_binding.note.1": "onReceived 在收到更新的那一端触发。绑定只负责搬运值，怎么响应是图的事。",
+
+  "kg.node.ldlib2_ui_bind.tooltip": "把绑定挂到元素上。",
+  "kg.node.ldlib2_ui_bind.note.1": "只对带值的元素有效 —— Item Slot、Fluid Slot、Progress Bar、Toggle、Slider、Text Field、Selector、Label 等。其它元素返回 false，请改用同步值加处理器。",
+
+  "kg.node.ldlib2_ui_unbind.tooltip": "摘掉绑定，元素不再镜像它。",
+
+  "kg.node.ldlib2_ui_rpc_define.tooltip": "声明一个对端可以发起的调用，并在被调用时运行一段链。",
+  "kg.node.ldlib2_ui_rpc_define.option.argCount.tooltip": "参数个数，最多四个。再多就改用「当收到消息」发一个 CompoundTag。",
+  "kg.node.ldlib2_ui_rpc_define.option.returnType.tooltip": "调用的返回类型。保持 unknown 即为单向调用。",
+  "kg.node.ldlib2_ui_rpc_define.note.1": "要返回值，就让 onCall 这条链以「Rpc 返回」收尾。",
+  "kg.node.ldlib2_ui_rpc_define.note.2": "双端必须以相同顺序注册相同的 RPC —— 网络上传的是注册序号，不是名字。",
+
+  "kg.node.ldlib2_ui_rpc_return.tooltip": "为当前正在处理的 RPC 调用给出返回值。",
+  "kg.node.ldlib2_ui_rpc_return.in.rpc": "不接线就回答最内层的那次调用，除非处理器嵌在另一次调用里，否则这正是你要的。",
+
+  "kg.node.ldlib2_ui_rpc_send.tooltip": "调用对端的 RPC。",
+  "kg.node.ldlib2_ui_rpc_send.desc.1": "next 立刻继续；onReturn 在回包到达时才触发，至少晚一 tick。需要结果的图必须从 onReturn 往下接。",
+  "kg.node.ldlib2_ui_rpc_send.note.1": "参数类型必须和定义节点逐位对应 —— 网络上不传参数名。",
+
+  "kg.node.ldlib2_ui_on_message.tooltip": "对端向该元素发来指定名字的消息时运行一段链。",
+  "kg.node.ldlib2_ui_on_message.desc.1": "零配置路径：没有类型要对齐，负载就是一个 CompoundTag，图里现成的 NBT 节点就能拆。先用这个，不够再上类型化 RPC。",
+
+  "kg.node.ldlib2_ui_send_message.tooltip": "向对端的同一个元素发送带 NBT 负载的具名消息。",
+
+  "kg.node.ldlib2_ui_side.tooltip": "本次求值运行在哪一端。",
+  "kg.node.ldlib2_ui_side.desc.1": "由当前线程判断，所以在 UI 还不存在时也能给出正确答案。",
+  "kg.node.ldlib2_ui_side.note.1": "用它分支**行为** —— 只有服务端能改世界，只有客户端能播动画。绝不要用它分支 UI 树的形状或同步值/RPC 的集合：那些是靠注册顺序在网络两端对齐的。",
+
+  "kg.node.ldlib2_ui_modular_of.tooltip": "元素所属的活 UI。",
+  "kg.node.ldlib2_ui_modular_of.out.mounted": "元素被加入已挂载的树之前都是 false。",
+
+  "kg.node.ldlib2_ui_mui_info.tooltip": "一张图可能会问到的、关于活 UI 的一切。",
+  "kg.node.ldlib2_ui_mui_info.out.tick": "UI 自己的 tick 计数，从它打开时的 0 开始 —— UI 里的超时逻辑要对照的正是这个。",
+
+  "kg.node.ldlib2_ui_close.tooltip": "关闭 UI。",
+  "kg.node.ldlib2_ui_close.desc.1": "走玩家的容器关闭流程，这是菜单型 UI 和纯屏幕 UI 唯一都认的动作。",
+
+  "ldlib2_ui_start_drag": "开始拖拽",
+  "ldlib2_ui_drag_info": "拖拽信息",
+  "kg.node.ldlib2_ui_start_drag.tooltip": "开始一次拖拽，并携带任意负载。",
+  "kg.node.ldlib2_ui_start_drag.desc.1": "在玩家抓住的那个元素的 mouseDown 处理器里调用它。拖拽不是因为鼠标移动才开始的，而是因为有人主动发起了它。",
+  "kg.node.ldlib2_ui_start_drag.in.payload": "图里能携带的任何东西 —— 物品堆、索引、甚至源元素本身。接收放置的一方会通过「拖拽信息」把它取回来。",
+  "kg.node.ldlib2_ui_start_drag.note.1": "元素必须已挂载：拖拽状态存在活 UI 上，树还没挂上去时无处发起。",
+  "kg.node.ldlib2_ui_start_drag.note.2": "仅客户端。LDLib2 从不把拖拽事件发往服务端 —— 让放置处理器在确定放了什么之后发一个 RPC 或消息。",
+  "kg.node.ldlib2_ui_drag_info.tooltip": "从拖拽事件里读出正在被拖的东西。",
+  "kg.node.ldlib2_ui_drag_info.desc.1": "被拖的对象存在事件的 DragHandler 上而不是事件本身，所以「事件信息」够不着它 —— 这个节点就是为此存在的。",
+  "kg.node.ldlib2_ui_drag_info.in.element": "事件之外的另一种来源：tick 或 mouseMove 处理器手上没有拖拽事件，但仍然可以问自己所在的 UI 当前是否正在拖拽。",
+  "kg.node.ldlib2_ui_drag_info.out.payload": "原样返回，不带类型。期待特定类型的处理器应该判断而不是假定。",
+  "kg.node.ldlib2_ui_drag_info.out.source": "拖拽发起的元素 —— dragEnd 就派发在它身上。"
 }

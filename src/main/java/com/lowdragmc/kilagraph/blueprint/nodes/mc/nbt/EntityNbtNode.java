@@ -22,7 +22,7 @@ import net.minecraft.world.level.storage.TagValueOutput;
  * <p>Without the id, matching {@code saveWithoutId} — the tag describes what the entity <em>is</em>, not
  * which entity it is, so it can be written onto another entity of the same type.
  */
-@NodeAttribute(name = "mc_nbt_entity", group = "mc_nbt", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_nbt_entity", group = "mc/nbt", graphTypes = BlueprintGraph.class)
 public class EntityNbtNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

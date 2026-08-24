@@ -10,18 +10,20 @@
   "map": "Map",
   "math": "Math",
   "bitwise": "Bitwise",
-  "mc_entity": "MC Entity",
-  "mc_nbt": "MC NBT",
-  "mc_world": "MC World",
-  "mc_action": "MC Action",
+  "mc": "MC",
+  "ui": "UI",
+  "entity": "Entity",
+  "nbt": "NBT",
+  "world": "World",
+  "action": "Action",
 
-  "mc_container": "MC Container",
+  "container": "Container",
 
-  "mc_redstone": "MC Redstone",
+  "redstone": "Redstone",
 
-  "mc_recipe": "MC Recipe",
+  "recipe": "Recipe",
 
-  "mc_loot": "MC Loot",
+  "loot": "Loot",
 
   "mc_redstone_power": "Redstone Power",
   "kg.node.mc_redstone_power.tooltip": "The strongest signal reaching a position, from any side.",
@@ -847,14 +849,14 @@
   "vector_flatten": "Flatten Vector",
   "vector_yaw_between": "Yaw Between",
 
-  "mc_id": "MC Identifier",
-  "mc_tag": "MC Tag",
-  "mc_geometry": "MC Geometry",
-  "mc_block": "MC Block",
-  "mc_item": "MC Item",
-  "mc_fluid": "MC Fluid",
-  "mc_text": "MC Text",
-  "mc_gameplay": "MC Gameplay",
+  "id": "Identifier",
+  "tag": "Tag",
+  "geometry": "Geometry",
+  "block": "Block",
+  "item": "Item",
+  "fluid": "Fluid",
+  "text": "Text",
+  "gameplay": "Gameplay",
   "mc_id_create": "Make Identifier",
   "mc_id_parse": "Parse Identifier",
   "mc_item_from_id": "Item From Id",
@@ -943,7 +945,7 @@
   "mc_enchantment_exists": "Enchantment Exists",
   "mc_block_entity_info": "Block Entity Info",
 
-  "mc_component": "MC Component",
+  "component": "Component",
   "convert_instanceof": "Is Type",
   "mc_item_components": "Stack Components",
   "mc_fluid_components": "Fluid Stack Components",
@@ -1038,6 +1040,7 @@
   "string_contains": "Contains",
   "string_starts_with": "Starts With",
   "string_ends_with": "Ends With",
+  "string_multiline": "Multi Line Text",
 
   "List": "List",
   "Map": "Map",
@@ -2693,6 +2696,12 @@
   "kg.node.string_case.option.op.tooltip.TITLE": "TITLE: first letter of each word capitalised, the rest lowercase.",
   "kg.node.string_case.in.in": "The text to convert.",
   "kg.node.string_case.out.out": "The text in the chosen case.",
+  "kg.node.string_multiline.tooltip": "A string literal written in a real text area.",
+  "kg.node.string_multiline.desc.1": "A plain STRING constant gives you a one-line field, which is the wrong shape for the things graphs actually want to paste in — a UI XML document, a command block's worth of commands, a book page, a JSON payload. This node is the same string value with a proper editor over it: Enter starts a new line instead of committing.",
+  "kg.node.string_multiline.desc.2": "The value is an ordinary string with a newline between the lines, so nothing downstream has to know it came from here. Feed it to Split with a newline delimiter to get the lines as a list.",
+  "kg.node.string_multiline.note.1": "The text lives on the node, not on a wire — it is authored in the editor and saved with the graph, so there is no input port to override it at runtime.",
+  "kg.node.string_multiline.option.text.tooltip": "The text. Lines are joined with a newline.",
+  "kg.node.string_multiline.out.out": "The whole text as one string.",
 
   "kg.node.mc_block_to_item.desc.1": "The item a block becomes when you pick it up. Blocks with no item form — fire, or the various technical blocks — give air instead.",
   "kg.node.mc_item_to_block.desc.1": "The block an item places. Items that place nothing give the air block, so check the result before using it.",
@@ -4119,5 +4128,503 @@
   "rendertypegraph.preview.sphere": "Sphere",
   "rendertypegraph.error.missing_vertex_element": "Vertex attribute node needs '%s', not in the vertex format",
   "rendertypegraph.warn.vertex_element_defaulted": "A default uses vertex attribute '%s' (not in the format) — using a constant",
-  "rendertypegraph.error.stage_affinity": "%s: %s node used in the %s stage"
+  "rendertypegraph.error.stage_affinity": "%s: %s node used in the %s stage",
+
+  "doc": "Document",
+  "element": "Element",
+  "style": "Style",
+  "event": "Event",
+  "sync": "Sync",
+  "context": "Context",
+
+  "ldlib2_ui_load_xml": "Load UI Xml",
+
+  "ldlib2_ui_parse_xml": "Parse UI Xml",
+
+  "ldlib2_ui_create": "Make UI",
+
+  "ldlib2_ui_create_sized": "Make Sized UI",
+
+  "ldlib2_ui_unpack": "Unpack UI",
+
+  "ldlib2_ui_to_template": "To Template",
+
+  "ldlib2_ui_template_load": "Load Template",
+
+  "ldlib2_ui_template_create_ui": "Template To UI",
+
+  "ldlib2_ui_template_init": "Apply Template",
+  "ldlib2_ui_template_styles": "Template Styles",
+  "ldlib2_ui_template_copy": "Copy Template",
+
+  "ldlib2_ui_modular_create": "Make Modular UI",
+
+  "ldlib2_ui_element_new": "New Element",
+
+  "ldlib2_ui_element_from_xml": "Element From Xml",
+
+  "ldlib2_ui_add_child": "Add Child",
+  "ldlib2_ui_add_children": "Add Children",
+
+  "ldlib2_ui_remove_child": "Remove Child",
+  "ldlib2_ui_remove_self": "Remove Self",
+
+  "ldlib2_ui_clear_children": "Clear Children",
+
+  "ldlib2_ui_copy": "Copy Element",
+  "ldlib2_ui_serialize": "Element To Nbt",
+  "ldlib2_ui_deserialize": "Element From Nbt",
+  "ldlib2_ui_parent": "Parent",
+  "ldlib2_ui_children": "Children",
+  "ldlib2_ui_descendants": "Descendants",
+
+  "ldlib2_ui_child_at": "Child At",
+
+  "ldlib2_ui_ancestor_of_type": "Ancestor Of Type",
+
+  "ldlib2_ui_select": "Select",
+
+  "ldlib2_ui_select_id": "Select By Id",
+  "ldlib2_ui_select_regex": "Select By Regex",
+
+  "ldlib2_ui_find_by_id": "Find By Id",
+
+
+  "ldlib2_ui_set_id": "Set Id",
+  "ldlib2_ui_set_flag": "Set Flag",
+
+
+  "ldlib2_ui_focus": "Focus",
+
+  "ldlib2_ui_set_text": "Set Text",
+
+  "ldlib2_ui_get_text": "Get Text",
+  "ldlib2_ui_get_value": "Get Value",
+
+  "ldlib2_ui_set_value": "Set Value",
+  "ldlib2_ui_set_property": "Set Property",
+
+  "ldlib2_ui_get_property": "Get Property",
+
+  "ldlib2_ui_list_properties": "List Properties",
+
+  "ldlib2_ui_element_info": "Element Info",
+
+  "ldlib2_ui_info_identity": "Identity",
+  "ldlib2_ui_info_state": "State",
+  "ldlib2_ui_info_interaction": "Interaction",
+  "ldlib2_ui_info_structure": "Structure",
+  "ldlib2_ui_info_position": "Position",
+  "ldlib2_ui_info_size": "Size",
+
+  "ldlib2_ui_info_content_box": "Content Box",
+
+  "ldlib2_ui_info_margin": "Margin",
+
+  "ldlib2_ui_lss_set": "Set Lss",
+  "ldlib2_ui_lss_remove": "Remove Lss",
+  "ldlib2_ui_lss_block": "Lss Block",
+  "ldlib2_ui_lss_get": "Get Lss",
+
+  "ldlib2_ui_class": "Classes",
+
+  "ldlib2_ui_has_class": "Has Class",
+
+  "ldlib2_ui_stylesheet_parse": "Parse Stylesheet",
+  "ldlib2_ui_stylesheet_load": "Load Stylesheet",
+  "ldlib2_ui_stylesheet_builtin": "Builtin Stylesheet",
+  "ldlib2_ui_stylesheet_merge": "Merge Stylesheets",
+  "ldlib2_ui_stylesheet_register": "Register Stylesheet",
+
+  "ldlib2_ui_local_stylesheet": "Local Stylesheet",
+
+  "ldlib2_ui_global_stylesheet": "Global Stylesheet",
+
+  "ldlib2_ui_apply_stylesheet": "Apply Stylesheet",
+
+  "ldlib2_ui_animate": "Animate Style",
+  "ldlib2_ui_tooltip": "Set Tooltip",
+
+  "ldlib2_ui_on_event": "On Event",
+
+  "ldlib2_ui_on_server_event": "On Server Event",
+
+  "ldlib2_ui_on_tick": "On Tick",
+
+  "ldlib2_ui_event_info": "Event Info",
+  "ldlib2_ui_event_stop": "Stop Event",
+  "ldlib2_ui_event_dispatch": "Dispatch Event",
+
+  "ldlib2_ui_sync_value": "Sync Value",
+  "ldlib2_ui_sync_get": "Get Synced",
+  "ldlib2_ui_sync_set": "Set Synced",
+
+  "ldlib2_ui_binding": "Make Binding",
+  "ldlib2_ui_bind": "Bind",
+  "ldlib2_ui_unbind": "Unbind",
+
+  "ldlib2_ui_rpc_define": "Define Rpc",
+  "ldlib2_ui_rpc_return": "Rpc Return",
+  "ldlib2_ui_rpc_send": "Send Rpc",
+
+  "ldlib2_ui_on_message": "On Message",
+
+  "ldlib2_ui_send_message": "Send Message",
+
+  "ldlib2_ui_side": "Which Side",
+
+  "ldlib2_ui_modular_of": "Modular UI Of",
+
+  "ldlib2_ui_mui_info": "Modular UI Info",
+
+  "ldlib2_ui_close": "Close UI",
+
+  "kg.node.ldlib2_ui_load_xml.tooltip": "A UI xml file, loaded by resource id.",
+  "kg.node.ldlib2_ui_load_xml.desc.1": "The file may contain a <root> tree, inline <style> blocks and <stylesheet> references — the whole document format.",
+  "kg.node.ldlib2_ui_load_xml.in.location": "The resource id of the xml file.",
+  "kg.node.ldlib2_ui_load_xml.out.ui": "The loaded UI. Empty if the file was missing.",
+  "kg.node.ldlib2_ui_load_xml.out.root": "The UI's root element, for convenience.",
+  "kg.node.ldlib2_ui_load_xml.note.1": "The client looks in assets, the server in datapacks. A UI both sides build needs its xml under data/, or the server silently builds an empty tree.",
+
+  "kg.node.ldlib2_ui_parse_xml.tooltip": "UI xml written inline, with as little ceremony as you like.",
+  "kg.node.ldlib2_ui_parse_xml.desc.1": "All three of these mean the same thing: the full <ui><root>…</root></ui>, just <root>…</root>, or bare elements like <button id=\"ok\"/>.",
+  "kg.node.ldlib2_ui_parse_xml.in.xml": "The xml text.",
+  "kg.node.ldlib2_ui_parse_xml.example.1": "<button id=\"save\" class=\"primary\"/> builds one button with an id and a class — enough for a stylesheet and a selector to find it.",
+
+  "kg.node.ldlib2_ui_create.tooltip": "A UI from a root element and the stylesheets it should use.",
+  "kg.node.ldlib2_ui_create.in.root": "The root element.",
+  "kg.node.ldlib2_ui_create.in.stylesheets": "Stylesheets to style the whole tree with.",
+  "kg.node.ldlib2_ui_create.note.1": "A UI is immutable once made. To add a stylesheet later, use Global Stylesheet on the Modular UI.",
+
+  "kg.node.ldlib2_ui_create_sized.tooltip": "A UI that sizes itself against the screen.",
+  "kg.node.ldlib2_ui_create_sized.desc.1": "The size is recomputed every time the screen initialises, so it survives a window resize — which a fixed layout width would not.",
+  "kg.node.ldlib2_ui_create_sized.option.mode.tooltip": "How width and height are read.",
+  "kg.node.ldlib2_ui_create_sized.option.mode.tooltip.fixed": "Pixels, ignoring the screen.",
+  "kg.node.ldlib2_ui_create_sized.option.mode.tooltip.percent_of_screen": "Percentages of the screen, 0-100.",
+  "kg.node.ldlib2_ui_create_sized.option.mode.tooltip.screen_minus": "Pixels subtracted from the screen — a margin on each axis.",
+
+  "kg.node.ldlib2_ui_unpack.tooltip": "The root element and stylesheets of a UI.",
+
+  "kg.node.ldlib2_ui_to_template.tooltip": "A snapshot of a UI, as a template.",
+  "kg.node.ldlib2_ui_to_template.desc.1": "Takes either a UI or a bare element — whichever is wired. A template is the form that survives a save file or a packet.",
+  "kg.node.ldlib2_ui_to_template.note.1": "A template stores the tree, ids, classes and persisted fields. Event listeners, sync values and RPCs are Java objects and do not survive.",
+
+  "kg.node.ldlib2_ui_template_load.tooltip": "A template from LDLib2's UI resource library.",
+  "kg.node.ldlib2_ui_template_load.in.path": "A typed path, e.g. builtin(ldlib2:missing), file(/my_ui.ui) or pack(mymod:ui/machine).",
+  "kg.node.ldlib2_ui_template_load.out.ok": "False when the path did not resolve; the template output is then the red 'Missing' placeholder.",
+
+  "kg.node.ldlib2_ui_template_create_ui.tooltip": "A fresh UI stamped out of a template.",
+  "kg.node.ldlib2_ui_template_create_ui.desc.1": "Each pass through builds a new tree, so this inside a loop produces one per iteration.",
+
+  "kg.node.ldlib2_ui_template_init.tooltip": "Stamps a template into an element that already exists.",
+  "kg.node.ldlib2_ui_template_init.desc.1": "Unlike Template To UI, this fills a root you already hold — which is what you want when the element is already parented into a bigger tree.",
+
+  "kg.node.ldlib2_ui_template_styles.tooltip": "Replaces a template's styles.",
+  "kg.node.ldlib2_ui_template_styles.in.builtinStyles": "An inline LSS block stored inside the template itself.",
+  "kg.node.ldlib2_ui_template_styles.in.stylesheets": "Resource ids of stylesheets the template should reference.",
+
+  "kg.node.ldlib2_ui_template_copy.tooltip": "An independent copy of a template.",
+  "kg.node.ldlib2_ui_template_copy.desc.1": "A template's NBT is mutable, so two UIs stamped from one that a graph then edited would disagree about what they were stamped from.",
+
+  "kg.node.ldlib2_ui_modular_create.tooltip": "A live UI instance for a player.",
+  "kg.node.ldlib2_ui_modular_create.desc.1": "This does not mount the tree. It sets up the sync manager, the style engine and the layout tree; the root is attached only when the host says so — a menu on the server, screen init on the client. Until then no element has a Modular UI and nothing has reached the sync manager.",
+  "kg.node.ldlib2_ui_modular_create.note.1": "So sync values reach the manager in the order the tree is walked as it mounts, not the order the graph declared them in. Still deterministic, and still requires both sides to build the same tree.",
+
+  "kg.node.ldlib2_ui_element_new.tooltip": "A new element of a registered type.",
+  "kg.node.ldlib2_ui_element_new.desc.1": "The type list is LDLib2's element registry — the same table an xml tag name resolves through, so 'button' here and <button/> in xml build the same thing.",
+  "kg.node.ldlib2_ui_element_new.in.id": "The id, for selectors and stylesheets to find it by. Optional.",
+  "kg.node.ldlib2_ui_element_new.in.classes": "Space-separated class names, as in a class=\"a b\" attribute.",
+  "kg.node.ldlib2_ui_element_new.option.type.tooltip": "Which registered element type to build.",
+  "kg.node.ldlib2_ui_element_new.note.1": "An exec node, not a plain value: an element has identity, so when it is made has to be something the graph states. Inside a loop it makes a new one per iteration; outside, it makes one that event handlers can find again.",
+
+  "kg.node.ldlib2_ui_element_from_xml.tooltip": "Elements written as xml — <button id=\"ok\"/> is enough.",
+  "kg.node.ldlib2_ui_element_from_xml.out.element": "The first element. The common case.",
+  "kg.node.ldlib2_ui_element_from_xml.out.elements": "All of them, so a fragment naming several siblings loses nothing.",
+
+  "kg.node.ldlib2_ui_add_child.tooltip": "Adds a child to a parent.",
+  "kg.node.ldlib2_ui_add_child.in.index": "Where to insert. -1 appends. Sibling order is what a flex layout lays out in.",
+  "kg.node.ldlib2_ui_add_child.out.out": "The parent again, so a build chain can keep threading it along.",
+  "kg.node.ldlib2_ui_add_child.note.1": "Refuses to create a cycle — adding an element to its own descendant would make hit-testing loop forever.",
+
+  "kg.node.ldlib2_ui_add_children.tooltip": "Adds every element of a list to a parent, in order.",
+  "kg.node.ldlib2_ui_add_children.out.added": "How many were actually added.",
+
+  "kg.node.ldlib2_ui_remove_child.tooltip": "Removes a child from its parent.",
+
+  "kg.node.ldlib2_ui_remove_self.tooltip": "Removes an element from whatever parent it has.",
+
+  "kg.node.ldlib2_ui_clear_children.tooltip": "Removes an element's children.",
+  "kg.node.ldlib2_ui_clear_children.in.keepInternal": "Keep the element's own internal children. On by default, and usually right: a Button owns its caption, a Scroller owns its handle, and clearing those leaves a control that can never display anything again.",
+
+  "kg.node.ldlib2_ui_copy.tooltip": "An independent copy of an element and everything under it.",
+  "kg.node.ldlib2_ui_copy.note.1": "The copy carries the tree, ids, classes and persisted fields — but not event listeners, sync values or RPCs, which NBT cannot hold. Attach behaviour after copying, not before.",
+
+  "kg.node.ldlib2_ui_serialize.tooltip": "An element's tree as NBT.",
+
+  "kg.node.ldlib2_ui_deserialize.tooltip": "Loads an NBT tree into an element, replacing what was there.",
+
+  "kg.node.ldlib2_ui_parent.tooltip": "An element's parent.",
+
+  "kg.node.ldlib2_ui_children.tooltip": "An element's direct children.",
+
+  "kg.node.ldlib2_ui_descendants.tooltip": "Every element under this one, depth-first.",
+  "kg.node.ldlib2_ui_descendants.in.includeSelf": "Whether the element itself is in the list.",
+
+  "kg.node.ldlib2_ui_child_at.tooltip": "The child at an index.",
+
+  "kg.node.ldlib2_ui_ancestor_of_type.tooltip": "The nearest ancestor of a chosen element type.",
+  "kg.node.ldlib2_ui_ancestor_of_type.desc.1": "How a child finds the panel it lives in without the graph having to carry a wire all the way down.",
+
+  "kg.node.ldlib2_ui_select.tooltip": "Elements matching a selector, searched downwards from a root.",
+  "kg.node.ldlib2_ui_select.in.selector": "The same syntax LSS uses: #id, .class, a bare type name, or a combination.",
+  "kg.node.ldlib2_ui_select.out.first": "The first match, since most selectors are meant to find one thing.",
+  "kg.node.ldlib2_ui_select.note.1": "Walks the tree, so it works before the UI is mounted — which is when a build needs it. Find By Id is faster but only sees mounted elements.",
+
+  "kg.node.ldlib2_ui_select_id.tooltip": "Elements whose id matches exactly.",
+
+  "kg.node.ldlib2_ui_select_regex.tooltip": "Elements whose id matches a regular expression.",
+  "kg.node.ldlib2_ui_select_regex.desc.1": "For rows a template numbered slot_0, slot_1, …: slot_\\d+ gets all of them without knowing how many there are.",
+
+  "kg.node.ldlib2_ui_find_by_id.tooltip": "An element by id, through the live UI's index.",
+  "kg.node.ldlib2_ui_find_by_id.note.1": "A map lookup rather than a tree walk, but it only sees elements already added to the UI. During a build there is nothing to find.",
+
+
+  "kg.node.ldlib2_ui_set_id.tooltip": "Sets an element's id.",
+  "kg.node.ldlib2_ui_set_id.desc.1": "The id is the handle a selector, a stylesheet rule and Find By Id all use.",
+
+  "kg.node.ldlib2_ui_set_flag.tooltip": "Flips one of an element's state flags.",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip": "Which flag to set.",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.visible": "Drawn or not. An invisible element still takes up its layout space and still receives events.",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.active": "Receives events or not. Off is what 'disabled' means.",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.focusable": "Can take keyboard focus.",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.display": "In the layout or not. Off removes it entirely, so siblings close the gap.",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.overflow_visible": "Whether content outside the element's bounds is drawn rather than clipped.",
+  "kg.node.ldlib2_ui_set_flag.option.flag.tooltip.hit_test": "Whether the mouse can hit it. Off makes it click-through.",
+
+
+  "kg.node.ldlib2_ui_focus.tooltip": "Moves keyboard focus.",
+  "kg.node.ldlib2_ui_focus.option.op.tooltip": "What to do with the focus.",
+  "kg.node.ldlib2_ui_focus.option.op.tooltip.focus": "Give this element focus. It must be focusable.",
+  "kg.node.ldlib2_ui_focus.option.op.tooltip.blur": "Take focus away from this element, if it has it.",
+  "kg.node.ldlib2_ui_focus.option.op.tooltip.clear": "Drop focus entirely, whatever holds it.",
+  "kg.node.ldlib2_ui_focus.note.1": "Focus lives on the live UI, so this does nothing for an element that has not been mounted yet. Focusing is nearly always a handler's job, not a build step.",
+
+  "kg.node.ldlib2_ui_set_text.tooltip": "Sets the caption of anything that shows one.",
+  "kg.node.ldlib2_ui_set_text.desc.1": "Covers Label, Text, Button and Text Field. For a Text Field the component is flattened to a plain string.",
+
+  "kg.node.ldlib2_ui_get_text.tooltip": "Reads an element's caption.",
+
+  "kg.node.ldlib2_ui_get_value.tooltip": "The element's own value — a Toggle's boolean, a Slider's float, an Item Slot's stack.",
+  "kg.node.ldlib2_ui_get_value.option.valueType.tooltip": "Types the output pin. Leaving it unknown gives an anything-goes pin and still works.",
+
+  "kg.node.ldlib2_ui_set_value.tooltip": "Writes the element's value through its own setter, so listeners and bindings see it.",
+  "kg.node.ldlib2_ui_set_value.in.notify": "Whether listeners are told. Turn it off to write a value back into the control that produced it without re-entering your own change handler.",
+
+  "kg.node.ldlib2_ui_set_property.tooltip": "Writes one of the element's configurable fields.",
+  "kg.node.ldlib2_ui_set_property.desc.1": "The property list is exactly what LDLib2's own UI editor shows in its Inspector, and the value pin takes the field's declared type — pick progress-bar then value and it becomes a float pin.",
+  "kg.node.ldlib2_ui_set_property.option.elementType.tooltip": "Which element type's property list to offer. Only a lens for the picker — the write itself uses whatever element arrives.",
+  "kg.node.ldlib2_ui_set_property.option.property.tooltip": "Which property to write.",
+  "kg.node.ldlib2_ui_set_property.note.1": "Writes go through the field's annotated setter when it has one, which is where the behaviour lives — clamping a progress value, notifying a toggle's listeners.",
+  "kg.node.ldlib2_ui_set_property.note.2": "Appearance is not here. Everything visual goes through Set Lss and Classes instead.",
+
+  "kg.node.ldlib2_ui_get_property.tooltip": "Reads one of the element's configurable fields.",
+
+  "kg.node.ldlib2_ui_list_properties.tooltip": "The configurable property names an element has.",
+
+  "kg.node.ldlib2_ui_element_info.tooltip": "Holds one element for the property blocks placed inside it.",
+  "kg.node.ldlib2_ui_element_info.desc.1": "Wire the element once, then stack as many property blocks as you need — instead of wiring the same element into a dozen separate nodes.",
+
+  "kg.node.ldlib2_ui_info_identity.tooltip": "The element's id, type name and classes.",
+
+  "kg.node.ldlib2_ui_info_state.tooltip": "The visibility and interaction flags.",
+
+  "kg.node.ldlib2_ui_info_interaction.tooltip": "Whether the mouse is over it and whether it holds focus.",
+  "kg.node.ldlib2_ui_info_interaction.out.selfOrChildHover": "True when the cursor is over this element or anything inside it — what a container usually wants to know.",
+
+  "kg.node.ldlib2_ui_info_structure.tooltip": "Where the element sits in the tree.",
+
+
+  "kg.node.ldlib2_ui_info_position.tooltip": "The element's position, relative to its parent's content box.",
+
+  "kg.node.ldlib2_ui_info_size.tooltip": "The element's own width and height, border included.",
+
+  "kg.node.ldlib2_ui_info_content_box.tooltip": "The box children are laid out in: inside the padding.",
+
+  "kg.node.ldlib2_ui_info_margin.tooltip": "The element's margins, one per side.",
+
+  "kg.node.ldlib2_ui_info_position.note.1": "Layout numbers only exist once a client has laid the tree out. On the server, and before the first layout pass, they read zero — so read them in a hover or tick handler, not during the build.",
+
+  "kg.node.ldlib2_ui_lss_set.tooltip": "Sets one LSS property on one element.",
+  "kg.node.ldlib2_ui_lss_set.desc.1": "The value is written the way LSS writes it, because the same parser reads it: #ff5555, 50%, 12, center. A number is formatted plainly; an integer wired into a colour property becomes #AARRGGBB.",
+  "kg.node.ldlib2_ui_lss_set.option.property.tooltip": "Which LSS property.",
+  "kg.node.ldlib2_ui_lss_set.option.origin.tooltip": "Which layer of the cascade the value belongs to. Higher layers win: default < stylesheet < inline < animation < important.",
+  "kg.node.ldlib2_ui_lss_set.note.1": "Prefer Classes when a stylesheet could describe the look. Reach for this when the value is one only the graph can know — a bar width computed from a number.",
+
+  "kg.node.ldlib2_ui_lss_remove.tooltip": "Removes a property this graph set, letting what was underneath show through.",
+  "kg.node.ldlib2_ui_lss_remove.desc.1": "Only removes the graph's own value at that layer — a stylesheet rule setting the same property is untouched. That is how a hover effect is undone without erasing the element's normal appearance.",
+
+  "kg.node.ldlib2_ui_lss_block.tooltip": "A whole LSS declaration block at once: color: #ff5555; opacity: 0.5;",
+  "kg.node.ldlib2_ui_lss_block.desc.1": "Exactly what a UI xml file's style=\"…\" attribute means, parsed by the same code. Unknown property names are skipped rather than failing the block.",
+  "kg.node.ldlib2_ui_lss_block.out.applied": "How many declarations were understood.",
+
+  "kg.node.ldlib2_ui_lss_get.tooltip": "The value an element's style resolves to right now.",
+  "kg.node.ldlib2_ui_lss_get.desc.1": "Answers after the whole cascade — a colour coming from a stylesheet reads the same as one set inline. Good for checking a style, poor for storing the graph's own state in.",
+
+  "kg.node.ldlib2_ui_class.tooltip": "Adds, removes, replaces or toggles class names.",
+  "kg.node.ldlib2_ui_class.desc.1": "The pipeline most interaction should use. A handler that adds .selected leaves what 'selected' looks like with the designer, works for every element the rule matches, and is undone by removing one name.",
+  "kg.node.ldlib2_ui_class.in.classes": "Space-separated names, as in a class=\"a b\" attribute.",
+  "kg.node.ldlib2_ui_class.option.op.tooltip": "What to do with the names.",
+  "kg.node.ldlib2_ui_class.option.op.tooltip.add": "Add them.",
+  "kg.node.ldlib2_ui_class.option.op.tooltip.remove": "Remove them.",
+  "kg.node.ldlib2_ui_class.option.op.tooltip.set": "Replace the whole class list with them. With no names, clears every class.",
+  "kg.node.ldlib2_ui_class.option.op.tooltip.toggle": "Add each one that is absent, remove each one that is present.",
+
+  "kg.node.ldlib2_ui_has_class.tooltip": "Whether an element carries a class name.",
+
+  "kg.node.ldlib2_ui_stylesheet_parse.tooltip": "Parses LSS text into a stylesheet.",
+  "kg.node.ldlib2_ui_stylesheet_parse.in.name": "A name for the sheet, shown in the UI debugger.",
+
+  "kg.node.ldlib2_ui_stylesheet_load.tooltip": "A stylesheet from a resource id.",
+  "kg.node.ldlib2_ui_stylesheet_load.desc.1": "ldlib2:lss/mc.lss is that one file. ldlib2:lss/mc — no extension — is every lss/mc.lss in every loaded pack, merged.",
+
+  "kg.node.ldlib2_ui_stylesheet_builtin.tooltip": "One of LDLib2's own stylesheets.",
+  "kg.node.ldlib2_ui_stylesheet_builtin.option.sheet.tooltip": "Which one. The merged variants also pick up rules other packs contribute at the same path, which is what makes a theme extensible.",
+
+  "kg.node.ldlib2_ui_stylesheet_merge.tooltip": "Merges one stylesheet's rules into another, in place.",
+  "kg.node.ldlib2_ui_stylesheet_merge.note.1": "Mutates the target. Merging into a sheet the manager owns edits it for every UI in the game — merge into one this graph parsed.",
+
+  "kg.node.ldlib2_ui_stylesheet_register.tooltip": "Registers a stylesheet under a resource id, so anything can load it by name.",
+  "kg.node.ldlib2_ui_stylesheet_register.note.1": "Global and permanent for the session. A graph that runs more than once should register the same id each time rather than generating names.",
+
+  "kg.node.ldlib2_ui_local_stylesheet.tooltip": "A stylesheet scoped to one element and its descendants.",
+  "kg.node.ldlib2_ui_local_stylesheet.in.lss": "Raw LSS text, if you would rather not build a stylesheet first. The parsed stylesheet input wins if both are wired.",
+  "kg.node.ldlib2_ui_local_stylesheet.option.op.tooltip": "Attach, detach, or remove every local sheet.",
+
+  "kg.node.ldlib2_ui_global_stylesheet.tooltip": "Adds or removes a stylesheet on a live UI.",
+  "kg.node.ldlib2_ui_global_stylesheet.desc.1": "The only way to add a sheet after the UI was constructed, because a UI is immutable. This is what runtime theming uses.",
+  "kg.node.ldlib2_ui_global_stylesheet.note.1": "Client only — the server has no style engine.",
+
+  "kg.node.ldlib2_ui_apply_stylesheet.tooltip": "Matches a stylesheet against an element and writes the matching rules onto it, by hand.",
+  "kg.node.ldlib2_ui_apply_stylesheet.desc.1": "The step the style engine does automatically when an element joins a client UI. Doing it explicitly is useful where there is no engine — on the server — or not one yet, before the UI is mounted.",
+  "kg.node.ldlib2_ui_apply_stylesheet.in.recursive": "Whether descendants are matched too. On by default, since a stylesheet's selectors are meant to find things throughout a subtree.",
+
+  "kg.node.ldlib2_ui_animate.tooltip": "Interpolates a style property from where it is now to a target.",
+  "kg.node.ldlib2_ui_animate.in.duration": "Seconds.",
+  "kg.node.ldlib2_ui_animate.in.delay": "Seconds to wait before starting.",
+  "kg.node.ldlib2_ui_animate.option.ease.tooltip": "The easing curve.",
+  "kg.node.ldlib2_ui_animate.note.1": "Client only, and only on a mounted element — the animation engine lives on the live UI.",
+  "kg.node.ldlib2_ui_animate.note.2": "The animation outranks stylesheet and inline values while it runs, then leaves its final value behind as an inline one. To hand the property back to the stylesheet afterwards, remove it with Remove Lss at the inline layer.",
+
+  "kg.node.ldlib2_ui_tooltip.tooltip": "Sets the tooltip lines an element shows on hover.",
+  "kg.node.ldlib2_ui_tooltip.in.line": "A single line — the common case, and shorter than building a list.",
+  "kg.node.ldlib2_ui_tooltip.in.lines": "More lines, appended after the single one.",
+  "kg.node.ldlib2_ui_tooltip.desc.1": "An empty list clears the tooltip, which is how a hint is turned off once it no longer applies.",
+
+  "kg.node.ldlib2_ui_on_event.tooltip": "Runs a chain whenever an event reaches an element.",
+  "kg.node.ldlib2_ui_on_event.desc.1": "Two exec outputs. 'next' continues building the UI straight away; 'onEvent' runs every time the player triggers the event, however much later.",
+  "kg.node.ldlib2_ui_on_event.desc.2": "The handler is evaluated fresh each time, so whatever it reads from the UI is current rather than whatever was true while the tree was being built.",
+  "kg.node.ldlib2_ui_on_event.in.useCapture": "Listen on the way down instead of the way up. An event travels root to target, fires, then travels back — a capture listener sees it before any descendant does, which is how a dialog intercepts clicks meant for what is underneath.",
+  "kg.node.ldlib2_ui_on_event.option.eventType.tooltip": "Which event. The list is LDLib2's built-in types, but anything you type is accepted — a custom type dispatched by another graph is not in any registry.",
+  "kg.node.ldlib2_ui_on_event.example.1": "New Element (button) → On Event (mouseClick) → onEvent → Classes (toggle 'selected'). One node registers, one reacts.",
+
+  "kg.node.ldlib2_ui_on_server_event.tooltip": "Runs a chain on the server whenever an event reaches the element on the client.",
+  "kg.node.ldlib2_ui_on_server_event.desc.1": "For a reaction that has to change the world — consume an item, flip a machine — where the client has nothing real to change.",
+  "kg.node.ldlib2_ui_on_server_event.note.1": "The event is rebuilt from the wire: coordinates, button and key data survive; drag state and custom data do not.",
+  "kg.node.ldlib2_ui_on_server_event.note.2": "There is a round trip, so the server reacts a tick or so later. Anything the player must see immediately belongs in a client handler.",
+  "kg.node.ldlib2_ui_on_server_event.note.3": "Registers an RPC, so both sides must reach this node in the same order as every other sync registration. Build the same tree on both sides.",
+
+  "kg.node.ldlib2_ui_on_tick.tooltip": "Runs a chain once per tick, while the element is active and displayed.",
+  "kg.node.ldlib2_ui_on_tick.desc.1": "The hook for anything that has to poll: a countdown, a value that changes without an input event.",
+  "kg.node.ldlib2_ui_on_tick.note.1": "Twenty times a second, and it recomputes the chain each time. Keep it small — a value that changes rarely belongs on a sync value's onReceived instead.",
+
+  "kg.node.ldlib2_ui_event_info.tooltip": "Everything carried by a dispatched event.",
+  "kg.node.ldlib2_ui_event_info.out.x": "Horizontal position, in the target element's own space — so it can be compared against the element's content box without transforming anything.",
+  "kg.node.ldlib2_ui_event_info.out.y": "Vertical position, in the target element's own space.",
+  "kg.node.ldlib2_ui_event_info.out.character": "The character typed, for a charTyped event. Empty when none.",
+  "kg.node.ldlib2_ui_event_info.out.relatedTarget": "The other element involved: on focus, the one that lost it; on blur, the one that gained it.",
+
+  "kg.node.ldlib2_ui_event_stop.tooltip": "Stops an event travelling further.",
+  "kg.node.ldlib2_ui_event_stop.desc.1": "How a handler says 'I dealt with it'. Without it, a click on a button inside a scrollable panel also reaches the panel.",
+  "kg.node.ldlib2_ui_event_stop.option.mode.tooltip": "How far to stop it.",
+  "kg.node.ldlib2_ui_event_stop.option.mode.tooltip.propagation": "No further element sees it, in either direction.",
+  "kg.node.ldlib2_ui_event_stop.option.mode.tooltip.immediate": "As above, and no other listener on this element runs either.",
+  "kg.node.ldlib2_ui_event_stop.option.mode.tooltip.later": "This element's other listeners still run; nothing after this phase does.",
+
+  "kg.node.ldlib2_ui_event_dispatch.tooltip": "Builds an event and dispatches it at an element, as though the player had caused it.",
+  "kg.node.ldlib2_ui_event_dispatch.desc.1": "Two uses: synthetic input, and a custom event type as a message bus — dispatch mymod:refresh at the root and let every part of the UI that cares listen for it, instead of wiring each one to the thing that changed.",
+  "kg.node.ldlib2_ui_event_dispatch.in.sendServer": "Whether server-side listeners are notified too. Off by default: a synthetic event claiming the player did something is worth thinking about before it reaches the server.",
+  "kg.node.ldlib2_ui_event_dispatch.out.handled": "Whether any listener ran.",
+
+  "kg.node.ldlib2_ui_sync_value.tooltip": "A value LDLib2 keeps the same on both sides.",
+  "kg.node.ldlib2_ui_sync_value.desc.1": "Use a sync value for state — what is this now — and an RPC for a moment, when something just happened.",
+  "kg.node.ldlib2_ui_sync_value.desc.2": "Wire something into 'source' and the sending side pulls that expression every tick, so the value tracks it. Leave it unwired and push with Set Synced instead.",
+  "kg.node.ldlib2_ui_sync_value.in.element": "The element that owns it. The value lives as long as that element is in the UI.",
+  "kg.node.ldlib2_ui_sync_value.in.name": "A name, for debugging. The wire does not carry it.",
+  "kg.node.ldlib2_ui_sync_value.option.valueType.tooltip": "What is being synced. Must be a concrete type — the sync layer needs an accessor to turn it into bytes.",
+  "kg.node.ldlib2_ui_sync_value.option.direction.tooltip": "Which way it travels.",
+  "kg.node.ldlib2_ui_sync_value.option.direction.tooltip.s2c": "Server to client. The usual one: the server owns the truth, the client shows it.",
+  "kg.node.ldlib2_ui_sync_value.option.direction.tooltip.c2s": "Client to server. For what the player edits.",
+  "kg.node.ldlib2_ui_sync_value.option.direction.tooltip.both": "Both ways.",
+  "kg.node.ldlib2_ui_sync_value.option.strategy.tooltip": "How often it is sent.",
+  "kg.node.ldlib2_ui_sync_value.note.1": "The wire identifies a sync value by the order it was registered in, not by its name. Both sides must register the same values in the same sequence — so build the same tree on both sides, and never branch the structure on Which Side.",
+
+  "kg.node.ldlib2_ui_sync_get.tooltip": "The value a sync value currently holds, on whichever side asks.",
+
+  "kg.node.ldlib2_ui_sync_set.tooltip": "Writes a sync value, so the other side sees it next tick.",
+  "kg.node.ldlib2_ui_sync_set.in.markChanged": "Force a send even when nothing looks changed. Needed for a value edited in place — a list, a tag — because the dirty check compares against the very instance that was mutated.",
+
+  "kg.node.ldlib2_ui_binding.tooltip": "A two-way binding between a server-side value and an element.",
+  "kg.node.ldlib2_ui_binding.desc.1": "Goes one step further than a sync value: bound to an element, an Item Slot shows the server's stack and a Text Field sends what the player types, with no handler in between.",
+  "kg.node.ldlib2_ui_binding.desc.2": "For some elements it is the only way in — an Item Slot's real contents are not a configurable field and cannot be reached with Set Property.",
+  "kg.node.ldlib2_ui_binding.in.serverValue": "What the server side provides. Pulled every tick, so the binding tracks whatever expression is wired here.",
+  "kg.node.ldlib2_ui_binding.note.1": "'onReceived' fires on whichever side an update lands on. The binding only moves the value — reacting to it is the graph's job.",
+
+  "kg.node.ldlib2_ui_bind.tooltip": "Attaches a binding to an element.",
+  "kg.node.ldlib2_ui_bind.note.1": "Only works on an element that carries a value — Item Slot, Fluid Slot, Progress Bar, Toggle, Slider, Text Field, Selector, Label and the rest. Anything else reports false; use a sync value and a handler instead.",
+
+  "kg.node.ldlib2_ui_unbind.tooltip": "Detaches a binding, so the element stops mirroring it.",
+
+  "kg.node.ldlib2_ui_rpc_define.tooltip": "Declares a call the other side can make, and runs a chain when it does.",
+  "kg.node.ldlib2_ui_rpc_define.option.argCount.tooltip": "How many arguments, up to four. Beyond that, send a compound tag with On Message instead.",
+  "kg.node.ldlib2_ui_rpc_define.option.returnType.tooltip": "What the call answers with. Leave it unknown for a one-way call.",
+  "kg.node.ldlib2_ui_rpc_define.note.1": "To answer, end the onCall chain at Rpc Return.",
+  "kg.node.ldlib2_ui_rpc_define.note.2": "Both sides must register the same RPCs in the same order — the wire carries a registration index, not a name.",
+
+  "kg.node.ldlib2_ui_rpc_return.tooltip": "Answers the RPC call currently being handled.",
+  "kg.node.ldlib2_ui_rpc_return.in.rpc": "Leave unwired to answer the innermost call, which is what a handler wants unless it is nested inside another.",
+
+  "kg.node.ldlib2_ui_rpc_send.tooltip": "Calls an RPC on the other side.",
+  "kg.node.ldlib2_ui_rpc_send.desc.1": "'next' continues immediately; 'onReturn' fires when the answer arrives, at least a tick later. A graph that needs the answer must continue from onReturn.",
+  "kg.node.ldlib2_ui_rpc_send.note.1": "The argument types must match the defining node's, position for position — the wire carries no names.",
+
+  "kg.node.ldlib2_ui_on_message.tooltip": "Runs a chain when the other side sends a named message to this element.",
+  "kg.node.ldlib2_ui_on_message.desc.1": "The zero-configuration path: no types to line up, and the payload is a compound tag the graph's NBT nodes can take apart. Start here before reaching for a typed RPC.",
+
+  "kg.node.ldlib2_ui_send_message.tooltip": "Sends a named message with an NBT payload to the same element on the other side.",
+
+  "kg.node.ldlib2_ui_side.tooltip": "Which side this evaluation is running on.",
+  "kg.node.ldlib2_ui_side.desc.1": "Derived from the current thread, so it answers correctly even before a UI exists.",
+  "kg.node.ldlib2_ui_side.note.1": "Branch on this for behaviour — only the server can change the world, only the client can animate. Never branch the shape of the UI tree or the set of sync values on it: those are matched across the network by registration order.",
+
+  "kg.node.ldlib2_ui_modular_of.tooltip": "The live UI an element belongs to.",
+  "kg.node.ldlib2_ui_modular_of.out.mounted": "False until the element has been added to a mounted tree.",
+
+  "kg.node.ldlib2_ui_mui_info.tooltip": "Everything about a live UI a graph is likely to ask for.",
+  "kg.node.ldlib2_ui_mui_info.out.tick": "The UI's own tick counter, starting at zero when it opened — which is what a timeout in a UI wants to measure against.",
+
+  "kg.node.ldlib2_ui_close.tooltip": "Closes the UI.",
+  "kg.node.ldlib2_ui_close.desc.1": "Goes through the player's container, which is the one action a menu-backed UI and a plain screen both agree on.",
+
+  "ldlib2_ui_start_drag": "Start Drag",
+  "ldlib2_ui_drag_info": "Drag Info",
+  "kg.node.ldlib2_ui_start_drag.tooltip": "Begins a drag, carrying an arbitrary payload.",
+  "kg.node.ldlib2_ui_start_drag.desc.1": "Call it from a mouseDown handler on whatever the player grabbed. A drag does not begin because the mouse moved — it begins because something started one.",
+  "kg.node.ldlib2_ui_start_drag.in.payload": "Anything the graph carries — an item stack, an index, the source element itself. It comes back out of Drag Info on whatever receives the drop.",
+  "kg.node.ldlib2_ui_start_drag.note.1": "Needs a mounted element: the drag lives on the live UI, so there is nowhere to start one before the tree is attached.",
+  "kg.node.ldlib2_ui_start_drag.note.2": "Client only. LDLib2 never sends drag events to the server — have the drop handler send an RPC or a message once it knows what was dropped.",
+  "kg.node.ldlib2_ui_drag_info.tooltip": "What is being dragged, read off a drag event.",
+  "kg.node.ldlib2_ui_drag_info.desc.1": "The dragged object lives on the event's drag handler rather than on the event, which is why Event Info cannot reach it and this node exists.",
+  "kg.node.ldlib2_ui_drag_info.in.element": "An alternative to the event: a tick or mouseMove handler has no drag event to hand, but can still ask its UI whether a drag is in progress.",
+  "kg.node.ldlib2_ui_drag_info.out.payload": "Untyped, exactly as it was given. A handler expecting a particular type should check rather than assume.",
+  "kg.node.ldlib2_ui_drag_info.out.source": "The element the drag started from — what dragEnd is dispatched at."
 }

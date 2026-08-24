@@ -31,7 +31,7 @@ import net.minecraft.world.level.material.Fluid;
  */
 public final class McIdNodes {
 
-    private static final String GROUP = "mc_id";
+    private static final String GROUP = "mc/id";
 
     private McIdNodes() {
     }

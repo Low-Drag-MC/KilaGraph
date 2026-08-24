@@ -24,7 +24,7 @@ import java.util.List;
  * contents. A graph that renders a tag, or compares two lists of keys, would otherwise see spurious
  * differences. Sorting costs nothing at these sizes and makes the output a function of the value.
  */
-@NodeAttribute(name = "mc_nbt_keys", group = "mc_nbt", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_nbt_keys", group = "mc/nbt", graphTypes = BlueprintGraph.class)
 public class NbtKeysNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

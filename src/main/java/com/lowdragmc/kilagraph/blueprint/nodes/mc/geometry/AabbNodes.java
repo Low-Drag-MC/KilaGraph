@@ -27,7 +27,7 @@ import org.joml.Vector3f;
  */
 public final class AabbNodes {
 
-    private static final String GROUP = "mc_geometry";
+    private static final String GROUP = "mc/geometry";
     private static final AABB UNIT = new AABB(0, 0, 0, 1, 1, 1);
 
     private AabbNodes() {

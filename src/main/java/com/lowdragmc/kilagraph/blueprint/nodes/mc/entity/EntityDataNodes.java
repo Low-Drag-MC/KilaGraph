@@ -44,7 +44,7 @@ import java.util.List;
  */
 public final class EntityDataNodes {
 
-    private static final String GROUP = "mc_entity";
+    private static final String GROUP = "mc/entity";
 
     private EntityDataNodes() {
     }

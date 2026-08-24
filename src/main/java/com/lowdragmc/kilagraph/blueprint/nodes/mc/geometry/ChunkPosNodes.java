@@ -16,7 +16,7 @@ import net.minecraft.world.level.ChunkPos;
  */
 public final class ChunkPosNodes {
 
-    private static final String GROUP = "mc_geometry";
+    private static final String GROUP = "mc/geometry";
 
     private ChunkPosNodes() {
     }

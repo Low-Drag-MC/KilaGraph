@@ -22,7 +22,7 @@ import net.minecraft.world.entity.EntityType;
  */
 public final class EntityTypeNodes {
 
-    private static final String GROUP = "mc_entity";
+    private static final String GROUP = "mc/entity";
 
     private EntityTypeNodes() {
     }

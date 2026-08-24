@@ -29,7 +29,7 @@ import net.minecraft.server.level.ServerPlayer;
  */
 public final class WorldEffectNodes {
 
-    private static final String GROUP = "mc_action";
+    private static final String GROUP = "mc/action";
 
     private WorldEffectNodes() {
     }

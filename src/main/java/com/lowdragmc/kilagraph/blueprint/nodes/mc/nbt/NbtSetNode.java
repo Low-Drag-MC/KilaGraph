@@ -19,7 +19,7 @@ import java.util.List;
  */
 // valueType MUST stay an option — see NbtGetNode: it drives the dynamic port's type, decided at
 // defineNode time, before any wire has a value.
-@NodeAttribute(name = "mc_nbt_set", group = "mc_nbt", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_nbt_set", group = "mc/nbt", graphTypes = BlueprintGraph.class)
 public class NbtSetNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

@@ -54,7 +54,7 @@ import java.util.List;
  */
 public final class LootNodes {
 
-    private static final String GROUP = "mc_loot";
+    private static final String GROUP = "mc/loot";
 
     private LootNodes() {
     }

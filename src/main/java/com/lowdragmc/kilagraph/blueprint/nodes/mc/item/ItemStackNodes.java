@@ -43,7 +43,7 @@ import net.minecraft.network.chat.CommonComponents;
  */
 public final class ItemStackNodes {
 
-    private static final String GROUP = "mc_item";
+    private static final String GROUP = "mc/item";
 
     private ItemStackNodes() {
     }

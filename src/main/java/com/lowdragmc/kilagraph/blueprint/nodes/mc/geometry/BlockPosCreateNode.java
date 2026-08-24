@@ -10,7 +10,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.core.BlockPos;
 
 /** Builds a {@link BlockPos} from x/y/z. */
-@NodeAttribute(name = "mc_block_pos_create", group = "mc_geometry", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_block_pos_create", group = "mc/geometry", graphTypes = BlueprintGraph.class)
 public class BlockPosCreateNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

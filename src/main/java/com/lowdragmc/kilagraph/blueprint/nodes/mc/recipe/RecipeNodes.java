@@ -57,7 +57,7 @@ import net.minecraft.world.item.crafting.display.SlotDisplayContext;
  */
 public final class RecipeNodes {
 
-    private static final String GROUP = "mc_recipe";
+    private static final String GROUP = "mc/recipe";
 
     /**
      * Largest grid {@code mc_crafting_result} will build.

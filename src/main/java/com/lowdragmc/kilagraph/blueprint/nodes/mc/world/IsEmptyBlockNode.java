@@ -11,7 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 
 /** {@code level.isEmptyBlock(pos)} (air). Null level → false. */
-@NodeAttribute(name = "mc_is_empty_block", group = "mc_world", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_is_empty_block", group = "mc/world", graphTypes = BlueprintGraph.class)
 public class IsEmptyBlockNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

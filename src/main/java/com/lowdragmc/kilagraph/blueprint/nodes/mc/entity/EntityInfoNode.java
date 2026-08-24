@@ -14,7 +14,7 @@ import net.minecraft.world.entity.Entity;
  * running the same wire into a node per property. For a player, use {@link PlayerInfoNode} instead: it
  * accepts every block this one does, plus the player-only ones.
  */
-@NodeAttribute(name = "mc_entity_info", group = "mc_entity", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_entity_info", group = "mc/entity", graphTypes = BlueprintGraph.class)
 public class EntityInfoNode extends InfoContextNode<Entity> {
     @Override
     protected Component getNodeTooltip() {

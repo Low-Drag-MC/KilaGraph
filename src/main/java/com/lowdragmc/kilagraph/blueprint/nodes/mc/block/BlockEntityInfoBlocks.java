@@ -25,7 +25,7 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public final class BlockEntityInfoBlocks {
 
-    private static final String GROUP = "mc_block";
+    private static final String GROUP = "mc/block";
 
     private BlockEntityInfoBlocks() {
     }

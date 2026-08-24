@@ -23,7 +23,7 @@ import net.minecraft.world.level.Level;
  */
 public final class LevelInfoBlocks {
 
-    private static final String GROUP = "mc_world";
+    private static final String GROUP = "mc/world";
 
     private LevelInfoBlocks() {
     }

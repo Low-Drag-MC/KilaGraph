@@ -12,7 +12,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 /** {@code level.getBlockEntity(pos)} — null if no block entity (or null level). */
-@NodeAttribute(name = "mc_get_block_entity", group = "mc_world", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_get_block_entity", group = "mc/world", graphTypes = BlueprintGraph.class)
 public class GetBlockEntityNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

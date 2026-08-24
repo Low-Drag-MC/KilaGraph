@@ -38,7 +38,7 @@ import net.minecraft.world.level.levelgen.structure.Structure;
  *
  * <p>Server side only, and false when the world was generated with structures turned off.
  */
-@NodeAttribute(name = "mc_find_structure", group = "mc_world", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_find_structure", group = "mc/world", graphTypes = BlueprintGraph.class)
 public class FindStructureNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

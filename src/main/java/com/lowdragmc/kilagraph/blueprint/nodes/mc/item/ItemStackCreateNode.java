@@ -27,7 +27,7 @@ import net.minecraft.world.item.Items;
  * {@code Set Component} already does, and it would have to take them as one opaque blob rather than
  * one at a time. Build the stack here and pipe it through {@code Set Component} for each one.
  */
-@NodeAttribute(name = "mc_item_stack_create", group = "mc_item", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_item_stack_create", group = "mc/item", graphTypes = BlueprintGraph.class)
 public class ItemStackCreateNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

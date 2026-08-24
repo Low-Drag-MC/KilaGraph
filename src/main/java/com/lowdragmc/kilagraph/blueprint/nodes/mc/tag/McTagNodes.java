@@ -37,7 +37,7 @@ import net.minecraft.world.level.material.Fluid;
  */
 public final class McTagNodes {
 
-    private static final String GROUP = "mc_tag";
+    private static final String GROUP = "mc/tag";
 
     private McTagNodes() {
     }

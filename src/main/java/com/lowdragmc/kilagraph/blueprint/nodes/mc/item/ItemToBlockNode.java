@@ -13,7 +13,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 
 /** The block form of an {@link Item} ({@link Block#byItem(Item)}); AIR block for non-block items. */
-@NodeAttribute(name = "mc_item_to_block", group = "mc_item", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_item_to_block", group = "mc/item", graphTypes = BlueprintGraph.class)
 public class ItemToBlockNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

@@ -26,7 +26,7 @@ import java.util.List;
  */
 public final class BlockPosNodes {
 
-    private static final String GROUP = "mc_geometry";
+    private static final String GROUP = "mc/geometry";
 
     private BlockPosNodes() {
     }

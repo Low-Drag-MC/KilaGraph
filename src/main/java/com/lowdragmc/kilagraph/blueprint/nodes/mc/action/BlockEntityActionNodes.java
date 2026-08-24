@@ -36,7 +36,7 @@ import net.minecraft.world.level.storage.TagValueInput;
  */
 public final class BlockEntityActionNodes {
 
-    private static final String GROUP = "mc_action";
+    private static final String GROUP = "mc/action";
 
     private BlockEntityActionNodes() {
     }

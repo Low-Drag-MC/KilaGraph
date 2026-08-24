@@ -13,7 +13,7 @@ import net.minecraft.world.level.Level;
  * <p>The level is never injected by the framework. It comes in on the {@code target} port, from a graph
  * variable or from {@code mc_block_entity_level}.
  */
-@NodeAttribute(name = "mc_level_info", group = "mc_world", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_level_info", group = "mc/world", graphTypes = BlueprintGraph.class)
 public class LevelInfoNode extends InfoContextNode<Level> {
     @Override
     protected Component getNodeTooltip() {

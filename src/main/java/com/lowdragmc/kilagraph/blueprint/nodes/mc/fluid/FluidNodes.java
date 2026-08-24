@@ -30,7 +30,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
  */
 public final class FluidNodes {
 
-    private static final String GROUP = "mc_fluid";
+    private static final String GROUP = "mc/fluid";
 
     private FluidNodes() {
     }
