@@ -19,10 +19,12 @@ public class ListSliceNode extends AnnotatedNode {
     @InputPort public int from = 0;
     @InputPort public int to = 0;
     @OutputPort public List<?> out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         List<?> src = ctx.getInput("list", List.class, List.of());
-        int f = Math.max(0, Math.min(src.size(), ctx.getInput("from", Integer.class, 0)));
-        int t = Math.max(0, Math.min(src.size(), ctx.getInput("to", Integer.class, src.size())));
+        int f = Math.max(0, Math.min(src.size(), ctx.getInt("from", 0)));
+        int t = Math.max(0, Math.min(src.size(), ctx.getInt("to", src.size())));
         ctx.setOutput("out", f >= t ? List.of() : new ArrayList<>(src.subList(f, t)));
     }
 }

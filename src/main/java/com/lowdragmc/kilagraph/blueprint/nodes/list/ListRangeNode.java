@@ -19,10 +19,12 @@ public class ListRangeNode extends AnnotatedNode {
     @InputPort public int to = 10;
     @InputPort public int step = 1;
     @OutputPort public List<?> out;
-@Override public void evaluate(EvalContext ctx) {
-        int f = ctx.getInput("from", Integer.class, 0);
-        int t = ctx.getInput("to", Integer.class, 10);
-        int s = ctx.getInput("step", Integer.class, 1);
+
+    @Override
+    public void evaluate(EvalContext ctx) {
+        int f = ctx.getInt("from", 0);
+        int t = ctx.getInt("to", 10);
+        int s = ctx.getInt("step", 1);
         List<Integer> result = new ArrayList<>();
         if (s > 0) for (int i = f; i < t; i += s) result.add(i);
         ctx.setOutput("out", result);

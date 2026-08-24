@@ -1,7 +1,5 @@
 package com.lowdragmc.kilagraph.graph.exec;
 
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
-
 import java.util.List;
 
 /**
@@ -11,17 +9,18 @@ import java.util.List;
  */
 public final class SequenceFrame extends ExecFrame {
 
-    private final NodeModel node;
+    private final PreparedGraph.Node node;
     private final List<String> outIds;
     private int cursor = 0;
 
-    SequenceFrame(GraphExecutor scope, NodeModel node, List<String> outIds) {
+    SequenceFrame(GraphExecutor scope, PreparedGraph.Node node, List<String> outIds) {
         super(scope);
         this.node = node;
         this.outIds = outIds;
     }
 
-    @Override public Kind kind() { return Kind.SEQUENCE; }
+    @Override
+    public Kind kind() { return Kind.SEQUENCE; }
 
     @Override boolean resume(ExecSession session) {
         if (cursor >= outIds.size()) return false;  // all outputs done — pop

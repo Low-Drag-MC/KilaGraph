@@ -15,9 +15,11 @@ public class RandomIntNode extends AnnotatedNode {
     @InputPort public int min = 0;
     @InputPort public int max = 100;
     @OutputPort public int out;
-@Override public void evaluate(EvalContext ctx) {
-        int lo = ctx.getInput("min", Integer.class, 0);
-        int hi = ctx.getInput("max", Integer.class, 100);
+
+    @Override
+    public void evaluate(EvalContext ctx) {
+        int lo = ctx.getInt("min", 0);
+        int hi = ctx.getInt("max", 100);
         if (hi <= lo) { ctx.setOutput("out", lo); return; }
         ctx.setOutput("out", lo + ctx.getExecutor().rng().nextInt(hi - lo));
     }

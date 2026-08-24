@@ -1,6 +1,5 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
@@ -20,14 +19,15 @@ import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import java.util.List;
 import java.util.Map;
+import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
+import net.minecraft.core.Holder;
+import net.minecraft.gametest.framework.TestData;
+import net.minecraft.gametest.framework.TestEnvironmentDefinition;
+import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -53,6 +53,7 @@ public final class MapNodeGameTest {
 
     private MapNodeGameTest() {}
 
+
     public static void registerFunctions() {
         KGGameTests.registerFunction(CREATE, MapNodeGameTest::create);
         KGGameTests.registerFunction(GET, MapNodeGameTest::get);
@@ -70,9 +71,14 @@ public final class MapNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{CREATE, GET, GET_DEFAULT, PUT, REMOVE, CONTAINS_KEY,
-                CONTAINS_VALUE, KEYS, VALUES, SIZE, IS_EMPTY, MERGE, IMMUTABILITY}) {
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        for (String p : new String[]{
+                CREATE, GET, GET_DEFAULT,
+                PUT, REMOVE, CONTAINS_KEY,
+                CONTAINS_VALUE, KEYS, VALUES,
+                SIZE, IS_EMPTY, MERGE,
+                IMMUTABILITY
+        }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
     }
@@ -91,9 +97,12 @@ public final class MapNodeGameTest {
         return n;
     }
 
+
+
     public static void create(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1", "b", "2");
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> map = new GraphExecutor(g).evaluate(m.getOutputsById().get("out"), Map.class);
         assertEq(helper, "size", 2, map.size());
@@ -101,6 +110,8 @@ public final class MapNodeGameTest {
         assertEq(helper, "b", "2", map.get("b"));
         helper.succeed();
     }
+
+
 
     public static void get(GameTestHelper helper) {
         var g = newGraph();
@@ -116,6 +127,8 @@ public final class MapNodeGameTest {
         helper.succeed();
     }
 
+
+
     public static void getDefault(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1");
@@ -130,6 +143,8 @@ public final class MapNodeGameTest {
         helper.succeed();
     }
 
+
+
     public static void put(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1");
@@ -139,12 +154,15 @@ public final class MapNodeGameTest {
         setInputConstant(put, "key", "b");
         setInputConstant(put, "value", "2");
         wire(g, put.getInputsById().get("map"), m.getOutputsById().get("out"));
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> result = new GraphExecutor(g).evaluate(put.getOutputsById().get("out"), Map.class);
         assertEq(helper, "size", 2, result.size());
         assertEq(helper, "b", "2", result.get("b"));
         helper.succeed();
     }
+
+
 
     public static void remove(GameTestHelper helper) {
         var g = newGraph();
@@ -153,12 +171,15 @@ public final class MapNodeGameTest {
         setOption(rm, "keyType", TypeHandles.STRING.getIdentification());
         setInputConstant(rm, "key", "a");
         wire(g, rm.getInputsById().get("map"), m.getOutputsById().get("out"));
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> result = new GraphExecutor(g).evaluate(rm.getOutputsById().get("out"), Map.class);
         assertEq(helper, "size", 1, result.size());
         assertEq(helper, "b kept", "2", result.get("b"));
         helper.succeed();
     }
+
+
 
     public static void containsKey(GameTestHelper helper) {
         var g = newGraph();
@@ -180,6 +201,8 @@ public final class MapNodeGameTest {
                 new GraphExecutor(g2).evaluate(ck2.getOutputsById().get("out"), Boolean.class));
         helper.succeed();
     }
+
+
 
     public static void containsValue(GameTestHelper helper) {
         var g = newGraph();
@@ -206,12 +229,15 @@ public final class MapNodeGameTest {
         return get.getOutputsById().get("value");
     }
 
+
+
     public static void keys(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1", "b", "2", "c", "3");
         var k = addNode(g, MapKeysNode.class);
         setOption(k, "keyType", TypeHandles.STRING.getIdentification());
         wire(g, k.getInputsById().get("map"), m.getOutputsById().get("out"));
+
         @SuppressWarnings("unchecked")
         List<Object> keys = new GraphExecutor(g).evaluate(k.getOutputsById().get("out"), List.class);
         assertEq(helper, "size", 3, keys.size());
@@ -222,11 +248,14 @@ public final class MapNodeGameTest {
         helper.succeed();
     }
 
+
+
     public static void values(GameTestHelper helper) {
         var g = newGraph();
         var m = stringStringMap(g, "a", "1", "b", "2");
         var v = addNode(g, MapValuesNode.class);
         wire(g, v.getInputsById().get("map"), m.getOutputsById().get("out"));
+
         @SuppressWarnings("unchecked")
         List<Object> values = new GraphExecutor(g).evaluate(v.getOutputsById().get("out"), List.class);
         assertEq(helper, "size", 2, values.size());
@@ -234,6 +263,8 @@ public final class MapNodeGameTest {
         assertEq(helper, "[1]", "2", values.get(1));
         helper.succeed();
     }
+
+
 
     public static void size(GameTestHelper helper) {
         var g = newGraph();
@@ -244,6 +275,8 @@ public final class MapNodeGameTest {
                 (int) new GraphExecutor(g).evaluate(s.getOutputsById().get("size"), Integer.class));
         helper.succeed();
     }
+
+
 
     public static void isEmpty(GameTestHelper helper) {
         var g = newGraph();
@@ -260,6 +293,8 @@ public final class MapNodeGameTest {
         helper.succeed();
     }
 
+
+
     public static void merge(GameTestHelper helper) {
         var g = newGraph();
         var mA = stringStringMap(g, "a", "1", "b", "2");
@@ -267,6 +302,7 @@ public final class MapNodeGameTest {
         var merge = addNode(g, MapMergeNode.class);
         wire(g, merge.getInputsById().get("a"), mA.getOutputsById().get("out"));
         wire(g, merge.getInputsById().get("b"), mB.getOutputsById().get("out"));
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> result = new GraphExecutor(g).evaluate(merge.getOutputsById().get("out"), Map.class);
         assertEq(helper, "size", 3, result.size());
@@ -275,6 +311,8 @@ public final class MapNodeGameTest {
         assertEq(helper, "c", "3", result.get("c"));
         helper.succeed();
     }
+
+
 
     public static void immutability(GameTestHelper helper) {
         // Put must not mutate the source — re-evaluate source after put.
@@ -288,10 +326,13 @@ public final class MapNodeGameTest {
         wire(g, put.getInputsById().get("map"), src.getOutputsById().get("out"));
 
         var exec = new GraphExecutor(g);
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> s1 = exec.evaluate(src.getOutputsById().get("out"), Map.class);
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> pAfter = exec.evaluate(put.getOutputsById().get("out"), Map.class);
+
         @SuppressWarnings("unchecked")
         Map<Object, Object> s2 = exec.evaluate(src.getOutputsById().get("out"), Map.class);
 

@@ -1,7 +1,8 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.blueprint.nodes.convert.CastNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.NumberFormatNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ParseBoolNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ParseNumberNode;
@@ -11,22 +12,32 @@ import com.lowdragmc.kilagraph.blueprint.nodes.convert.ToStringNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListGetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosNodes;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.id.McIdNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.graph.exec.TypeMismatchException;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
-import net.minecraft.core.Holder;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.Identifier;
+import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
+import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
+import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertTrue;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.newGraph;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputConstant;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
 public final class ConvertNodeGameTest {
+    private static final String CAST_RELABELS_AND_COERCES = "convert_node_cast_relabels_and_coerces";
     private static final String TO_STRING = "convert_to_string";
     private static final String PARSE_NUMBER = "convert_parse_number";
     private static final String PARSE_BOOL = "convert_parse_bool";
@@ -36,28 +47,31 @@ public final class ConvertNodeGameTest {
 
     private ConvertNodeGameTest() {}
 
+
     public static void registerFunctions() {
         KGGameTests.registerFunction(TO_STRING, ConvertNodeGameTest::toStringTest);
         KGGameTests.registerFunction(PARSE_NUMBER, ConvertNodeGameTest::parseNumber);
         KGGameTests.registerFunction(PARSE_BOOL, ConvertNodeGameTest::parseBool);
-        KGGameTests.registerFunction(NUMBER_FORMAT, ConvertNodeGameTest::numberFormat);
         KGGameTests.registerFunction(TO_INT, ConvertNodeGameTest::toInt);
         KGGameTests.registerFunction(TO_FLOAT, ConvertNodeGameTest::toFloat);
+        KGGameTests.registerFunction(NUMBER_FORMAT, ConvertNodeGameTest::numberFormat);
+        KGGameTests.registerFunction(CAST_RELABELS_AND_COERCES, ConvertNodeGameTest::castRelabelsAndCoerces);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, TO_STRING, KGGameTests.functionKey(TO_STRING), data);
-        KGGameTests.registerFunctionTest(event, PARSE_NUMBER, KGGameTests.functionKey(PARSE_NUMBER), data);
-        KGGameTests.registerFunctionTest(event, PARSE_BOOL, KGGameTests.functionKey(PARSE_BOOL), data);
-        KGGameTests.registerFunctionTest(event, NUMBER_FORMAT, KGGameTests.functionKey(NUMBER_FORMAT), data);
-        KGGameTests.registerFunctionTest(event, TO_INT, KGGameTests.functionKey(TO_INT), data);
-        KGGameTests.registerFunctionTest(event, TO_FLOAT, KGGameTests.functionKey(TO_FLOAT), data);
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        for (String p : new String[]{
+                TO_STRING, PARSE_NUMBER, PARSE_BOOL,
+                TO_INT, TO_FLOAT, NUMBER_FORMAT,
+                CAST_RELABELS_AND_COERCES
+        }) {
+            KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
+        }
     }
 
     /** A wired Float source (AddNode out) to feed UNKNOWN inputs that have no embedded constant. */
-    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel floatSource(
-            com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, float value) {
+    private static PortModel floatSource(
+            BlueprintGraph g, float value) {
         var add = addNode(g, AddNode.class);
         setInputConstant(add, "in1", value);
         setInputConstant(add, "in2", 0f);
@@ -65,8 +79,8 @@ public final class ConvertNodeGameTest {
     }
 
     /** A wired Integer source (ListCombine(INT)+ListGet(INT)) to feed UNKNOWN inputs. */
-    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel intSource(
-            com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, int value) {
+    private static PortModel intSource(
+            BlueprintGraph g, int value) {
         var combine = addNode(g, ListCombineNode.class);
         setOption(combine, "type", TypeHandles.INT.getIdentification());
         setOption(combine, "inputs", 1);
@@ -79,8 +93,8 @@ public final class ConvertNodeGameTest {
     }
 
     /** Helper: feed a String value into an UNKNOWN port via a ListCombine(STRING)+ListGet(STRING). */
-    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel stringSource(
-            com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, String value) {
+    private static PortModel stringSource(
+            BlueprintGraph g, String value) {
         var combine = addNode(g, ListCombineNode.class);
         setOption(combine, "type", TypeHandles.STRING.getIdentification());
         setOption(combine, "inputs", 1);
@@ -91,6 +105,8 @@ public final class ConvertNodeGameTest {
         wire(g, get.getInputsById().get("list"), combine.getOutputsById().get("out"));
         return get.getOutputsById().get("value");
     }
+
+
 
     public static void toStringTest(GameTestHelper helper) {
         // Number to string via wire from a String source (since UNKNOWN port has no constant)
@@ -108,6 +124,8 @@ public final class ConvertNodeGameTest {
         helper.succeed();
     }
 
+
+
     public static void parseNumber(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, ParseNumberNode.class);
@@ -123,6 +141,8 @@ public final class ConvertNodeGameTest {
                 new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), Float.class), 1e-5f);
         helper.succeed();
     }
+
+
 
     public static void parseBool(GameTestHelper helper) {
         for (String s : new String[]{"true", "True", "YES", "1"}) {
@@ -142,6 +162,8 @@ public final class ConvertNodeGameTest {
         helper.succeed();
     }
 
+
+
     public static void toInt(GameTestHelper helper) {
         for (var c : new Object[][]{{ToIntNode.Op.TRUNC, 3.9f, 3}, {ToIntNode.Op.TRUNC, -3.9f, -3},
                                      {ToIntNode.Op.FLOOR, 3.9f, 3}, {ToIntNode.Op.CEIL, 3.1f, 4},
@@ -156,6 +178,8 @@ public final class ConvertNodeGameTest {
         helper.succeed();
     }
 
+
+
     public static void toFloat(GameTestHelper helper) {
         var g = newGraph();
         var n = addNode(g, ToFloatNode.class);
@@ -164,6 +188,8 @@ public final class ConvertNodeGameTest {
         assertEq(helper, "int 7 → float 7.0", 7.0f, v, 1e-5f);
         helper.succeed();
     }
+
+
 
     public static void numberFormat(GameTestHelper helper) {
         var g = newGraph();
@@ -180,5 +206,73 @@ public final class ConvertNodeGameTest {
         assertEq(helper, "fixed 4dp", "1.0000",
                 new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), String.class));
         helper.succeed();
+    }
+
+    /**
+     * Cast: the promise that a loosely-typed value really is a given type.
+     *
+     * <p>Cast does not convert — it re-labels, so the output port carries the promised type and the wire
+     * rules downstream accept it. What it actually does at runtime is the same liberal coercion
+     * {@code getInput} applies, which is why a number promised as text arrives as text and a value that
+     * cannot be represented arrives as nothing rather than as an exception.
+     *
+     * <p>It is <b>strict</b>: a promise that cannot be honoured throws rather than yielding nothing. That
+     * is the right call for this node specifically — everything downstream trusts the output's declared
+     * type, so a silent null would push the failure somewhere it cannot be diagnosed. A null <em>input</em>
+     * is different and passes through, because "no value yet" is not a broken promise.
+     *
+     * <h2>The value has to be wired, not typed in</h2>
+     * Cast's input is {@code UNKNOWN}, and LDLib2 deliberately gives an {@code UNKNOWN} port no embedded
+     * constant — there is no editor for a value whose type is not yet decided. So the test feeds it from
+     * a real producer, which is also the only way a graph can use it.
+     */
+    public static void castRelabelsAndCoerces(GameTestHelper helper) {
+        // An int, produced by unpacking a block position.
+        assertEq(helper, "int stays an int", 7, castInt(TypeHandles.INT, Integer.class).intValue());
+        assertEq(helper, "int promised as float", 7f,
+                castInt(TypeHandles.FLOAT, Float.class).floatValue(), 1e-6f);
+        assertEq(helper, "int promised as text", "7", castInt(TypeHandles.STRING, String.class));
+
+        assertEq(helper, "text cast to text is itself", "not_a_number",
+                castText(TypeHandles.STRING, String.class));
+
+        // A promise that cannot be honoured throws, and the message names both types.
+        boolean threw = false;
+        try {
+            castText(TypeHandles.INT, Integer.class);
+        } catch (TypeMismatchException expected) {
+            threw = true;
+        }
+        assertTrue(helper, "non-numeric text promised as int throws", threw);
+        helper.succeed();
+    }
+
+    /** Casts the int 7, sourced from a Block Pos Unpack so the value arrives over a wire. */
+    private static <T> T castInt(TypeHandle target,
+                                 Class<T> type) {
+        var g = newGraph();
+        var src = addNode(g, BlockPosNodes.Unpack.class);
+        setInputConstant(src, "in", new BlockPos(7, 0, 0));
+        return runCast(g, src.getOutputsById().get("x"), target, type);
+    }
+
+    /** Casts the text "not_a_number", sourced from an Identifier Unpack. */
+    private static <T> T castText(TypeHandle target,
+                                  Class<T> type) {
+        var g = newGraph();
+        var src = addNode(g, McIdNodes.Unpack.class);
+        setInputConstant(src, "in",
+                Identifier.fromNamespaceAndPath("minecraft", "not_a_number"));
+        return runCast(g, src.getOutputsById().get("path"), target, type);
+    }
+
+    private static <T> T runCast(BlueprintGraph g,
+                                 PortModel source,
+                                 TypeHandle target,
+                                 Class<T> type) {
+        var n = addNode(g, CastNode.class);
+        setOption(n, "targetType", target.getIdentification());
+        wire(g, n.getInputsById().get("in"), source);
+        return new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), type);
     }
 }

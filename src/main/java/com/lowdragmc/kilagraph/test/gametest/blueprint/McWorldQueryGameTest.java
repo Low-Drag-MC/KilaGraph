@@ -1,6 +1,5 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.world.GetBlockEntityNode;
@@ -11,22 +10,22 @@ import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
-
-import java.util.Map;
+import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
+import net.minecraft.core.Holder;
+import net.minecraft.gametest.framework.TestData;
+import net.minecraft.gametest.framework.TestEnvironmentDefinition;
+import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -47,6 +46,7 @@ public final class McWorldQueryGameTest {
 
     private McWorldQueryGameTest() {}
 
+
     public static void registerFunctions() {
         KGGameTests.registerFunction(READ_BLOCK, McWorldQueryGameTest::readBlock);
         KGGameTests.registerFunction(EMPTY_AND_BE, McWorldQueryGameTest::emptyAndBlockEntity);
@@ -54,7 +54,9 @@ public final class McWorldQueryGameTest {
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{READ_BLOCK, EMPTY_AND_BE}) {
+        for (String p : new String[]{
+                READ_BLOCK, EMPTY_AND_BE
+        }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
     }
@@ -93,7 +95,7 @@ public final class McWorldQueryGameTest {
 
         var exec = execWithLevel(g, level);
         assertEq(helper, "GetBlock", Blocks.STONE,
-                exec.evaluate(getBlock.getOutputsById().get("out"), net.minecraft.world.level.block.Block.class));
+                exec.evaluate(getBlock.getOutputsById().get("out"), Block.class));
         BlockState state = exec.evaluate(getState.getOutputsById().get("out"), BlockState.class);
         assertTrue(helper, "GetBlockState non-null", state != null);
         assertEq(helper, "state.block", Blocks.STONE, state.getBlock());

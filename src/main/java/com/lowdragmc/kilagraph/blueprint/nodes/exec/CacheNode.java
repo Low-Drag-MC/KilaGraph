@@ -35,7 +35,7 @@ public class CacheNode extends AnnotatedNode {
         var state = ctx.getExecutor().nodeState(getNodeModel().getUid());
         // containsKey (not get != null) so a memoised null is honoured rather than recomputed.
         if (!state.containsKey("cached")) {
-            state.put("cached", ctx.getInput("value").orElse(null));
+            state.put("cached", ctx.getInputRaw("value"));
         }
         ctx.setOutput("cached", state.get("cached"));
         ctx.setOutput("ref", new NodeRef(getNodeModel().getUid()));

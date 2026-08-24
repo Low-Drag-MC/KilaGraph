@@ -12,7 +12,9 @@ public class NotNode extends AnnotatedNode {
 
     @InputPort public boolean in = false;
     @OutputPort public boolean out;
-@Override public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", !ctx.getInput("in", Boolean.class, false));
+
+    @Override
+    public void evaluate(EvalContext ctx) {
+        ctx.setOutput("out", !ctx.getBool("in", false));
     }
 }

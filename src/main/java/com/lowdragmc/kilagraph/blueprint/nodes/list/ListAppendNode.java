@@ -20,20 +20,24 @@ import java.util.List;
 public class ListAppendNode extends AnnotatedNode {
     @InputPort public List<?> list = List.of();
     @OutputPort public List<?> out;
-@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))
                 .build();
     }
 
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("value", currentElementType());
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         List<?> src = ctx.getInput("list", List.class, List.of());
-        Object value = ctx.getInput("value").orElse(null);
+        Object value = ctx.getInputRaw("value");
         List<Object> result = new ArrayList<>(src);
         result.add(value);
         ctx.setOutput("out", result);

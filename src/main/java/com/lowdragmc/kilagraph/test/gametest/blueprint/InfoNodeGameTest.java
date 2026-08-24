@@ -1,18 +1,28 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
-
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.ItemStackCreateNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.info.EntityInfoNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.info.InfoFieldBlock;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.info.ItemStackInfoNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.block.BlockEntityInfoBlocks;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.block.BlockEntityInfoNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.EntityInfoBlocks;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.EntityInfoNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.PlayerInfoBlocks;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.PlayerInfoNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.world.LevelInfoBlocks;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.world.LevelInfoNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
-import com.lowdragmc.kilagraph.graph.mc.MemberInfoRegistry;
-import net.minecraft.core.Holder;
+import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.ContextNode;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.UseWithContext;
+import java.util.List;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import org.joml.Vector3f;
+import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
+import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
-import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
@@ -22,125 +32,180 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertFals
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertTrue;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.newGraph;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputConstant;
-import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
-import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
 /**
- * The InfoNode context/block framework + {@link MemberInfoRegistry}. An
- * {@link com.lowdragmc.kilagraph.blueprint.nodes.mc.info.InfoContextNode} holds a {@code target};
- * each {@link InfoFieldBlock} added to it reads one selected property of that target.
+ * The context/property-block mechanism itself, as opposed to what any one block reads (that is
+ * {@link McInfoBlockGameTest}).
+ *
+ * <p>Four things have to hold for the design to work: several blocks in one context all see the same
+ * target; a missing target degrades to null instead of throwing; a block only appears in the contexts it
+ * declares; and a block whose declared type does not match the context's target reads as absent rather
+ * than class-casting. The last two are what replaced a reflective property picker, so they are the ones
+ * worth pinning.
  */
 public final class InfoNodeGameTest {
-    private static final String MULTI_BLOCK = "info_multi_block";
-    private static final String CACHE_IDENTITY = "info_cache_identity";
-    private static final String OVERRIDE = "info_override_extra_exclude";
-    private static final String UNKNOWN_KEY = "info_unknown_key_null";
-    private static final String NULL_TARGET = "info_null_target_null";
-
-    /** Reflection fixture for the override test (public so reflection sees its members). */
-    public static final class Dummy {
-        public int a = 7;
-        public int getB() {
-            return 9;
-        }
-    }
-
-    private InfoNodeGameTest() {}
+    private static final String ONE_TARGET_MANY_BLOCKS = "info_node_one_target_many_blocks";
+    private static final String MISSING_TARGET_READS_NULL = "info_node_missing_target_reads_null";
+    private static final String CONTEXT_REFUSES_A_FOREIGN_BLOCK = "info_node_context_refuses_a_foreign_block";
+    private static final String BLOCKS_ARE_SCOPED_TO_THEIR_CONTEXTS = "info_node_blocks_are_scoped_to_their_contexts";
+    private static final String POSITION_BLOCKS_USE_THE_GRAPH_VECTOR_TYPE = "info_node_position_blocks_use_the_graph_vector_type";
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(MULTI_BLOCK, InfoNodeGameTest::multiBlock);
-        KGGameTests.registerFunction(CACHE_IDENTITY, InfoNodeGameTest::cacheIdentity);
-        KGGameTests.registerFunction(OVERRIDE, InfoNodeGameTest::overrideExtraExclude);
-        KGGameTests.registerFunction(UNKNOWN_KEY, InfoNodeGameTest::unknownKeyNull);
-        KGGameTests.registerFunction(NULL_TARGET, InfoNodeGameTest::nullTargetNull);
+        KGGameTests.registerFunction(ONE_TARGET_MANY_BLOCKS, InfoNodeGameTest::oneTargetManyBlocks);
+        KGGameTests.registerFunction(MISSING_TARGET_READS_NULL, InfoNodeGameTest::missingTargetReadsNull);
+        KGGameTests.registerFunction(CONTEXT_REFUSES_A_FOREIGN_BLOCK, InfoNodeGameTest::contextRefusesAForeignBlock);
+        KGGameTests.registerFunction(BLOCKS_ARE_SCOPED_TO_THEIR_CONTEXTS, InfoNodeGameTest::blocksAreScopedToTheirContexts);
+        KGGameTests.registerFunction(POSITION_BLOCKS_USE_THE_GRAPH_VECTOR_TYPE, InfoNodeGameTest::positionBlocksUseTheGraphVectorType);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{MULTI_BLOCK, CACHE_IDENTITY, OVERRIDE, UNKNOWN_KEY, NULL_TARGET}) {
+        for (String p : new String[]{
+                ONE_TARGET_MANY_BLOCKS, MISSING_TARGET_READS_NULL, CONTEXT_REFUSES_A_FOREIGN_BLOCK,
+                BLOCKS_ARE_SCOPED_TO_THEIR_CONTEXTS, POSITION_BLOCKS_USE_THE_GRAPH_VECTOR_TYPE
+        }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
     }
 
-    /** One ItemStack context feeding three blocks reading three different properties. */
-    public static void multiBlock(GameTestHelper helper) {
-        var g = newGraph();
-        var create = addNode(g, ItemStackCreateNode.class);
-        setInputConstant(create, "item", Items.DIAMOND);
-        setInputConstant(create, "count", 7);
-
-        var ctx = addNode(g, ItemStackInfoNode.class);
-        wire(g, ctx.getInputsById().get("target"), create.getOutputsById().get("out"));
-
-        var countBlock = addBlock(g, ctx, InfoFieldBlock.class);
-        setOption(countBlock, "field", "count");
-        var maxBlock = addBlock(g, ctx, InfoFieldBlock.class);
-        setOption(maxBlock, "field", "maxStackSize");
-        var emptyBlock = addBlock(g, ctx, InfoFieldBlock.class);
-        setOption(emptyBlock, "field", "isEmpty");
-
-        var exec = new GraphExecutor(g);
-        assertEq(helper, "count", 7, ((Number) exec.evaluate(countBlock.getOutputsById().get("value"), Object.class)).intValue());
-        assertEq(helper, "maxStackSize", 64, ((Number) exec.evaluate(maxBlock.getOutputsById().get("value"), Object.class)).intValue());
-        assertFalse(helper, "isEmpty", (Boolean) exec.evaluate(emptyBlock.getOutputsById().get("value"), Object.class));
-        helper.succeed();
+    private InfoNodeGameTest() {
     }
 
-    /** Member map is cached per class — same instance on repeated lookups. */
-    public static void cacheIdentity(GameTestHelper helper) {
-        var a = MemberInfoRegistry.membersFor(net.minecraft.world.item.ItemStack.class);
-        var b = MemberInfoRegistry.membersFor(net.minecraft.world.item.ItemStack.class);
-        assertTrue(helper, "same cached instance", a == b);
-        assertTrue(helper, "has count", a.containsKey("count"));
-        helper.succeed();
-    }
+    /** One context feeding several blocks: each reads a different property of the same target. */
+    public static void oneTargetManyBlocks(GameTestHelper helper) {
+        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
 
-    /** registerExtra adds a member; exclude removes a reflective one. */
-    public static void overrideExtraExclude(GameTestHelper helper) {
-        var base = MemberInfoRegistry.membersFor(Dummy.class);
-        assertTrue(helper, "field a present", base.containsKey("a"));
-        assertTrue(helper, "getter b present", base.containsKey("b"));
-
-        MemberInfoRegistry.registerExtra(Dummy.class, "c", int.class, o -> 42);
-        MemberInfoRegistry.exclude(Dummy.class, "a");
-
-        var after = MemberInfoRegistry.membersFor(Dummy.class);
-        assertFalse(helper, "a excluded", after.containsKey("a"));
-        assertTrue(helper, "b kept", after.containsKey("b"));
-        assertTrue(helper, "c added", after.containsKey("c"));
-        var c = MemberInfoRegistry.member(Dummy.class, "c");
-        assertEq(helper, "c value", 42, ((Number) c.getter().apply(new Dummy())).intValue());
-        assertEq(helper, "b value", 9, ((Number) after.get("b").getter().apply(new Dummy())).intValue());
-        helper.succeed();
-    }
-
-    /** An unknown member key yields a null output (no throw). */
-    public static void unknownKeyNull(GameTestHelper helper) {
-        var g = newGraph();
-        var create = addNode(g, ItemStackCreateNode.class);
-        setInputConstant(create, "item", Items.DIAMOND);
-        setInputConstant(create, "count", 1);
-
-        var ctx = addNode(g, ItemStackInfoNode.class);
-        wire(g, ctx.getInputsById().get("target"), create.getOutputsById().get("out"));
-        var block = addBlock(g, ctx, InfoFieldBlock.class);
-        setOption(block, "field", "totallyNotAField");
-
-        var exec = new GraphExecutor(g);
-        assertEq(helper, "unknown key → null", null, exec.evaluate(block.getOutputsById().get("value"), Object.class));
-        helper.succeed();
-    }
-
-    /** A null target (wire-only Entity context, unconnected) yields a null output. */
-    public static void nullTargetNull(GameTestHelper helper) {
         var g = newGraph();
         var ctx = addNode(g, EntityInfoNode.class);
-        // target left unconnected — Entity has no embedded constant, so it resolves to null.
-        var block = addBlock(g, ctx, InfoFieldBlock.class);
-        setOption(block, "field", "x");
+        setInputConstant(ctx, "target", pig);
+        var pos = addBlock(g, ctx, EntityInfoBlocks.BlockPosition.class);
+        var identity = addBlock(g, ctx, EntityInfoBlocks.Identity.class);
+        var state = addBlock(g, ctx, EntityInfoBlocks.State.class);
 
         var exec = new GraphExecutor(g);
-        assertEq(helper, "null target → null", null, exec.evaluate(block.getOutputsById().get("value"), Object.class));
+        assertEq(helper, "block position", pig.blockPosition(),
+                exec.evaluate(pos.getOutputsById().get("value"), BlockPos.class));
+        assertEq(helper, "entity id", pig.getId(),
+                exec.evaluate(identity.getOutputsById().get("id"), Integer.class).intValue());
+        assertTrue(helper, "alive", exec.evaluate(state.getOutputsById().get("alive"), Boolean.class));
         helper.succeed();
+    }
+
+    /**
+     * No target wired: every output reads null, and nothing throws.
+     *
+     * <p>A half-built graph has to stay evaluable — the alternative would let one unwired context take
+     * down branches that do not depend on it.</p>
+     */
+    public static void missingTargetReadsNull(GameTestHelper helper) {
+        var g = newGraph();
+        var ctx = addNode(g, EntityInfoNode.class);
+        // target deliberately left unconnected — Entity is wire-only, so it has no embedded constant
+        var block = addBlock(g, ctx, EntityInfoBlocks.Identity.class);
+
+        var exec = new GraphExecutor(g);
+        assertEq(helper, "uuid is null", null,
+                exec.evaluate(block.getOutputsById().get("uuid"), Object.class));
+        assertEq(helper, "name is null", null,
+                exec.evaluate(block.getOutputsById().get("name"), Object.class));
+        helper.succeed();
+    }
+
+    /**
+     * The model refuses a block its context does not accept.
+     *
+     * <p>Scoping is enforced at insert time by LDLib2, not just filtered in the UI — attaching a
+     * player-only block to an entity context throws rather than producing a block that reads nothing.
+     * That is the stronger guarantee, and it is why {@code InfoPropertyBlock}'s runtime type check is
+     * defence in depth rather than the mechanism: a mismatched pair cannot be built through this API at
+     * all, so the check only covers a target whose runtime type is narrower than the port's.</p>
+     */
+    public static void contextRefusesAForeignBlock(GameTestHelper helper) {
+        var g = newGraph();
+        var ctx = addNode(g, EntityInfoNode.class);
+
+        boolean threw = false;
+        try {
+            addBlock(g, ctx, PlayerInfoBlocks.Food.class);
+        } catch (RuntimeException expected) {
+            threw = true;
+        }
+        assertTrue(helper, "an entity context rejects a player block", threw);
+
+        // And the accepted pairing really does attach, so the rejection above is about scoping rather
+        // than about addBlock being broken.
+        assertTrue(helper, "but accepts an entity block",
+                addBlock(g, ctx, EntityInfoBlocks.Identity.class) != null);
+        helper.succeed();
+    }
+
+    /**
+     * Scoping: which blocks each context accepts.
+     *
+     * <p>{@code PlayerInfoNode} takes entity blocks as well as its own — that is the whole reason it is a
+     * separate context rather than a duplicate one — while {@code EntityInfoNode} takes only entity
+     * blocks, and neither takes another context's.</p>
+     */
+    public static void blocksAreScopedToTheirContexts(GameTestHelper helper) {
+        assertTrue(helper, "entity context takes entity blocks",
+                accepts(EntityInfoNode.class, EntityInfoBlocks.Position.class));
+        assertTrue(helper, "player context takes entity blocks too",
+                accepts(PlayerInfoNode.class, EntityInfoBlocks.Position.class));
+        assertTrue(helper, "player context takes player blocks",
+                accepts(PlayerInfoNode.class, PlayerInfoBlocks.Food.class));
+
+        assertFalse(helper, "entity context does not take player blocks",
+                accepts(EntityInfoNode.class, PlayerInfoBlocks.Food.class));
+        assertFalse(helper, "entity context does not take level blocks",
+                accepts(EntityInfoNode.class, LevelInfoBlocks.RainLevel.class));
+        assertFalse(helper, "level context does not take entity blocks",
+                accepts(LevelInfoNode.class, EntityInfoBlocks.Position.class));
+        assertFalse(helper, "block entity context does not take level blocks",
+                accepts(BlockEntityInfoNode.class, LevelInfoBlocks.RainLevel.class));
+        assertTrue(helper, "block entity context takes its own",
+                accepts(BlockEntityInfoNode.class, BlockEntityInfoBlocks.Position.class));
+        helper.succeed();
+    }
+
+    /**
+     * Every block declaring a position emits the graph's vector type, never a {@code Vec3}.
+     *
+     * <p>This used to need a whole curation registry: reflection typed these members by their Java return
+     * type, so they came out as {@code Vec3} — a pin the graph cannot carry, which rendered as a dead end
+     * and had to be swapped out member by member. A declared output port cannot get this wrong, and this
+     * asserts it stays that way.</p>
+     */
+    public static void positionBlocksUseTheGraphVectorType(GameTestHelper helper) {
+        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        for (Class<? extends BlockNode> cls : List.of(
+                EntityInfoBlocks.Position.class,
+                EntityInfoBlocks.EyePosition.class,
+                EntityInfoBlocks.LookDirection.class,
+                EntityInfoBlocks.Velocity.class)) {
+            var g = newGraph();
+            var ctx = addNode(g, EntityInfoNode.class);
+            setInputConstant(ctx, "target", pig);
+            var block = addBlock(g, ctx, cls);
+            var port = block.getOutputsById().get("value");
+            assertEq(helper, cls.getSimpleName() + " outputs VEC3", KGTypeHandles.VEC3, port.getDataTypeHandle());
+
+            Object value = new GraphExecutor(g).evaluate(port, Object.class);
+            assertTrue(helper, cls.getSimpleName() + " is a JOML vector", value instanceof Vector3f);
+        }
+        helper.succeed();
+    }
+
+    /** Whether {@code context} would accept {@code block}, without building a graph for it. */
+    private static boolean accepts(Class<? extends ContextNode> context,
+                                   Class<? extends BlockNode> block) {
+        // Read the annotation directly: ContextNode.acceptsBlock consults @UseWithContext first and only
+        // falls back to getSupportBlocks(), which needs a live graph model. The annotation is the
+        // declaration under test.
+        UseWithContext scope = block.getAnnotation(UseWithContext.class);
+        if (scope == null) return false;
+        for (var allowed : scope.value()) {
+            if (allowed.isAssignableFrom(context)) return true;
+        }
+        return false;
     }
 }

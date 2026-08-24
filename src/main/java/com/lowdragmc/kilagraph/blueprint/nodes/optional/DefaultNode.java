@@ -19,23 +19,26 @@ import java.util.List;
  */
 @NodeAttribute(name = "optional_default", group = "optional", graphTypes = BlueprintGraph.class)
 public class DefaultNode extends AnnotatedNode {
-@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+    @Override
+    protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))
                 .build();
     }
 
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         TypeHandle t = currentType();
         ctx.addInputPort("in", t);
         ctx.addInputPort("defaultValue", t);
         ctx.addOutputPort("out", t);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
-        Object v = ctx.getInput("in").orElse(null);
-        ctx.setOutput("out", v != null ? v : ctx.getInput("defaultValue").orElse(null));
+    @Override
+    public void evaluate(EvalContext ctx) {
+        Object v = ctx.getInputRaw("in");
+        ctx.setOutput("out", v != null ? v : ctx.getInputRaw("defaultValue"));
     }
 
     private TypeHandle currentType() {

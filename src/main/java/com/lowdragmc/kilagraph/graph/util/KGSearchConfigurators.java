@@ -1,18 +1,19 @@
 package com.lowdragmc.kilagraph.graph.util;
 
+import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.ui.SearchComponentConfigurator;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.IFieldValueConfigurable;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.ITypeConfigurable;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.utils.LocalizationUtils;
+import com.lowdragmc.lowdraglib2.utils.search.IResultHandler;
 import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
+import java.util.Collection;
+import java.util.function.Supplier;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.NonNull;
-
-import java.util.Collection;
-import java.util.function.Supplier;
 
 /**
  * Reusable {@link SearchComponentConfigurator.ISearchConfigurator} factories for KilaGraph
@@ -39,7 +40,7 @@ public final class KGSearchConfigurators {
     public static ITypeConfigurable typeHandlePickerOption(
             Supplier<Collection<TypeHandle>> candidatesSupplier) {
         SearchComponentConfigurator.ISearchConfigurator<TypeHandle> search = typeHandleSearch(candidatesSupplier);
-        return (vc, th) -> com.lowdragmc.lowdraglib2.configurator.IConfigurable.create(group ->
+        return (vc, th) -> IConfigurable.create(group ->
                 group.addConfigurator(new SearchComponentConfigurator<>(
                         "",
                         () -> readIdAsHandle(vc),
@@ -53,66 +54,6 @@ public final class KGSearchConfigurators {
         Object v = vc.getValue();
         String id = v == null ? "" : v.toString();
         return id.isEmpty() ? TypeHandles.UNKNOWN : TypeHandle.create(id);
-    }
-
-    /**
-     * Picker for a String-typed option whose value is one of a dynamic set of keys (e.g.
-     * {@link com.lowdragmc.kilagraph.graph.mc.MemberInfoRegistry} member keys for an
-     * {@link com.lowdragmc.kilagraph.graph.mc.InfoNode}). Filters case-insensitively by substring.
-     *
-     * <p>Same {@code Object} + {@code toString()} read as {@link #readIdAsHandle} to dodge the
-     * {@code IFieldValueConfigurable.getValue()} generic-overload trap.</p>
-     */
-    public static ITypeConfigurable memberKeyPickerOption(Supplier<Collection<String>> keysSupplier) {
-        SearchComponentConfigurator.ISearchConfigurator<String> search = memberKeySearch(keysSupplier);
-        return (vc, th) -> com.lowdragmc.lowdraglib2.configurator.IConfigurable.create(group ->
-                group.addConfigurator(new SearchComponentConfigurator<>(
-                        "",
-                        () -> readString(vc),
-                        s -> vc.setValue(s == null ? "" : s),
-                        search,
-                        vc.forceUpdate()
-                )));
-    }
-
-    private static String readString(IFieldValueConfigurable vc) {
-        Object v = vc.getValue();
-        return v == null ? "" : v.toString();
-    }
-
-    @MethodsReturnNonnullByDefault
-    public static SearchComponentConfigurator.ISearchConfigurator<String> memberKeySearch(
-            Supplier<Collection<String>> keysSupplier) {
-        return new SearchComponentConfigurator.ISearchConfigurator<>() {
-            @Override
-            public String defaultValue() {
-                return "";
-            }
-
-            @Override
-            public String resultText(@NotNull String value) {
-                return value;
-            }
-
-            @Override
-            public void search(String word, com.lowdragmc.lowdraglib2.utils.search.IResultHandler<String> handler) {
-                Collection<String> keys = keysSupplier.get();
-                if (keys == null) return;
-                String lower = word == null ? "" : word.toLowerCase();
-                for (String key : keys) {
-                    if (Thread.interrupted()) return;
-                    if (key == null) continue;
-                    if (lower.isEmpty() || key.toLowerCase().contains(lower)) {
-                        handler.accept(key);
-                    }
-                }
-            }
-
-            @Override
-            public Component mapping(@NonNull String value) {
-                return Component.literal(value);
-            }
-        };
     }
 
     @MethodsReturnNonnullByDefault
@@ -130,7 +71,7 @@ public final class KGSearchConfigurators {
             }
 
             @Override
-            public void search(String word, com.lowdragmc.lowdraglib2.utils.search.IResultHandler<TypeHandle> handler) {
+            public void search(String word, IResultHandler<TypeHandle> handler) {
                 Collection<TypeHandle> candidates = candidatesSupplier.get();
                 if (candidates == null) return;
                 String lower = word == null ? "" : word.toLowerCase();

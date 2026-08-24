@@ -12,11 +12,14 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 public class IsNullNode extends AnnotatedNode {
 
     @OutputPort public boolean out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("in", TypeHandles.UNKNOWN);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", ctx.getInput("in").orElse(null) == null);
+    @Override
+    public void evaluate(EvalContext ctx) {
+        ctx.setOutput("out", ctx.getInputRaw("in") == null);
     }
 }

@@ -13,10 +13,12 @@ public class ClampNode extends AnnotatedNode {
     @InputPort public float min = 0f;
     @InputPort public float max = 1f;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
-        float v = ctx.getInput("in", Float.class, 0f);
-        float lo = ctx.getInput("min", Float.class, 0f);
-        float hi = ctx.getInput("max", Float.class, 1f);
+
+    @Override
+    public void evaluate(EvalContext ctx) {
+        float v = ctx.getFloat("in", 0f);
+        float lo = ctx.getFloat("min", 0f);
+        float hi = ctx.getFloat("max", 1f);
         ctx.setOutput("out", Math.max(lo, Math.min(hi, v)));
     }
 }

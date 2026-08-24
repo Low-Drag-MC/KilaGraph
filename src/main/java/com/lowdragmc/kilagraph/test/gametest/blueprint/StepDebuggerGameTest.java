@@ -1,6 +1,5 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.compare.GreaterEqualNode;
@@ -22,12 +21,13 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.SpawnFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
+import org.joml.Vector2f;
+import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
+import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
-import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -45,6 +45,8 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * construction loads MC classes.
  */
 public final class StepDebuggerGameTest {
+    private static final String BREAKPOINT_INSIDE_LOOP_BODY = "step_debugger_breakpoint_inside_loop_body";
+    private static final String CURRENT_NODE_MATCHES_WHAT_STEP_RUNS = "step_debugger_current_node_matches_what_step_runs";
     private static final String LINEAR = "step_linear_chain";
     private static final String FOR_BODY = "step_into_for_body";
     private static final String BRANCH = "step_branch_chosen_path";
@@ -58,6 +60,7 @@ public final class StepDebuggerGameTest {
 
     private StepDebuggerGameTest() {}
 
+
     public static void registerFunctions() {
         KGGameTests.registerFunction(LINEAR, StepDebuggerGameTest::linear);
         KGGameTests.registerFunction(FOR_BODY, StepDebuggerGameTest::forBody);
@@ -69,11 +72,18 @@ public final class StepDebuggerGameTest {
         KGGameTests.registerFunction(BREAKPOINT, StepDebuggerGameTest::breakpoint);
         KGGameTests.registerFunction(RESET, StepDebuggerGameTest::reset);
         KGGameTests.registerFunction(CALLSTACK, StepDebuggerGameTest::callStackAndVars);
+        KGGameTests.registerFunction(BREAKPOINT_INSIDE_LOOP_BODY, StepDebuggerGameTest::breakpointInsideLoopBody);
+        KGGameTests.registerFunction(CURRENT_NODE_MATCHES_WHAT_STEP_RUNS, StepDebuggerGameTest::currentNodeMatchesWhatStepRuns);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{LINEAR, FOR_BODY, BRANCH, SEQUENCE, BREAK, CONTINUE, SUBGRAPH, BREAKPOINT, RESET, CALLSTACK}) {
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        for (String p : new String[]{
+                LINEAR, FOR_BODY, BRANCH,
+                SEQUENCE, BREAK, CONTINUE,
+                SUBGRAPH, BREAKPOINT, RESET,
+                CALLSTACK, BREAKPOINT_INSIDE_LOOP_BODY, CURRENT_NODE_MATCHES_WHAT_STEP_RUNS
+        }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
     }
@@ -346,6 +356,72 @@ public final class StepDebuggerGameTest {
         }
         assertTrue(helper, "call stack showed a LOOP frame inside the loop body", sawLoopFrame);
         assertTrue(helper, "variable snapshot reflected a mid-run write", sawCounterMidRun);
+        helper.succeed();
+    }
+
+    // ---- 12. a breakpoint on the first node of a loop body must still fire -------------------
+
+    /**
+     * {@code step()} settles the frame stack (runs {@code resume()} on exhausted frames) and then
+     * polls and executes, all in one call. A {@code For} node pushes its {@link ExecFrame} with an
+     * <em>empty</em> queue — the body is only armed by {@code LoopFrame.resume}. So between "For
+     * executed" and "first body node executed" there is a state where no frame has anything
+     * pending, and anything that asks "what runs next" without settling gets the wrong answer.
+     *
+     * <p>That state is not exotic: it is entered once per loop iteration, once per {@code Sequence}
+     * branch, and on every subgraph exit. A debugger that reports the next node from it either
+     * skips the breakpoint entirely or names a node from an outer frame that will not run next.
+     */
+    public static void breakpointInsideLoopBody(GameTestHelper helper) {
+        var g = newGraph();
+        var entry = addNode(g, EntryNode.class);
+        var loop = addNode(g, ForNode.class);
+        setInputConstant(loop, "count", 3);
+        var body = addNode(g, NoopNode.class);
+        wire(g, loop.getInputsById().get("in"), entry.getOutputsById().get("next"));
+        wire(g, body.getInputsById().get("in"), loop.getOutputsById().get("body"));
+
+        var s = new ExecSession(new GraphExecutor(g)).begin(entry);
+        s.addBreakpoint(body);
+
+        var hit = s.runToBreakpoint();
+        assertEq(helper, "paused on the loop body node", body, hit);
+        assertEq(helper, "body not executed yet (last was the For)", loop, s.lastExecuted());
+        assertFalse(helper, "not finished at the breakpoint", s.isFinished());
+
+        // And currentNode() must agree with what step() is about to run.
+        assertEq(helper, "currentNode agrees with the breakpoint", body, s.currentNode());
+        s.step();
+        assertEq(helper, "stepping ran exactly that node", body, s.lastExecuted());
+        helper.succeed();
+    }
+
+    // ---- 13. currentNode() must never name a node that step() will not run next --------------
+
+    /**
+     * Same unsettled state, seen from the other side: {@code Entry} fans out to a {@code For} and a
+     * {@code Noop} in that order, so the root frame still holds {@code Noop} while the loop body is
+     * what actually runs next.
+     */
+    public static void currentNodeMatchesWhatStepRuns(GameTestHelper helper) {
+        var g = newGraph();
+        var entry = addNode(g, EntryNode.class);
+        var loop = addNode(g, ForNode.class);
+        setInputConstant(loop, "count", 2);
+        var body = addNode(g, NoopNode.class);
+        var after = addNode(g, NoopNode.class);
+        wire(g, loop.getInputsById().get("in"), entry.getOutputsById().get("next"));
+        wire(g, after.getInputsById().get("in"), entry.getOutputsById().get("next"));
+        wire(g, body.getInputsById().get("in"), loop.getOutputsById().get("body"));
+
+        var s = new ExecSession(new GraphExecutor(g)).begin(entry);
+        for (int i = 0; i < 12; i++) {
+            NodeModel predicted = s.currentNode();
+            if (!s.step()) break;
+            assertEq(helper, "step " + i + ": currentNode predicted the executed node",
+                    predicted, s.lastExecuted());
+        }
+        assertTrue(helper, "flow finished", s.isFinished());
         helper.succeed();
     }
 }

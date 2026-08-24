@@ -21,8 +21,10 @@ public class RoundNode extends AnnotatedNode {
     @Option public Op op = Op.ROUND;
     @InputPort public float in = 0f;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
-        float v = ctx.getInput("in", Float.class, 0f);
+
+    @Override
+    public void evaluate(EvalContext ctx) {
+        float v = ctx.getFloat("in", 0f);
         Op o = ctx.getOption("op", Op.class, Op.ROUND);
         float r = switch (o) {
             case FLOOR -> (float) Math.floor(v);

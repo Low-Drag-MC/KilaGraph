@@ -20,20 +20,24 @@ import java.util.List;
 public class ListRepeatNode extends AnnotatedNode {
     @InputPort public int count = 0;
     @OutputPort public List<?> out;
-@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))
                 .build();
     }
 
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("value", currentElementType());
     }
 
-    @Override public void evaluate(EvalContext ctx) {
-        int n = Math.max(0, ctx.getInput("count", Integer.class, 0));
-        Object v = ctx.getInput("value").orElse(null);
+    @Override
+    public void evaluate(EvalContext ctx) {
+        int n = Math.max(0, ctx.getInt("count", 0));
+        Object v = ctx.getInputRaw("value");
         List<Object> result = new ArrayList<>(n);
         for (int i = 0; i < n; i++) result.add(v);
         ctx.setOutput("out", result);

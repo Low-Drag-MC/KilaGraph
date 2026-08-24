@@ -12,9 +12,11 @@ public class PowNode extends AnnotatedNode {
     @InputPort public float base = 1f;
     @InputPort public float exp = 1f;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         ctx.setOutput("out", (float) Math.pow(
-                ctx.getInput("base", Float.class, 1f),
-                ctx.getInput("exp", Float.class, 1f)));
+                ctx.getFloat("base", 1f),
+                ctx.getFloat("exp", 1f)));
     }
 }

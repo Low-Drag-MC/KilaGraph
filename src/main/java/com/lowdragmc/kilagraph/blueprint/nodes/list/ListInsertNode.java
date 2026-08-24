@@ -21,21 +21,25 @@ public class ListInsertNode extends AnnotatedNode {
     @InputPort public List<?> list = List.of();
     @InputPort public int index = 0;
     @OutputPort public List<?> out;
-@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))
                 .build();
     }
 
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("value", currentElementType());
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         List<?> src = ctx.getInput("list", List.class, List.of());
-        int i = ctx.getInput("index", Integer.class, 0);
-        Object value = ctx.getInput("value").orElse(null);
+        int i = ctx.getInt("index", 0);
+        Object value = ctx.getInputRaw("value");
         List<Object> result = new ArrayList<>(src);
         int clamped = Math.max(0, Math.min(result.size(), i));
         result.add(clamped, value);

@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.graph.util;
 
 import com.lowdragmc.lowdraglib2.gui.texture.ColorRectTexture;
+import com.lowdragmc.lowdraglib2.gui.ui.Style;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.data.TextWrap;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
@@ -50,6 +51,8 @@ public final class GlslCodeBlock {
         // A blank line still needs a line box, otherwise the paragraph spacing inside the block collapses.
         label.setText(line.isBlank() ? Component.literal(" ") : highlight(parser, line));
         label.layout(layout -> layout.widthPercent(100));
+        label.moveInlineAsDefault();
+        label.addClass("__node_description_code__");
         return label;
     }
 

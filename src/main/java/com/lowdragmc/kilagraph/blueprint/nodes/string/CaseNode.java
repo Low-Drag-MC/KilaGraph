@@ -22,7 +22,9 @@ public class CaseNode extends AnnotatedNode {
     @Option public Op op = Op.LOWER;
     @InputPort public String in = "";
     @OutputPort public String out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         String s = ctx.getInput("in", String.class, "");
         Op o = ctx.getOption("op", Op.class, Op.LOWER);
         String r = switch (o) {

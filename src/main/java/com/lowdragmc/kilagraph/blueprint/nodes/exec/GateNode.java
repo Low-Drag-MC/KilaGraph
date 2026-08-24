@@ -21,6 +21,6 @@ public class GateNode extends AnnotatedNode {
 
     @Override
     public void execute(ExecContext ctx) {
-        if (ctx.getInput("enabled", Boolean.class, true)) ctx.flow("out");
+        if (ctx.getBool("enabled", true)) ctx.flow("out");
     }
 }

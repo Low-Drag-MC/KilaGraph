@@ -21,7 +21,9 @@ import java.util.Map;
 @NodeAttribute(name = "map_get", group = "map", graphTypes = BlueprintGraph.class)
 public class MapGetNode extends AnnotatedNode {
     @InputPort public Map<?, ?> map = Map.of();
-@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("keyType", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))
@@ -32,7 +34,8 @@ public class MapGetNode extends AnnotatedNode {
                 .build();
     }
 
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         TypeHandle kt = current("keyType");
         TypeHandle vt = current("valueType");
         ctx.addInputPort("key", kt);
@@ -40,10 +43,11 @@ public class MapGetNode extends AnnotatedNode {
         ctx.addOutputPort("value", vt);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         Map<?, ?> m = ctx.getInput("map", Map.class, Map.of());
-        Object k = ctx.getInput("key").orElse(null);
-        Object def = ctx.getInput("defaultValue").orElse(null);
+        Object k = ctx.getInputRaw("key");
+        Object def = ctx.getInputRaw("defaultValue");
         Object v = m.get(k);
         ctx.setOutput("value", v != null ? v : def);
     }

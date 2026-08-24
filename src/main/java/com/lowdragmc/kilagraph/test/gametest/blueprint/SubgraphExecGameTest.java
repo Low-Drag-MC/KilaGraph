@@ -1,8 +1,6 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
-import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BranchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
@@ -14,12 +12,15 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.SpawnFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.SubgraphNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
-import net.minecraft.core.Holder;
+import java.util.HashMap;
+import java.util.Map;
 import net.minecraft.gametest.framework.GameTestHelper;
+import org.joml.Vector2f;
+import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
+import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
-import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -47,6 +48,7 @@ public final class SubgraphExecGameTest {
 
     private SubgraphExecGameTest() {}
 
+
     public static void registerFunctions() {
         KGGameTests.registerFunction(STRAIGHT_THROUGH, SubgraphExecGameTest::straightThrough);
         KGGameTests.registerFunction(DATA_IN_OUT, SubgraphExecGameTest::dataInOut);
@@ -57,8 +59,11 @@ public final class SubgraphExecGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{STRAIGHT_THROUGH, DATA_IN_OUT, MULTI_EXIT_TRUE, MULTI_EXIT_FALSE, NESTED, CHILD_VAR_ISOLATED}) {
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        for (String p : new String[]{
+                STRAIGHT_THROUGH, DATA_IN_OUT, MULTI_EXIT_TRUE,
+                MULTI_EXIT_FALSE, NESTED, CHILD_VAR_ISOLATED
+        }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
     }
@@ -169,7 +174,7 @@ public final class SubgraphExecGameTest {
     }
 
     // ---- 3. exclusive multi-exit: Branch picks exactly one of two exec-out pins ------------------
-    private static java.util.Map<String, Object> runMultiExit(boolean cond) {
+    private static Map<String, Object> runMultiExit(boolean cond) {
         var outer = newGraph();
         var inner = outer.graphModel.createLocalSubgraphInstance();
         outer.graphModel.addLocalSubgraph(inner);
@@ -217,11 +222,13 @@ public final class SubgraphExecGameTest {
         var exec = new GraphExecutor(outer);
         exec.executeFrom(entry);
         var vars = exec.getEnvironment().variables();
-        var result = new java.util.HashMap<String, Object>();
+        var result = new HashMap<String, Object>();
         result.put("tookA", vars.get("tookA"));
         result.put("tookB", vars.get("tookB"));
         return result;
     }
+
+
 
     public static void multiExitTrue(GameTestHelper helper) {
         var r = runMultiExit(true);
@@ -229,6 +236,8 @@ public final class SubgraphExecGameTest {
         assertEq(helper, "cond=true does NOT fire B", null, r.get("tookB"));
         helper.succeed();
     }
+
+
 
     public static void multiExitFalse(GameTestHelper helper) {
         var r = runMultiExit(false);

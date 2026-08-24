@@ -1,7 +1,7 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.BranchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.GateNode;
@@ -10,8 +10,10 @@ import com.lowdragmc.kilagraph.blueprint.nodes.exec.SequenceNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SwitchNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
-import net.minecraft.core.Holder;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import net.minecraft.gametest.framework.GameTestHelper;
+import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
+import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
@@ -34,6 +36,7 @@ public final class ExecPrimitivesGameTest {
 
     private ExecPrimitivesGameTest() {}
 
+
     public static void registerFunctions() {
         KGGameTests.registerFunction(SEQUENCE, ExecPrimitivesGameTest::sequence);
         KGGameTests.registerFunction(BRANCH_TRUE, ExecPrimitivesGameTest::branchTrue);
@@ -45,21 +48,26 @@ public final class ExecPrimitivesGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{SEQUENCE, BRANCH_TRUE, BRANCH_FALSE, GATE_OPEN, GATE_CLOSED,
-                SWITCH_MATCH, SWITCH_DEFAULT}) {
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        for (String p : new String[]{
+                SEQUENCE, BRANCH_TRUE, BRANCH_FALSE,
+                GATE_OPEN, GATE_CLOSED, SWITCH_MATCH,
+                SWITCH_DEFAULT
+        }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
     }
 
     /** Helper: Add node emitting a Float constant. */
-    private static com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel
-            floatSource(com.lowdragmc.kilagraph.blueprint.BlueprintGraph g, float v) {
+    private static NodeModel
+            floatSource(BlueprintGraph g, float v) {
         var add = addNode(g, AddNode.class);
         setInputConstant(add, "in1", v);
         setInputConstant(add, "in2", 0.0f);
         return add;
     }
+
+
 
     public static void sequence(GameTestHelper helper) {
         // Entry → Sequence(3 outs) → 3 Print nodes
@@ -82,7 +90,7 @@ public final class ExecPrimitivesGameTest {
         var exec = new GraphExecutor(g);
         exec.executeFrom(entry);
         for (int i = 0; i < 3; i++) {
-            Object captured = exec.nodeState(new com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel[]{p1, p2, p3}[i].getUid()).get("last");
+            Object captured = exec.nodeState(new NodeModel[]{p1, p2, p3}[i].getUid()).get("last");
             if (!(captured instanceof Number n) || Math.abs(n.floatValue() - (i + 1)) > 1e-5f) {
                 helper.fail("p" + (i + 1) + " missing or wrong: " + captured);
                 return;
@@ -91,9 +99,13 @@ public final class ExecPrimitivesGameTest {
         helper.succeed();
     }
 
+
+
     public static void branchTrue(GameTestHelper helper) {
         runBranch(helper, true, "true-branch", "false-branch", "true-branch");
     }
+
+
 
     public static void branchFalse(GameTestHelper helper) {
         runBranch(helper, false, "true-branch", "false-branch", "false-branch");
@@ -128,9 +140,13 @@ public final class ExecPrimitivesGameTest {
         helper.succeed();
     }
 
+
+
     public static void gateOpen(GameTestHelper helper) {
         runGate(helper, true, true);
     }
+
+
 
     public static void gateClosed(GameTestHelper helper) {
         runGate(helper, false, false);
@@ -154,6 +170,8 @@ public final class ExecPrimitivesGameTest {
         helper.succeed();
     }
 
+
+
     public static void switchMatch(GameTestHelper helper) {
         // 3 cases, selector=2 → case2 fires
         var g = newGraph();
@@ -171,7 +189,7 @@ public final class ExecPrimitivesGameTest {
         wire(g, p2.getInputsById().get("trigger"), sw.getOutputsById().get("case2"));
         wire(g, p3.getInputsById().get("trigger"), sw.getOutputsById().get("case3"));
         wire(g, pDef.getInputsById().get("trigger"), sw.getOutputsById().get("defaultExec"));
-        for (var p : new com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel[]{p1, p2, p3, pDef}) {
+        for (var p : new NodeModel[]{p1, p2, p3, pDef}) {
             wire(g, p.getInputsById().get("value"), floatSource(g, 1f).getOutputsById().get("out"));
         }
 
@@ -183,6 +201,8 @@ public final class ExecPrimitivesGameTest {
         assertEq(helper, "default not hit", null, exec.nodeState(pDef.getUid()).get("last"));
         helper.succeed();
     }
+
+
 
     public static void switchDefault(GameTestHelper helper) {
         // 2 cases, selector=99 → default
@@ -198,7 +218,7 @@ public final class ExecPrimitivesGameTest {
         wire(g, p1.getInputsById().get("trigger"), sw.getOutputsById().get("case1"));
         wire(g, p2.getInputsById().get("trigger"), sw.getOutputsById().get("case2"));
         wire(g, pDef.getInputsById().get("trigger"), sw.getOutputsById().get("defaultExec"));
-        for (var p : new com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel[]{p1, p2, pDef}) {
+        for (var p : new NodeModel[]{p1, p2, pDef}) {
             wire(g, p.getInputsById().get("value"), floatSource(g, 1f).getOutputsById().get("out"));
         }
 

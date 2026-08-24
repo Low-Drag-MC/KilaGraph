@@ -1,11 +1,8 @@
 package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.EntitiesInAabbNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.EntitiesInRadiusNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.EntityDistanceNode;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
@@ -14,21 +11,21 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
 import java.util.List;
 import java.util.Map;
+import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
+import net.minecraft.core.Holder;
+import net.minecraft.gametest.framework.TestData;
+import net.minecraft.gametest.framework.TestEnvironmentDefinition;
+import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
-import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertTrue;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.newGraph;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputConstant;
@@ -45,15 +42,16 @@ public final class EntityNodeGameTest {
 
     private EntityNodeGameTest() {}
 
+
     public static void registerFunctions() {
         KGGameTests.registerFunction(IN_RADIUS, EntityNodeGameTest::inRadius);
-        KGGameTests.registerFunction(IN_AABB, EntityNodeGameTest::inAabb);
-        KGGameTests.registerFunction(DISTANCE, EntityNodeGameTest::distance);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
-        for (String p : new String[]{IN_RADIUS, IN_AABB, DISTANCE}) {
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        for (String p : new String[]{
+                IN_RADIUS
+        }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
     }
@@ -62,6 +60,8 @@ public final class EntityNodeGameTest {
         var v = (VariableDeclarationModelBase) g.graphModel.createVariable(name, type, null, VariableKind.INPUT);
         return g.graphModel.createVariableNode(v, new Vector2f(0, 0), null, null).getOutputPort();
     }
+
+
 
     public static void inRadius(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
@@ -80,44 +80,6 @@ public final class EntityNodeGameTest {
         List<?> out = exec.evaluate(node.getOutputsById().get("out"), List.class);
         assertTrue(helper, "radius result non-null", out != null);
         assertTrue(helper, "radius contains both pigs", out.contains(a) && out.contains(b));
-        helper.succeed();
-    }
-
-    public static void inAabb(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        Entity a = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
-        BlockPos min = helper.absolutePos(new BlockPos(0, 1, 0));
-        BlockPos max = helper.absolutePos(new BlockPos(3, 4, 3));
-
-        var g = newGraph();
-        PortModel levelOut = source(g, "level", KGTypeHandles.LEVEL);
-        var node = addNode(g, EntitiesInAabbNode.class);
-        wire(g, node.getInputsById().get("level"), levelOut);
-        setInputConstant(node, "min", min);
-        setInputConstant(node, "max", max);
-
-        var exec = new GraphExecutor(g, EvaluationEnvironment.with(Map.of("level", level)));
-        List<?> out = exec.evaluate(node.getOutputsById().get("out"), List.class);
-        assertTrue(helper, "aabb result non-null", out != null);
-        assertTrue(helper, "aabb contains pig", out.contains(a));
-        helper.succeed();
-    }
-
-    public static void distance(GameTestHelper helper) {
-        Entity a = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
-        Entity b = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 4));
-        double expected = a.distanceTo(b);
-
-        var g = newGraph();
-        PortModel aOut = source(g, "a", KGTypeHandles.ENTITY);
-        PortModel bOut = source(g, "b", KGTypeHandles.ENTITY);
-        var node = addNode(g, EntityDistanceNode.class);
-        wire(g, node.getInputsById().get("a"), aOut);
-        wire(g, node.getInputsById().get("b"), bOut);
-
-        var env = EvaluationEnvironment.with(Map.of("a", a, "b", b));
-        Double v = new GraphExecutor(g, env).evaluate(node.getOutputsById().get("out"), Double.class);
-        assertEq(helper, "entity distance", (float) expected, v.floatValue(), 1e-3f);
         helper.succeed();
     }
 }

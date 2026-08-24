@@ -16,13 +16,16 @@ import java.util.Objects;
 @NodeAttribute(name = "cmp_neq", group = "compare", graphTypes = BlueprintGraph.class)
 public class NotEqualsNode extends AnnotatedNode {
     @OutputPort public boolean out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("a", TypeHandles.UNKNOWN);
         ctx.addInputPort("b", TypeHandles.UNKNOWN);
     }
 
-    @Override public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", !Objects.equals(ctx.getInput("a").orElse(null),
-                ctx.getInput("b").orElse(null)));
+    @Override
+    public void evaluate(EvalContext ctx) {
+        ctx.setOutput("out", !Objects.equals(ctx.getInputRaw("a"),
+                ctx.getInputRaw("b")));
     }
 }

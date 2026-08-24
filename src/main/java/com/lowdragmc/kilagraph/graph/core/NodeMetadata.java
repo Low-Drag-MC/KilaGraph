@@ -1,12 +1,12 @@
 package com.lowdragmc.kilagraph.graph.core;
 
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.IOptionBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.IInputPortBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.IOutputPortBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.PortCapacity;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.PortConnectorUI;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.PortDirection;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
@@ -22,7 +22,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Reflection-derived description of an {@link AnnotatedNode} class. One instance per Node class
+ * Reflection-derived description of an annotated node class — {@link AnnotatedNode} or
+ * {@link AnnotatedBlockNode}, which is why the apply methods take a plain {@code Node}: the field
+ * scan needs an instance only to read declared defaults off it. One instance per Node class
  * (cached in {@link #CACHE}). Trivial fields with concrete Java types declare {@link InputPort},
  * {@link OutputPort}, {@link ExecInputPort}, {@link ExecOutputPort}, or {@link Option}; anything
  * the annotation surface cannot express belongs in
@@ -102,7 +104,7 @@ final class NodeMetadata {
                 KGTypeHandles.handleFor(f.getGenericType()), false);
     }
 
-    void applyOptions(IOptionDefinitionContext ctx, AnnotatedNode node) {
+    void applyOptions(IOptionDefinitionContext ctx, Node node) {
         for (FieldDef d : defs) {
             if (d.kind != Kind.OPTION) continue;
             IOptionBuilder<?> b = ctx.addOption(d.id, d.typeHandle);
@@ -119,7 +121,7 @@ final class NodeMetadata {
         }
     }
 
-    void applyPorts(IPortDefinitionContext ctx, AnnotatedNode node) {
+    void applyPorts(IPortDefinitionContext ctx, Node node) {
         // Emit exec-flow ports before data ports so {@code trigger}/{@code next} sit at the top of the
         // node — even when declared in a superclass (the field scan visits subclass fields first, so an
         // inherited exec port would otherwise land at the bottom).
@@ -131,7 +133,7 @@ final class NodeMetadata {
         }
     }
 
-    private void applyPort(IPortDefinitionContext ctx, AnnotatedNode node, FieldDef d) {
+    private void applyPort(IPortDefinitionContext ctx, Node node, FieldDef d) {
         if (d.kind == Kind.INPUT_PORT) {
             IInputPortBuilder<?> b = ctx.addInputPort(d.id, d.typeHandle);
             if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));

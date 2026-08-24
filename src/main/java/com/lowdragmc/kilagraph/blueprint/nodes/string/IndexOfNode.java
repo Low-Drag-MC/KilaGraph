@@ -12,7 +12,9 @@ public class IndexOfNode extends AnnotatedNode {
     @InputPort public String in = "";
     @InputPort public String search = "";
     @OutputPort public int out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         ctx.setOutput("out",
                 ctx.getInput("in", String.class, "").indexOf(ctx.getInput("search", String.class, "")));
     }

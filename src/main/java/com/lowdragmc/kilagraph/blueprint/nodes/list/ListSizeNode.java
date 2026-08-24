@@ -14,7 +14,8 @@ public class ListSizeNode extends AnnotatedNode {
 
     @InputPort  public List<?> list = List.of();
     @OutputPort public int     size;
-@Override
+
+    @Override
     public void evaluate(EvalContext ctx) {
         List<?> l = ctx.getInput("list", List.class, List.of());
         ctx.setOutput("size", l.size());

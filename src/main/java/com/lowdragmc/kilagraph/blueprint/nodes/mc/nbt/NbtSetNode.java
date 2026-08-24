@@ -17,6 +17,8 @@ import java.util.List;
  * Put a value into a {@link CompoundTag} under {@code key}, returning the (mutated) tag. A null
  * input tag yields a fresh compound. The {@link NbtValueType} option types the {@code value} port.
  */
+// valueType MUST stay an option — see NbtGetNode: it drives the dynamic port's type, decided at
+// defineNode time, before any wire has a value.
 @NodeAttribute(name = "mc_nbt_set", group = "mc_nbt", graphTypes = BlueprintGraph.class)
 public class NbtSetNode extends AnnotatedNode {
     @Override
@@ -29,22 +31,25 @@ public class NbtSetNode extends AnnotatedNode {
     @InputPort public CompoundTag tag;
     @InputPort public String key = "";
     @OutputPort public CompoundTag out;
-@Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("value", optionValue("valueType", NbtValueType.class, valueType).portType());
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         CompoundTag t = ctx.getInput("tag", CompoundTag.class, null);
         if (t == null) t = new CompoundTag();
         String k = ctx.getInput("key", String.class, "");
         NbtValueType vt = ctx.getOption("valueType", NbtValueType.class, NbtValueType.STRING);
         if (!k.isEmpty()) {
             switch (vt) {
-                case INT -> t.putInt(k, ctx.getInput("value", Integer.class, 0));
-                case LONG -> t.putLong(k, ctx.getInput("value", Long.class, 0L));
-                case FLOAT -> t.putFloat(k, ctx.getInput("value", Float.class, 0f));
-                case DOUBLE -> t.putDouble(k, ctx.getInput("value", Double.class, 0d));
-                case BOOL -> t.putBoolean(k, ctx.getInput("value", Boolean.class, false));
+                case INT -> t.putInt(k, ctx.getInt("value", 0));
+                case LONG -> t.putLong(k, ctx.getLong("value", 0L));
+                case FLOAT -> t.putFloat(k, ctx.getFloat("value", 0f));
+                case DOUBLE -> t.putDouble(k, ctx.getDouble("value", 0d));
+                case BOOL -> t.putBoolean(k, ctx.getBool("value", false));
                 case COMPOUND -> {
                     CompoundTag c = ctx.getInput("value", CompoundTag.class, null);
                     if (c != null) t.put(k, c);
@@ -57,6 +62,6 @@ public class NbtSetNode extends AnnotatedNode {
 
     @Override
     public List<String> optionChoices(String optionId) {
-        return "valueType".equals(optionId) ? List.of("STRING", "INT", "LONG", "FLOAT", "DOUBLE", "BOOL", "COMPOUND") : List.of();
+        return "valueType".equals(optionId) ? NbtValueType.CHOICES : List.of();
     }
 }

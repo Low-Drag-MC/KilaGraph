@@ -39,3 +39,6 @@ CLAUDE.md
 AGENTS.md
 
 # local dev-only jars (e.g. the kilagraphdemo companion mod)
+
+# one-shot porting/maintenance scripts
+/tools

@@ -21,7 +21,9 @@ import java.util.Map;
 public class MapPutNode extends AnnotatedNode {
     @InputPort public Map<?, ?> map = Map.of();
     @OutputPort public Map<?, ?> out;
-@Override protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+
+    @Override
+    protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
         ctx.addOption("keyType", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
                 .withConfigurable(KGSearchConfigurators.typeHandlePickerOption(this::supportedTypes))
@@ -32,15 +34,17 @@ public class MapPutNode extends AnnotatedNode {
                 .build();
     }
 
-    @Override protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+    @Override
+    protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
         ctx.addInputPort("key", current("keyType"));
         ctx.addInputPort("value", current("valueType"));
     }
 
-    @Override public void evaluate(EvalContext ctx) {
+    @Override
+    public void evaluate(EvalContext ctx) {
         Map<?, ?> src = ctx.getInput("map", Map.class, Map.of());
-        Object k = ctx.getInput("key").orElse(null);
-        Object v = ctx.getInput("value").orElse(null);
+        Object k = ctx.getInputRaw("key");
+        Object v = ctx.getInputRaw("value");
         Map<Object, Object> result = new LinkedHashMap<>(src);
         if (k != null) result.put(k, v);
         ctx.setOutput("out", result);

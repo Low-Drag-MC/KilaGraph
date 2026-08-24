@@ -13,9 +13,11 @@ public class Atan2Node extends AnnotatedNode {
     @InputPort public float y = 0f;
     @InputPort public float x = 1f;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
-        float vy = ctx.getInput("y", Float.class, 0f);
-        float vx = ctx.getInput("x", Float.class, 1f);
+
+    @Override
+    public void evaluate(EvalContext ctx) {
+        float vy = ctx.getFloat("y", 0f);
+        float vx = ctx.getFloat("x", 1f);
         ctx.setOutput("out", (float) Math.atan2(vy, vx));
     }
 }

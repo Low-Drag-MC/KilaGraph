@@ -13,7 +13,9 @@ import java.util.Map;
 public class MapSizeNode extends AnnotatedNode {
     @InputPort public Map<?, ?> map = Map.of();
     @OutputPort public int size;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         ctx.setOutput("size", ctx.getInput("map", Map.class, Map.of()).size());
     }
 }

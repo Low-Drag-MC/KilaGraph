@@ -25,7 +25,8 @@ public class ListGetNode extends AnnotatedNode {
 
     @InputPort public List<?> list = List.of();
     @InputPort public int     index = 0;
-@Override
+
+    @Override
     protected void onDefineExtraOptions(IOptionDefinitionContext context) {
         context.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
@@ -41,7 +42,7 @@ public class ListGetNode extends AnnotatedNode {
     @Override
     public void evaluate(EvalContext ctx) {
         List<?> l = ctx.getInput("list", List.class, List.of());
-        int i = ctx.getInput("index", Integer.class, 0);
+        int i = ctx.getInt("index", 0);
         if (i < 0 || i >= l.size()) {
             throw new IndexOutOfBoundsException("ListGet index " + i + " out of bounds (size " + l.size() + ")");
         }

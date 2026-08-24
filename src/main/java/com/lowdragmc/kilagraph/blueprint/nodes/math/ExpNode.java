@@ -11,7 +11,9 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 public class ExpNode extends AnnotatedNode {
     @InputPort public float in = 0f;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", (float) Math.exp(ctx.getInput("in", Float.class, 0f)));
+
+    @Override
+    public void evaluate(EvalContext ctx) {
+        ctx.setOutput("out", (float) Math.exp(ctx.getFloat("in", 0f)));
     }
 }

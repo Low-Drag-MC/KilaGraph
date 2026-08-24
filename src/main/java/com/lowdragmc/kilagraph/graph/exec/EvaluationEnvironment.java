@@ -53,6 +53,19 @@ public class EvaluationEnvironment {
         return variables;
     }
 
+    /**
+     * The environment a subgraph runs in.
+     *
+     * <p>A subgraph gets its own variable store — that is what makes its locals local — but
+     * everything else about the environment belongs to the run, not to the graph level. A host that
+     * hangs its own context here (the entity being animated, the delta owed to this update) would
+     * otherwise find it silently absent one level down, and every node reading it would quietly
+     * answer zero rather than fail. Override this to carry that context across.
+     */
+    public EvaluationEnvironment createChild(VariableStore childVariables) {
+        return new EvaluationEnvironment(childVariables, seed());
+    }
+
     public OptionalLong seed() {
         return seed;
     }
@@ -63,7 +76,8 @@ public class EvaluationEnvironment {
      */
     @Nullable
     public Object lookupVariable(IVariable variable) {
-        if (variables.contains(variable.getName())) return variables.get(variable.getName());
+        Object value = variables.getOrAbsent(variable.getName());
+        if (value != VariableStore.ABSENT) return value;
         return variable.tryGetDefaultValue(variable.getDataType()).result().orElse(null);
     }
 }

@@ -27,11 +27,13 @@ public class EntitiesInRadiusNode extends AnnotatedNode {
     @InputPort public BlockPos center = BlockPos.ZERO;
     @InputPort public double radius = 8.0;
     @OutputPort public List<Entity> out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         Level l = ctx.getInput("level", Level.class, null);
         if (l == null) { ctx.setOutput("out", List.of()); return; }
         BlockPos c = ctx.getInput("center", BlockPos.class, BlockPos.ZERO);
-        double r = ctx.getInput("radius", Double.class, 8.0);
+        double r = ctx.getDouble("radius", 8.0);
         Vec3 cv = c.getCenter();
         AABB box = AABB.ofSize(cv, r * 2, r * 2, r * 2);
         ctx.setOutput("out", l.getEntitiesOfClass(Entity.class, box));

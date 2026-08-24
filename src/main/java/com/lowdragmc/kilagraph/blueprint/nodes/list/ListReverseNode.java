@@ -15,7 +15,9 @@ import java.util.List;
 public class ListReverseNode extends AnnotatedNode {
     @InputPort public List<?> list = List.of();
     @OutputPort public List<?> out;
-@Override public void evaluate(EvalContext ctx) {
+
+    @Override
+    public void evaluate(EvalContext ctx) {
         List<Object> result = new ArrayList<>(ctx.getInput("list", List.class, List.of()));
         Collections.reverse(result);
         ctx.setOutput("out", result);

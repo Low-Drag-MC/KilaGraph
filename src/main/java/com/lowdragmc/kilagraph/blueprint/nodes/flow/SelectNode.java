@@ -27,7 +27,8 @@ import java.util.List;
 public class SelectNode extends AnnotatedNode {
 
     @InputPort public boolean cond = false;
-@Override
+
+    @Override
     protected void onDefineExtraOptions(IOptionDefinitionContext context) {
         context.addOption("type", String.class)
                 .withDefaultValue(TypeHandles.UNKNOWN.getIdentification())
@@ -45,9 +46,9 @@ public class SelectNode extends AnnotatedNode {
 
     @Override
     public void evaluate(EvalContext ctx) {
-        boolean c = ctx.getInput("cond", Boolean.class, false);
-        Object value = c ? ctx.getInput("ifTrue").orElse(null)
-                         : ctx.getInput("ifFalse").orElse(null);
+        boolean c = ctx.getBool("cond", false);
+        Object value = c ? ctx.getInputRaw("ifTrue")
+                         : ctx.getInputRaw("ifFalse");
         ctx.setOutput("out", value);
     }
 

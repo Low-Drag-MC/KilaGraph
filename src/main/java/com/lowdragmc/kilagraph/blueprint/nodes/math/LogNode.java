@@ -15,9 +15,11 @@ public class LogNode extends AnnotatedNode {
     @InputPort public float in = 1f;
     @InputPort public float base = (float) Math.E;
     @OutputPort public float out;
-@Override public void evaluate(EvalContext ctx) {
-        float v = ctx.getInput("in", Float.class, 1f);
-        float b = ctx.getInput("base", Float.class, (float) Math.E);
+
+    @Override
+    public void evaluate(EvalContext ctx) {
+        float v = ctx.getFloat("in", 1f);
+        float b = ctx.getFloat("base", (float) Math.E);
         if (v <= 0f || b <= 0f || b == 1f) { ctx.setOutput("out", 0f); return; }
         ctx.setOutput("out", (float) (Math.log(v) / Math.log(b)));
     }
