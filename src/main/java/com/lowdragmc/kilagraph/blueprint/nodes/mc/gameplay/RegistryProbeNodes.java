@@ -33,7 +33,7 @@ import net.minecraft.world.level.Level;
  */
 public final class RegistryProbeNodes {
 
-    private static final String GROUP = "mc_gameplay";
+    private static final String GROUP = "mc/gameplay";
 
     private RegistryProbeNodes() {
     }

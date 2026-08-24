@@ -26,7 +26,7 @@ import net.neoforged.neoforge.items.IItemHandlerModifiable;
  */
 public final class ContainerActionNodes {
 
-    private static final String GROUP = "mc_container";
+    private static final String GROUP = "mc/container";
 
     private ContainerActionNodes() {
     }

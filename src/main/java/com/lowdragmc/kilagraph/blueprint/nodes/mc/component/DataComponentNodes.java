@@ -45,7 +45,7 @@ import java.util.List;
  */
 public final class DataComponentNodes {
 
-    private static final String GROUP = "mc_component";
+    private static final String GROUP = "mc/component";
     /** The key a non-compound component value is wrapped under. @see #encode */
     public static final String VALUE_KEY = "value";
 

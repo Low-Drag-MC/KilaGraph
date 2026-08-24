@@ -15,7 +15,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * {@code level.getBlockState(pos)}. {@code level} is a wire-only input (no embedded constant) —
  * feed it from a graph variable or a host-provided source node. Null level → null output.
  */
-@NodeAttribute(name = "mc_get_block_state", group = "mc_world", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_get_block_state", group = "mc/world", graphTypes = BlueprintGraph.class)
 public class GetBlockStateNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

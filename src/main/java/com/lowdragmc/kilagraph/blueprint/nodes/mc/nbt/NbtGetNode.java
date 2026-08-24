@@ -18,7 +18,7 @@ import java.util.List;
  */
 // valueType MUST stay an option, not a port: it decides the dynamic output port's TypeHandle, and
 // onDefineDynamicPorts can read an option (optionValue) but cannot know what a wire will carry.
-@NodeAttribute(name = "mc_nbt_get", group = "mc_nbt", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_nbt_get", group = "mc/nbt", graphTypes = BlueprintGraph.class)
 public class NbtGetNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

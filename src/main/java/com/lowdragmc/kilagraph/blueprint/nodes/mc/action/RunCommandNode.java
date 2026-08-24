@@ -47,7 +47,7 @@ import net.minecraft.world.phys.Vec3;
  * Given only a {@code pos}, the position is that block's centre with no executor, so {@code @s} matches
  * nothing. This is the same distinction as {@code /execute as} versus {@code /execute positioned}.
  */
-@NodeAttribute(name = "mc_run_command", group = "mc_action", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_run_command", group = "mc/action", graphTypes = BlueprintGraph.class)
 public class RunCommandNode extends AnnotatedNode {
 
     /** Command-block parity. Deliberately not configurable — see the class javadoc. */

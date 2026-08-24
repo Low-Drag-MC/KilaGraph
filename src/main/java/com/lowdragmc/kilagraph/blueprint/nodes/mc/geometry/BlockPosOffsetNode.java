@@ -11,7 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
 /** Offsets a {@link BlockPos} by {@code amount} blocks in {@code direction}. */
-@NodeAttribute(name = "mc_block_pos_offset", group = "mc_geometry", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_block_pos_offset", group = "mc/geometry", graphTypes = BlueprintGraph.class)
 public class BlockPosOffsetNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

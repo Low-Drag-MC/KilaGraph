@@ -34,7 +34,7 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public final class BlockEntityActionNodes {
 
-    private static final String GROUP = "mc_action";
+    private static final String GROUP = "mc/action";
 
     private BlockEntityActionNodes() {
     }

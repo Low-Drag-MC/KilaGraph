@@ -22,7 +22,7 @@ import net.minecraft.world.item.ItemStack;
  */
 public final class EntityInteractionNodes {
 
-    private static final String GROUP = "mc_action";
+    private static final String GROUP = "mc/action";
 
     private EntityInteractionNodes() {
     }

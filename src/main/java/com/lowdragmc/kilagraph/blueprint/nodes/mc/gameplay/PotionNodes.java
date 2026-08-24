@@ -44,7 +44,7 @@ import java.util.List;
  */
 public final class PotionNodes {
 
-    private static final String GROUP = "mc_gameplay";
+    private static final String GROUP = "mc/gameplay";
 
     private PotionNodes() {
     }

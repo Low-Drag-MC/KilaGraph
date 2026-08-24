@@ -9,7 +9,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.nbt.CompoundTag;
 
 /** Produces a fresh empty {@link CompoundTag}. */
-@NodeAttribute(name = "mc_nbt_create", group = "mc_nbt", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_nbt_create", group = "mc/nbt", graphTypes = BlueprintGraph.class)
 public class NbtCreateNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

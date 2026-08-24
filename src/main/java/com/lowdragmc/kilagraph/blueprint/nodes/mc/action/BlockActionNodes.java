@@ -21,7 +21,7 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public final class BlockActionNodes {
 
-    private static final String GROUP = "mc_action";
+    private static final String GROUP = "mc/action";
 
     private BlockActionNodes() {
     }

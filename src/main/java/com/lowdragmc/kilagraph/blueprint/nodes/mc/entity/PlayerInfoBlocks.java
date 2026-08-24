@@ -22,7 +22,7 @@ import net.minecraft.world.item.ItemStack;
  */
 public final class PlayerInfoBlocks {
 
-    private static final String GROUP = "mc_entity";
+    private static final String GROUP = "mc/entity";
 
     private PlayerInfoBlocks() {
     }

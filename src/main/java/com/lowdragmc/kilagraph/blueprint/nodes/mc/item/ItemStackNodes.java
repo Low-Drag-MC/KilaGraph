@@ -42,7 +42,7 @@ import net.minecraft.world.item.component.ItemLore;
  */
 public final class ItemStackNodes {
 
-    private static final String GROUP = "mc_item";
+    private static final String GROUP = "mc/item";
 
     private ItemStackNodes() {
     }

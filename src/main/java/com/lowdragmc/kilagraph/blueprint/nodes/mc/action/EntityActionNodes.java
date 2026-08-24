@@ -36,7 +36,7 @@ import org.joml.Vector3f;
  */
 public final class EntityActionNodes {
 
-    private static final String GROUP = "mc_action";
+    private static final String GROUP = "mc/action";
 
     private EntityActionNodes() {
     }

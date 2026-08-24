@@ -28,7 +28,7 @@ import net.minecraft.world.level.Level;
  */
 public final class WorldEffectNodes {
 
-    private static final String GROUP = "mc_action";
+    private static final String GROUP = "mc/action";
 
     private WorldEffectNodes() {
     }

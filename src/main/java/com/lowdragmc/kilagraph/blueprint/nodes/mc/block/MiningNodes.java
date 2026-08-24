@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class MiningNodes {
 
-    private static final String GROUP = "mc_block";
+    private static final String GROUP = "mc/block";
 
     /**
      * The divisors the game applies to mining progress: harvestable blocks take 30 ticks at speed 1,

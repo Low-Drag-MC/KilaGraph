@@ -11,7 +11,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 /** Serialises a {@link BlockEntity} to its NBT compound (without block/position metadata). */
-@NodeAttribute(name = "mc_nbt_block_entity", group = "mc_nbt", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_nbt_block_entity", group = "mc/nbt", graphTypes = BlueprintGraph.class)
 public class BlockEntityNbtNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

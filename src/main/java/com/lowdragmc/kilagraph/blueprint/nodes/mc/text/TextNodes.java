@@ -30,7 +30,7 @@ import java.util.List;
  */
 public final class TextNodes {
 
-    private static final String GROUP = "mc_text";
+    private static final String GROUP = "mc/text";
 
     private TextNodes() {
     }

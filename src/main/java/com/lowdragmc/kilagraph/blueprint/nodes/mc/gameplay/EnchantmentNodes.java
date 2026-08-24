@@ -35,7 +35,7 @@ import java.util.List;
  */
 public final class EnchantmentNodes {
 
-    private static final String GROUP = "mc_gameplay";
+    private static final String GROUP = "mc/gameplay";
 
     private EnchantmentNodes() {
     }

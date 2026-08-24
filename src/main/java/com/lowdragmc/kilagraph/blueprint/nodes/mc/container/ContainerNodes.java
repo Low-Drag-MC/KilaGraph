@@ -38,7 +38,7 @@ import net.neoforged.neoforge.items.wrapper.InvWrapper;
  */
 public final class ContainerNodes {
 
-    private static final String GROUP = "mc_container";
+    private static final String GROUP = "mc/container";
 
     private ContainerNodes() {
     }

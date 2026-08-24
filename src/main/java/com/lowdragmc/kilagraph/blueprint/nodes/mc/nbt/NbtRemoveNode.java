@@ -10,7 +10,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.nbt.CompoundTag;
 
 /** Remove {@code key} from {@code tag}, returning the (mutated) tag. */
-@NodeAttribute(name = "mc_nbt_remove", group = "mc_nbt", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_nbt_remove", group = "mc/nbt", graphTypes = BlueprintGraph.class)
 public class NbtRemoveNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

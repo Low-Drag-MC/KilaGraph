@@ -36,7 +36,7 @@ import net.minecraft.world.level.Level;
  */
 public final class RedstoneNodes {
 
-    private static final String GROUP = "mc_redstone";
+    private static final String GROUP = "mc/redstone";
 
     private RedstoneNodes() {
     }

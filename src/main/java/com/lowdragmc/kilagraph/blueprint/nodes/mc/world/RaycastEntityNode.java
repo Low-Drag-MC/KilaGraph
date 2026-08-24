@@ -32,7 +32,7 @@ import org.joml.Vector3f;
  * <p>Only entities that can be interacted with are considered — the same filter the game uses for
  * attacks, so a spectator or a dead entity is passed through rather than blocking the ray.
  */
-@NodeAttribute(name = "mc_raycast_entity", group = "mc_world", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_raycast_entity", group = "mc/world", graphTypes = BlueprintGraph.class)
 public class RaycastEntityNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

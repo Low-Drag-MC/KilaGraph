@@ -32,7 +32,7 @@ import org.joml.Vector3f;
  */
 public final class EntityInfoBlocks {
 
-    private static final String GROUP = "mc_entity";
+    private static final String GROUP = "mc/entity";
 
     private EntityInfoBlocks() {
     }

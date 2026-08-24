@@ -32,7 +32,7 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class WorldInteractionNodes {
 
-    private static final String GROUP = "mc_action";
+    private static final String GROUP = "mc/action";
 
     private WorldInteractionNodes() {
     }

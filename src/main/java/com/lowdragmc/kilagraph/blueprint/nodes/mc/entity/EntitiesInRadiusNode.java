@@ -16,7 +16,7 @@ import net.minecraft.world.phys.Vec3;
 import java.util.List;
 
 /** All entities within {@code radius} blocks of {@code center}. Empty list if level is null. */
-@NodeAttribute(name = "mc_entities_in_radius", group = "mc_entity", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_entities_in_radius", group = "mc/entity", graphTypes = BlueprintGraph.class)
 public class EntitiesInRadiusNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

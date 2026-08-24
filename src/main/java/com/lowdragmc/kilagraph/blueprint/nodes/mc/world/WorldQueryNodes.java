@@ -42,7 +42,7 @@ import org.joml.Vector3f;
  */
 public final class WorldQueryNodes {
 
-    private static final String GROUP = "mc_world";
+    private static final String GROUP = "mc/world";
 
     private WorldQueryNodes() {
     }

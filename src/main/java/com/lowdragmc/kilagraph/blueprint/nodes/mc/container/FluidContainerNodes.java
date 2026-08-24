@@ -35,7 +35,7 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
  */
 public final class FluidContainerNodes {
 
-    private static final String GROUP = "mc_container";
+    private static final String GROUP = "mc/container";
 
     private FluidContainerNodes() {
     }

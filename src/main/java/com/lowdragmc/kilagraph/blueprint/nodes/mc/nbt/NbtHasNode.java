@@ -10,7 +10,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.nbt.CompoundTag;
 
 /** True if {@code tag} contains {@code key}. */
-@NodeAttribute(name = "mc_nbt_has", group = "mc_nbt", graphTypes = BlueprintGraph.class)
+@NodeAttribute(name = "mc_nbt_has", group = "mc/nbt", graphTypes = BlueprintGraph.class)
 public class NbtHasNode extends AnnotatedNode {
     @Override
     protected Component getNodeTooltip() {

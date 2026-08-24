@@ -40,7 +40,7 @@ import java.util.List;
  */
 public final class BlockStateNodes {
 
-    private static final String GROUP = "mc_block";
+    private static final String GROUP = "mc/block";
 
     private BlockStateNodes() {
     }

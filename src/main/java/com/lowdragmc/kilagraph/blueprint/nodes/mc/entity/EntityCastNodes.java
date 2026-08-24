@@ -29,7 +29,7 @@ import net.minecraft.world.entity.player.Player;
  */
 public final class EntityCastNodes {
 
-    private static final String GROUP = "mc_entity";
+    private static final String GROUP = "mc/entity";
 
     private EntityCastNodes() {
     }
