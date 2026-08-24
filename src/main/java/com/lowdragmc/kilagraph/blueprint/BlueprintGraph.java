@@ -3,6 +3,7 @@ package com.lowdragmc.kilagraph.blueprint;
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.graph.type.KGGraphModel;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
+import com.lowdragmc.kilagraph.graph.ui.KGUITypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphNodeRegistry;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
@@ -43,6 +44,7 @@ public class BlueprintGraph extends Graph {
     @Override
     public List<TypeHandle> getSupportTypes() {
         KGTypeHandles.init();
+        KGUITypeHandles.init();
         var types = new HashSet<>(CustomGraphModelImpl.detectSupportedTypes(graphModel));
         // scalars
         types.add(TypeHandles.BOOL);
@@ -80,6 +82,9 @@ public class BlueprintGraph extends Graph {
         types.add(KGTypeHandles.MIRROR);
         types.add(KGTypeHandles.AXIS);
         types.add(KGTypeHandles.EQUIPMENT_SLOT);
+        // LDLib2 UI. All wire-only, so they belong here (a port can carry them) but not in
+        // getLibrarySupportTypes() (none can be authored as a literal).
+        types.addAll(KGUITypeHandles.all());
         return List.copyOf(types);
     }
 

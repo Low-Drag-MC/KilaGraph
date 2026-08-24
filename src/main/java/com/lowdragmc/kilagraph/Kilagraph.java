@@ -2,6 +2,7 @@ package com.lowdragmc.kilagraph;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
+import com.lowdragmc.kilagraph.graph.ui.KGUITypeHandles;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureHandler;
@@ -24,6 +25,9 @@ public class Kilagraph {
         // Custom TypeHandles (LIST etc.) must exist before any node class is scanned, because the
         // node registry instantiates each Node to harvest its declared port types.
         KGTypeHandles.init();
+        // Same ordering rule for the LDLib2 UI handles: a ldlib2_ui_* node declares UIElement /
+        // Stylesheet / UIEvent ports, and the registry scan instantiates it to harvest their types.
+        KGUITypeHandles.init();
         // Sampler2DValue is a custom-object constant/variable value; register its codec so it round-trips
         // in graph NBT (customType does not auto-register one — without this the value silently drops).
         AccessorRegistries.registerAccessor(CustomDirectAccessor.builder(RenderTypeGraphTypes.Sampler2DValue.class)
