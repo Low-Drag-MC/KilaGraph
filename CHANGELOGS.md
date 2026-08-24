@@ -1,4 +1,9 @@
 # ChangeLogs
+## v21.1.0.11
+* Added LDLib2 UI nodes (element, style, stylesheet, animation, event, drag, sync, binding, rpc, xml, template, context)
+* Added multi-line text node
+* Improved node library grouping (mc and ui parent groups)
+
 ## v21.1.0.10
 * Added Minecraft nodes (entity, player, level, block, item, container, redstone, enchantment, potion, recipe, loot, mining, tag, nbt, text, regex)
 * Added info context nodes
