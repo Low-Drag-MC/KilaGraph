@@ -1039,6 +1039,7 @@
   "string_contains": "Contains",
   "string_starts_with": "Starts With",
   "string_ends_with": "Ends With",
+  "string_multiline": "Multi Line Text",
 
   "List": "List",
   "Map": "Map",
@@ -2685,6 +2686,12 @@
   "kg.node.string_case.option.op.tooltip.TITLE": "TITLE: first letter of each word capitalised, the rest lowercase.",
   "kg.node.string_case.in.in": "The text to convert.",
   "kg.node.string_case.out.out": "The text in the chosen case.",
+  "kg.node.string_multiline.tooltip": "A string literal written in a real text area.",
+  "kg.node.string_multiline.desc.1": "A plain STRING constant gives you a one-line field, which is the wrong shape for the things graphs actually want to paste in — a UI XML document, a command block's worth of commands, a book page, a JSON payload. This node is the same string value with a proper editor over it: Enter starts a new line instead of committing.",
+  "kg.node.string_multiline.desc.2": "The value is an ordinary string with a newline between the lines, so nothing downstream has to know it came from here. Feed it to Split with a newline delimiter to get the lines as a list.",
+  "kg.node.string_multiline.note.1": "The text lives on the node, not on a wire — it is authored in the editor and saved with the graph, so there is no input port to override it at runtime.",
+  "kg.node.string_multiline.option.text.tooltip": "The text. Lines are joined with a newline.",
+  "kg.node.string_multiline.out.out": "The whole text as one string.",
 
   "kg.node.mc_block_to_item.desc.1": "The item a block becomes when you pick it up. Blocks with no item form — fire, or the various technical blocks — give air instead.",
   "kg.node.mc_item_to_block.desc.1": "The block an item places. Items that place nothing give the air block, so check the result before using it.",

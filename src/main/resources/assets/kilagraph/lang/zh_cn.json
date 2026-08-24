@@ -1039,6 +1039,7 @@
   "string_contains": "包含",
   "string_starts_with": "开头为",
   "string_ends_with": "结尾为",
+  "string_multiline": "多行文本",
 
   "List": "列表",
   "Map": "映射",
@@ -2683,6 +2684,12 @@
   "kg.node.string_case.option.op.tooltip.TITLE": "TITLE：每个单词首字母大写，其余小写。",
   "kg.node.string_case.in.in": "要转换的文本。",
   "kg.node.string_case.out.out": "转换为所选大小写形式的文本。",
+  "kg.node.string_multiline.tooltip": "在真正的文本编辑框里写出来的字符串常量。",
+  "kg.node.string_multiline.desc.1": "普通的 STRING 常量只给一行输入框，而图里真正想粘进去的东西并不是这个形状——一份 UI XML、一整串命令、一页书、一段 JSON。这个节点存的还是同一个字符串值，只是配了个像样的编辑器：回车是换行，而不是提交。",
+  "kg.node.string_multiline.desc.2": "值就是行与行之间夹着换行符的普通字符串，下游不需要知道它从哪来。想按行拿到列表，用换行符作分隔符接一个「拆分」即可。",
+  "kg.node.string_multiline.note.1": "文本存在节点上，不走连线——它在编辑器里写好、随图一起保存，所以没有输入端口可以在运行时覆盖它。",
+  "kg.node.string_multiline.option.text.tooltip": "文本内容。各行之间以换行符连接。",
+  "kg.node.string_multiline.out.out": "整段文本，作为一个字符串。",
 
   "kg.node.mc_block_to_item.desc.1": "方块被拿在手上时对应的物品。没有物品形态的方块 —— 火，以及各种技术性方块 —— 会得到空气。",
   "kg.node.mc_item_to_block.desc.1": "物品放置出来的方块。放不出方块的物品会得到空气方块，因此使用结果前请先判断。",

@@ -15,6 +15,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.string.IndexOfNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.JoinNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.LengthNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.MatchesNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.string.MultiLineNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.ReplaceNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.ReplaceRegexNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.string.SplitNode;
@@ -413,6 +414,31 @@ public final class StringNodeGameTest {
         var badEscape = node(ReplaceRegexNode.class, "in", "x=1", "pattern", "x", "replacement", "\\");
         assertEq(helper, "a dangling escape is refused", "x=1", eval(badEscape, "out", String.class));
         assertEq(helper, "and reports failure", Boolean.FALSE, eval(badEscape, "ok", Boolean.class));
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+
+    @PrefixGameTestTemplate(false)
+
+    public static void multiline(GameTestHelper helper) {
+        var g = newGraph();
+        var n = addNode(g, MultiLineNode.class);
+        assertEq(helper, "an untouched node is the empty string", "",
+                new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), String.class));
+
+        // The option is a plain string carrying its own newlines — no list, no per-line ports.
+        setOption(n, "text", "first\nsecond\n");
+        assertEq(helper, "the text comes out verbatim", "first\nsecond\n",
+                new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), String.class));
+
+        // Splitting on the newline is how a graph gets the lines back; the trailing blank one survives,
+        // which is what the text area's own -1 split promises.
+        var split = addNode(g, SplitNode.class);
+        setInputConstant(split, "delimiter", "\n");
+        wire(g, split.getInputsById().get("in"), n.getOutputsById().get("out"));
+        assertEq(helper, "split on newline yields the lines", List.of("first", "second", ""),
+                new GraphExecutor(g).evaluate(split.getOutputsById().get("out"), List.class));
         helper.succeed();
     }
 
