@@ -5,6 +5,7 @@ import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.exec.PreparedGraph;
 import com.lowdragmc.kilagraph.graph.exec.VariableStore;
+import com.lowdragmc.kilagraph.test.gametest.KGBench;
 import com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder;
 import com.lowdragmc.kilagraph.test.gametest.KGGraphFixtures;
 import com.mojang.logging.LogUtils;
@@ -326,5 +327,51 @@ public final class SealedGraphStressGameTest {
         long elapsed = System.nanoTime() - t0;
         for (Thread t : threads) t.join(2000);
         return elapsed;
+    }
+
+    /**
+     * What sealing costs on a normal single-threaded run. Logged, never asserted.
+     *
+     * <p>Two structurally identical graphs, so they are two different models and therefore two
+     * different prepared graphs — which is the only way to have one sealed and one not at the same
+     * time, since a prepared graph is shared by every executor over its model.</p>
+     *
+     * <p>The expectation is nothing measurable: the seal is one volatile read in
+     * {@code PreparedGraph.node()}, and {@code node()} is not on the per-node path — the hot pull
+     * walks {@code inputSourceOwners} directly and never asks for a node by model. If this ever comes
+     * back non-trivial, that assumption has stopped being true.</p>
+     */
+    @GameTest(template = "empty", timeoutTicks = 6000)
+    @PrefixGameTestTemplate(false)
+    public static void sealingCostsNothingMeasurable(GameTestHelper helper) {
+        var sealedGraph = KGGraphFixtures.mixedWorkload();
+        var plainGraph = KGGraphFixtures.mixedWorkload();
+        var sealedExec = frozenExecutor(sealedGraph);
+        var plainExec = frozenExecutor(plainGraph);
+        var sealedEntry = sealedGraph.node("entry");
+        var plainEntry = plainGraph.node("entry");
+        sealedExec.executeFrom(sealedEntry);
+        plainExec.executeFrom(plainEntry);
+
+        PreparedGraph prepared = sealedExec.preparedGraph();
+        if (prepared == null) {
+            helper.fail("warm-up resolved no prepared graph");
+            return;
+        }
+        prepared.seal();
+        try {
+            var c = KGBench.comparePaired(
+                    "mixed-workload (unsealed)",
+                    () -> { plainExec.clearCache(); plainExec.executeFrom(plainEntry); },
+                    "mixed-workload (sealed)",
+                    () -> { sealedExec.clearCache(); sealedExec.executeFrom(sealedEntry); },
+                    4_000, 20_000, 5);
+            LOGGER.info("[KGBench] cost of sealing: {} ns/run on a 44-node graph — {}",
+                    String.format("%+.0f", c.deltaNsPerRun()),
+                    c.conclusive() ? "conclusive (positive means sealed is slower)" : "inconclusive");
+        } finally {
+            prepared.unseal();
+        }
+        helper.succeed();
     }
 }
