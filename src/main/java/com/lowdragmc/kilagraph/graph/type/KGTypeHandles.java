@@ -260,9 +260,18 @@ public final class KGTypeHandles {
         return TypeHandleHelpers.fromType(t);
     }
 
+    /**
+     * The override registered for {@code t}, or null — including when {@code t} itself is null.
+     *
+     * <p>The null guard is not decoration. {@link #OVERRIDES} is a {@code ConcurrentHashMap}, which
+     * throws on a null key rather than answering "absent", and a port's Java type <em>is</em> null
+     * whenever its handle resolves to nothing — every {@code EXECUTION_FLOW} pin, for one. So the
+     * obvious use of this method, asking a port whether its type is overridden, would otherwise
+     * throw on the first exec pin it met.</p>
+     */
     @Nullable
-    public static TypeHandle lookupOverride(Type t) {
-        return OVERRIDES.get(t);
+    public static TypeHandle lookupOverride(@Nullable Type t) {
+        return t == null ? null : OVERRIDES.get(t);
     }
 
     public static void init() {
