@@ -151,6 +151,20 @@ public final class KGGameTestHelpers {
         return m.createVariableNode(v, new Vector2f(x, y), null, null);
     }
 
+    /**
+     * An output port carrying {@code value} with {@code value}'s own runtime type.
+     *
+     * <p>For the tests that care what kind of number is on a wire rather than only what it is worth —
+     * the {@code NumericLane} rule reads the runtime type, so a {@code Long} has to reach the node
+     * still being a {@code Long}. An embedded constant cannot do that job: a math node's ports are
+     * declared {@code float}, so anything typed into one arrives as a {@code Float}. A typed
+     * {@code INPUT} variable is the shortest thing that can, and it is what {@code gameTime} and the
+     * NBT readers look like from the consuming node's side.</p>
+     */
+    public static PortModel valueSource(CustomGraphModelImpl m, String name, Class<?> type, Object value) {
+        return varNode(m, dataVar(m, name, type, value, VariableKind.INPUT)).getOutputPort();
+    }
+
     /** The call-site port id mirroring {@code v}. Single-direction variables only. */
     public static String pin(VariableDeclarationModelBase v) {
         return v.getUid().toString();

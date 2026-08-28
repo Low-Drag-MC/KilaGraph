@@ -57,6 +57,7 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.McWorldEntityGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McWorldQueryGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.MixedWorkloadGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NbtNodeGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.NumericPromotionGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NbtPipelineGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.OptionalNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.PreparedGraphGameTest;
@@ -189,6 +190,7 @@ public final class KGGameTests {
             new Group(McWorldEntityGameTest::registerFunctions, McWorldEntityGameTest::register),
             new Group(MixedWorkloadGameTest::registerFunctions, MixedWorkloadGameTest::register),
             new Group(NbtPipelineGameTest::registerFunctions, NbtPipelineGameTest::register),
+            new Group(NumericPromotionGameTest::registerFunctions, NumericPromotionGameTest::register),
             new Group(PreparedGraphGameTest::registerFunctions, PreparedGraphGameTest::register),
             new Group(VectorNodeGameTest::registerFunctions, VectorNodeGameTest::register));
 

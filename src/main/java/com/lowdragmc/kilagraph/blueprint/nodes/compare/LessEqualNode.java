@@ -7,6 +7,7 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 
+/** {@code a <= b}, compared in the lane its operands ask for. @see NumericComparison */
 @NodeAttribute(name = "cmp_le", group = "compare", graphTypes = BlueprintGraph.class)
 public class LessEqualNode extends AnnotatedNode {
     @InputPort  public float a = 0f;
@@ -15,6 +16,6 @@ public class LessEqualNode extends AnnotatedNode {
 
     @Override
     public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", ctx.getFloat("a", 0f) <= ctx.getFloat("b", 0f));
+        ctx.setOutput("out", NumericComparison.evaluate(ctx, NumericComparison.LE));
     }
 }

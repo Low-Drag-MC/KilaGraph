@@ -322,6 +322,45 @@ public final class EvalContext {
         return getInput(inputId, Boolean.class, defaultIfMissing);
     }
 
+    // ---- numeric lane -------------------------------------------------------------------------
+
+    /**
+     * The width to do this node's arithmetic in, given what arrived on {@code inputIds} — one of
+     * {@link NumericLane#LONG}, {@link NumericLane#FLOAT} or {@link NumericLane#DOUBLE}, never
+     * {@code NONE}.
+     *
+     * <p>Read it once at the top of {@code evaluate} and switch on it, then read the operands with
+     * the matching {@link #getLong} / {@link #getFloat} / {@link #getDouble}. {@link NumericLane}
+     * has the rule and the reasons; the short version is that a wire names the lane and an
+     * unconnected constant goes along with whatever the wires decided.</p>
+     */
+    public byte lane(String... inputIds) {
+        byte lane = NumericLane.NONE;
+        for (String id : inputIds) lane = NumericLane.widen(lane, laneOf(id));
+        return NumericLane.resolve(lane);
+    }
+
+    /**
+     * One input's contribution to {@link #lane}, {@link NumericLane#NONE} included.
+     *
+     * <p>For a variadic node to fold the lane over {@code in1..inN} without building the array
+     * {@link #lane}'s varargs would need — the arity is an option, so the ids are not a constant.</p>
+     */
+    public byte laneOf(String inputId) {
+        // See Opt.NUMERIC_PROMOTION. Off, every input abstains and lane() resolves to FLOAT, which
+        // is the pre-lane behaviour — for benchmarking the check against itself, nothing else.
+        if (!executor.numericPromotion()) return NumericLane.NONE;
+        int idx = prepared.inputIndex(inputId);
+        if (idx >= 0) return executor.pullLane(prepared, idx);
+        // Not in the snapshot — same slow path the reads take. The live port still says whether it is
+        // connected, which is the one thing the constant-vs-wire distinction needs.
+        PortModel pm = prepared.asNodeModel == null ? null
+                : prepared.asNodeModel.getInputsById().get(inputId);
+        if (pm == null) return NumericLane.NONE;
+        Object raw = pullRaw(inputId);
+        return pm.isConnected() ? NumericLane.of(raw) : NumericLane.ofConstant(raw);
+    }
+
     // ---- unboxed writes -----------------------------------------------------------------------
 
     /**

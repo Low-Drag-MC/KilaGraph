@@ -239,7 +239,29 @@ public final class GraphExecutor {
          * Drain a frame's queue without re-settling the stack between nodes, in
          * {@link ExecSession#runToCompletion()}. Stepping one node at a time is unaffected.
          */
-        FUSED_EXEC_DRIVER
+        FUSED_EXEC_DRIVER,
+        /**
+         * Let a numeric node pick its {@link NumericLane} from what reaches it.
+         *
+         * <p><b>Not an optimisation, and the only entry here that is not one.</b> Switching this off
+         * does not restore a slower path that computes the same thing — it makes the executor
+         * <em>answer differently</em>: every promoted node reverts to working in {@code float}, which
+         * is the pre-lane behaviour and is wrong above 2^24. It exists because the project's bench
+         * rule is that only an interleaved paired comparison against an off switch counts, and
+         * without one the cost of the lane check could only ever be estimated. Never ship with it
+         * off; nothing but a benchmark should touch it.</p>
+         */
+        NUMERIC_PROMOTION,
+        /**
+         * Fold each promoted intrinsic's lane <em>as it reads</em> its operands, instead of walking
+         * them once to decide the lane and again to read them.
+         *
+         * <p>A real optimisation — both paths compute the same thing. It has its own switch because
+         * once the fold is fused into the pull, {@link #NUMERIC_PROMOTION} can no longer isolate its
+         * cost: the off side would still be computing the lane it then ignores. This is the only
+         * comparison that answers "is one pass cheaper than two".</p>
+         */
+        SINGLE_PASS_LANE
     }
 
     /** @see Opt#FUSED_EXEC_DRIVER */
@@ -250,6 +272,16 @@ public final class GraphExecutor {
     /** @see Opt#OPTION_PRERESOLVE */
     boolean optionPreresolve() {
         return opt(Opt.OPTION_PRERESOLVE);
+    }
+
+    /** @see Opt#NUMERIC_PROMOTION */
+    boolean numericPromotion() {
+        return opt(Opt.NUMERIC_PROMOTION);
+    }
+
+    /** @see Opt#SINGLE_PASS_LANE */
+    private boolean singlePassLane() {
+        return opt(Opt.SINGLE_PASS_LANE);
     }
 
     /** Bitmask over {@link Opt}; every optimisation on by default. Propagated to child executors. */
@@ -1086,6 +1118,30 @@ public final class GraphExecutor {
         return asDouble(slots[srcSlot], def);
     }
 
+    /**
+     * Which {@link NumericLane} the value feeding {@code inputIndex} asks the reading node to work in.
+     *
+     * <p>The distinction the lane rule turns on — is this input <em>connected</em>, or is it an
+     * unconnected embedded constant — is already resolved here: a source slot of -1 is precisely
+     * "unconnected", so it costs the array read the pull was going to do anyway. See
+     * {@link NumericLane#ofConstant} for why the two cases answer differently.</p>
+     *
+     * <p>A connected input has to be computed before its kind means anything, so this evaluates the
+     * producer exactly as a pull would. That is memoised, so the pull that follows is a stamp
+     * comparison, and — since every node that asks about a lane goes on to read every input it
+     * asked about, in the same order — nothing is evaluated that would not have been.</p>
+     */
+    byte pullLane(PreparedGraph.Node owner, int inputIndex) {
+        int srcSlot = owner.inputSourceSlots[inputIndex];
+        if (srcSlot < 0) {
+            return NumericLane.ofConstant(readConstant(owner.inputConstants[inputIndex], Object.class));
+        }
+        PreparedGraph.Node src = owner.inputSourceOwners[inputIndex];
+        if (!ensureComputed(src, srcSlot)) return NumericLane.NONE;
+        byte k = kinds[srcSlot];
+        return k == KIND_OBJECT ? NumericLane.of(slots[srcSlot]) : NumericLane.ofKind(k);
+    }
+
     /** As {@link #pullDouble}, but exact for integral values (no round trip through double). */
     long pullLong(PreparedGraph.Node owner, int inputIndex, long def) {
         int srcSlot = owner.inputSourceSlots[inputIndex];
@@ -1243,9 +1299,21 @@ public final class GraphExecutor {
      */
     private boolean evalArithmetic(PreparedGraph.Node n) {
         int[] in = n.opIn;
+        // The variadic shape check, hoisted out of the four cases that used to make it individually.
+        // It has to come before the lane fold as well as before the body: a node whose arity option
+        // disagrees with its port count reads a different set of inputs than opIn names, and folding
+        // a lane over the wrong set would evaluate a producer the node never asks for — which the
+        // differential harness would see, since it compares which nodes ran. opAux is -1 for every
+        // non-variadic opcode, so this is a single predictable branch for the rest.
+        if (n.opAux >= 0 && variadicArity(n) != in.length) return false;
+        if (!singlePassLane() && !isFloatLane(n)) return false;
         switch (n.op) {
             // Math.abs(getFloat("in", 0f))
-            case Intrinsics.OP_ABS -> writeFloat(n.opOutSlot, Math.abs(pullFloat(n, in[0], 0f)));
+            case Intrinsics.OP_ABS -> {
+                float v = pullFloatLane(n, in[0], 0f);
+                if (!floatLane(lastLane)) return false;
+                writeFloat(n.opOutSlot, Math.abs(v));
+            }
 
             // v = getFloat("in", 0f); v < 0f ? 0f : (float) Math.sqrt(v)
             case Intrinsics.OP_SQRT -> {
@@ -1254,11 +1322,16 @@ public final class GraphExecutor {
             }
 
             // -getFloat("in", 0f)
-            case Intrinsics.OP_NEGATE -> writeFloat(n.opOutSlot, -pullFloat(n, in[0], 0f));
+            case Intrinsics.OP_NEGATE -> {
+                float v = pullFloatLane(n, in[0], 0f);
+                if (!floatLane(lastLane)) return false;
+                writeFloat(n.opOutSlot, -v);
+            }
 
             // v = getFloat("in", 0f); v > 0f ? 1f : v < 0f ? -1f : 0f
             case Intrinsics.OP_SIGN -> {
-                float v = pullFloat(n, in[0], 0f);
+                float v = pullFloatLane(n, in[0], 0f);
+                if (!floatLane(lastLane)) return false;
                 writeFloat(n.opOutSlot, v > 0f ? 1f : v < 0f ? -1f : 0f);
             }
 
@@ -1273,16 +1346,21 @@ public final class GraphExecutor {
 
             // v=getFloat("in",0f); lo=getFloat("min",0f); hi=getFloat("max",1f); max(lo, min(hi, v))
             case Intrinsics.OP_CLAMP -> {
-                float v = pullFloat(n, in[0], 0f);
-                float lo = pullFloat(n, in[1], 0f);
-                float hi = pullFloat(n, in[2], 1f);
+                float v = pullFloatLane(n, in[0], 0f);
+                byte lane = lastLane;
+                float lo = pullFloatLane(n, in[1], 0f);
+                lane = NumericLane.widen(lane, lastLane);
+                float hi = pullFloatLane(n, in[2], 1f);
+                if (!floatLane(NumericLane.widen(lane, lastLane))) return false;
                 writeFloat(n.opOutSlot, Math.max(lo, Math.min(hi, v)));
             }
 
             // va=getFloat("a",0f); vb=getFloat("b",0f); va - vb
             case Intrinsics.OP_SUB -> {
-                float va = pullFloat(n, in[0], 0f);
-                float vb = pullFloat(n, in[1], 0f);
+                float va = pullFloatLane(n, in[0], 0f);
+                byte lane = lastLane;
+                float vb = pullFloatLane(n, in[1], 0f);
+                if (!floatLane(NumericLane.widen(lane, lastLane))) return false;
                 writeFloat(n.opOutSlot, va - vb);
             }
 
@@ -1295,8 +1373,10 @@ public final class GraphExecutor {
 
             // va=getFloat("a",0f); vb=getFloat("b",1f); vb == 0f ? 0f : va % vb
             case Intrinsics.OP_MOD -> {
-                float va = pullFloat(n, in[0], 0f);
-                float vb = pullFloat(n, in[1], 1f);
+                float va = pullFloatLane(n, in[0], 0f);
+                byte lane = lastLane;
+                float vb = pullFloatLane(n, in[1], 1f);
+                if (!floatLane(NumericLane.widen(lane, lastLane))) return false;
                 writeFloat(n.opOutSlot, vb == 0f ? 0f : va % vb);
             }
 
@@ -1352,33 +1432,49 @@ public final class GraphExecutor {
 
             // n = max(1, option("inputs")); sum = 0f; sum += getFloat("in"+i, 0f)
             case Intrinsics.OP_ADD -> {
-                if (variadicArity(n) != in.length) return false;
+                byte lane = NumericLane.NONE;
                 float sum = 0f;
-                for (int i = 0; i < in.length; i++) sum += pullFloat(n, in[i], 0f);
+                for (int i = 0; i < in.length; i++) {
+                    sum += pullFloatLane(n, in[i], 0f);
+                    lane = NumericLane.widen(lane, lastLane);
+                }
+                if (!floatLane(lane)) return false;
                 writeFloat(n.opOutSlot, sum);
             }
 
             // n = max(1, option("inputs")); p = 1f; p *= getFloat("in"+i, 1f)
             case Intrinsics.OP_MUL -> {
-                if (variadicArity(n) != in.length) return false;
+                byte lane = NumericLane.NONE;
                 float p = 1f;
-                for (int i = 0; i < in.length; i++) p *= pullFloat(n, in[i], 1f);
+                for (int i = 0; i < in.length; i++) {
+                    p *= pullFloatLane(n, in[i], 1f);
+                    lane = NumericLane.widen(lane, lastLane);
+                }
+                if (!floatLane(lane)) return false;
                 writeFloat(n.opOutSlot, p);
             }
 
             // n = max(1, option("inputs")); m = +Inf; m = min(m, getFloat("in"+i, 0f))
             case Intrinsics.OP_MIN -> {
-                if (variadicArity(n) != in.length) return false;
+                byte lane = NumericLane.NONE;
                 float m = Float.POSITIVE_INFINITY;
-                for (int i = 0; i < in.length; i++) m = Math.min(m, pullFloat(n, in[i], 0f));
+                for (int i = 0; i < in.length; i++) {
+                    m = Math.min(m, pullFloatLane(n, in[i], 0f));
+                    lane = NumericLane.widen(lane, lastLane);
+                }
+                if (!floatLane(lane)) return false;
                 writeFloat(n.opOutSlot, m);
             }
 
             // n = max(1, option("inputs")); m = -Inf; m = max(m, getFloat("in"+i, 0f))
             case Intrinsics.OP_MAX -> {
-                if (variadicArity(n) != in.length) return false;
+                byte lane = NumericLane.NONE;
                 float m = Float.NEGATIVE_INFINITY;
-                for (int i = 0; i < in.length; i++) m = Math.max(m, pullFloat(n, in[i], 0f));
+                for (int i = 0; i < in.length; i++) {
+                    m = Math.max(m, pullFloatLane(n, in[i], 0f));
+                    lane = NumericLane.widen(lane, lastLane);
+                }
+                if (!floatLane(lane)) return false;
                 writeFloat(n.opOutSlot, m);
             }
 
@@ -1400,13 +1496,37 @@ public final class GraphExecutor {
         int[] in = n.opIn;
         switch (n.op) {
             // getFloat("a", 0f) OP getFloat("b", 0f)
-            case Intrinsics.OP_GT -> writeSlot(n.opOutSlot, pullFloat(n, in[0], 0f) > pullFloat(n, in[1], 0f));
-            case Intrinsics.OP_GE -> writeSlot(n.opOutSlot, pullFloat(n, in[0], 0f) >= pullFloat(n, in[1], 0f));
-            case Intrinsics.OP_LT -> writeSlot(n.opOutSlot, pullFloat(n, in[0], 0f) < pullFloat(n, in[1], 0f));
-            case Intrinsics.OP_LE -> writeSlot(n.opOutSlot, pullFloat(n, in[0], 0f) <= pullFloat(n, in[1], 0f));
+            case Intrinsics.OP_GT -> {
+                float va = pullFloatLane(n, in[0], 0f);
+                byte lane = lastLane;
+                float vb = pullFloatLane(n, in[1], 0f);
+                if (!floatLane(NumericLane.widen(lane, lastLane))) return false;
+                writeSlot(n.opOutSlot, va > vb);
+            }
+            case Intrinsics.OP_GE -> {
+                float va = pullFloatLane(n, in[0], 0f);
+                byte lane = lastLane;
+                float vb = pullFloatLane(n, in[1], 0f);
+                if (!floatLane(NumericLane.widen(lane, lastLane))) return false;
+                writeSlot(n.opOutSlot, va >= vb);
+            }
+            case Intrinsics.OP_LT -> {
+                float va = pullFloatLane(n, in[0], 0f);
+                byte lane = lastLane;
+                float vb = pullFloatLane(n, in[1], 0f);
+                if (!floatLane(NumericLane.widen(lane, lastLane))) return false;
+                writeSlot(n.opOutSlot, va < vb);
+            }
+            case Intrinsics.OP_LE -> {
+                float va = pullFloatLane(n, in[0], 0f);
+                byte lane = lastLane;
+                float vb = pullFloatLane(n, in[1], 0f);
+                if (!floatLane(NumericLane.widen(lane, lastLane))) return false;
+                writeSlot(n.opOutSlot, va <= vb);
+            }
 
-            // !Objects.equals(getInputRaw("a"), getInputRaw("b"))
-            case Intrinsics.OP_NEQ -> writeSlot(n.opOutSlot, !Objects.equals(
+            // !NumericLane.valuesEqual(getInputRaw("a"), getInputRaw("b"))
+            case Intrinsics.OP_NEQ -> writeSlot(n.opOutSlot, !NumericLane.valuesEqual(
                     pullInput(n, in[0], Object.class), pullInput(n, in[1], Object.class)));
 
             // !getBool("in", false)
@@ -1431,6 +1551,87 @@ public final class GraphExecutor {
     private int variadicArity(PreparedGraph.Node n) {
         Object raw = optionValue(n, n.opAux);
         return raw instanceof Number num ? Math.max(1, num.intValue()) : -1;
+    }
+
+    /**
+     * The lane the operand most recently read by {@link #pullFloatLane} asked for.
+     *
+     * <p>A side channel rather than a return value, because the caller wants the {@code float} and
+     * the lane from one read and Java has no cheap pair. <b>It must be consumed immediately</b>, before
+     * the next pull — which is also what makes it re-entrancy-safe: {@code pullFloatLane} writes it
+     * after {@code ensureComputed} has returned, so a nested intrinsic evaluated inside that call has
+     * already finished with its own value by the time ours is written.</p>
+     */
+    private byte lastLane;
+
+    /**
+     * {@link #pullFloat}, plus the {@link NumericLane} the source asked for, in {@link #lastLane}.
+     *
+     * <p>This is the whole of the single-pass rewrite. A promoting intrinsic used to walk its inputs
+     * twice — once through {@code pullLane} to decide whether it could answer at all, then again
+     * through {@code pullFloat} to read them — which for an embedded constant meant calling
+     * {@code Constant.getValue()} twice per evaluation, and for a wire meant a second
+     * {@code ensureComputed}. Measured at 1.5-2 ns per input; see
+     * {@code ExecutorBenchShapesGameTest.numericPromotionCost}. Now each operand is touched once and
+     * reports both, and the bail-out happens before anything is written, so a node that turns out not
+     * to be in the float lane is left in exactly the state the old pre-check left it in.</p>
+     */
+    private float pullFloatLane(PreparedGraph.Node owner, int inputIndex, float def) {
+        // Hoisted, so Opt.NUMERIC_PROMOTION costs one mask test per pull rather than one per
+        // classification site — and so its off position skips the classification itself rather than
+        // taking a different route to the same place. See Opt.NUMERIC_PROMOTION.
+        boolean lanes = numericPromotion();
+        int srcSlot = owner.inputSourceSlots[inputIndex];
+        if (srcSlot < 0) {
+            Object v = readConstant(owner.inputConstants[inputIndex], Object.class);
+            lastLane = lanes ? NumericLane.ofConstant(v) : NumericLane.NONE;
+            return v instanceof Number num ? num.floatValue() : def;
+        }
+        PreparedGraph.Node src = owner.inputSourceOwners[inputIndex];
+        if (!ensureComputed(src, srcSlot)) {
+            lastLane = NumericLane.NONE;
+            return def;
+        }
+        byte k = kinds[srcSlot];
+        long bits = nums[srcSlot];
+        lastLane = lanes ? NumericLane.ofKind(k) : NumericLane.NONE;
+        return switch (k) {
+            case KIND_FLOAT -> Float.intBitsToFloat((int) bits);
+            case KIND_DOUBLE -> (float) Double.longBitsToDouble(bits);
+            case KIND_INT -> (float) (int) bits;
+            case KIND_LONG -> (float) bits;
+            default -> {
+                Object o = slots[srcSlot];
+                if (lanes) lastLane = NumericLane.of(o);
+                yield o instanceof Number num ? num.floatValue() : def;
+            }
+        };
+    }
+
+    /**
+     * Whether a folded lane is the one the float-only transcriptions can answer in.
+     *
+     * <p>{@code Opt.NUMERIC_PROMOTION} is consulted <em>here</em>, not inside the pull, and that
+     * placement is load-bearing for the benchmark rather than for correctness. Checking it in
+     * {@link #pullFloatLane} made the off side take a different code path — an extra call layer the
+     * on side did not have — so the comparison was measuring the switch's own shape and two
+     * consecutive runs disagreed by 6 ns per node step in opposite directions. Here both sides run
+     * byte-identical pull code and differ only in this comparison, which is the thing under test.</p>
+     */
+    private boolean floatLane(byte lane) {
+        if (!numericPromotion()) return true;
+        if (!singlePassLane()) return true;   // the two-pass prologue already decided
+        return NumericLane.resolve(lane) == NumericLane.FLOAT;
+    }
+
+    /** The two-pass fold: walk the operands once purely to decide the lane. @see Opt#SINGLE_PASS_LANE */
+    private boolean isFloatLane(PreparedGraph.Node n) {
+        if (!numericPromotion()) return true;
+        byte lane = NumericLane.NONE;
+        for (int i = 0; i < n.opIn.length; i++) {
+            lane = NumericLane.widen(lane, pullLane(n, n.opIn[i]));
+        }
+        return NumericLane.resolve(lane) == NumericLane.FLOAT;
     }
 
     private void writeFloat(int slot, float value) {

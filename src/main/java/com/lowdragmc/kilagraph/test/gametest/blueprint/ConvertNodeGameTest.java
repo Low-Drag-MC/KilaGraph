@@ -7,7 +7,9 @@ import com.lowdragmc.kilagraph.blueprint.nodes.convert.NumberFormatNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ParseBoolNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ParseNumberNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ToFloatNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.convert.ToDoubleNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ToIntNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.convert.ToLongNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.convert.ToStringNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListCombineNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListGetNode;
@@ -34,6 +36,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertTrue
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.newGraph;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputConstant;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
+import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.valueSource;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
 public final class ConvertNodeGameTest {
@@ -45,10 +48,20 @@ public final class ConvertNodeGameTest {
     private static final String TO_INT = "convert_to_int";
     private static final String TO_FLOAT = "convert_to_float";
 
+    private static final String TO_INT_KEEPS_LARGE_WHOLE_NUMBERS = "convert_to_int_keeps_large_whole_numbers";
+    private static final String TO_INT_SATURATES_RATHER_THAN_WRAPPING = "convert_to_int_saturates_rather_than_wrapping";
+    private static final String TO_LONG = "convert_to_long";
+    private static final String TO_DOUBLE = "convert_to_double";
+    private static final String PARSE_NUMBER_KEEPS_WHOLE_TEXT_WHOLE = "convert_parse_number_keeps_whole_text_whole";
     private ConvertNodeGameTest() {}
 
 
     public static void registerFunctions() {
+        KGGameTests.registerFunction(TO_INT_KEEPS_LARGE_WHOLE_NUMBERS, ConvertNodeGameTest::toIntKeepsLargeWholeNumbers);
+        KGGameTests.registerFunction(TO_INT_SATURATES_RATHER_THAN_WRAPPING, ConvertNodeGameTest::toIntSaturatesRatherThanWrapping);
+        KGGameTests.registerFunction(TO_LONG, ConvertNodeGameTest::toLong);
+        KGGameTests.registerFunction(TO_DOUBLE, ConvertNodeGameTest::toDouble);
+        KGGameTests.registerFunction(PARSE_NUMBER_KEEPS_WHOLE_TEXT_WHOLE, ConvertNodeGameTest::parseNumberKeepsWholeTextWhole);
         KGGameTests.registerFunction(TO_STRING, ConvertNodeGameTest::toStringTest);
         KGGameTests.registerFunction(PARSE_NUMBER, ConvertNodeGameTest::parseNumber);
         KGGameTests.registerFunction(PARSE_BOOL, ConvertNodeGameTest::parseBool);
@@ -59,6 +72,11 @@ public final class ConvertNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
+        KGGameTests.registerFunctionTest(event, TO_INT_KEEPS_LARGE_WHOLE_NUMBERS, KGGameTests.functionKey(TO_INT_KEEPS_LARGE_WHOLE_NUMBERS), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, TO_INT_SATURATES_RATHER_THAN_WRAPPING, KGGameTests.functionKey(TO_INT_SATURATES_RATHER_THAN_WRAPPING), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, TO_LONG, KGGameTests.functionKey(TO_LONG), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, TO_DOUBLE, KGGameTests.functionKey(TO_DOUBLE), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, PARSE_NUMBER_KEEPS_WHOLE_TEXT_WHOLE, KGGameTests.functionKey(PARSE_NUMBER_KEEPS_WHOLE_TEXT_WHOLE), KGGameTests.defaultTestData(environment, "empty"));
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
         for (String p : new String[]{
                 TO_STRING, PARSE_NUMBER, PARSE_BOOL,
@@ -274,5 +292,101 @@ public final class ConvertNodeGameTest {
         setOption(n, "targetType", target.getIdentification());
         wire(g, n.getInputsById().get("in"), source);
         return new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), type);
+    }
+
+    // ---- precision on the way in --------------------------------------------------------------
+    //
+    // The convert group used to read every input as ctx.getFloat(...), so it was itself one of the
+    // places precision went missing: ToInt(gameTime) answered a neighbouring number, and
+    // ParseNumber("<a pasted id>") answered the nearest float. See NumericLane.
+
+    /** A whole number above a float's 24-bit mantissa converts to itself, not to a neighbour. */
+    public static void toIntKeepsLargeWholeNumbers(GameTestHelper helper) {
+        // 20000001 is not representable as a float; the nearest is 20000002.
+        int value = 20_000_001;
+        var g = newGraph();
+        var n = addNode(g, ToIntNode.class);
+        wire(g, n.getInputsById().get("in"), valueSource(g.graphModel, "v", long.class, (long) value));
+        assertEq(helper, "a large whole number converts to itself", value,
+                (int) (Integer) new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Integer.class));
+        helper.succeed();
+    }
+
+    /** Out of an int's range, ToInt stops at the limit rather than wrapping round to a wrong sign. */
+    public static void toIntSaturatesRatherThanWrapping(GameTestHelper helper) {
+        var g = newGraph();
+        var n = addNode(g, ToIntNode.class);
+        wire(g, n.getInputsById().get("in"), valueSource(g.graphModel, "v", long.class, 5_000_000_000L));
+        assertEq(helper, "5e9 saturates at Integer.MAX_VALUE", Integer.MAX_VALUE,
+                (int) (Integer) new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Integer.class));
+
+        var g2 = newGraph();
+        var n2 = addNode(g2, ToIntNode.class);
+        wire(g2, n2.getInputsById().get("in"), valueSource(g2.graphModel, "v", long.class, -5_000_000_000L));
+        assertEq(helper, "-5e9 saturates at Integer.MIN_VALUE", Integer.MIN_VALUE,
+                (int) (Integer) new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), Integer.class));
+        helper.succeed();
+    }
+
+    /** To Long: no ceiling, and the rounding option still applies to a fractional input. */
+    public static void toLong(GameTestHelper helper) {
+        long big = 3_090_200_953_712_304_400L;
+        var g = newGraph();
+        var n = addNode(g, ToLongNode.class);
+        wire(g, n.getInputsById().get("in"), valueSource(g.graphModel, "v", long.class, big));
+        assertEq(helper, "a huge whole number survives", big,
+                new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Object.class));
+
+        for (var c : new Object[][]{{ToIntNode.Op.TRUNC, -3.9f, -3L}, {ToIntNode.Op.FLOOR, -3.9f, -4L},
+                                    {ToIntNode.Op.CEIL, 3.1f, 4L}, {ToIntNode.Op.ROUND, 3.6f, 4L}}) {
+            var gf = newGraph();
+            var nf = addNode(gf, ToLongNode.class);
+            setOption(nf, "op", c[0]);
+            wire(gf, nf.getInputsById().get("in"), floatSource(gf, (float) c[1]));
+            assertEq(helper, c[0] + "(" + c[1] + ")", c[2],
+                    new GraphExecutor(gf).evaluate(nf.getOutputsById().get("out"), Object.class));
+        }
+        helper.succeed();
+    }
+
+    /** To Double widens without the seven-digit ceiling a float would impose. */
+    public static void toDouble(GameTestHelper helper) {
+        long value = 9_007_199_254_740_991L;   // 2^53 - 1: exact in a double, nowhere near it in a float
+        var g = newGraph();
+        var n = addNode(g, ToDoubleNode.class);
+        wire(g, n.getInputsById().get("in"), valueSource(g.graphModel, "v", long.class, value));
+        assertEq(helper, "2^53-1 survives the widening", (double) value,
+                new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Object.class));
+        helper.succeed();
+    }
+
+    /** Text of digits parses whole, keeping every digit; text with a point parses fractional. */
+    public static void parseNumberKeepsWholeTextWhole(GameTestHelper helper) {
+        var g = newGraph();
+        var n = addNode(g, ParseNumberNode.class);
+        wire(g, n.getInputsById().get("in"), stringSource(g, "3090200953712304400"));
+        assertEq(helper, "a pasted id keeps all its digits", 3_090_200_953_712_304_400L,
+                new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Object.class));
+
+        var g2 = newGraph();
+        var n2 = addNode(g2, ParseNumberNode.class);
+        wire(g2, n2.getInputsById().get("in"), stringSource(g2, "-12"));
+        assertEq(helper, "a negative whole number", -12L,
+                new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), Object.class));
+
+        // A point means decimals were meant, and the value is kept at double precision.
+        var g3 = newGraph();
+        var n3 = addNode(g3, ParseNumberNode.class);
+        wire(g3, n3.getInputsById().get("in"), stringSource(g3, "3.14159265358979"));
+        assertEq(helper, "a decimal keeps its digits too", 3.14159265358979d,
+                new GraphExecutor(g3).evaluate(n3.getOutputsById().get("out"), Object.class));
+
+        // Too large for a whole number: falls through to the wider parse rather than failing.
+        var g4 = newGraph();
+        var n4 = addNode(g4, ParseNumberNode.class);
+        wire(g4, n4.getInputsById().get("in"), stringSource(g4, "99999999999999999999"));
+        assertEq(helper, "past a long, parsed as a decimal", 1.0e20d,
+                new GraphExecutor(g4).evaluate(n4.getOutputsById().get("out"), Object.class));
+        helper.succeed();
     }
 }

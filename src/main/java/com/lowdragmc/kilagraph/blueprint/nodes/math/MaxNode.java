@@ -6,9 +6,11 @@ import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
+import com.lowdragmc.kilagraph.graph.exec.NumericLane;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
+/** Largest of {@code inputs} values, in the {@link NumericLane} they ask for. */
 @NodeAttribute(name = "math_max", group = "math", graphTypes = BlueprintGraph.class)
 public class MaxNode extends AnnotatedNode {
     @Option public int inputs = 2;
@@ -23,8 +25,23 @@ public class MaxNode extends AnnotatedNode {
     @Override
     public void evaluate(EvalContext ctx) {
         int n = Math.max(1, ctx.getOption("inputs", Integer.class, inputs));
-        float m = Float.NEGATIVE_INFINITY;
-        for (int i = 1; i <= n; i++) m = Math.max(m, ctx.getFloat(PortIds.in(i), 0f));
-        ctx.setOutput("out", m);
+        switch (VariadicLane.of(ctx, n)) {
+            // Long.MIN_VALUE is the identity here — see MinNode.
+            case NumericLane.INT, NumericLane.LONG -> {
+                long m = Long.MIN_VALUE;
+                for (int i = 1; i <= n; i++) m = Math.max(m, ctx.getLong(PortIds.in(i), 0L));
+                ctx.setOutput("out", m);
+            }
+            case NumericLane.DOUBLE -> {
+                double m = Double.NEGATIVE_INFINITY;
+                for (int i = 1; i <= n; i++) m = Math.max(m, ctx.getDouble(PortIds.in(i), 0d));
+                ctx.setOutput("out", m);
+            }
+            default -> {
+                float m = Float.NEGATIVE_INFINITY;
+                for (int i = 1; i <= n; i++) m = Math.max(m, ctx.getFloat(PortIds.in(i), 0f));
+                ctx.setOutput("out", m);
+            }
+        }
     }
 }
