@@ -60,6 +60,7 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.NbtNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NumericPromotionGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NbtPipelineGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.OptionalNodeGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.PortConstantTypeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.PreparedGraphGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.SetVarGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.StepDebuggerGameTest;
@@ -191,6 +192,7 @@ public final class KGGameTests {
             new Group(MixedWorkloadGameTest::registerFunctions, MixedWorkloadGameTest::register),
             new Group(NbtPipelineGameTest::registerFunctions, NbtPipelineGameTest::register),
             new Group(NumericPromotionGameTest::registerFunctions, NumericPromotionGameTest::register),
+            new Group(PortConstantTypeGameTest::registerFunctions, PortConstantTypeGameTest::register),
             new Group(PreparedGraphGameTest::registerFunctions, PreparedGraphGameTest::register),
             new Group(VectorNodeGameTest::registerFunctions, VectorNodeGameTest::register));
 

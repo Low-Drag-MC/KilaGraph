@@ -2,7 +2,6 @@ package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 import net.minecraft.core.Holder;
-import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
@@ -88,17 +87,17 @@ public final class NumericPromotionGameTest {
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, MODULO_ON_A_TICK_COUNTER_IS_EXACT, KGGameTests.functionKey(MODULO_ON_A_TICK_COUNTER_IS_EXACT), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, MODULO_EDGES_IN_THE_WHOLE_LANE, KGGameTests.functionKey(MODULO_EDGES_IN_THE_WHOLE_LANE), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, WHOLE_NUMBERS_SURVIVE_EVERY_PROMOTED_OPERATION, KGGameTests.functionKey(WHOLE_NUMBERS_SURVIVE_EVERY_PROMOTED_OPERATION), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, COMPARISONS_SEE_CONSECUTIVE_TICKS_APART, KGGameTests.functionKey(COMPARISONS_SEE_CONSECUTIVE_TICKS_APART), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, CONSTANT_ONLY_GRAPHS_STAY_FLOAT, KGGameTests.functionKey(CONSTANT_ONLY_GRAPHS_STAY_FLOAT), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, A_WHOLE_FLOAT_CONSTANT_DOES_NOT_FORCE_THE_FLOAT_LANE, KGGameTests.functionKey(A_WHOLE_FLOAT_CONSTANT_DOES_NOT_FORCE_THE_FLOAT_LANE), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, A_FRACTIONAL_CONSTANT_FORCES_THE_FLOAT_LANE, KGGameTests.functionKey(A_FRACTIONAL_CONSTANT_FORCES_THE_FLOAT_LANE), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, DOUBLE_BEATS_WHOLE, KGGameTests.functionKey(DOUBLE_BEATS_WHOLE), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, THE_LANE_FOLDS_OVER_EVERY_VARIADIC_INPUT, KGGameTests.functionKey(THE_LANE_FOLDS_OVER_EVERY_VARIADIC_INPUT), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, REAL_VALUED_OPERATIONS_STAY_FLOAT, KGGameTests.functionKey(REAL_VALUED_OPERATIONS_STAY_FLOAT), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, THE_LANE_SURVIVES_A_CHAIN_OF_NODES, KGGameTests.functionKey(THE_LANE_SURVIVES_A_CHAIN_OF_NODES), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, MODULO_ON_A_TICK_COUNTER_IS_EXACT, KGGameTests.functionKey(MODULO_ON_A_TICK_COUNTER_IS_EXACT), data);
+        KGGameTests.registerFunctionTest(event, MODULO_EDGES_IN_THE_WHOLE_LANE, KGGameTests.functionKey(MODULO_EDGES_IN_THE_WHOLE_LANE), data);
+        KGGameTests.registerFunctionTest(event, WHOLE_NUMBERS_SURVIVE_EVERY_PROMOTED_OPERATION, KGGameTests.functionKey(WHOLE_NUMBERS_SURVIVE_EVERY_PROMOTED_OPERATION), data);
+        KGGameTests.registerFunctionTest(event, COMPARISONS_SEE_CONSECUTIVE_TICKS_APART, KGGameTests.functionKey(COMPARISONS_SEE_CONSECUTIVE_TICKS_APART), data);
+        KGGameTests.registerFunctionTest(event, CONSTANT_ONLY_GRAPHS_STAY_FLOAT, KGGameTests.functionKey(CONSTANT_ONLY_GRAPHS_STAY_FLOAT), data);
+        KGGameTests.registerFunctionTest(event, A_WHOLE_FLOAT_CONSTANT_DOES_NOT_FORCE_THE_FLOAT_LANE, KGGameTests.functionKey(A_WHOLE_FLOAT_CONSTANT_DOES_NOT_FORCE_THE_FLOAT_LANE), data);
+        KGGameTests.registerFunctionTest(event, A_FRACTIONAL_CONSTANT_FORCES_THE_FLOAT_LANE, KGGameTests.functionKey(A_FRACTIONAL_CONSTANT_FORCES_THE_FLOAT_LANE), data);
+        KGGameTests.registerFunctionTest(event, DOUBLE_BEATS_WHOLE, KGGameTests.functionKey(DOUBLE_BEATS_WHOLE), data);
+        KGGameTests.registerFunctionTest(event, THE_LANE_FOLDS_OVER_EVERY_VARIADIC_INPUT, KGGameTests.functionKey(THE_LANE_FOLDS_OVER_EVERY_VARIADIC_INPUT), data);
+        KGGameTests.registerFunctionTest(event, REAL_VALUED_OPERATIONS_STAY_FLOAT, KGGameTests.functionKey(REAL_VALUED_OPERATIONS_STAY_FLOAT), data);
+        KGGameTests.registerFunctionTest(event, THE_LANE_SURVIVES_A_CHAIN_OF_NODES, KGGameTests.functionKey(THE_LANE_SURVIVES_A_CHAIN_OF_NODES), data);
     }
 
     private NumericPromotionGameTest() {}

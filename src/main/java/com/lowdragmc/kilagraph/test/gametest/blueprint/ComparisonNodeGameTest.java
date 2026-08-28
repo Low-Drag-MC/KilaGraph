@@ -46,9 +46,9 @@ public final class ComparisonNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        KGGameTests.registerFunctionTest(event, NOT_EQUALS_COMPARES_NUMBERS_BY_VALUE, KGGameTests.functionKey(NOT_EQUALS_COMPARES_NUMBERS_BY_VALUE), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, NOT_EQUALS_STILL_COMPARES_NON_NUMBERS_BY_EQUALS, KGGameTests.functionKey(NOT_EQUALS_STILL_COMPARES_NON_NUMBERS_BY_EQUALS), KGGameTests.defaultTestData(environment, "empty"));
         var data = KGGameTests.defaultTestData(environment, "empty");
+        KGGameTests.registerFunctionTest(event, NOT_EQUALS_COMPARES_NUMBERS_BY_VALUE, KGGameTests.functionKey(NOT_EQUALS_COMPARES_NUMBERS_BY_VALUE), data);
+        KGGameTests.registerFunctionTest(event, NOT_EQUALS_STILL_COMPARES_NON_NUMBERS_BY_EQUALS, KGGameTests.functionKey(NOT_EQUALS_STILL_COMPARES_NON_NUMBERS_BY_EQUALS), data);
         KGGameTests.registerFunctionTest(event, GT, KGGameTests.functionKey(GT), data);
         KGGameTests.registerFunctionTest(event, GE, KGGameTests.functionKey(GE), data);
         KGGameTests.registerFunctionTest(event, LT, KGGameTests.functionKey(LT), data);
