@@ -57,11 +57,13 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.McWorldEntityGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McWorldQueryGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.MixedWorkloadGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NbtNodeGameTest;
-import com.lowdragmc.kilagraph.test.gametest.blueprint.NumericPromotionGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NbtPipelineGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.NumericPromotionGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.OptionalNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.PortConstantTypeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.PreparedGraphGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.SealedGraphConcurrencyGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.SealedGraphStressGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.SetVarGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.StepDebuggerGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.StringNodeGameTest;
@@ -194,6 +196,8 @@ public final class KGGameTests {
             new Group(NumericPromotionGameTest::registerFunctions, NumericPromotionGameTest::register),
             new Group(PortConstantTypeGameTest::registerFunctions, PortConstantTypeGameTest::register),
             new Group(PreparedGraphGameTest::registerFunctions, PreparedGraphGameTest::register),
+            new Group(SealedGraphConcurrencyGameTest::registerFunctions, SealedGraphConcurrencyGameTest::register),
+            new Group(SealedGraphStressGameTest::registerFunctions, SealedGraphStressGameTest::register),
             new Group(VectorNodeGameTest::registerFunctions, VectorNodeGameTest::register));
 
     /** Every render-type-graph test group. @see Group */
@@ -217,6 +221,38 @@ public final class KGGameTests {
     public static DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>> registerFunction(
             String path, Consumer<GameTestHelper> function) {
         return TEST_FUNCTIONS.register(path, () -> function);
+    }
+
+    /**
+     * A test body that is allowed to declare checked exceptions. @see #registerThrowingFunction
+     */
+    @FunctionalInterface
+    public interface ThrowingTest {
+        void run(GameTestHelper helper) throws Exception;
+    }
+
+    /**
+     * As {@link #registerFunction(String, Consumer)}, for a test that declares checked exceptions.
+     *
+     * <p>A separate name rather than an overload: both parameter types are functional interfaces
+     * with the same shape, so every {@code Cls::method} argument in the file would become ambiguous.</p>
+     *
+     * <p>The registry holds {@code Consumer}s, which throw nothing; the concurrency tests await an
+     * {@code ExecutorService} and so are declared {@code throws Exception}. Rethrowing unchecked is
+     * exactly what the runner wants — an exception out of the body fails the test — so the only thing
+     * missing was somewhere to say it once instead of in a try/catch at every registration site.</p>
+     */
+    public static DeferredHolder<Consumer<GameTestHelper>, Consumer<GameTestHelper>> registerThrowingFunction(
+            String path, ThrowingTest function) {
+        return registerFunction(path, helper -> {
+            try {
+                function.run(helper);
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     public static ResourceKey<Consumer<GameTestHelper>> functionKey(String path) {
