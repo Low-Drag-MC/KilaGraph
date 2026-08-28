@@ -29,8 +29,10 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -77,11 +79,52 @@ import org.jetbrains.annotations.Nullable;
  * hook for anything else.</p>
  *
  * <h2>Threading</h2>
- * The cache map is synchronized, but a {@code PreparedGraph} itself is <b>not</b> thread-safe: it
- * grows when a node is discovered late ({@link #node}). It inherits the confinement its graph model
- * already has — LDLib2's model layer is single-threaded, and {@link GraphExecutor} is documented the
- * same way — so two threads sharing one prepared graph means two threads were already sharing one
- * {@code GraphModel}, which was never supported. Executors on different graphs never interact.
+ * By default a {@code PreparedGraph} is <b>not</b> thread-safe: it grows when a node is discovered
+ * late ({@link #node} → {@link #admit}), which appends to {@link #nodes}, puts into the
+ * {@code IdentityHashMap} {@link #byModel}, bumps {@link #slotCount}, re-derives {@link #mayCycle}
+ * and re-takes the structural digest. A reader racing that sees a half-updated map.
+ *
+ * <p>{@link #seal()} is the way to share one instance across threads. A sealed graph never admits:
+ * {@code node()} answers null for a model it does not already know and records {@link #sealBreached()}
+ * instead, so the failure mode is a null — which every caller already handles — plus a flag, rather
+ * than a data race. Nothing else here is written after {@code build()}: the per-node intrinsic
+ * binding happens inside {@code link()}, and {@code seal()} forces the one lazy field
+ * ({@link #variableWriters}) before it flips.
+ *
+ * <p><b>The sequence, and why each step is needed:</b></p>
+ * <ol>
+ *   <li>Run each graph once on one thread, and create every executor that will share it there too.
+ *       {@code build()} discovers nodes from {@code getNodeModels()}, context blocks and both ends of
+ *       every wire, but an orphan-spawned node with no wires reaches none of those — the warm-up is
+ *       what proves the node set is complete. {@link #admitCount()} says whether it had to admit
+ *       anything; a graph that admitted during warm-up is one whose shape {@code build()} could not
+ *       see, and sealing it is a bet. The warm-up is also what makes the instance <em>shared</em>:
+ *       {@link #of} reads {@link #CACHE} and populates it as two separate steps, so two threads
+ *       meeting a graph for the first time at once can each build their own and then disagree about
+ *       which one is canonical — sealing cannot help with that, only ordering can.</li>
+ *   <li>{@link #seal()}, then submit the tasks. The reader threads' happens-before comes from the
+ *       submission itself — every {@code ExecutorService} and {@code ForkJoinPool} establishes it —
+ *       so sealing must complete <em>before</em> the fork, not during it.</li>
+ *   <li>Every executor sharing the instance must be {@code setGraphFrozen(true)}. An unfrozen one
+ *       re-checks freshness on entry and may replace the whole prepared graph mid-flight. Child
+ *       executors inherit both halves of this: {@code GraphExecutor.checkoutChild} copies the frozen
+ *       flag down the call tree, and {@code seal()} follows the subgraph call sites so a callee's
+ *       prepared graph — shared between siblings exactly as its caller's is — is sealed too.</li>
+ *   <li>After the join, check {@link #sealBreached()}. If it is set, some node was not in the
+ *       prepared set and that run's results are not trustworthy — {@link #unseal()} and redo it
+ *       serially. <b>Unsealing is not optional in that path</b>: a sealed graph keeps answering null
+ *       on the serial retry too. {@code seal()}/{@code unseal()} are paired and counted, so a shared
+ *       function graph stays sealed until every asset that sealed it has released it.</li>
+ * </ol>
+ *
+ * <p>One precondition is worth stating because it is not obvious: the sealed tree is collected from
+ * <em>resolved</em> call sites ({@code Node.subInner}), which is what {@code GraphExecutor} uses to
+ * make a child executor on its normal path — with {@code Opt.SUBGRAPH_PRERESOLVE} off it instead
+ * resolves the callee live on entry, and could reach a graph the seal never saw. That switch exists
+ * to be benchmarked against, not to be shipped, but the guarantee here is conditional on it.</p>
+ *
+ * <p>The {@link #CACHE} map is synchronized independently of all this, and a frozen executor stops
+ * consulting it after its first run ({@code GraphExecutor.syncPrepared}).</p>
  */
 public final class PreparedGraph {
 
@@ -267,8 +310,167 @@ public final class PreparedGraph {
     @Nullable
     Node node(@Nullable AbstractNodeModel m) {
         if (m == null) return null;
+        // Read the seal before the map, so this also acquires whatever seal() released. It does not
+        // make the whole instance safely published on its own — most reads never come through here,
+        // they walk Node.inputSourceOwners directly — but it costs nothing on a path that is already
+        // the slow one, and it means a thread cannot admit into a map it is seeing half of.
+        boolean isSealed = sealCount.get() > 0;
         Node n = byModel.get(m);
-        return n != null ? n : admit(m);
+        if (n != null) return n;
+        if (isSealed) {
+            sealBreached = true;
+            return null;
+        }
+        return admit(m);
+    }
+
+    // ---- seal ---------------------------------------------------------------------------------
+
+    /**
+     * How many {@link #seal()} calls currently cover this graph — <b>a count, not a flag</b>.
+     *
+     * <p>A function graph is called by more than one blueprint, so one prepared graph can be in two
+     * sealed trees at once. With a boolean, the second asset unsealing after a breach would clear the
+     * seal out from under the first asset's threads, which start admitting again mid-flight — the
+     * exact race the seal exists to remove, and silently, because no breach is ever recorded. Counting
+     * makes a callee stay sealed until every root that sealed it has let go.</p>
+     */
+    private final AtomicInteger sealCount = new AtomicInteger();
+
+    /**
+     * Whether {@code this} is currently a sealed <em>root</em>, so {@link #seal()} stays idempotent
+     * without leaking counts onto its callees.
+     */
+    private volatile boolean sealedByMe;
+    /** @see #sealBreached() */
+    private volatile boolean sealBreached;
+    /**
+     * @see #admitCount()
+     *
+     * <p>{@code volatile} to be readable after a join, not to be atomic: {@code ++} on it is not.
+     * That is sound because admission only happens while unsealed, which is the single-threaded
+     * mode — but it does mean the number is not to be trusted if someone runs an unsealed graph
+     * concurrently, which is exactly the thing not to do.</p>
+     */
+    private volatile int admitCount;
+
+    /**
+     * Every prepared graph {@link #seal()} covered, this one included.
+     *
+     * <p>A subgraph call runs on a <em>child</em> executor over the callee's own prepared graph, which
+     * is shared between siblings exactly as this one is. Sealing only the graph the host happens to
+     * hold would therefore be a guarantee about the outer graph and nothing else — and a blueprint
+     * that uses functions is the normal case, not the exotic one. So {@code seal()} walks the call
+     * tree, and each member gets the same array so that asking any one of them about a breach answers
+     * for all of them.</p>
+     *
+     * <p>Starts as just this graph, which is what makes {@link #sealBreached()} and
+     * {@link #admitCount()} mean the same thing before and after sealing.</p>
+     */
+    private volatile PreparedGraph[] sealedTree = {this};
+
+    /**
+     * Freeze the structure — and that of every graph it calls — so the instances can be read by
+     * several threads at once.
+     *
+     * <p>Forces the lazy fields across the whole tree first, then flips {@link #sealed} on each: a
+     * volatile write, so everything {@code build()} and the warm-up produced is released here. See
+     * the class javadoc for the sequence this belongs to and for what the readers still owe.</p>
+     *
+     * <p>Building a callee's prepared graph here, if it has never run, is deliberate — better on this
+     * thread now than lazily on a worker later. Idempotent, and it does <em>not</em> clear
+     * {@link #sealBreached()}: a breach is a fact about a node set, not about one run, and re-sealing
+     * after one would hide it.</p>
+     */
+    public void seal() {
+        if (sealedByMe) return;                            // idempotent per root; see sealCount
+        List<PreparedGraph> found = new ArrayList<>();
+        collectCallTree(found, Collections.newSetFromMap(new IdentityHashMap<>()));
+        PreparedGraph[] tree = found.toArray(new PreparedGraph[0]);
+        for (PreparedGraph g : tree) g.variableWriters();   // still single-threaded here
+        for (PreparedGraph g : tree) {
+            g.sealedTree = tree;
+            g.sealCount.incrementAndGet();
+        }
+        sealedByMe = true;
+    }
+
+    /** Depth-first over subgraph call sites, identity-guarded so a self-referential graph terminates. */
+    private void collectCallTree(List<PreparedGraph> out, Set<PreparedGraph> seen) {
+        if (!seen.add(this)) return;
+        out.add(this);
+        for (int i = 0; i < nodes.size(); i++) {
+            CustomGraphModelImpl inner = nodes.get(i).subInner;
+            if (inner == null) continue;
+            PreparedGraph callee = of(inner);
+            if (callee != null) callee.collectCallTree(out, seen);
+        }
+    }
+
+    /**
+     * Release the seal this root took — required before retrying serially after a breach, and before
+     * any further editing.
+     *
+     * <p>Paired with {@link #seal()} rather than absolute: a graph called by two assets stays sealed
+     * until both have released it, so unsealing one blueprint cannot pull the seal out from under
+     * another one's running threads. A root that never sealed is a no-op, and unsealing does not by
+     * itself stop threads that are still running — pair it with a return to single-threaded use.</p>
+     */
+    public void unseal() {
+        if (!sealedByMe) return;
+        for (PreparedGraph g : sealedTree) g.sealCount.updateAndGet(v -> v > 0 ? v - 1 : 0);
+        sealedByMe = false;
+    }
+
+    /**
+     * Whether any seal is in force on this instance — including one taken by a <em>different</em>
+     * root that calls this graph.
+     */
+    public boolean isSealed() {
+        return sealCount.get() > 0;
+    }
+
+    /**
+     * How many prepared graphs the last {@link #seal()} covered — this one plus every graph it calls,
+     * transitively. One before sealing, and one after sealing a graph with no subgraph nodes.
+     *
+     * <p>Exists to be asserted on. The cascade through subgraph call sites is invisible in any result:
+     * an inner graph that never needs to admit behaves identically sealed or not, so a test that only
+     * runs subgraphs concurrently cannot tell whether the seal reached them. This can.</p>
+     */
+    public int sealedGraphCount() {
+        return sealedTree.length;
+    }
+
+    /**
+     * Whether anything has asked this graph, <em>or any graph it calls</em>, for a node it did not
+     * have while sealed.
+     *
+     * <p>Sticky for the life of the instances, and deliberately so: it says a prepared node set is
+     * incomplete, which does not stop being true after one run. A run that sets this produced at
+     * least one null where a value was expected, so its results are not to be used — see the class
+     * javadoc.</p>
+     */
+    public boolean sealBreached() {
+        for (PreparedGraph g : sealedTree) {
+            if (g.sealBreached) return true;
+        }
+        return false;
+    }
+
+    /**
+     * How many nodes have been admitted across the sealed tree since those instances were built —
+     * i.e. found by a run rather than by {@code build()}.
+     *
+     * <p>The number to assert on before sealing. Zero after a full warm-up means {@code build()}
+     * already saw every node the graph reaches, which is the condition that makes sealing a
+     * statement rather than a hope. Non-zero means sealing would have changed behaviour, and says so
+     * before it is too late to notice.</p>
+     */
+    public int admitCount() {
+        int total = 0;
+        for (PreparedGraph g : sealedTree) total += g.admitCount;
+        return total;
     }
 
     // ---- construction ------------------------------------------------------------------------
@@ -328,6 +530,7 @@ public final class PreparedGraph {
      * too. If we were already stale, leave the old digest so the next check rebuilds.</p>
      */
     private Node admit(AbstractNodeModel m) {
+        admitCount++;
         boolean wasFresh = isFresh();
         Node n = admitShallow(m);
         n.link();

@@ -737,12 +737,18 @@ public final class GraphExecutor {
                 reused.resetForReuse(childEnv);
                 reused.trace = trace;
                 reused.enabledOpts = enabledOpts;
+                reused.graphFrozen = graphFrozen;
                 return reused;
             }
         }
         var childExec = new GraphExecutor(inner.getGraph(), childEnv);
         childExec.trace = trace;                  // one trace spans the whole call tree; see EvalTrace
         childExec.enabledOpts = enabledOpts;      // a mode applies to the whole call tree, not just its root
+        // Freezing is a statement about the asset, and a function is part of the asset that calls it.
+        // Without this a child re-derives the structural digest on every single invocation — the
+        // largest per-entry cost there is — and, worse, a digest that ever came back false would have
+        // it rebuild a PreparedGraph that sibling threads are reading. See PreparedGraph#seal().
+        childExec.graphFrozen = graphFrozen;
         return childExec;
     }
 
@@ -2016,6 +2022,20 @@ public final class GraphExecutor {
     }
 
     /**
+     * This executor's resolved view of the graph, or null before its first run.
+     *
+     * <p>Exists so a host can {@link PreparedGraph#seal()} the instance and read
+     * {@link PreparedGraph#sealBreached()} afterwards — the prepared form is shared by every executor
+     * over the same graph model, so sealing through any one of them seals it for all of them. See
+     * {@link PreparedGraph}'s class javadoc for the sequence running several executors against one
+     * instance requires.</p>
+     */
+    @Nullable
+    public PreparedGraph preparedGraph() {
+        return prepared;
+    }
+
+    /**
      * Promise that nobody will edit this graph while the executor is alive, letting each run skip
      * the structural freshness check.
      *
@@ -2024,6 +2044,11 @@ public final class GraphExecutor {
      * wires and port counts (see {@link PreparedGraph}). For an editor that is the right trade. For
      * a host running one fixed graph per entity every frame — the case this whole layer exists for —
      * it is pure overhead, and this switch removes it.</p>
+     *
+     * <p><b>The promise covers the graphs this one calls, too.</b> Child executors inherit the flag,
+     * so a subgraph no longer re-derives its own digest on every invocation — which is most of what
+     * made a call expensive, and which was also the last thing that would have noticed an inner graph
+     * being edited while only the outer executor was frozen. Nothing does now.</p>
      *
      * <p>Editing a frozen graph produces wrong answers, not an error. Call
      * {@link #invalidatePrepared()} if you must change one.</p>
