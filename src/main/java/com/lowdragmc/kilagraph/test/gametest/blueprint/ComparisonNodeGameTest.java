@@ -20,6 +20,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.newGraph;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputConstant;
+import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.valueSource;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
 @GameTestHolder(Kilagraph.MODID)
@@ -116,6 +117,76 @@ public final class ComparisonNodeGameTest {
         assertEq(helper, "1f != 1f", Boolean.FALSE,
                 new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), Boolean.class));
 
+        helper.succeed();
+    }
+
+    /**
+     * A number equals a number of the same value, whatever wrapper it arrived in.
+     *
+     * <p>This used to be {@code Objects.equals}, which asks the wrapper: {@code Long.equals} demands a
+     * {@code Long} on the other side, so a 5 produced by one node and a 5 produced by another compared
+     * <em>unequal</em> whenever the two nodes happened to publish different numeric types. Nothing in
+     * the editor shows which type a wire carries, so the only way to find out was for a graph to
+     * misbehave.</p>
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void notEqualsComparesNumbersByValue(GameTestHelper helper) {
+        record Case(String label, Class<?> ta, Object a, Class<?> tb, Object b, boolean differ) {}
+        var cases = new Case[]{
+                new Case("long 5 vs int 5", long.class, 5L, int.class, 5, false),
+                new Case("int 5 vs float 5.0", int.class, 5, float.class, 5f, false),
+                new Case("long 5 vs double 5.0", long.class, 5L, double.class, 5d, false),
+                new Case("float 5.0 vs double 5.0", float.class, 5f, double.class, 5d, false),
+                new Case("long 5 vs int 6", long.class, 5L, int.class, 6, true),
+                new Case("int 5 vs float 5.5", int.class, 5, float.class, 5.5f, true),
+                // A long past 2^53 and the double nearest it are different numbers, and comparing
+                // through double would have called them equal.
+                new Case("2^53+1 vs the double below it", long.class, 9007199254740993L,
+                        double.class, 9007199254740992d, true),
+        };
+        for (Case c : cases) {
+            var g = newGraph();
+            var n = addNode(g, NotEqualsNode.class);
+            wire(g, n.getInputsById().get("a"), valueSource(g.graphModel, "a", c.ta(), c.a()));
+            wire(g, n.getInputsById().get("b"), valueSource(g.graphModel, "b", c.tb(), c.b()));
+            assertEq(helper, c.label(), c.differ(),
+                    new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Boolean.class));
+        }
+        helper.succeed();
+    }
+
+    /** Non-numbers keep {@code Objects.equals}, nulls included. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void notEqualsStillComparesNonNumbersByEquals(GameTestHelper helper) {
+        var g = newGraph();
+        var n = addNode(g, NotEqualsNode.class);
+        wire(g, n.getInputsById().get("a"), valueSource(g.graphModel, "a", String.class, "x"));
+        wire(g, n.getInputsById().get("b"), valueSource(g.graphModel, "b", String.class, "x"));
+        assertEq(helper, "\"x\" != \"x\"", Boolean.FALSE,
+                new GraphExecutor(g).evaluate(n.getOutputsById().get("out"), Boolean.class));
+
+        var g2 = newGraph();
+        var n2 = addNode(g2, NotEqualsNode.class);
+        wire(g2, n2.getInputsById().get("a"), valueSource(g2.graphModel, "a", String.class, "x"));
+        wire(g2, n2.getInputsById().get("b"), valueSource(g2.graphModel, "b", String.class, "y"));
+        assertEq(helper, "\"x\" != \"y\"", Boolean.TRUE,
+                new GraphExecutor(g2).evaluate(n2.getOutputsById().get("out"), Boolean.class));
+
+        // Both unwired: two nulls are equal, as they always were.
+        var g3 = newGraph();
+        var n3 = addNode(g3, NotEqualsNode.class);
+        assertEq(helper, "null != null", Boolean.FALSE,
+                new GraphExecutor(g3).evaluate(n3.getOutputsById().get("out"), Boolean.class));
+
+        // One side a number, the other not — not equal, and not an exception either.
+        var g4 = newGraph();
+        var n4 = addNode(g4, NotEqualsNode.class);
+        wire(g4, n4.getInputsById().get("a"), valueSource(g4.graphModel, "a", int.class, 5));
+        wire(g4, n4.getInputsById().get("b"), valueSource(g4.graphModel, "b", String.class, "5"));
+        assertEq(helper, "5 != \"5\"", Boolean.TRUE,
+                new GraphExecutor(g4).evaluate(n4.getOutputsById().get("out"), Boolean.class));
         helper.succeed();
     }
 }

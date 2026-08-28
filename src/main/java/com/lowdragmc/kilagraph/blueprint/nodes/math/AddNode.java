@@ -6,11 +6,15 @@ import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
+import com.lowdragmc.kilagraph.graph.exec.NumericLane;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
 /**
- * Sum of {@code inputs} float values: {@code in1 + in2 + ... + inN}. Default is 2 inputs.
+ * Sum of {@code inputs} values: {@code in1 + in2 + ... + inN}. Default is 2 inputs.
+ *
+ * <p>Summed in the {@link NumericLane} the operands ask for, so adding to a tick count or an id stays
+ * exact instead of rounding to the nearest float once past 2^24.</p>
  */
 @NodeAttribute(name = "math_add", group = "math", graphTypes = BlueprintGraph.class)
 public class AddNode extends AnnotatedNode {
@@ -30,10 +34,22 @@ public class AddNode extends AnnotatedNode {
     @Override
     public void evaluate(EvalContext ctx) {
         int n = Math.max(1, ctx.getOption("inputs", Integer.class, inputs));
-        float sum = 0f;
-        for (int i = 1; i <= n; i++) {
-            sum += ctx.getFloat(PortIds.in(i), 0f);
+        switch (VariadicLane.of(ctx, n)) {
+            case NumericLane.INT, NumericLane.LONG -> {
+                long sum = 0L;
+                for (int i = 1; i <= n; i++) sum += ctx.getLong(PortIds.in(i), 0L);
+                ctx.setOutput("out", sum);
+            }
+            case NumericLane.DOUBLE -> {
+                double sum = 0d;
+                for (int i = 1; i <= n; i++) sum += ctx.getDouble(PortIds.in(i), 0d);
+                ctx.setOutput("out", sum);
+            }
+            default -> {
+                float sum = 0f;
+                for (int i = 1; i <= n; i++) sum += ctx.getFloat(PortIds.in(i), 0f);
+                ctx.setOutput("out", sum);
+            }
         }
-        ctx.setOutput("out", sum);
     }
 }

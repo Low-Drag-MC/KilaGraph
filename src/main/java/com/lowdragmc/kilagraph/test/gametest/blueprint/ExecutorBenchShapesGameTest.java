@@ -492,6 +492,118 @@ public final class ExecutorBenchShapesGameTest {
         helper.succeed();
     }
 
+
+    // ---- what the numeric lane check costs ----------------------------------------------------
+
+    /**
+     * The price of letting a numeric node pick its lane, measured against itself.
+     *
+     * <p>Every promoted node now folds {@code NumericLane} over its inputs before it does anything,
+     * so it can tell whether the values reaching it are whole. That is not free, and the project's
+     * bench rule is that an estimate is not a measurement — hence {@code Opt.NUMERIC_PROMOTION},
+     * which exists for no other purpose than to be the other half of this comparison.
+     *
+     * <p>Two shapes, because the fold has two quite different paths and they cost different amounts:
+     * <ul>
+     *   <li><b>{@code Add} chain</b> — one wired input and one <em>embedded float constant</em> per
+     *       node. The constant path is the expensive one: it reads the constant, then decides whether
+     *       it is a whole number, which costs a {@code Math.rint}. This is the worst realistic case
+     *       and the one to judge by.</li>
+     *   <li><b>{@code Abs} chain</b> — a single wired input per node and no constant at all. The wire
+     *       path is a stamp comparison the pull was about to make anyway plus a switch on the slot's
+     *       kind, so this isolates the cheap half.</li>
+     * </ul>
+     *
+     * <p>Both graphs are fed nothing but floats, so <em>both sides answer the same value</em> — which
+     * is asserted, because if the off side computed something different the comparison would be
+     * timing two different amounts of work rather than the check.
+     */
+    @GameTest(template = "empty", timeoutTicks = 6000)
+    @PrefixGameTestTemplate(false)
+    public static void numericPromotionCost(GameTestHelper helper) {
+        laneCost(helper, "add-chain-16 (1 wire + 1 constant)",
+                KGGraphFixtures.chainOfAdds(CHAIN), "n" + (CHAIN - 1), CHAIN);
+        laneCost(helper, "abs-chain-16 (1 wire, no constant)",
+                KGGraphFixtures.monomorphicChain(CHAIN), "u" + (CHAIN - 1), CHAIN);
+        passCost(helper, "add-chain-16", KGGraphFixtures.chainOfAdds(CHAIN), "n" + (CHAIN - 1));
+        passCost(helper, "abs-chain-16", KGGraphFixtures.monomorphicChain(CHAIN), "u" + (CHAIN - 1));
+        helper.succeed();
+    }
+
+    /**
+     * One pass over the operands against two, with the lane feature on in both.
+     *
+     * <p>Needed because {@code Opt.NUMERIC_PROMOTION} stops being able to answer this once the fold
+     * is fused into the pull: its off side would still compute the lane and merely ignore it, so the
+     * comparison collapses to the cost of one {@code resolve}. Here both sides run the same pull and
+     * differ in whether the operands are walked once or twice.</p>
+     */
+    private static void passCost(GameTestHelper helper, String label,
+                                 KGGraphBuilder graph, String tip) {
+        var one = new GraphExecutor(graph.graph());
+        var two = new GraphExecutor(graph.graph());
+        one.setGraphFrozen(true);
+        two.setGraphFrozen(true);
+        two.setOptimisationEnabled(GraphExecutor.Opt.SINGLE_PASS_LANE, false);
+
+        var out = graph.outputOf(tip);
+        assertEq(helper, label + ": both passes must compute the same value",
+                f(two.evaluate(out, Float.class)), f(one.evaluate(out, Float.class)), 0f);
+
+        var c = KGBench.comparePaired(
+                label + " [one pass]", () -> { one.clearCache(); one.evaluate(out, Float.class); },
+                label + " [two passes]", () -> { two.clearCache(); two.evaluate(out, Float.class); },
+                8_000, 40_000, 7);
+
+        LOGGER.info("[KGBench] second operand pass on {}: {} ns/node-step over {} nodes — {}",
+                label, String.format("%+.2f", c.deltaNsPerRun() / CHAIN), CHAIN,
+                c.conclusive() ? "conclusive (positive means one pass is faster)"
+                        : "INCONCLUSIVE: spread exceeds delta, measured drift");
+    }
+
+
+    /** One paired on/off comparison over {@code graph}, reported per node step. */
+    private static void laneCost(GameTestHelper helper, String label,
+                                 KGGraphBuilder graph, String tip, int nodes) {
+        var on = new GraphExecutor(graph.graph());
+        var off = new GraphExecutor(graph.graph());
+        on.setGraphFrozen(true);
+        off.setGraphFrozen(true);
+        off.setOptimisationEnabled(GraphExecutor.Opt.NUMERIC_PROMOTION, false);
+
+        var out = graph.outputOf(tip);
+        float withLane = f(on.evaluate(out, Float.class));
+        float withoutLane = f(off.evaluate(out, Float.class));
+        assertEq(helper, label + ": both sides must compute the same value",
+                withoutLane, withLane, 0f);
+
+        // More repetitions than the comparisons above use: the delta being looked for here is a
+        // couple of nanoseconds per node step, and at 3 repetitions the constant-path chain reported
+        // a spread four times its own delta — i.e. it measured the machine, not the check.
+        var c = KGBench.comparePaired(
+                label + " [lane off]", () -> { off.clearCache(); off.evaluate(out, Float.class); },
+                label + " [lane on]", () -> { on.clearCache(); on.evaluate(out, Float.class); },
+                8_000, 40_000, 7);
+
+        LOGGER.info("[KGBench] lane check on {}: {} ns/node-step over {} nodes — {}",
+                label, String.format("%+.2f", c.deltaNsPerRun() / nodes), nodes,
+                c.conclusive() ? "conclusive" : "INCONCLUSIVE: spread exceeds delta, measured drift");
+    }
+
+
+    /**
+     * The expression node against the node chain it replaces — the gate this feature had to pass.
+     *
+     * <p>An expression node earns its place only if it is <em>faster</em> than wiring the same
+     * arithmetic by hand; a tree-walking interpreter would have been slower, which is why the text is
+     * compiled to a flat instruction array once instead. A node step in this executor costs about
+     * 10 ns and an instruction in that loop costs a couple, so collapsing five nodes into one should
+     * win comfortably. This is where that claim is checked rather than asserted.</p>
+     *
+     * <p>The two are compared for value <em>approximately</em>, not bit-for-bit: the expression does
+     * its decimal arithmetic in {@code double} and narrows once at the end, where the chain rounds to
+     * {@code float} at every hop. That difference is the point, not a defect.</p>
+     */
     // ---- helpers -----------------------------------------------------------------------------
 
     private static float f(Float v) {

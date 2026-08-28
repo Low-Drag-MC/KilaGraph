@@ -7,6 +7,10 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 
+/**
+ * {@code ~in} — every bit flipped, in 64 bits when the input is a {@code long} and 32 bits otherwise.
+ * @see BitwiseLane
+ */
 @NodeAttribute(name = "bitwise_not", group = "bitwise", graphTypes = BlueprintGraph.class)
 public class BitNotNode extends AnnotatedNode {
     @InputPort public int in = 0;
@@ -14,6 +18,10 @@ public class BitNotNode extends AnnotatedNode {
 
     @Override
     public void evaluate(EvalContext ctx) {
-        ctx.setOutput("out", ~ctx.getInt("in", 0));
+        if (BitwiseLane.wide(ctx, "in")) {
+            ctx.setOutput("out", ~ctx.getLong("in", 0L));
+        } else {
+            ctx.setOutput("out", ~ctx.getInt("in", 0));
+        }
     }
 }
