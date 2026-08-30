@@ -121,6 +121,12 @@ public final class PortConstantTypeGameTest {
         if (expected == null) return;   // not an overridden type — nothing to say about it
         TypeHandle actual = port.getDataTypeHandle();
         if (expected.equals(actual)) return;
+        // The one deliberate exception. VECTOR resolves to Vector3f — that is what keeps plain JOML
+        // on the wire and out of every Minecraft interop — but it is not registered as that class's
+        // override, because an annotated Vector3f field must keep meaning VEC3 (i.e. "genuinely
+        // three-dimensional"). A VECTOR port is therefore always a port that asked for VECTOR by
+        // name in onDefineDynamicPorts, which is the opposite of the accident this test hunts.
+        if (KGTypeHandles.VECTOR.equals(actual) && KGTypeHandles.VEC3.equals(expected)) return;
         failures.add(node + "." + where + " resolves to " + typeName(port)
                 + ", which KGTypeHandles overrides to " + expected.getIdentification()
                 + ", but the port carries " + (actual == null ? "<null>" : actual.getIdentification())

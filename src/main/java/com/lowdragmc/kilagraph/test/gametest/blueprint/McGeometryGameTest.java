@@ -7,8 +7,8 @@ import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.BlockPosOffsetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.ChunkPosNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.DirectionNodes;
-import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.graph.type.Vectors;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import java.util.HashSet;
@@ -253,7 +253,7 @@ public final class McGeometryGameTest {
     }
 
     private static void assertVec(GameTestHelper helper, String label, float[] expected, Object actual) {
-        float[] got = VectorNodes.components(actual);
+        float[] got = Vectors.components(actual);
         for (int i = 0; i < expected.length; i++) {
             assertEq(helper, label + " component " + i, expected[i], got[i], EPS);
         }

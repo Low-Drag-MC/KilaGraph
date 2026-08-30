@@ -62,6 +62,30 @@ public final class KGTypeHandles {
     public static final TypeHandle VEC3;
     public static final TypeHandle VEC4;
 
+    /**
+     * A vector of <em>any</em> width — what the width-polymorphic half of the {@code vector} node
+     * group declares, as opposed to the handful of operations that are genuinely three-dimensional.
+     *
+     * <p><b>This is the pin type telling the truth.</b> Those nodes read however many components
+     * arrive and answer in kind, so a VEC3 pin on them was a label that happened to be wrong for two
+     * of the three widths it accepted. Now the colour is the documentation: a VECTOR pin takes 2, 3
+     * or 4 and answers in kind; a VEC3 pin means the operation really is 3D and will read the first
+     * three of anything wider ({@code vector_cross}, {@code vector_rotate_axis},
+     * {@code vector_yaw_between}, and the yaw/pitch conversions).
+     *
+     * <p><b>It resolves to {@code Vector3f} on purpose, and is deliberately not registered as that
+     * class's override.</b> The values on the wire stay plain JOML — nothing downstream, and none of
+     * the Minecraft interop, has to learn a new representation. The cost is that a Java field typed
+     * {@code Vector3f} still resolves to {@link #VEC3}, so a VECTOR port has to be declared
+     * imperatively in {@code onDefineDynamicPorts} (see {@code docs/CONVENTIONS.md} §1, which says
+     * that is where a port whose handle is not its field type belongs anyway).
+     *
+     * <p>Ports carrying it must also take {@link Vectors#CODEC} via {@code withCodec} — the default
+     * accessor path would resolve {@code Vector3f} and store exactly three floats. {@code VectorPorts}
+     * is what applies both, so no node does this by hand.
+     */
+    public static final TypeHandle VECTOR;
+
     // Minecraft context/value handles not exposed as constants by LDLib2's TypeHandles.
     // (LDLib2 already registers DIRECTION/BLOCK/ITEM/FLUID/ENTITY_TYPE/ITEM_STACK/FLUID_STACK —
     //  import those from TypeHandles directly; don't re-register.)
@@ -134,6 +158,18 @@ public final class KGTypeHandles {
         VEC2 = vector(Vector2f.class, "VEC2", "Vector2", 0xFF7ED3F0, Vector2f::new);
         VEC3 = vector(Vector3f.class, "VEC3", "Vector3", 0xFFF3C13A, Vector3f::new);
         VEC4 = vector(Vector4f.class, "VEC4", "Vector4", 0xFFE08A3C, Vector4f::new);
+
+        // Not through vector(): that registers the Java type's override, and Vector3f must keep
+        // resolving to VEC3 so that an annotated Vector3f field still means "genuinely 3D".
+        VECTOR = TypeHandleHelpers.customType(Vector3f.class, "VECTOR", "Vector");
+        TypeHandleHelpers.setCustomColor(VECTOR, 0xFF9B7EDE);
+        // Width 3 is the default a fresh pin offers — the width most graphs mean, and the one the
+        // editor's width picker starts on.
+        TypeHandleHelpers.setCustomDefaultValue(VECTOR, Vector3f::new);
+        // Client-only editor (a width picker plus that many component fields), referenced lazily so
+        // the dedicated server never loads the UI class.
+        TypeHandleHelpers.setCustomConfigurable(VECTOR, (valueConfigurable, typeHandle) ->
+                com.lowdragmc.kilagraph.graph.ui.VectorConfigurator.build(valueConfigurable));
 
         LIST = TypeHandleHelpers.customType(List.class, "LIST", "List");
         // No custom default value: LDLib2 would otherwise initialise the embedded constant with

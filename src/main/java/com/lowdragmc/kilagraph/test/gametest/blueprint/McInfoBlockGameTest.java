@@ -10,8 +10,8 @@ import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.PlayerInfoBlocks;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.PlayerInfoNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.world.LevelInfoBlocks;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.world.LevelInfoNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.graph.type.Vectors;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.ContextNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
@@ -125,7 +125,7 @@ public final class McInfoBlockGameTest {
         Object look = probe.read(EntityInfoBlocks.LookDirection.class, "value", Object.class);
         assertVector(helper, "lookAngle", pig.getLookAngle(), look);
         // And it really is normalised, which is what makes it safe to scale by a reach distance.
-        float[] l = VectorNodes.components(look);
+        float[] l = Vectors.components(look);
         assertEq(helper, "look direction is a unit vector", 1f,
                 (float) Math.sqrt(l[0] * l[0] + l[1] * l[1] + l[2] * l[2]), 1e-2f);
         assertVector(helper, "velocity", pig.getDeltaMovement(),
@@ -292,7 +292,7 @@ public final class McInfoBlockGameTest {
     /** The block's JOML vector against the Vec3 it came from, at float precision. */
     private static void assertVector(GameTestHelper helper, String label,
                                      Vec3 expected, Object actual) {
-        float[] c = VectorNodes.components(actual);
+        float[] c = Vectors.components(actual);
         assertEq(helper, label + " x", (float) expected.x, c[0], EPS);
         assertEq(helper, label + " y", (float) expected.y, c[1], EPS);
         assertEq(helper, label + " z", (float) expected.z, c[2], EPS);

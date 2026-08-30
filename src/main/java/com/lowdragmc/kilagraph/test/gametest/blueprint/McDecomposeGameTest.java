@@ -11,8 +11,8 @@ import com.lowdragmc.kilagraph.blueprint.nodes.mc.geometry.DirectionNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.id.McIdNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.item.ItemStackNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtKeysNode;
-import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.graph.type.Vectors;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import java.util.List;
@@ -110,7 +110,7 @@ public final class McDecomposeGameTest {
         assertEq(helper, "zSize", (Object) box.getZsize(), c.eval("zSize", Double.class));
 
         // The centre is the graph's vector type, not a Vec3 — the whole reason this is a node.
-        float[] mid = VectorNodes.components(c.eval("center", Object.class));
+        float[] mid = Vectors.components(c.eval("center", Object.class));
         assertEq(helper, "centre x", (float) box.getCenter().x, mid[0], EPS);
         assertEq(helper, "centre y", (float) box.getCenter().y, mid[1], EPS);
         assertEq(helper, "centre z", (float) box.getCenter().z, mid[2], EPS);

@@ -4,6 +4,7 @@ import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.graph.type.Vectors;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -164,7 +165,7 @@ public final class VectorNodeGameTest {
         BlueprintGraph g = newGraph();
         NodeModel norm = addNode(g, VectorNodes.Normalize.class);
         setInputConstant(norm, "in", new Vector3f(0f, 0f, 0f));
-        float[] zero = VectorNodes.components(
+        float[] zero = Vectors.components(
                 new GraphExecutor(g).evaluate(norm.getOutputsById().get("out"), Object.class));
         for (int i = 0; i < zero.length; i++) {
             assertTrue(helper, "component " + i + " is not NaN, it was " + zero[i],
@@ -430,7 +431,7 @@ public final class VectorNodeGameTest {
     }
 
     private static void assertVec(GameTestHelper helper, String label, float[] expected, Object actual) {
-        float[] got = VectorNodes.components(actual);
+        float[] got = Vectors.components(actual);
         assertEq(helper, label + " width", expected.length, got.length);
         for (int i = 0; i < expected.length; i++) {
             assertEq(helper, label + " component " + i, expected[i], got[i], EPS);
