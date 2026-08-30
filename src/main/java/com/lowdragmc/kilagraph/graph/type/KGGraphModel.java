@@ -44,10 +44,10 @@ public class KGGraphModel extends CustomGraphModelImpl {
         return types;
     }
 
-    /** VEC2/VEC3/VEC4 — the widths the vector nodes read interchangeably. */
+    /** Every vector pin: the three concrete widths, plus the any-width {@code VECTOR}. */
     private static boolean isVector(TypeHandle handle) {
-        return KGTypeHandles.VEC2.equals(handle) || KGTypeHandles.VEC3.equals(handle)
-                || KGTypeHandles.VEC4.equals(handle);
+        return KGTypeHandles.VECTOR.equals(handle) || KGTypeHandles.VEC2.equals(handle)
+                || KGTypeHandles.VEC3.equals(handle) || KGTypeHandles.VEC4.equals(handle);
     }
 
     @Override
@@ -55,10 +55,11 @@ public class KGGraphModel extends CustomGraphModelImpl {
         TypeHandle dst = destination.getDataTypeHandle();
         TypeHandle src = source.getDataTypeHandle();
 
-        // Any vector into any vector width. A pin has to name one type (LDLib2 has no polymorphic
-        // pin), so the vector nodes declare VEC3 — but they read however many components arrive and
-        // answer in kind. Refusing a VEC4 here would make the editor enforce a rule the machine does
-        // not have, and thirteen of the fifteen vector nodes would be width-polymorphic in name only.
+        // Any vector into any vector pin. VECTOR accepts every width because that is what it means;
+        // VEC2/VEC3/VEC4 accept every width because the operations behind them read whatever arrives
+        // and truncate or zero-fill by their own documented rule (vector_cross reads the first three
+        // of anything). Refusing a width here would make the editor enforce a rule the machine does
+        // not have.
         if (isVector(dst) && isVector(src)) {
             return true;
         }

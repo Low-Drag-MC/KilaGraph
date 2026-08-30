@@ -6,10 +6,17 @@ import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
+import com.lowdragmc.kilagraph.graph.type.Vectors;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+
+import static com.lowdragmc.kilagraph.graph.type.Vectors.at;
+import static com.lowdragmc.kilagraph.graph.type.Vectors.carrier;
+import static com.lowdragmc.kilagraph.graph.type.Vectors.components;
+import static com.lowdragmc.kilagraph.graph.type.Vectors.lengthSquared;
 
 /**
  * Vector arithmetic, two to four components.
@@ -19,11 +26,14 @@ import org.joml.Vector4f;
  * arrive and answer in kind. Only what is genuinely three-dimensional — Cross, and the yaw between
  * two directions — insists on three.
  *
- * <p>Pins are typed VEC3 because a pin has to name one type (LDLib2 has no polymorphic pin;
- * {@code PortModel.isPolymorphic} is hardcoded false) and three is what most graphs use. Wiring a
- * VEC2 or VEC4 in is allowed by {@link com.lowdragmc.kilagraph.graph.type.KGGraphModel}, which
- * treats any vector width as assignable to any other — refusing it would be the editor enforcing a
- * rule the machine does not have.
+ * <p><b>The pin says which.</b> The polymorphic ones declare {@code VECTOR}
+ * ({@link com.lowdragmc.kilagraph.graph.type.KGTypeHandles#VECTOR}) and the three-dimensional ones
+ * declare {@code VEC3}, so the port colour tells a graph author whether a Vector2 will be operated on
+ * or truncated. Make/Make2/Make4 keep their exact widths for the same reason: each produces one
+ * specific width and says so.
+ *
+ * @see VectorPorts for why the polymorphic ports are declared imperatively
+ * @see Vectors for the component arithmetic all of these share
  */
 public final class VectorNodes {
 
@@ -78,11 +88,15 @@ public final class VectorNodes {
     /** Splits any width; components the value does not have read zero rather than failing. */
     @NodeAttribute(name = "vector_break", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Break extends AnnotatedNode {
-        @InputPort public Vector3f in;
         @OutputPort public float x;
         @OutputPort public float y;
         @OutputPort public float z;
         @OutputPort public float w;
+
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.in(ctx, "in");
+        }
 
         @Override
         public void evaluate(EvalContext ctx) {
@@ -98,9 +112,10 @@ public final class VectorNodes {
 
     @NodeAttribute(name = "vector_add", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Add extends AnnotatedNode {
-        @InputPort public Vector3f a;
-        @InputPort public Vector3f b;
-        @OutputPort public Vector3f out;
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.binary(ctx);
+        }
 
         @Override
         public void evaluate(EvalContext ctx) {
@@ -110,9 +125,10 @@ public final class VectorNodes {
 
     @NodeAttribute(name = "vector_subtract", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Subtract extends AnnotatedNode {
-        @InputPort public Vector3f a;
-        @InputPort public Vector3f b;
-        @OutputPort public Vector3f out;
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.binary(ctx);
+        }
 
         @Override
         public void evaluate(EvalContext ctx) {
@@ -122,9 +138,12 @@ public final class VectorNodes {
 
     @NodeAttribute(name = "vector_scale", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Scale extends AnnotatedNode {
-        @InputPort public Vector3f in;
-        @InputPort public float scale = 1f;
-        @OutputPort public Vector3f out;
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.in(ctx, "in");
+            ctx.addInputPort("scale", Float.class).withDefaultValue(1f);
+            VectorPorts.out(ctx, "out");
+        }
 
         @Override
         public void evaluate(EvalContext ctx) {
@@ -140,26 +159,25 @@ public final class VectorNodes {
 
     @NodeAttribute(name = "vector_dot", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Dot extends AnnotatedNode {
-        @InputPort public Vector3f a;
-        @InputPort public Vector3f b;
-        @OutputPort public float out;
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.reduce(ctx);
+        }
 
         @Override
         public void evaluate(EvalContext ctx) {
-            float[] p = components(ctx.getInputRaw("a"));
-            float[] q = components(ctx.getInputRaw("b"));
-            float sum = 0f;
-            for (int i = 0; i < Math.max(p.length, q.length); i++) {
-                sum += at(p, i) * at(q, i);
-            }
-            ctx.setOutput("out", sum);
+            ctx.setOutput("out", Vectors.dot(
+                    components(ctx.getInputRaw("a")), components(ctx.getInputRaw("b"))));
         }
     }
 
     @NodeAttribute(name = "vector_length", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Length extends AnnotatedNode {
-        @InputPort public Vector3f in;
-        @OutputPort public float out;
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.in(ctx, "in");
+            ctx.addOutputPort("out", Float.class);
+        }
 
         @Override
         public void evaluate(EvalContext ctx) {
@@ -170,15 +188,17 @@ public final class VectorNodes {
     /** Zero in, zero out — normalising a zero vector must not put NaN into the graph. */
     @NodeAttribute(name = "vector_normalize", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Normalize extends AnnotatedNode {
-        @InputPort public Vector3f in;
-        @OutputPort public Vector3f out;
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.unary(ctx);
+        }
 
         @Override
         public void evaluate(EvalContext ctx) {
             float[] v = components(ctx.getInputRaw("in"));
             float length = (float) Math.sqrt(lengthSquared(v));
             float[] unit = new float[v.length];
-            if (length >= 1e-6f) {
+            if (length >= Vectors.EPSILON) {
                 for (int i = 0; i < v.length; i++) {
                     unit[i] = v[i] / length;
                 }
@@ -189,29 +209,27 @@ public final class VectorNodes {
 
     @NodeAttribute(name = "vector_distance", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Distance extends AnnotatedNode {
-        @InputPort public Vector3f a;
-        @InputPort public Vector3f b;
-        @OutputPort public float out;
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.reduce(ctx);
+        }
 
         @Override
         public void evaluate(EvalContext ctx) {
-            float[] p = components(ctx.getInputRaw("a"));
-            float[] q = components(ctx.getInputRaw("b"));
-            float sum = 0f;
-            for (int i = 0; i < Math.max(p.length, q.length); i++) {
-                float d = at(p, i) - at(q, i);
-                sum += d * d;
-            }
-            ctx.setOutput("out", (float) Math.sqrt(sum));
+            ctx.setOutput("out", (float) Math.sqrt(Vectors.distanceSquared(
+                    components(ctx.getInputRaw("a")), components(ctx.getInputRaw("b")))));
         }
     }
 
     @NodeAttribute(name = "vector_lerp", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Lerp extends AnnotatedNode {
-        @InputPort public Vector3f a;
-        @InputPort public Vector3f b;
-        @InputPort public float t;
-        @OutputPort public Vector3f out;
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.in(ctx, "a");
+            VectorPorts.in(ctx, "b");
+            ctx.addInputPort("t", Float.class).withDefaultValue(0f);
+            VectorPorts.out(ctx, "out");
+        }
 
         @Override
         public void evaluate(EvalContext ctx) {
@@ -220,7 +238,12 @@ public final class VectorNodes {
         }
     }
 
-    /** Genuinely three-dimensional; a 2- or 4-component input is read as its first three. */
+    /**
+     * Genuinely three-dimensional; a 2- or 4-component input is read as its first three.
+     *
+     * <p>Hence VEC3 pins rather than VECTOR: the colour is the warning that a Vector4 wired in here
+     * loses its w, which is the one thing a width-polymorphic pin would have promised not to do.
+     */
     @NodeAttribute(name = "vector_cross", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Cross extends AnnotatedNode {
         @InputPort public Vector3f a;
@@ -246,12 +269,15 @@ public final class VectorNodes {
     @NodeAttribute(name = "vector_flatten", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Flatten extends AnnotatedNode {
         @Option public int axis = 1;
-        @InputPort public Vector3f in;
-        @OutputPort public Vector3f out;
+
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.unary(ctx);
+        }
 
         @Override
         public void evaluate(EvalContext ctx) {
-            float[] v = components(ctx.getInputRaw("in")).clone();
+            float[] v = components(ctx.getInputRaw("in"));
             int axis = ctx.getOption("axis", Integer.class, 1);
             if (axis >= 0 && axis < v.length) {
                 v[axis] = 0f;
@@ -269,6 +295,9 @@ public final class VectorNodes {
      * mathematically tidier {@code atan2(x, z)} would answer the negative of this for every input —
      * a sign flip that reads as a character strafing while it walks straight, and that nothing but a
      * convention-aware test can catch.
+     *
+     * <p>VEC3 pins: a turn about the vertical axis is a three-dimensional idea, and only x and z are
+     * read at all.
      */
     @NodeAttribute(name = "vector_yaw_between", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class YawBetween extends AnnotatedNode {
@@ -288,12 +317,23 @@ public final class VectorNodes {
     }
 
     // ---- shared
+    //
+    // The component arithmetic itself lives in Vectors, in the type layer, because the VECTOR
+    // handle's codec and editor need it too. What stays here is the pair of folds that read and
+    // write through an EvalContext, which is a node-layer idea.
 
-    private interface Zip {
+    /** A component-wise binary operation, for {@link #zip}. */
+    public interface Zip {
         float apply(float a, float b);
     }
 
-    private static void zip(EvalContext ctx, Zip op) {
+    /** A component-wise unary operation, for {@link #map}. */
+    public interface Unary {
+        float apply(float v);
+    }
+
+    /** {@code out = op(a, b)} over ports {@code a}/{@code b}, at the wider operand's width. */
+    public static void zip(EvalContext ctx, Zip op) {
         float[] p = components(ctx.getInputRaw("a"));
         float[] q = components(ctx.getInputRaw("b"));
         int width = Math.max(p.length, q.length);
@@ -304,48 +344,12 @@ public final class VectorNodes {
         ctx.setOutput("out", carrier(out));
     }
 
-    private static float at(float[] v, int index) {
-        return index < v.length ? v[index] : 0f;
-    }
-
-    private static float lengthSquared(float[] v) {
-        float sum = 0f;
-        for (float c : v) {
-            sum += c * c;
+    /** {@code out = op(in)} over port {@code in}, keeping its width. */
+    public static void map(EvalContext ctx, Unary op) {
+        float[] v = components(ctx.getInputRaw("in"));
+        for (int i = 0; i < v.length; i++) {
+            v[i] = op.apply(v[i]);
         }
-        return sum;
-    }
-
-    /**
-     * The components behind a pin, whatever width it carries.
-     *
-     * <p>An unconnected pin can hold a constant of a different width than the node declares, and
-     * {@code KGGraphModel} lets a VEC2 or VEC4 wire reach a VEC3 pin. Reading components rather
-     * than casting is what keeps those cases arithmetic instead of silently zero.
-     */
-    public static float[] components(Object raw) {
-        if (raw instanceof Vector4f v) {
-            return new float[] {v.x, v.y, v.z, v.w};
-        }
-        if (raw instanceof Vector3f v) {
-            return new float[] {v.x, v.y, v.z};
-        }
-        if (raw instanceof Vector2f v) {
-            return new float[] {v.x, v.y};
-        }
-        if (raw instanceof Number n) {
-            return new float[] {n.floatValue()};
-        }
-        return new float[] {0f, 0f, 0f};
-    }
-
-    /** The JOML shape for a width, so a value keeps its type across a wire. */
-    public static Object carrier(float[] v) {
-        return switch (v.length) {
-            case 2 -> new Vector2f(v[0], v[1]);
-            case 4 -> new Vector4f(v[0], v[1], v[2], v[3]);
-            case 1 -> (Object) v[0];
-            default -> new Vector3f(at(v, 0), at(v, 1), at(v, 2));
-        };
+        ctx.setOutput("out", carrier(v));
     }
 }

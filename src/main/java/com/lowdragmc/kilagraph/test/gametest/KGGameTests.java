@@ -70,7 +70,9 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.StringNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.SubgraphExecGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.SubgraphGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.VariableGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.VectorNodeExtrasGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.VectorNodeGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.VectorPinTypeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.WirePortalGameTest;
 import com.lowdragmc.kilagraph.test.gametest.rendertypegraph.RenderTypeGraphGameTest;
 import com.lowdragmc.kilagraph.test.gametest.rendertypegraph.ShaderCompilerGameTest;
@@ -198,7 +200,9 @@ public final class KGGameTests {
             new Group(PreparedGraphGameTest::registerFunctions, PreparedGraphGameTest::register),
             new Group(SealedGraphConcurrencyGameTest::registerFunctions, SealedGraphConcurrencyGameTest::register),
             new Group(SealedGraphStressGameTest::registerFunctions, SealedGraphStressGameTest::register),
-            new Group(VectorNodeGameTest::registerFunctions, VectorNodeGameTest::register));
+            new Group(VectorNodeGameTest::registerFunctions, VectorNodeGameTest::register),
+            new Group(VectorNodeExtrasGameTest::registerFunctions, VectorNodeExtrasGameTest::register),
+            new Group(VectorPinTypeGameTest::registerFunctions, VectorPinTypeGameTest::register));
 
     /** Every render-type-graph test group. @see Group */
     private static final List<Group> RENDER_TYPE_GRAPH = List.of(
