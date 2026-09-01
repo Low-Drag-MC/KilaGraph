@@ -28,7 +28,9 @@ import java.util.List;
  * <p>Spaces: <b>object</b> (model space), <b>view</b> ({@code mat3(ModelViewMat) · N}), <b>world</b>
  * ({@code mat3(IViewMat) · mat3(ModelViewMat) · N}, identical to {@link ShaderCompileContext#meshNormal()}).
  * Because MC's matrices are pure rotations, normals transform with the plain (non-inverse-transpose) rotation.
- * Unity's Tangent space isn't offered — Minecraft meshes carry no per-vertex tangent basis. The per-node preview
+ * <b>tangent</b> is the constant {@code (0,0,1)}, exactly as in Unity: the tangent basis is <em>defined</em>
+ * with the surface normal as its third axis, so the normal in tangent space is the axis itself — the flat
+ * value a normal-map chain (Normal Unpack / Blend / Strength) starts from. The per-node preview
  * shows the preview mesh's own interpolated normal ({@code vNormal}) for every space, like {@code meshNormal}.</p>
  */
 @NodeAttribute(name = "rt_normal", group = "rendertype_input", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
@@ -38,7 +40,7 @@ public class NormalNode extends ShaderNode {
         return Component.translatable("kg.node.rt_normal.tooltip");
     }
 
-    private static final List<String> SPACES = List.of("object", "world", "view");
+    private static final List<String> SPACES = List.of("object", "world", "view", "tangent");
 
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
@@ -55,6 +57,12 @@ public class NormalNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         String space = choice("space", "world", SPACES);
+        // Tangent space needs no basis at all: N is the basis' own third axis, so it is +Z by construction
+        // (checked before the injection and preview branches — the identity holds under both).
+        if ("tangent".equals(space)) {
+            ctx.output("out", new ShaderExpr("vec3(0.0, 0.0, 1.0)", GlslType.VEC3));
+            return;
+        }
         // Injection FIRST — injection implies isPreview(), and the preview branch's vNormal is a
         // preview-quad varying that does NOT exist in an injected shaderpack fragment. meshNormal()
         // reconstructs the WORLD normal from the pack's own view-space varying (kg_recon_normal);
@@ -95,6 +103,7 @@ public class NormalNode extends ShaderNode {
         return switch (space) {
             case "object" -> "Object";
             case "view" -> "View";
+            case "tangent" -> "Tangent";
             default -> "World";
         };
     }
@@ -119,6 +128,8 @@ public class NormalNode extends ShaderNode {
                 out = normalize(mat3(ModelViewMat) * N);
                 // world
                 out = normalize(mat3(IViewMat)
-                    * mat3(ModelViewMat) * N);""";
+                    * mat3(ModelViewMat) * N);
+                // tangent: N is the basis' own axis
+                out = vec3(0.0, 0.0, 1.0);""";
     }
 }

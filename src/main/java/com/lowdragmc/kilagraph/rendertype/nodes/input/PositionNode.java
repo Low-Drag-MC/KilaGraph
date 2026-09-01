@@ -27,10 +27,12 @@ import java.util.List;
  * <p>Spaces: <b>object</b> (per-draw model space), <b>view</b> (eye space, {@code ModelViewMat · pos}),
  * <b>world</b> (absolute world — the view point un-rotated by {@code IViewMat} plus the camera world position
  * from {@code globals.glsl}, matching {@link com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode}'s
- * object→world). Unity's Tangent / Absolute-World aren't offered — Minecraft meshes carry no per-vertex tangent
- * basis, and "world" here is already absolute. The per-node preview has no real vertex stage, so it shows the
- * preview mesh's forwarded object position ({@code vPos}) for every space (the preview camera's degenerate
- * matrices make the world/view transforms meaningless — like {@code meshNormal}'s preview).</p>
+ * object→world), <b>tangent</b> (the object position projected onto the surface's tangent basis — see
+ * {@link ShaderCompileContext#tangentBasis(String)}, which derives that basis because Minecraft carries no
+ * per-vertex tangent). Unity's Absolute-World isn't offered — "world" here is already absolute. The per-node
+ * preview has no real vertex stage, so it shows the preview mesh's forwarded object position ({@code vPos})
+ * for every space (the preview camera's degenerate matrices make the world/view transforms meaningless —
+ * like {@code meshNormal}'s preview).</p>
  */
 @NodeAttribute(name = "rt_position", group = "rendertype_input", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class PositionNode extends ShaderNode {
@@ -39,7 +41,7 @@ public class PositionNode extends ShaderNode {
         return Component.translatable("kg.node.rt_position.tooltip");
     }
 
-    private static final List<String> SPACES = List.of("object", "world", "view");
+    private static final List<String> SPACES = List.of("object", "world", "view", "tangent");
 
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
@@ -62,10 +64,14 @@ public class PositionNode extends ShaderNode {
         // all three spaces are exact under a shaderpack.
         if (ctx.isInjection()) {
             ShaderExpr view = ctx.temp(GlslType.VEC3, ctx.reconstructedViewPos().code());
+            String object = "(" + ctx.transformField("IModelViewMat", GlslType.MAT4).code()
+                    + " * vec4(" + view.code() + ", 1.0)).xyz";
             String out = switch (space) {
                 case "view" -> view.code();
-                case "object" -> "(" + ctx.transformField("IModelViewMat", GlslType.MAT4).code()
-                        + " * vec4(" + view.code() + ", 1.0)).xyz";
+                case "object" -> object;
+                // The basis is derived in object space, so project the object position onto it (the basis
+                // itself is reconstructed under injection too — see ShaderGraphCompiler#tangentFrameNormal).
+                case "tangent" -> ctx.spaceToTangent("object", new ShaderExpr(object, GlslType.VEC3)).code();
                 default /* world */ -> "(mat3(" + ctx.transformField("IViewMat", GlslType.MAT4).code()
                         + ") * " + view.code() + " + (vec3("
                         + ctx.transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "
@@ -85,6 +91,8 @@ public class PositionNode extends ShaderNode {
         ShaderExpr out = switch (space) {
             case "object" -> ctx.objectSpacePosition();
             case "view" -> ctx.viewSpacePosition();
+            // The basis is derived in object space, so project the object position onto it.
+            case "tangent" -> ctx.spaceToTangent("object", ctx.objectSpacePosition());
             default /* world */ -> ctx.worldSpacePosition();
         };
         ctx.output("out", out);
@@ -99,6 +107,7 @@ public class PositionNode extends ShaderNode {
         return switch (space) {
             case "object" -> "Object";
             case "view" -> "View";
+            case "tangent" -> "Tangent";
             default -> "World";
         };
     }
@@ -123,6 +132,9 @@ public class PositionNode extends ShaderNode {
                 out = (ModelViewMat * vec4(pos, 1.0)).xyz;
                 // world
                 out = mat3(IViewMat) * viewPos
-                    + cameraWorldPos;""";
+                    + cameraWorldPos;
+                // tangent
+                out = vec3(dot(pos, T), dot(pos, B),
+                           dot(pos, N));""";
     }
 }

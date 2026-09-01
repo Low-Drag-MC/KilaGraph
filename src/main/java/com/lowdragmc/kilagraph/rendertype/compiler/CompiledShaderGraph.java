@@ -63,6 +63,11 @@ public record CompiledShaderGraph(
         // was substituted in the GLSL). Diagnostics only — surfaced as editor warnings; the GLSL already
         // reflects the substitution, so this is NOT part of contentHash().
         List<String> missingAttributes,
+        // Whether a tangent basis had to fall back to the normal-only approximation — the vertex stage (no
+        // screen-space derivatives) or a format with no UV0. The basis is orthonormal but its rotation around
+        // the normal is arbitrary, so uv-anchored uses (normal maps, parallax) are wrong. Diagnostics only,
+        // like missingAttributes: the GLSL already reflects the fallback, so NOT part of contentHash().
+        boolean tangentBasisDegraded,
         // The fragment surface compiled as a kg_surface() function for injection into an Iris shaderpack's
         // gbuffers program (see InjectionSnippet / IrisShaderInjector). Null when the graph isn't
         // injection-compatible or for editor previews. Metadata — NOT part of contentHash().

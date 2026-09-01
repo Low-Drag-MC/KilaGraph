@@ -63,7 +63,17 @@ public final class KGVertexFormat {
             // any element already added (the editor can transiently offer the same element twice).
             if (!seen.add(desc.attribName())) continue;
             VertexFormatElement element = VertexFormatElement.byId(desc.mcElementId());
-            if (element == null) continue;
+            if (element == null) {
+                // The generated vertex shader declares an `in` for EVERY settings element (it has no access
+                // to blaze3d), so dropping one here leaves that attribute unbound and reading garbage. That
+                // is invisible at runtime, so say it loudly: the element's id was never registered with
+                // Minecraft (see KGVertexElements#TANGENT_KEY for the contract).
+                LOGGER.error("[KilaGraph] vertex element '{}' (attribute {}) has no Minecraft "
+                                + "VertexFormatElement for id {} — skipping it, so the shader's `in {} {}` "
+                                + "will be unbound. Register the element id via VertexFormatElement.register.",
+                        key, desc.attribName(), desc.mcElementId(), desc.glslType(), desc.attribName());
+                continue;
+            }
             builder.add(desc.attribName(), element);
             size += element.byteSize();
             added++;
