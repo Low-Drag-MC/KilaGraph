@@ -7,6 +7,8 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
+import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
+import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.KGSamplerGl;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
@@ -28,8 +30,10 @@ import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaDiscardBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentBaseColorBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentEmissionBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.BitangentNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.NormalNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.PositionNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.TangentNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.ViewDirectionNode;
@@ -96,6 +100,10 @@ import com.lowdragmc.kilagraph.rendertype.nodes.uv.RadialShearNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.uv.RotateNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.uv.SpherizeNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.uv.TilingAndOffsetNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.artistic.normal.NormalFromHeightNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.artistic.normal.NormalFromTextureNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.ParallaxMappingNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.ParallaxOcclusionMappingNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.uv.TriplanarNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.uv.TwirlNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomFloatBlock;
@@ -421,6 +429,216 @@ public final class ShaderCompilerGameTest {
         // Normal, view space: object normal rotated by ModelViewMat only.
         assertTrue(helper, "normal view uses ModelViewMat",
                 inputNodeFsh(NormalNode.class, "space", "view").contains("ModelViewMat"));
+        helper.succeed();
+    }
+
+    /**
+     * Minecraft has no tangent vertex attribute, so the Tangent/Bitangent nodes (and every Tangent space)
+     * compile against a <em>derived</em> basis: the mesh uv's cotangent frame in the fragment stage, an
+     * orthonormal basis built from the normal alone in the vertex stage (where derivatives are illegal).
+     * Both are then rotated into the chosen space by the same matrices the Normal node uses.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void tangentBasisIsDerivedPerStage(GameTestHelper helper) {
+        // Fragment stage: the uv frame, from screen-space derivatives of the position and the uv.
+        RenderTypeGraph fragGraph = new RenderTypeGraph();
+        NodeModel fragEmission = addBlock(fragGraph, fragGraph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel fragTangent = addNode(fragGraph, TangentNode.class);
+        setOption(fragTangent, "space", "world");
+        wire(fragGraph, fragEmission.getInputsById().get("color"), fragTangent.getOutputsById().get("out"));
+        CompiledShaderGraph fragCompiled = compile(fragGraph);
+        String fsh = fragCompiled.fragmentSource();
+        assertTrue(helper, "fragment tangent uses the uv cotangent frame", fsh.contains("kg_tangentFrameFromUv"));
+        assertFalse(helper, "the uv frame is the real thing, not a reported degradation",
+                fragCompiled.tangentBasisDegraded());
+        assertTrue(helper, "the uv frame reads screen-space derivatives",
+                fsh.contains("dFdx(") && fsh.contains("dFdy("));
+        assertTrue(helper, "the normal-only frame is registered as its degenerate fallback",
+                fsh.contains("kg_tangentFrameFromNormal"));
+        assertTrue(helper, "world tangent rotates via ModelViewMat + kg_IViewMat",
+                fsh.contains("ModelViewMat") && fsh.contains("kg_IViewMat"));
+
+        // Vertex stage: no derivatives available, so the basis comes from the normal alone.
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel varying = addBlock(graph, graph.getVertexStageModel(), VaryingCustomVec3Block.class);
+        NodeModel tangent = addNode(graph, TangentNode.class);
+        setOption(tangent, "space", "object");
+        wire(graph, varying.getInputsById().get("value"), tangent.getOutputsById().get("out"));
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), varying.getOutputsById().get("value"));
+        CompiledShaderGraph vertexCompiled = compile(graph);
+        String vsh = vertexCompiled.vertexSource();
+        assertTrue(helper, "vertex tangent falls back to the normal-derived basis",
+                vsh.contains("kg_tangentFrameFromNormal"));
+        assertTrue(helper, "the vertex stage never emits a derivative (illegal in a vsh)",
+                !vsh.contains("dFdx(") && !vsh.contains("dFdy("));
+        // The fallback is orthonormal but arbitrarily rotated, so a normal map read through it is wrong
+        // while looking plausible — the compile must say so rather than degrade silently.
+        assertTrue(helper, "the vertex-stage fallback is reported as a degraded basis",
+                vertexCompiled.tangentBasisDegraded());
+        helper.succeed();
+    }
+
+    /**
+     * Tier 1 of the tangent seam: when something <em>does</em> supply a per-vertex tangent, the derived
+     * frames must step aside entirely. Registering a {@code tangent} element and putting it in the graph's
+     * vertex format is the whole opt-in — no node or graph edit — and the value then travels the normal
+     * attribute route: a raw {@code in} in the vsh, an interpolated varying in the fsh.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void realTangentAttributeReplacesTheDerivedBasis(GameTestHelper helper) {
+        // Nothing registers one by default — that is the point of reserving the key.
+        assertTrue(helper, "no tangent element is registered out of the box",
+                KGVertexElements.tangent() == null);
+        KGVertexElements.register(new KGVertexElement(KGVertexElements.TANGENT_KEY,
+                KGVertexElements.TANGENT_ATTRIB_NAME, "vec4", 6));
+        try {
+            RenderTypeGraph graph = new RenderTypeGraph();
+            var s = graph.getSettings();
+            var elements = new java.util.ArrayList<>(s.vertexFormatElements());
+            elements.add(KGVertexElements.TANGENT_KEY);
+            graph.setSettings(new RenderTypeGraph.Settings(elements, s.vertexFormatMode(), s.blend(),
+                    s.depthTest(), s.depthWrite(), s.cull(), s.outputTarget(), s.affectsOutline(),
+                    s.sortOnUpload()));
+            NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+            NodeModel tangent = addNode(graph, TangentNode.class);
+            setOption(tangent, "space", "object");
+            wire(graph, emission.getInputsById().get("color"), tangent.getOutputsById().get("out"));
+
+            CompiledShaderGraph compiled = compile(graph);
+            String vsh = compiled.vertexSource();
+            String fsh = compiled.fragmentSource();
+            assertTrue(helper, "the vsh declares the raw Tangent attribute", vsh.contains("in vec4 Tangent;"));
+            assertTrue(helper, "the vsh forwards it as a varying", vsh.contains("kg_objectTangent = Tangent;"));
+            assertTrue(helper, "the fsh reads the interpolated tangent", fsh.contains("in vec4 kg_objectTangent;"));
+            assertTrue(helper, "the real tangent replaces both derived frames",
+                    !fsh.contains("kg_tangentFrameFromUv") && !fsh.contains("kg_tangentFrameFromNormal"));
+            assertFalse(helper, "a real tangent is not a degraded basis", compiled.tangentBasisDegraded());
+            // Interpolation breaks both unit length and perpendicularity, so the frame is rebuilt per-fragment.
+            assertTrue(helper, "the interpolated tangent is re-orthogonalised against the normal",
+                    fsh.contains("dot(") && fsh.contains("normalize("));
+            assertTrue(helper, "the bitangent takes its handedness from w", fsh.contains("sign(kg_objectTangent.w)"));
+        } finally {
+            KGVertexElements.unregister(KGVertexElements.TANGENT_KEY);
+        }
+        assertTrue(helper, "the registry is left as it was found", KGVertexElements.tangent() == null);
+        helper.succeed();
+    }
+
+    /** Deriving the basis costs four derivatives, so it is built once per stage: a second reader (Bitangent
+     *  alongside Tangent) must reuse the same hoisted temps rather than deriving it again. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void tangentBasisIsSharedWithinAStage(GameTestHelper helper) {
+        int onlyTangent = countOccurrences(inputNodeFsh(TangentNode.class, "space", "world"),
+                "kg_tangentFrameFromUv(");
+
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel tangent = addNode(graph, TangentNode.class);
+        NodeModel bitangent = addNode(graph, BitangentNode.class);
+        NodeModel combine = addNode(graph, CrossNode.class); // any node taking both, to keep both alive
+        wire(graph, combine.getInputsById().get("a"), tangent.getOutputsById().get("out"));
+        wire(graph, combine.getInputsById().get("b"), bitangent.getOutputsById().get("out"));
+        wire(graph, emission.getInputsById().get("color"), combine.getOutputsById().get("out"));
+        int both = countOccurrences(compile(graph).fragmentSource(), "kg_tangentFrameFromUv(");
+
+        assertTrue(helper, "a second tangent reader adds no second derivation", both == onlyTangent);
+        helper.succeed();
+    }
+
+    /**
+     * The tangent basis is defined with the surface normal as its third axis, so the Normal node's Tangent
+     * space is the constant {@code (0,0,1)} — Unity's behaviour, and the flat value a normal-map chain starts
+     * from. Transform's {@code tangent → world} with type {@code normal} is the inverse: it applies the basis.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void tangentSpaceNormalRoundTrip(GameTestHelper helper) {
+        assertTrue(helper, "normal in tangent space is the basis' own axis",
+                inputNodeFsh(NormalNode.class, "space", "tangent").contains("vec3(0.0, 0.0, 1.0)"));
+
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel transform = addNode(graph, TransformNode.class);
+        setOption(transform, "from", "tangent");
+        setOption(transform, "to", "world");
+        setOption(transform, "type", "normal");
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), transform.getOutputsById().get("out"));
+        String fsh = compile(graph).fragmentSource();
+        assertTrue(helper, "tangent→world applies the derived basis", fsh.contains("kg_tangentFrameFromUv"));
+        assertTrue(helper, "tangent→world goes on through object→world",
+                fsh.contains("ModelViewMat") && fsh.contains("kg_IViewMat"));
+        assertTrue(helper, "type=normal normalizes the result", fsh.contains("normalize("));
+        helper.succeed();
+    }
+
+    /**
+     * The normal-producing Artistic nodes gained Unity's Output Space option. Tangent (the default) must
+     * emit exactly what they emitted before — these are the graphs everyone already has — while World runs
+     * the result through the tangent basis so it can be lit without a Transform node wired on the end.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void normalNodesCanOutputWorldSpace(GameTestHelper helper) {
+        for (Class<? extends Node> nodeClass : List.of(NormalFromHeightNode.class, NormalFromTextureNode.class)) {
+            String tangent = inputNodeFsh(nodeClass, "space", "tangent");
+            assertFalse(helper, nodeClass.getSimpleName() + " tangent output builds no basis",
+                    tangent.contains("kg_tangentFrameFromUv"));
+
+            String world = inputNodeFsh(nodeClass, "space", "world");
+            assertTrue(helper, nodeClass.getSimpleName() + " world output derives the tangent basis",
+                    world.contains("kg_tangentFrameFromUv"));
+            assertTrue(helper, nodeClass.getSimpleName() + " world output rotates into world space",
+                    world.contains("kg_IViewMat"));
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Triplanar's Normal type blends three normal-map samples into a world normal off the projection axes —
+     * the one normal-mapping path that needs no mesh tangent, so it must NOT pull in the tangent seam.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void triplanarNormalNeedsNoTangentBasis(GameTestHelper helper) {
+        String def = inputNodeFsh(TriplanarNode.class, "type", "default");
+        assertFalse(helper, "default triplanar does not unpack normals", def.contains("* 2.0 - 1.0"));
+
+        String normal = inputNodeFsh(TriplanarNode.class, "type", "normal");
+        assertTrue(helper, "normal triplanar unpacks each sample", normal.contains("* 2.0 - 1.0"));
+        assertTrue(helper, "normal triplanar normalizes the blend", normal.contains("normalize("));
+        assertTrue(helper, "normal triplanar builds no tangent basis of its own",
+                !normal.contains("kg_tangentFrameFromUv") && !normal.contains("kg_tangentFrameFromNormal"));
+        helper.succeed();
+    }
+
+    /** The parallax nodes are the payoff of tangent-space view direction: both march the uv along it, and
+     *  POM's step count is a compile-time constant so the loop can unroll. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void parallaxNodesUseTangentSpaceViewDir(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel parallax = addNode(graph, ParallaxMappingNode.class);
+        wire(graph, emission.getInputsById().get("color"), parallax.getOutputsById().get("out"));
+        String fsh = compile(graph).fragmentSource();
+        assertTrue(helper, "parallax emits its offset helper", fsh.contains("kg_parallaxOffset("));
+        assertTrue(helper, "parallax projects the view direction onto the tangent basis",
+                fsh.contains("kg_tangentFrameFromUv") && fsh.contains("dot("));
+
+        RenderTypeGraph pomGraph = new RenderTypeGraph();
+        NodeModel pomEmission = addBlock(pomGraph, pomGraph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel pom = addNode(pomGraph, ParallaxOcclusionMappingNode.class);
+        setOption(pom, "steps", "32");
+        wire(pomGraph, pomEmission.getInputsById().get("color"), pom.getOutputsById().get("out"));
+        String pomFsh = compile(pomGraph).fragmentSource();
+        assertTrue(helper, "POM emits its march helper", pomFsh.contains("kg_parallaxOcclusion("));
+        assertTrue(helper, "the step count is baked in as a constant", pomFsh.contains(", 32)"));
+        // An implicit-lod fetch inside a non-uniform loop is undefined; the march must ask for an explicit one.
+        assertTrue(helper, "the march samples at an explicit lod", pomFsh.contains("textureLod("));
         helper.succeed();
     }
 

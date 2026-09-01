@@ -8,16 +8,26 @@ import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity;
+import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
 import com.lowdragmc.kilagraph.rendertype.nodes.artistic.ArtisticNode;
+import com.lowdragmc.lowdraglib2.gui.ui.data.Tooltips;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
+import java.util.List;
+
 /**
- * Unity's Normal From Texture: derives a tangent-space normal by sampling a (height) texture at the uv
- * and one {@code offset} step along u and v, then crossing the two slope vectors scaled by {@code strength}.
+ * Unity's Normal From Texture: derives a normal by sampling a (height) texture at the uv and one
+ * {@code offset} step along u and v, then crossing the two slope vectors scaled by {@code strength}.
  * Samples a texture, so {@link StageAffinity#FRAGMENT_ONLY}. Unconnected {@code texture}/{@code uv} fall
  * back to the missing-texture sampler and the mesh uv.
+ *
+ * <p>The <b>space</b> option picks the output space: <b>tangent</b> (the raw cross product) or <b>world</b>,
+ * run through the surface's tangent basis so it can be lit without wiring a Transform node on the end. Unlike
+ * {@link NormalFromHeightNode} the slopes here are measured in <em>uv</em> units, which is the same thing the
+ * basis is anchored to — so world mode is exact rather than a screen-space approximation.</p>
  */
 @NodeAttribute(name = "rt_normal_from_texture", group = "rendertype_artistic/normal", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class NormalFromTextureNode extends ArtisticNode {
@@ -29,6 +39,14 @@ public class NormalFromTextureNode extends ArtisticNode {
     @Override
     public StageAffinity stageAffinity() {
         return StageAffinity.FRAGMENT_ONLY; // texture() auto-lod needs derivatives
+    }
+
+    @Override
+    public void onDefineOptions(IOptionDefinitionContext context) {
+        context.addOption("space", TypeHandles.STRING).withDefaultValue("tangent")
+                .withTooltips(Tooltips.of("kg.node.rt_normal_from_texture.option.space.tooltip"))
+                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, NormalSpaces.SPACES, NormalSpaces::label))
+                .build();
     }
 
     @Override
@@ -55,7 +73,13 @@ public class NormalFromTextureNode extends ArtisticNode {
                 "texture(" + tex + ", " + uv.code() + " + vec2(0.0, " + off + ")).r");
         String va = "vec3(1.0, 0.0, (" + du.code() + " - " + n.code() + ") * " + s + ")";
         String vb = "vec3(0.0, 1.0, (" + dv.code() + " - " + n.code() + ") * " + s + ")";
-        ctx.output("out", new ShaderExpr("normalize(cross(" + va + ", " + vb + "))", GlslType.VEC3));
+        ShaderExpr tangentSpace = new ShaderExpr("normalize(cross(" + va + ", " + vb + "))", GlslType.VEC3);
+        ctx.output("out", NormalSpaces.toChosenSpace(this, ctx, tangentSpace));
+    }
+
+    @Override
+    public List<String> optionChoices(String optionId) {
+        return NormalSpaces.optionChoices(optionId);
     }
 
     @Override
@@ -64,8 +88,10 @@ public class NormalFromTextureNode extends ArtisticNode {
                 float n  = texture(tex, uv).r;
                 float du = texture(tex, uv + vec2(offset, 0)).r;
                 float dv = texture(tex, uv + vec2(0, offset)).r;
-                out = normalize(cross(
+                vec3 t = normalize(cross(
                     vec3(1, 0, (du - n) * strength),
-                    vec3(0, 1, (dv - n) * strength)));""";
+                    vec3(0, 1, (dv - n) * strength)));
+                // space = world
+                out = T * t.x + B * t.y + N * t.z;""";
     }
 }

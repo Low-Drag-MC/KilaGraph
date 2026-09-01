@@ -34,7 +34,34 @@ public final class KGVertexElements {
     public static final KGVertexElement UV2 = register(new KGVertexElement("uv2", "UV2", "ivec2", 4));
     public static final KGVertexElement NORMAL = register(new KGVertexElement("normal", "Normal", "vec3", 5));
 
+    /**
+     * The reserved registry key for a per-vertex tangent. <b>Nothing registers it</b> — Minecraft has no
+     * tangent vertex element, so the shader compiler derives a tangent basis instead (see
+     * {@code ShaderGraphCompiler#objectTangentBasis()}). The key is reserved so a mod that <em>does</em> feed
+     * its own geometry can opt in: register an element under this key and every tangent-reading node
+     * (Tangent/Bitangent, the Tangent space of Position/View Direction/Transform, and any normal-map graph
+     * built on them) switches from the derived basis to the real attribute, with no graph edits.
+     *
+     * <p>The contract: bind name {@code Tangent}; GLSL type {@code vec4} — {@code xyz} the unit tangent in
+     * the same space as {@code Normal}, {@code w} the bitangent handedness ({@code ±1}, the glTF/Unity
+     * convention) — or {@code vec3} for a right-handed-only tangent. The {@code mcElementId} <b>must</b>
+     * resolve through {@code VertexFormatElement.byId} on the client: {@link KGVertexFormat} silently skips
+     * an element it cannot resolve, while the generated vertex shader still declares the {@code in}, leaving
+     * the attribute unbound.</p>
+     */
+    public static final String TANGENT_KEY = "tangent";
+
+    /** The GLSL/{@code VertexFormat} binding name a {@link #TANGENT_KEY} element must use. */
+    public static final String TANGENT_ATTRIB_NAME = "Tangent";
+
     private KGVertexElements() {}
+
+    /** The registered per-vertex tangent element, or {@code null} when nothing supplies one (the default —
+     *  the compiler then derives a basis). See {@link #TANGENT_KEY}. */
+    @Nullable
+    public static KGVertexElement tangent() {
+        return get(TANGENT_KEY);
+    }
 
     /** Register an element. Replaces any element with the same key; the last registration for a given
      * Minecraft id wins the reverse lookup. Returns the registered element for static-field convenience. */
@@ -42,6 +69,15 @@ public final class KGVertexElements {
         BY_KEY.put(element.key(), element);
         BY_MC_ID.put(element.mcElementId(), element);
         return element;
+    }
+
+    /** Drop a previously {@link #register}ed element (both lookups). Returns the removed element, or
+     *  {@code null} if the key was not registered. The built-ins can be removed too — don't. */
+    @Nullable
+    public static KGVertexElement unregister(String key) {
+        KGVertexElement removed = BY_KEY.remove(key);
+        if (removed != null) BY_MC_ID.remove(removed.mcElementId(), removed);
+        return removed;
     }
 
     @Nullable

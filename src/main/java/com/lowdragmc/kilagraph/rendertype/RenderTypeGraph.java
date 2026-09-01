@@ -415,6 +415,12 @@ public class RenderTypeGraph extends Graph {
                     logger.warning(Component.translatable("rendertypegraph.warn.vertex_element_defaulted", attrib));
                 }
             }
+            // A tangent basis that fell back to the normal-only approximation still compiles, but its
+            // rotation around the normal is arbitrary — normal maps read through it are simply wrong, and
+            // nothing in the output looks broken enough to notice. Say so.
+            if (compiled.tangentBasisDegraded()) {
+                logger.warning(Component.translatable("rendertypegraph.warn.tangent_basis_degraded"));
+            }
             // Stage-affinity violations from the same compile: a node pulled into a stage its affinity
             // forbids (e.g. a vertex attribute read in the fragment stage). Keyed to the offending node.
             for (var err : compiled.stageErrors()) {

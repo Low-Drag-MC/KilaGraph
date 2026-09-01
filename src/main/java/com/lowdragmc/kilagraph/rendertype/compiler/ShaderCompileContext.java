@@ -356,6 +356,33 @@ public final class ShaderCompileContext {
         return compiler.worldSpaceNormal();
     }
 
+    /**
+     * The surface tangent basis in {@code space} ({@code "object"}/{@code "view"}/{@code "world"}) — the
+     * Tangent/Bitangent nodes' output and the frame every tangent-space conversion goes through.
+     *
+     * <p>Minecraft carries no per-vertex tangent, so this is <b>derived</b>, best source first: a real
+     * {@code Tangent} attribute if some mod registered one into the format (see
+     * {@link com.lowdragmc.kilagraph.rendertype.format.KGVertexElements#TANGENT_KEY}), else the mesh uv's own
+     * cotangent frame from screen-space derivatives (fragment stage — this is the one that makes a sampled
+     * normal map land the right way round), else an arbitrary-but-stable basis built from the normal alone
+     * (vertex stage, or a format with no uv). Built once per stage and shared.</p>
+     */
+    public TangentBasis tangentBasis(String space) {
+        return compiler.tangentBasis(space);
+    }
+
+    /** A tangent-space vector expressed in {@code space}: {@code T·v.x + B·v.y + N·v.z}. The inverse of
+     *  {@link #spaceToTangent(String, ShaderExpr)}. See {@link #tangentBasis(String)}. */
+    public ShaderExpr tangentToSpace(String space, ShaderExpr v) {
+        return compiler.tangentToSpace(space, v);
+    }
+
+    /** A vector in {@code space} expressed in tangent space: {@code vec3(dot(v,T), dot(v,B), dot(v,N))}.
+     *  See {@link #tangentBasis(String)}. */
+    public ShaderExpr spaceToTangent(String space, ShaderExpr v) {
+        return compiler.spaceToTangent(space, v);
+    }
+
     /** The surface&rarr;camera direction in object space (unnormalized) — the View Direction node's "Object" output. */
     public ShaderExpr objectSpaceViewDir() {
         return compiler.objectSpaceViewDir();

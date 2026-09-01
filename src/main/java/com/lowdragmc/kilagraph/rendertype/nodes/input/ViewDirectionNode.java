@@ -24,9 +24,10 @@ import java.util.List;
  *
  * <p>The camera sits at the view-space origin, so the raw direction is simply {@code -viewPos} (view space);
  * because Minecraft's matrices are pure rotation + translation, rotating that vector into <b>world</b>
- * ({@code mat3(IViewMat)}) or <b>object</b> ({@code mat3(IModelViewMat)}) space preserves its length. Unity's
- * <b>Tangent</b> space isn't offered — Minecraft meshes carry no per-vertex tangent basis (the same reason
- * {@link com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode} omits it). The surface position
+ * ({@code mat3(IViewMat)}) or <b>object</b> ({@code mat3(IModelViewMat)}) space preserves its length.
+ * <b>tangent</b> projects it onto the surface's tangent basis ({@link ShaderCompileContext#tangentBasis(String)}
+ * derives that basis — Minecraft carries no per-vertex tangent); that is the form parallax/relief mapping and
+ * tangent-space lighting want, since the uv offset they need is just the direction's {@code xy}. The surface position
  * is the interpolated model-space vertex position ({@link ShaderCompileContext#meshPosition()}), so the node
  * is fragment-safe and stage-agnostic. It is <b>unnormalized by default</b> (its length is the distance to the
  * camera); enable the {@code normalize} option for a unit-length direction.</p>
@@ -38,7 +39,7 @@ public class ViewDirectionNode extends ShaderNode {
         return Component.translatable("kg.node.rt_view_direction.tooltip");
     }
 
-    private static final List<String> SPACES = List.of("world", "object", "view");
+    private static final List<String> SPACES = List.of("world", "object", "view", "tangent");
 
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
@@ -66,6 +67,9 @@ public class ViewDirectionNode extends ShaderNode {
         ShaderExpr dir = switch (space) {
             case "object" -> ctx.objectSpaceViewDir();
             case "view" -> ctx.viewSpaceViewDir();
+            // The basis is derived in object space, so project the object-space direction onto it. The basis
+            // is orthonormal, so this preserves the length (= distance to the camera) like the rotations do.
+            case "tangent" -> ctx.spaceToTangent("object", ctx.objectSpaceViewDir());
             default /* world */ -> ctx.worldSpaceViewDir();
         };
         // Normalize only when asked (default off) — the unnormalized vector's length is the camera distance.
@@ -91,6 +95,9 @@ public class ViewDirectionNode extends ShaderNode {
                 vec3 dir = -viewPos;
                 // world
                 out = mat3(IViewMat) * dir;
+                // tangent
+                out = vec3(dot(dir, T), dot(dir, B),
+                           dot(dir, N));
                 // with normalize enabled
                 out = normalize(out);""";
     }
@@ -99,6 +106,7 @@ public class ViewDirectionNode extends ShaderNode {
         return switch (space) {
             case "object" -> "Object";
             case "view" -> "View";
+            case "tangent" -> "Tangent";
             default -> "World";
         };
     }

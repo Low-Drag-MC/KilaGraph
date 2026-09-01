@@ -26,9 +26,11 @@ import java.util.List;
  *
  * <p>Spaces: <b>object</b> (per-draw model space), <b>view</b> (eye space, {@code ModelViewMat · pos}),
  * <b>world</b> (absolute world — the view point un-rotated by {@code IViewMat} plus the camera world position,
- * matching {@link com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode}'s object→world). Unity's
- * Tangent / Absolute-World aren't offered — Minecraft meshes carry no per-vertex tangent basis, and "world"
- * here is already absolute. The per-node preview has no real vertex stage, so it shows the preview mesh's
+ * matching {@link com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode}'s object→world),
+ * <b>tangent</b> (the object position projected onto the surface's tangent basis — see
+ * {@link ShaderCompileContext#tangentBasis(String)}, which derives that basis because Minecraft carries no
+ * per-vertex tangent). Unity's Absolute-World isn't offered — "world" here is already absolute. The per-node
+ * preview has no real vertex stage, so it shows the preview mesh's
  * forwarded object position ({@code vPos}) for every space (the preview camera's degenerate matrices make the
  * world/view transforms meaningless — like {@code meshNormal}'s preview).</p>
  */
@@ -39,7 +41,7 @@ public class PositionNode extends ShaderNode {
         return Component.translatable("kg.node.rt_position.tooltip");
     }
 
-    private static final List<String> SPACES = List.of("object", "world", "view");
+    private static final List<String> SPACES = List.of("object", "world", "view", "tangent");
 
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
@@ -67,6 +69,8 @@ public class PositionNode extends ShaderNode {
         ShaderExpr out = switch (space) {
             case "object" -> ctx.objectSpacePosition();
             case "view" -> ctx.viewSpacePosition();
+            // The basis is derived in object space, so project the object position onto it.
+            case "tangent" -> ctx.spaceToTangent("object", ctx.objectSpacePosition());
             default /* world */ -> ctx.worldSpacePosition();
         };
         ctx.output("out", out);
@@ -91,13 +95,17 @@ public class PositionNode extends ShaderNode {
                 out = (ModelViewMat * vec4(pos, 1.0)).xyz;
                 // world
                 out = mat3(IViewMat) * viewPos
-                    + cameraWorldPos;""";
+                    + cameraWorldPos;
+                // tangent
+                out = vec3(dot(pos, T), dot(pos, B),
+                           dot(pos, N));""";
     }
 
     private static String label(String space) {
         return switch (space) {
             case "object" -> "Object";
             case "view" -> "View";
+            case "tangent" -> "Tangent";
             default -> "World";
         };
     }

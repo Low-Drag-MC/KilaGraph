@@ -40,8 +40,14 @@ import java.util.List;
  * (exact per-fragment), so e.g. {@code clip → world} reconstructs a world position from a depth/NDC sample;
  * direction/normal carry no position and keep the linear inverse (no divide). The <b>screen</b> target does
  * the perspective divide → {@code xy} in {@code [0,1]} + {@code z} = NDC depth (target-only; the divide is
- * exact only when this runs per-fragment). Downstream vec3 consumers just read {@code .xyz}. Unity's
- * Tangent / Absolute-World aren't offered — MC has no per-vertex tangent basis.</p>
+ * exact only when this runs per-fragment). Downstream vec3 consumers just read {@code .xyz}.</p>
+ *
+ * <p><b>tangent</b> is available as both source and target, routed through object space (the basis is derived
+ * there — see {@link ShaderCompileContext#tangentBasis(String)}, since MC has no per-vertex tangent). It is a
+ * rotation about the surface point and carries no translation, so {@code w} is untouched in either direction.
+ * {@code tangent → world} with {@code type = normal} is the standard "apply a normal map" step: feed it an
+ * unpacked normal-map sample and it comes out as a world-space normal. Unity's Absolute-World isn't offered —
+ * "world" here is already absolute.</p>
  */
 @NodeAttribute(name = "rt_transform", group = "rendertype_math/vector", graphTypes = {RenderTypeGraph.class, ShaderFunctionGraph.class})
 public class TransformNode extends ShaderNode {
@@ -51,8 +57,8 @@ public class TransformNode extends ShaderNode {
     }
 
 
-    private static final List<String> SPACES = List.of("object", "view", "world", "clip");
-    private static final List<String> TARGETS = List.of("object", "view", "world", "clip", "screen");
+    private static final List<String> SPACES = List.of("object", "view", "world", "clip", "tangent");
+    private static final List<String> TARGETS = List.of("object", "view", "world", "clip", "screen", "tangent");
     private static final List<String> TYPES = List.of("position", "direction", "normal");
 
     @Override
@@ -119,6 +125,13 @@ public class TransformNode extends ShaderNode {
     private String toView(ShaderCompileContext ctx, String space, String v4, boolean noTranslate) {
         return switch (space) {
             case "view" -> v4;
+            // The tangent basis is derived in object space (ctx.tangentBasis), so tangent→view goes through
+            // object. Tangent space is a rotation about the surface point — it carries no translation, so w
+            // rides along untouched whatever the type is.
+            case "tangent" -> {
+                ShaderExpr obj = ctx.tangentToSpace("object", new ShaderExpr(v4 + ".xyz", GlslType.VEC3));
+                yield modelViewMat(ctx) + " * vec4(" + obj.code() + ", " + v4 + ".w)";
+            }
             // world is absolute; camera-relative = world - cameraPos (positions only), then rotate to view.
             case "world" -> noTranslate
                     ? viewMat(ctx) + " * " + v4
@@ -144,6 +157,12 @@ public class TransformNode extends ShaderNode {
                     ? iViewMat(ctx) + " * " + view4
                     : "(" + iViewMat(ctx) + " * " + view4 + " + vec4(" + cameraPos(ctx) + ", 0.0))";
             case "clip" -> projMat(ctx) + " * " + view4;
+            // view→object, then project onto the object-space tangent basis (see toView).
+            case "tangent" -> {
+                String obj = "(" + iModelViewMat(ctx) + " * " + view4 + ").xyz";
+                ShaderExpr t = ctx.spaceToTangent("object", new ShaderExpr(obj, GlslType.VEC3));
+                yield "vec4(" + t.code() + ", " + (noTranslate ? "0.0" : "1.0") + ")";
+            }
             default /* object */ -> iModelViewMat(ctx) + " * " + view4;
         };
     }

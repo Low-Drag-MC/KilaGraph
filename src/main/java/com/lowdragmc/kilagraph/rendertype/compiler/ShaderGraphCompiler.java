@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -73,6 +74,10 @@ public class ShaderGraphCompiler {
         boolean usesGradient;
         /** Whether this stage references the {@code KG_Curve} struct (so its decl is emitted in the prelude). */
         boolean usesCurve;
+        /** Tangent basis per coordinate space, built at most once each per stage: deriving the object basis
+         *  costs four screen-space derivatives and rotating it costs two mat3 multiplies per column, so every
+         *  tangent-reading node in a stage shares one set of hoisted temps. */
+        final Map<String, TangentBasis> tangentBases = new HashMap<>();
 
         StageScope(String tempPrefix) {
             this.tempPrefix = tempPrefix;
@@ -102,6 +107,9 @@ public class ShaderGraphCompiler {
     /** Attribute names a node/block default referenced that aren't in the active vertex format (a safe
      *  constant was substituted) — surfaced as editor warnings so the user knows a default degraded. */
     private final Set<String> missingAttributes = new LinkedHashSet<>();
+    /** Whether a tangent basis fell back to the normal-only approximation (no uv to anchor it, so it is
+     *  useless for normal maps) — surfaced as an editor warning. See {@link #objectTangentBasis()}. */
+    private boolean tangentBasisDegraded;
 
     /** Sampler name for an unconnected Sampler2D fallback — bound to the MC missing-texture. */
     public static final String MISSING_SAMPLER = "kg_MissingSampler";
@@ -248,7 +256,8 @@ public class ShaderGraphCompiler {
                 new ArrayList<>(stageErrors.values()), graph.getSettings(),
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes));
+                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes),
+                tangentBasisDegraded);
     }
 
     /**
@@ -290,7 +299,8 @@ public class ShaderGraphCompiler {
                 new ArrayList<>(stageErrors.values()), PREVIEW_SETTINGS,
                 new LinkedHashMap<>(uniformDefaults), new LinkedHashMap<>(samplerDefaults),
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
-                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes));
+                usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth, new ArrayList<>(missingAttributes),
+                tangentBasisDegraded);
     }
 
     /**
@@ -607,6 +617,152 @@ public class ShaderGraphCompiler {
                 GlslType.VEC3);
     }
 
+    // ---- tangent basis seam (Tangent/Bitangent nodes + the tangent space of Position/ViewDir/Transform) ----
+    // Minecraft has no tangent vertex attribute, so unlike the position/normal seams this one *derives* its
+    // basis. Three tiers, best first: a real per-vertex tangent when some mod put one in the format, the uv's
+    // own cotangent frame from screen-space derivatives (fragment stage — the tier that makes normal maps
+    // land the right way round), and an arbitrary-but-stable basis built from the normal alone.
+
+    /**
+     * The <b>object-space</b> tangent basis — the single source the per-space {@link #tangentBasis(String)}
+     * rotates, mirroring how {@link #objectNormal()} is the single source of the normal seams. Memoised per
+     * stage: the columns are hoisted temps, so N readers share one derivation.
+     */
+    protected TangentBasis objectTangentBasis() {
+        return tangentBasis("object");
+    }
+
+    private TangentBasis buildObjectTangentBasis() {
+        ShaderExpr n = hoist(GlslType.VEC3, objectSpaceNormal().code());
+
+        // Tier 1: a real per-vertex tangent. Nothing registers one by default (see KGVertexElements#tangent);
+        // this is the seam a mod supplying its own geometry hooks into by registering the element.
+        KGVertexElement element = KGVertexElements.tangent();
+        if (element != null && hasAttribute(element)) {
+            ShaderExpr raw = objectTangentAttribute(element);
+            // vec4 tangents carry the bitangent handedness in w (the glTF/Unity convention); a vec3 one has
+            // no handedness, so it is right-handed. sign() rather than a bare multiply: w is ±1 by contract,
+            // but it rides a smooth varying into the fragment stage and must not scale B if it drifts.
+            boolean hasHandedness = "vec4".equals(element.glslType());
+            String t3 = hasHandedness ? raw.code() + ".xyz" : raw.code();
+            String sign = hasHandedness ? " * sign(" + raw.code() + ".w)" : "";
+            // Gram-Schmidt against N. Interpolating a per-vertex tangent across a triangle leaves it neither
+            // unit-length nor perpendicular to the (also interpolated) normal, and a skewed T makes
+            // cross(N, T) shorter than unit — so re-orthogonalise before building B, as every engine does.
+            ShaderExpr t = hoist(GlslType.VEC3,
+                    "normalize(" + t3 + " - " + n.code() + " * dot(" + n.code() + ", " + t3 + "))");
+            ShaderExpr b = hoist(GlslType.VEC3, "(cross(" + n.code() + ", " + t.code() + ")" + sign + ")");
+            return new TangentBasis(t, b, n);
+        }
+
+        ShaderExpr t = hoist(GlslType.VEC3, "vec3(0.0)");
+        ShaderExpr b = hoist(GlslType.VEC3, "vec3(0.0)");
+        addFunction(TangentGlsl.FROM_NORMAL_NAME, TangentGlsl.FROM_NORMAL); // the uv frame's fallback: first
+
+        // Tier 2: the uv's cotangent frame. Needs screen-space derivatives (fragment stage — a preview is one
+        // too, compilePreview emits only a fragment scope) and a uv to anchor the rotation; without a uv the
+        // frame would be degenerate, so fall through to tier 3.
+        if (isFragmentStage() && hasAttribute(KGVertexElements.UV0)) {
+            addFunction(TangentGlsl.FROM_UV_NAME, TangentGlsl.FROM_UV);
+            line(TangentGlsl.FROM_UV_NAME + "(" + n.code() + ", " + tangentFramePosition().code() + ", "
+                    + meshUv().code() + ", " + t.code() + ", " + b.code() + ");");
+            return new TangentBasis(t, b, n);
+        }
+
+        // Tier 3: the normal alone — the vertex stage (no derivatives), or a format with no uv. The frame is
+        // orthonormal and stable, but its rotation around the normal is arbitrary: it has no relation to the
+        // uv layout, so anything uv-anchored (a normal map, parallax) comes out wrong. Flag it — silently
+        // handing back a basis that only *looks* right is the worst outcome. A missing uv is additionally
+        // reported through the usual substituted-attribute channel.
+        tangentBasisDegraded = true;
+        if (!hasAttribute(KGVertexElements.UV0)) markMissingAttribute(KGVertexElements.UV0.attribName());
+        line(TangentGlsl.FROM_NORMAL_NAME + "(" + n.code() + ", " + t.code() + ", " + b.code() + ");");
+        return new TangentBasis(t, b, n);
+    }
+
+    /** The raw object-space tangent as a stage-agnostic input: the attribute in the vsh, a {@code
+     *  kg_objectTangent} varying in the fsh. Only reached when the active format actually has the element. */
+    private ShaderExpr objectTangentAttribute(KGVertexElement element) {
+        GlslType type = "vec4".equals(element.glslType()) ? GlslType.VEC4 : GlslType.VEC3;
+        ShaderExpr fallback = new ShaderExpr(type.glsl() + "(1.0, 0.0, 0.0"
+                + (type == GlslType.VEC4 ? ", 1.0)" : ")"), type);
+        return varyingInput("kg_objectTangent", type, () -> attribute(element, type, fallback), fallback);
+    }
+
+    /** The position whose screen-space gradient anchors the cotangent frame: the object-space surface point,
+     *  or — in a per-node preview, where {@link #meshPosition()} is a constant — the preview quad's {@code
+     *  vPos}, so previews of a normal-map graph show a real basis instead of the degenerate fallback. */
+    private ShaderExpr tangentFramePosition() {
+        return preview ? new ShaderExpr("vPos", GlslType.VEC3) : objectSpacePosition();
+    }
+
+    /**
+     * The tangent basis expressed in {@code space} ({@code "object"}/{@code "view"}/{@code "world"}) — the
+     * object basis rotated by the same matrices the normal seams use, which keeps the frame orthonormal
+     * (Minecraft's matrices are pure rotations). A per-node preview has no meaningful camera, so every space
+     * yields the object basis — matching how the Normal/Position nodes preview.
+     *
+     * <p>Every column is a hoisted temp, memoised per stage <em>and</em> space. That matters: the callers
+     * that convert a vector read all three columns in one expression, so an inlined rotation would repeat
+     * its {@code mat3 · mat3} chain three times per conversion.</p>
+     */
+    protected TangentBasis tangentBasis(String space) {
+        // The preview quad has no meaningful camera, so its every space is the object basis — share the memo
+        // slot too, or the same three temps would be hoisted once per space asked for.
+        String key = preview ? "object" : space;
+        TangentBasis cached = current.tangentBases.get(key);
+        if (cached != null) return cached;
+
+        TangentBasis basis = switch (key) {
+            case "view" -> rotate(objectTangentBasis(), this::rotateObjectToView);
+            case "world" -> rotate(objectTangentBasis(), this::rotateObjectToWorld);
+            default /* object */ -> buildObjectTangentBasis();
+        };
+        current.tangentBases.put(key, basis);
+        return basis;
+    }
+
+    /** Rotate every column of a basis by {@code rotation}, hoisting each so downstream readers share them. */
+    private TangentBasis rotate(TangentBasis basis, UnaryOperator<ShaderExpr> rotation) {
+        return new TangentBasis(
+                hoist(GlslType.VEC3, rotation.apply(basis.tangent()).code()),
+                hoist(GlslType.VEC3, rotation.apply(basis.bitangent()).code()),
+                hoist(GlslType.VEC3, rotation.apply(basis.normal()).code()));
+    }
+
+    /** A tangent-space vector expressed in {@code space}: {@code T·v.x + B·v.y + N·v.z}. */
+    protected ShaderExpr tangentToSpace(String space, ShaderExpr v) {
+        TangentBasis basis = tangentBasis(space);
+        ShaderExpr in = hoist(GlslType.VEC3, v.code());
+        return new ShaderExpr("(" + basis.tangent().code() + " * " + in.code() + ".x + "
+                + basis.bitangent().code() + " * " + in.code() + ".y + "
+                + basis.normal().code() + " * " + in.code() + ".z)", GlslType.VEC3);
+    }
+
+    /** A vector in {@code space} expressed in tangent space: {@code vec3(dot(v,T), dot(v,B), dot(v,N))}. The
+     *  transpose stands in for the inverse — exact for an orthonormal frame, the standard approximation
+     *  otherwise (a skewed uv layout makes T and B non-orthogonal). */
+    protected ShaderExpr spaceToTangent(String space, ShaderExpr v) {
+        TangentBasis basis = tangentBasis(space);
+        ShaderExpr in = hoist(GlslType.VEC3, v.code());
+        return new ShaderExpr("vec3(dot(" + in.code() + ", " + basis.tangent().code() + "), dot("
+                + in.code() + ", " + basis.bitangent().code() + "), dot("
+                + in.code() + ", " + basis.normal().code() + "))", GlslType.VEC3);
+    }
+
+    /** Rotate an object-space direction into view space (the rotation {@link #viewSpaceNormal()} uses). */
+    private ShaderExpr rotateObjectToView(ShaderExpr v) {
+        String mv = useBuiltinUniform("ModelViewMat", GlslType.MAT4);
+        return new ShaderExpr("(mat3(" + mv + ") * " + v.code() + ")", GlslType.VEC3);
+    }
+
+    /** Rotate an object-space direction into world space (the rotation {@link #worldSpaceNormal()} uses). */
+    private ShaderExpr rotateObjectToWorld(ShaderExpr v) {
+        String mv = useBuiltinUniform("ModelViewMat", GlslType.MAT4);
+        String iView = transformField("IViewMat", GlslType.MAT4).code();
+        return new ShaderExpr("(mat3(" + iView + ") * mat3(" + mv + ") * " + v.code() + ")", GlslType.VEC3);
+    }
+
     /** View-space surface&rarr;camera direction (<b>unnormalized</b>; its length is the distance to the
      *  camera): the camera sits at the view-space origin, so it is simply {@code -viewSpacePosition()} —
      *  the View Direction node's "View" output. Derived from {@link #viewSpacePosition()} so a subclass that
@@ -640,6 +796,12 @@ public class ShaderGraphCompiler {
     /** Whether this is a per-node preview compile (single fragment quad; no real vertex stage). */
     protected boolean isPreview() {
         return preview;
+    }
+
+    /** Whether the current emission scope is the fragment stage — i.e. whether screen-space derivatives
+     *  ({@code dFdx}/{@code dFdy}) are legal here. See {@link #objectTangentBasis()}. */
+    protected boolean isFragmentStage() {
+        return current == fragment;
     }
 
     /** Whether the given vertex element is declared in the active vertex format (so its raw {@code in}
