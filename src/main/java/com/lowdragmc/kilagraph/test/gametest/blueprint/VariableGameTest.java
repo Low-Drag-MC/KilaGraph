@@ -33,10 +33,12 @@ public final class VariableGameTest {
     private static final String OUTPUT_VAR_DEFAULT_WHEN_UNWIRED = "var_output_default_when_unwired";
     private static final String STORE_NULL_OVERRIDES_DEFAULT = "var_store_null_overrides_default";
 
+    private static final String NULL_DEFAULT_READS_NULL_RATHER_THAN_THROWING = "variable_null_default_reads_null_rather_than_throwing";
     private VariableGameTest() {}
 
 
     public static void registerFunctions() {
+        KGGameTests.registerFunction(NULL_DEFAULT_READS_NULL_RATHER_THAN_THROWING, VariableGameTest::nullDefaultReadsNullRatherThanThrowing);
         KGGameTests.registerFunction(INPUT_VAR_READ_FROM_STORE, VariableGameTest::inputVarReadFromStore);
         KGGameTests.registerFunction(OUTPUT_VAR_RUN_OUTPUTS, VariableGameTest::outputVarRunOutputs);
         KGGameTests.registerFunction(OUTPUT_VAR_DEFAULT_WHEN_UNWIRED, VariableGameTest::outputVarDefaultWhenUnwired);
@@ -44,6 +46,8 @@ public final class VariableGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
+        var data = KGGameTests.defaultTestData(environment, "empty");
+        KGGameTests.registerFunctionTest(event, NULL_DEFAULT_READS_NULL_RATHER_THAN_THROWING, KGGameTests.functionKey(NULL_DEFAULT_READS_NULL_RATHER_THAN_THROWING), data);
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
         for (String p : new String[]{
                 INPUT_VAR_READ_FROM_STORE, OUTPUT_VAR_RUN_OUTPUTS, OUTPUT_VAR_DEFAULT_WHEN_UNWIRED,
@@ -142,6 +146,32 @@ public final class VariableGameTest {
         Map<String, Object> results = executor.runOutputs();
         if (!results.containsKey("y")) { helper.fail("'y' missing from results"); return; }
         if (results.get("y") != null) { helper.fail("expected null override, got " + results.get("y")); return; }
+
+        helper.succeed();
+    }
+
+    // --- 5. A declared default of null is a null value, not a crash --------------------------------
+    /**
+     * A reference-typed variable (an entity, a host's object) has no default but null. Reading it
+     * unset used to throw from {@code DataResult.result()} ({@code Optional.of(null)}) and take
+     * the whole run down with it.
+     */
+    public static void nullDefaultReadsNullRatherThanThrowing(GameTestHelper helper) {
+        var graph = newGraph();
+        // an Entity, not a String: a String constant normalises a null default to "" and never
+        // reached the crash; a reference type has no such spelling of "nothing"
+        graph.graphModel.createVariable("who", net.minecraft.world.entity.Entity.class, null, VariableKind.OUTPUT);
+
+        var executor = new GraphExecutor(graph, new EvaluationEnvironment(new VariableStore(), OptionalLong.empty()));
+        Map<String, Object> results;
+        try {
+            results = executor.runOutputs();
+        } catch (RuntimeException e) {
+            helper.fail("reading a variable with a null default threw: " + e);
+            return;
+        }
+        if (!results.containsKey("who")) { helper.fail("'who' missing from results"); return; }
+        if (results.get("who") != null) { helper.fail("expected null, got " + results.get("who")); return; }
 
         helper.succeed();
     }
