@@ -135,4 +135,32 @@ public final class VariableGameTest {
 
         helper.succeed();
     }
+
+    // --- 5. A declared default of null is a null value, not a crash --------------------------------
+    /**
+     * A reference-typed variable (an entity, a host's object) has no default but null. Reading it
+     * unset used to throw from {@code DataResult.result()} ({@code Optional.of(null)}) and take
+     * the whole run down with it.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void nullDefaultReadsNullRatherThanThrowing(GameTestHelper helper) {
+        var graph = newGraph();
+        // an Entity, not a String: a String constant normalises a null default to "" and never
+        // reached the crash; a reference type has no such spelling of "nothing"
+        graph.graphModel.createVariable("who", net.minecraft.world.entity.Entity.class, null, VariableKind.OUTPUT);
+
+        var executor = new GraphExecutor(graph, new EvaluationEnvironment(new VariableStore(), OptionalLong.empty()));
+        Map<String, Object> results;
+        try {
+            results = executor.runOutputs();
+        } catch (RuntimeException e) {
+            helper.fail("reading a variable with a null default threw: " + e);
+            return;
+        }
+        if (!results.containsKey("who")) { helper.fail("'who' missing from results"); return; }
+        if (results.get("who") != null) { helper.fail("expected null, got " + results.get("who")); return; }
+
+        helper.succeed();
+    }
 }

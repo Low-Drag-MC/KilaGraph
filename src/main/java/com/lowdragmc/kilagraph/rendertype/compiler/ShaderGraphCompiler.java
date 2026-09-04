@@ -1278,7 +1278,7 @@ public class ShaderGraphCompiler {
         }
         VariableScope scope = (variable instanceof VariableDeclarationModelBase vd)
                 ? vd.getScope() : VariableScope.LOCAL;
-        Object defaultValue = variable.tryGetDefaultValue(variable.getDataType()).result().orElse(null);
+        Object defaultValue = com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment.defaultValueOf(variable);
         for (PortModel outp : nm.getOutputsByDisplayOrder()) {
             GlslType decl = GlslType.of(outp.getDataTypeHandle());
             if (decl == null) continue;
@@ -1364,7 +1364,7 @@ public class ShaderGraphCompiler {
             return pullInput(inputs.values().iterator().next(), target);
         }
         // No writer node — fall back to the variable's declared default (baked literal), else zero.
-        Object def = v.tryGetDefaultValue(v.getDataType()).result().orElse(null);
+        Object def = com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment.defaultValueOf(v);
         return decl != null ? hoist(decl, GlslFormat.literal(def, decl)) : new ShaderExpr("0.0", GlslType.FLOAT);
     }
 

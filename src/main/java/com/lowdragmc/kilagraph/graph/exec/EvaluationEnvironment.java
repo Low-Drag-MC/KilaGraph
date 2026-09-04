@@ -78,6 +78,20 @@ public class EvaluationEnvironment {
     public Object lookupVariable(IVariable variable) {
         Object value = variables.getOrAbsent(variable.getName());
         if (value != VariableStore.ABSENT) return value;
-        return variable.tryGetDefaultValue(variable.getDataType()).result().orElse(null);
+        return defaultValueOf(variable);
+    }
+
+    /**
+     * The variable's declared default, or null when it has none — including a default that
+     * <b>is</b> null, which a reference-typed variable (an entity, an object) declares by nature.
+     *
+     * <p>Not {@code tryGetDefaultValue(...).result().orElse(null)}: a {@code DataResult} that
+     * succeeded with a null value throws from {@code result()} ({@code Optional.of(null)}), so that
+     * spelling turned every unset reference variable into a crash of the whole run.
+     */
+    @Nullable
+    public static Object defaultValueOf(IVariable variable) {
+        var result = variable.tryGetDefaultValue(variable.getDataType());
+        return result.isSuccess() ? result.getOrThrow() : null;
     }
 }

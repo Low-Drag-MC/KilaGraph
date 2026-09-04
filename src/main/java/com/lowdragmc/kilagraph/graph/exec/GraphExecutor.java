@@ -1659,7 +1659,7 @@ public final class GraphExecutor {
         }
         VarCell cell = cellFor(n.index, var.getName());
         if (!cell.present) {
-            writeAllOutputs(n, var.tryGetDefaultValue(var.getDataType()).result().orElse(null));
+            writeAllOutputs(n, EvaluationEnvironment.defaultValueOf(var));
         } else if (cell.kind == KIND_OBJECT) {
             writeAllOutputs(n, cell.value);
         } else {
@@ -1949,7 +1949,7 @@ public final class GraphExecutor {
         }
         // No writer node — fall back to env, then default.
         if (env.variables().contains(v.getName())) return env.variables().get(v.getName());
-        return v.tryGetDefaultValue(v.getDataType()).result().orElse(null);
+        return EvaluationEnvironment.defaultValueOf(v);
     }
 
     /**
@@ -1971,7 +1971,7 @@ public final class GraphExecutor {
             }
         }
         if (env.variables().contains(v.getName())) return env.variables().get(v.getName());
-        return v.tryGetDefaultValue(v.getDataType()).result().orElse(null);
+        return EvaluationEnvironment.defaultValueOf(v);
     }
 
     // ---- misc --------------------------------------------------------------------------------
