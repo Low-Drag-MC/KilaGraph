@@ -1141,6 +1141,29 @@ public final class ShaderCompilerGameTest {
         wire(transform, trEmission.getInputsById().get("color"), tr.getOutputsById().get("out"));
         cases.add(new Case("transform", transform));
 
+        // Tangent space. The derived basis reads the object normal and the object position, and under
+        // injection BOTH of those vanilla seams degrade to preview-quad varyings (vNormal/vPos) that the
+        // blacklist gate rejects — so the basis has its own injection path (ShaderGraphCompiler#
+        // tangentFrameNormal/tangentFramePosition, reconstructing from the pack normal + gl_FragCoord).
+        // Without it every graph that touches tangent space silently loses Iris injection entirely.
+        cases.add(new Case("tangent vector", inputNodeGraph(TangentNode.class, "space", "world")));
+        cases.add(new Case("bitangent vector", inputNodeGraph(BitangentNode.class, "space", "world")));
+        cases.add(new Case("position in tangent space", inputNodeGraph(PositionNode.class, "space", "tangent")));
+        cases.add(new Case("view dir in tangent space", inputNodeGraph(ViewDirectionNode.class, "space", "tangent")));
+
+        // Transform tangent->world with type=normal: the "apply a normal map" chain, and the one that goes
+        // through the basis in both directions (spaceToTangent's memo and the object<->view seams).
+        RenderTypeGraph tangentToWorld = new RenderTypeGraph();
+        NodeModel ttwEmission = addBlock(tangentToWorld, tangentToWorld.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel ttw = addNode(tangentToWorld, TransformNode.class);
+        setOption(ttw, "from", "tangent");
+        setOption(ttw, "to", "world");
+        setOption(ttw, "type", "normal");
+        NodeModel ttwVec = addNode(tangentToWorld, Vec3Node.class);
+        wire(tangentToWorld, ttw.getInputsById().get("in"), ttwVec.getOutputsById().get("out"));
+        wire(tangentToWorld, ttwEmission.getInputsById().get("color"), ttw.getOutputsById().get("out"));
+        cases.add(new Case("transform tangent->world normal", tangentToWorld));
+
         for (Case c : cases) {
             var snippet = injectionSnippet(c.graph());
             assertTrue(helper, c.name() + " snippet exists (no rejection)", snippet != null);
