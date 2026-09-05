@@ -78,6 +78,11 @@ public class ShaderGraphCompiler {
     private final StageScope vertex = new StageScope("v");
     private final StageScope fragment = new StageScope("f");
     private final MaterialUniformLayout layout = new MaterialUniformLayout();
+    /** Minecraft builtin UBOs the generated GLSL actually references — nothing else. A block a consumer
+     *  binds unconditionally belongs on that consumer's pipeline, not here: {@code RenderTypeFactory} adds
+     *  {@code DynamicTransforms} itself because {@code RenderType.draw} always binds it. Putting it here
+     *  instead made every consumer that drives its OWN draw (Photon's fullscreen post-effect passes bind
+     *  nothing of Minecraft's) declare a uniform it never fills, which 26.1 rejects at draw. */
     private final Set<String> builtinUbos = new LinkedHashSet<>();
     /** name -> type of varyings already built in the vertex shader. */
     private final Map<String, GlslType> varyings = new java.util.LinkedHashMap<>();
@@ -170,8 +175,6 @@ public class ShaderGraphCompiler {
 
     public ShaderGraphCompiler(RenderTypeGraph graph) {
         this.graph = graph;
-        // DynamicTransforms is always bound by RenderType.draw, so the pipeline must declare it.
-        builtinUbos.add("DynamicTransforms");
     }
 
     // ---- public entry ------------------------------------------------------------------------
@@ -302,8 +305,12 @@ public class ShaderGraphCompiler {
     public CompiledShaderGraph compilePreview(PortModel outputPort) {
         preview = true;
         current = fragment;
-        // The preview vsh provides Position + UV0 and passes uv through as vUv.
-        builtinUbos.add("Projection"); // vsh uses ProjMat * ModelViewMat
+        // The preview vsh provides Position + UV0 and passes uv through as vUv. Both blocks are imported
+        // by assemblePreviewVertex() unconditionally (`ProjMat * ModelViewMat`), so both are registered
+        // here — a builtin the GLSL declares but the pipeline doesn't is left at binding 0 by GlProgram
+        // (DynamicTransforms is not in its BUILT_IN_UNIFORMS self-heal set), i.e. silent garbage.
+        builtinUbos.add("Projection");
+        builtinUbos.add("DynamicTransforms");
         ShaderExpr value = previewValueOf(outputPort);
         if (value == null) value = new ShaderExpr("vec4(0.0)", GlslType.VEC4);
         // The preview quad is composited over the editor GUI by its alpha, so a value's alpha would control

@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -263,8 +264,14 @@ public final class RenderTypeFactory {
                 .withDepthStencilState(depthState(settings.depthTest(), settings.depthWrite()))
                 .withCull(settings.cull());
 
-        // Builtin UBOs actually referenced by the generated GLSL (DynamicTransforms always present).
-        for (String ubo : compiled.builtinUniforms()) {
+        // Builtin UBOs actually referenced by the generated GLSL, plus DynamicTransforms: RenderType.draw
+        // binds it on EVERY draw, so a pipeline of ours must declare it whether or not a node read it.
+        // That requirement belongs here and not in the compiler — builtinUniforms() means "what the GLSL
+        // references", and a consumer driving its own draw (Photon's fullscreen post-effect passes) binds
+        // nothing of Minecraft's, so a declaration it can't honour is a hard "Missing uniform" at draw.
+        Set<String> builtins = new LinkedHashSet<>(compiled.builtinUniforms());
+        builtins.add("DynamicTransforms");
+        for (String ubo : builtins) {
             b.withUniform(ubo, UniformType.UNIFORM_BUFFER);
         }
         // Per-material UBO + samplers exposed by the graph.
