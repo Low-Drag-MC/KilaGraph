@@ -122,6 +122,18 @@ public final class GraphExecutor {
     private int writtenCount;
 
     /**
+     * Slots an exec node published from {@code execute()} — logged by {@link ExecContext#flush} on
+     * both lanes, since a retained number has to be re-stamped just as a retained reference does.
+     * What {@link #retainExecOutputs(boolean)} keeps across {@link #clearCache()}; nothing else is
+     * ever retained. Compacted to unique live entries on every retaining clear, so it is bounded by
+     * the slot table however many runs retain.
+     */
+    private int[] execWritten = EMPTY_STAMPS;
+    private int execWrittenCount;
+    /** @see #retainExecOutputs(boolean) */
+    private boolean retainExecOutputs;
+
+    /**
      * The variable cell each variable-touching node resolved, by node index, plus the name it was
      * resolved for.
      *
@@ -333,15 +345,91 @@ public final class GraphExecutor {
 
     // ---- kick-off surfaces -------------------------------------------------------------------
 
-    /** Reset the result cache. Call between independent evaluations if reusing the executor. */
+    /**
+     * Reset the result cache. Call between independent evaluations if reusing the executor.
+     *
+     * <p>With {@link #retainExecOutputs(boolean)} on, what exec nodes published from
+     * {@code execute()} survives: those slots keep their value and are stamped into the new
+     * generation, so a node pulling them in the next run reads what was published rather than
+     * falling through to {@code evaluate()} on a node that is not going to run again. Everything
+     * else — every pure node's memo — is dropped as always. A slot invalidated since it was
+     * published ({@link #invalidateNodeOutputs}) is not brought back.</p>
+     */
     public void clearCache() {
-        for (int i = 0; i < writtenCount; i++) slots[written[i]] = null;
-        writtenCount = 0;
-        if (++generation == Integer.MAX_VALUE) {
+        int next = generation + 1;
+        if (next == Integer.MAX_VALUE) {
             // Wrap-around would make ancient stamps look current. Cheap and effectively never taken.
             Arrays.fill(stamps, 0);
-            generation = 1;
+            next = 1;
         }
+        if (retainExecOutputs && execWrittenCount > 0) {
+            int kept = 0;
+            for (int i = 0; i < execWrittenCount; i++) {
+                int slot = execWritten[i];
+                if (stamps[slot] == next) continue;         // logged twice: already carried over
+                if (stamps[slot] != generation) continue;   // invalidated since it was published
+                stamps[slot] = next;
+                execWritten[kept++] = slot;
+            }
+            execWrittenCount = kept;
+            // A retained reference stays in the release log, so the first clear that does not
+            // retain still lets go of it.
+            int live = 0;
+            for (int i = 0; i < writtenCount; i++) {
+                int slot = written[i];
+                if (stamps[slot] == next) {
+                    written[live++] = slot;
+                } else {
+                    slots[slot] = null;
+                }
+            }
+            writtenCount = live;
+        } else {
+            for (int i = 0; i < writtenCount; i++) slots[written[i]] = null;
+            writtenCount = 0;
+            execWrittenCount = 0;
+        }
+        generation = next;
+    }
+
+    /**
+     * <b>Whether {@link #clearCache()} keeps what exec nodes published.</b>
+     *
+     * <p>Unreal's blueprint keeps an event's parameters and every exec node's outputs in the
+     * object's ubergraph frame until the object dies — which is what lets the nodes after a
+     * {@code Delay} still read them. This executor drops the whole memo between runs instead, so a
+     * host that resumes a graph mid-chain on a later run (a latent node coming back on a later
+     * tick) turns this on for as long as such a resume is pending, and the resumed chain reads
+     * what its entry published — the latest value, if the entry ran again meanwhile, as in
+     * Unreal. Off, the default, is the behaviour the executor always had: the next
+     * {@code clearCache} releases everything, references included. The host owns the switch
+     * because only it knows when nothing is pending any more; leaving it on is Unreal's leak
+     * without Unreal's garbage collector to null the dead references.</p>
+     */
+    public void retainExecOutputs(boolean retain) {
+        this.retainExecOutputs = retain;
+    }
+
+    /** @see #retainExecOutputs(boolean) */
+    public boolean retainsExecOutputs() {
+        return retainExecOutputs;
+    }
+
+    /**
+     * How many exec-node publications the next {@link #clearCache()} would retain — those logged
+     * since the last clear that did not retain. For diagnostics and tests: zero once a host has
+     * let go.
+     */
+    public int retainedExecOutputs() {
+        return execWrittenCount;
+    }
+
+    /** {@link ExecContext#flush} logging an output an exec node published — see {@link #execWritten}. */
+    void noteExecOutput(int slot) {
+        if (execWrittenCount == execWritten.length) {
+            execWritten = Arrays.copyOf(execWritten, Math.max(16, execWritten.length * 2));
+        }
+        execWritten[execWrittenCount++] = slot;
     }
 
     /** Compute the value of an output port. */
@@ -433,6 +521,8 @@ public final class GraphExecutor {
                 stamps = EMPTY_STAMPS;
                 written = EMPTY_STAMPS;
                 writtenCount = 0;
+                execWritten = EMPTY_STAMPS;
+                execWrittenCount = 0;
                 varCells = EMPTY_CELLS;
                 varCellNames = EMPTY_CELL_NAMES;
                 activeLoops = EMPTY_LOOPS;

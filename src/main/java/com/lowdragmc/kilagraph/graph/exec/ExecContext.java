@@ -102,8 +102,10 @@ public final class ExecContext {
             if (stagedStamp[k] == stagedGen) {
                 if (stagedKind[k] != GraphExecutor.KIND_OBJECT) {
                     executor.writeNum(n.outputSlots[k], stagedKind[k], stagedNum[k]);
+                    executor.noteExecOutput(n.outputSlots[k]);
                 } else if (staged[k] != null) {
                     executor.writeSlot(n.outputSlots[k], staged[k]);
+                    executor.noteExecOutput(n.outputSlots[k]);
                 }
             }
             staged[k] = null;
