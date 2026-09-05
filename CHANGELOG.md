@@ -1,4 +1,5 @@
-## v21.1.0.13
-* Refactored Vector nodes of blueprint
-* Added tangent space support to the shader graph
-* Added the missing node wiki entries for ports and options
+## v21.1.0.14
+* Fixed a variable with a null default crashing
+* Added the exec pin a node was entered through
+* Added retainExecOutputs for exec node output cache
+* Added retainExecOutputs
