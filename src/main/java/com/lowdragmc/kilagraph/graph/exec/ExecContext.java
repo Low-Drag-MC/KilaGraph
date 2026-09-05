@@ -54,6 +54,8 @@ public final class ExecContext {
     private int stagedGen;
     /** Whether anything was staged at all, so a node that writes no data output can skip the flush. */
     private boolean anyStaged;
+    /** The input index the flow entered this node through, or -1 — see {@link #enteredPort()}. */
+    private int enteredPin = -1;
 
     ExecContext(GraphExecutor executor) {
         this.executor = executor;
@@ -64,6 +66,7 @@ public final class ExecContext {
         this.prepared = node;
         this.session = session;
         this.frame = frame;
+        this.enteredPin = frame == null ? -1 : frame.lastPolledPin();
         int n = node.outputIds.length;
         if (staged.length < n) {
             staged = new Object[Math.max(n, staged.length * 2)];
@@ -364,7 +367,23 @@ public final class ExecContext {
         if (idx < 0) {
             throw new IllegalArgumentException("No output port '" + outputId + "' on " + prepared.uid);
         }
-        frame.enqueueAll(prepared.flowTargets[idx]);
+        frame.enqueueAll(prepared.flowTargets[idx], prepared.flowTargetPins[idx]);
+    }
+
+    /**
+     * The id of the exec input the flow came in through — what a node with several of them
+     * (Unreal's Gate: Enter / Open / Close / Toggle; DoOnce's In / Reset) branches on — or null
+     * when it was not entered by a wire: the session's entry node, or an
+     * {@link #executeFrom} into it.
+     */
+    public String enteredPort() {
+        int pin = enteredPin;
+        return pin < 0 || pin >= prepared.inputIds.length ? null : prepared.inputIds[pin];
+    }
+
+    /** {@code inputId.equals(enteredPort())}, for a node's branch on which pin fired. */
+    public boolean enteredThrough(String inputId) {
+        return inputId.equals(enteredPort());
     }
 
     /**

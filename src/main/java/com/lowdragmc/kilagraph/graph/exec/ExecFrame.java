@@ -39,8 +39,16 @@ public abstract class ExecFrame {
      * entry — resolve anything at all.</p>
      */
     private PreparedGraph.Node[] pending = new PreparedGraph.Node[8];
+    /**
+     * Which input pin each pending node is entered through — parallel to {@link #pending}, -1 for
+     * "not by a wire" (the session's entry node, a portal fan-out that could not tell). Read back
+     * by {@link #lastPolledPin()} for the node {@link #poll()} just handed out, so the context can
+     * answer {@link ExecContext#enteredPort()}.
+     */
+    private int[] pendingPins = new int[8];
     private int head;
     private int tail;
+    private int lastPin = -1;
 
     protected ExecFrame(GraphExecutor scope) {
         this.scope = scope;
@@ -50,11 +58,24 @@ public abstract class ExecFrame {
 
     // ---- queue ------------------------------------------------------------------------------
 
-    /** Enqueue pre-resolved exec targets — what {@link ExecContext#flow} hands us. */
+    /** Enqueue pre-resolved exec targets with no pin — for callers that have only the nodes. */
     void enqueueAll(PreparedGraph.Node[] targets) {
+        enqueueAll(targets, null);
+    }
+
+    /**
+     * Enqueue pre-resolved exec targets — what {@link ExecContext#flow} hands us — with the pin each
+     * is entered through ({@code pins} parallel to {@code targets}, or null for none known).
+     */
+    void enqueueAll(PreparedGraph.Node[] targets, int[] pins) {
         if (targets.length == 0) return;
         ensureRoom(targets.length);
         System.arraycopy(targets, 0, pending, tail, targets.length);
+        if (pins != null && pins.length == targets.length) {
+            System.arraycopy(pins, 0, pendingPins, tail, targets.length);
+        } else {
+            Arrays.fill(pendingPins, tail, tail + targets.length, -1);
+        }
         tail += targets.length;
     }
 
@@ -66,7 +87,11 @@ public abstract class ExecFrame {
         if (outputPort == null) return;
         List<PortModel> connected = outputPort.getConnectedPorts();
         for (int i = 0; i < connected.size(); i++) {
-            if (connected.get(i).getNodeModel() instanceof NodeModel nm) enqueueModel(nm);
+            PortModel in = connected.get(i);
+            if (in.getNodeModel() instanceof NodeModel nm) {
+                PreparedGraph.Node node = scope.resolveForFlow(nm);
+                enqueueOne(node, node == null ? -1 : node.inputIndexOf(in));
+            }
         }
     }
 
@@ -74,12 +99,17 @@ public abstract class ExecFrame {
     void enqueueFlow(PreparedGraph.Node node, String outId) {
         if (node == null) return;
         int idx = node.flowIndex(outId);
-        if (idx >= 0) enqueueAll(node.flowTargets[idx]);
+        if (idx >= 0) enqueueAll(node.flowTargets[idx], node.flowTargetPins[idx]);
     }
 
     void enqueueOne(PreparedGraph.Node node) {
+        enqueueOne(node, -1);
+    }
+
+    void enqueueOne(PreparedGraph.Node node, int pin) {
         if (node == null) return;
         ensureRoom(1);
+        pendingPins[tail] = pin;
         pending[tail++] = node;
     }
 
@@ -99,11 +129,16 @@ public abstract class ExecFrame {
         int size = tail - head;
         if (size + n <= pending.length) {
             System.arraycopy(pending, head, pending, 0, size);
+            System.arraycopy(pendingPins, head, pendingPins, 0, size);
             Arrays.fill(pending, size, tail, null);
         } else {
-            PreparedGraph.Node[] bigger = new PreparedGraph.Node[Math.max(size + n, pending.length * 2)];
+            int room = Math.max(size + n, pending.length * 2);
+            PreparedGraph.Node[] bigger = new PreparedGraph.Node[room];
+            int[] biggerPins = new int[room];
             System.arraycopy(pending, head, bigger, 0, size);
+            System.arraycopy(pendingPins, head, biggerPins, 0, size);
             pending = bigger;
+            pendingPins = biggerPins;
         }
         head = 0;
         tail = size;
@@ -115,9 +150,15 @@ public abstract class ExecFrame {
 
     PreparedGraph.Node poll() {
         PreparedGraph.Node n = pending[head];
+        lastPin = pendingPins[head];
         pending[head++] = null;
         if (head == tail) head = tail = 0;
         return n;
+    }
+
+    /** The input pin the node {@link #poll()} last handed out was entered through, or -1. */
+    int lastPolledPin() {
+        return lastPin;
     }
 
     /** Peek the next node this frame would run (without removing it). Null if none pending. */

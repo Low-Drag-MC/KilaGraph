@@ -17,6 +17,7 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecLoopsGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecPrimitivesGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecRuntimeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecSemanticsGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecStateNodesGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecVarInteractionGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecutorBenchGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ExecutorBenchShapesGameTest;
@@ -145,6 +146,7 @@ public final class KGGameTests {
             new Group(SetVarGameTest::registerFunctions, SetVarGameTest::register),
             new Group(ExecLoopsGameTest::registerFunctions, ExecLoopsGameTest::register),
             new Group(ExecSemanticsGameTest::registerFunctions, ExecSemanticsGameTest::register),
+            new Group(ExecStateNodesGameTest::registerFunctions, ExecStateNodesGameTest::register),
             new Group(ExecIntegrationGameTest::registerFunctions, ExecIntegrationGameTest::register),
             new Group(ExecCombinationsGameTest::registerFunctions, ExecCombinationsGameTest::register),
             new Group(CacheGameTest::registerFunctions, CacheGameTest::register),

@@ -135,6 +135,7 @@ public final class PreparedGraph {
     enum ExecKind { SUBGRAPH, PORTAL_ENTRY, VARIABLE, ANNOTATED, NONE }
 
     private static final Node[] NO_TARGETS = new Node[0];
+    private static final int[] NO_PINS = new int[0];
     private static final WireModel[] NO_WIRES = new WireModel[0];
     private static final PortModel[] NO_PORTS = new PortModel[0];
     private static final int[] NO_COUNTS = new int[0];
@@ -734,6 +735,13 @@ public final class PreparedGraph {
          * one up in an {@code IdentityHashMap} on the way past.</p>
          */
         final Node[][] flowTargets;
+        /**
+         * Which input of each downstream node the wire lands on, parallel to {@link #flowTargets}
+         * — the index into that node's {@code inputPorts}, or -1 when unknown. What lets a node
+         * with several exec inputs (Unreal's Gate: Enter / Open / Close / Toggle) tell them apart
+         * through {@link ExecContext#enteredPort()}; before this the target was only ever a node.
+         */
+        final int[][] flowTargetPins;
 
         // ---- intrinsic, resolved once (NONE unless this node's class is in Intrinsics.TABLE) ----
         /** @see Intrinsics */
@@ -850,6 +858,7 @@ public final class PreparedGraph {
             this.outputPorts = new PortModel[nOut];
             this.outputSlots = new int[nOut];
             this.flowTargets = new Node[nOut][];
+            this.flowTargetPins = new int[nOut][];
             for (int k = 0; k < nOut; k++) {
                 PortModel p = outs.get(k);
                 outputIds[k] = p.getPortId();
@@ -857,6 +866,7 @@ public final class PreparedGraph {
                 outputPorts[k] = p;
                 outputSlots[k] = owner.slotCount++;
                 flowTargets[k] = NO_TARGETS;
+                flowTargetPins[k] = NO_PINS;
             }
         }
 
@@ -887,12 +897,16 @@ public final class PreparedGraph {
                 List<PortModel> connected = outputPorts[k].getConnectedPorts();
                 if (connected.isEmpty()) continue;
                 List<Node> targets = new ArrayList<>(connected.size());
+                int[] pins = new int[connected.size()];
                 for (PortModel p : connected) {
                     if (!(p.getNodeModel() instanceof NodeModel nm)) continue;
                     Node target = owner.node(nm);
-                    if (target != null) targets.add(target);
+                    if (target == null) continue;
+                    pins[targets.size()] = target.inputIndexOf(p);   // the wire's landing pin, alongside the node
+                    targets.add(target);
                 }
                 flowTargets[k] = targets.toArray(NO_TARGETS);
+                flowTargetPins[k] = targets.size() == pins.length ? pins : java.util.Arrays.copyOf(pins, targets.size());
             }
             linkSubgraph();
             Intrinsics.bind(this);

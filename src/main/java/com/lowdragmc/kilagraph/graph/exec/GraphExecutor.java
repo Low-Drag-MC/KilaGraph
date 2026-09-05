@@ -584,22 +584,24 @@ public final class GraphExecutor {
     private void execIntrinsic(PreparedGraph.Node n, ExecFrame frame) {
         switch (n.execOp) {
             // Entry / Noop: ctx.flow(the one exec output)
-            case Intrinsics.XOP_FLOW -> frame.enqueueAll(n.flowTargets[n.execFlowA]);
+            case Intrinsics.XOP_FLOW -> frame.enqueueAll(n.flowTargets[n.execFlowA], n.flowTargetPins[n.execFlowA]);
 
             // Branch: ctx.flow(ctx.getBool("cond", false) ? "trueExec" : "falseExec")
-            case Intrinsics.XOP_BRANCH ->
-                    frame.enqueueAll(n.flowTargets[pullBool(n, n.execIn, false) ? n.execFlowA : n.execFlowB]);
+            case Intrinsics.XOP_BRANCH -> {
+                int out = pullBool(n, n.execIn, false) ? n.execFlowA : n.execFlowB;
+                frame.enqueueAll(n.flowTargets[out], n.flowTargetPins[out]);
+            }
 
             // Gate: if (ctx.getBool("enabled", true)) ctx.flow("out")
             case Intrinsics.XOP_GATE -> {
-                if (pullBool(n, n.execIn, true)) frame.enqueueAll(n.flowTargets[n.execFlowA]);
+                if (pullBool(n, n.execIn, true)) frame.enqueueAll(n.flowTargets[n.execFlowA], n.flowTargetPins[n.execFlowA]);
             }
 
             // SetVar: ctx.setVariable(ctx.getOption("varName", String, ""), "value"); ctx.flow("next")
             case Intrinsics.XOP_SETVAR -> {
                 Object raw = optionValue(n, n.execAux);
                 if (raw instanceof String name) assignVariable(n, n.execIn, name);
-                frame.enqueueAll(n.flowTargets[n.execFlowA]);
+                frame.enqueueAll(n.flowTargets[n.execFlowA], n.flowTargetPins[n.execFlowA]);
             }
 
             default -> { }
