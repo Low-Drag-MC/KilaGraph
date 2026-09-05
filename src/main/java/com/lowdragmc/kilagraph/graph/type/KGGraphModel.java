@@ -3,17 +3,12 @@ package com.lowdragmc.kilagraph.graph.type;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.constant.Constant;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.Tag;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * KilaGraph's {@link CustomGraphModelImpl} subclass. Relaxes {@code canAssignTo} so that:
@@ -90,45 +85,5 @@ public class KGGraphModel extends CustomGraphModelImpl {
 
     private static boolean isNumber(Type t) {
         return t instanceof Class<?> c && Number.class.isAssignableFrom(c);
-    }
-
-    /**
-     * <b>After a load, every pin's embedded constant follows the pin's type.</b>
-     *
-     * <p>A pin's type comes from the node's code, and LDLib2 re-types a reused pin to the current
-     * declaration when the node is defined on load. The constant sitting on that pin does not: it
-     * is rebuilt from the file with the type it was <em>saved</em> under, and the pin's control is
-     * drawn from the constant's type. So a pin whose type changed since the file was written — a
-     * plain string that became a typed asset reference — came back as a text box on every old
-     * graph and as the asset picker on every new one, holding the very same value. Re-initialising
-     * the constant to the pin's type, value kept where the new type can hold it, is what
-     * Unreal's pin reconstruction does implicitly by rebuilding the pin's default from the
-     * declaration.
-     */
-    @Override
-    public void deserializeAdditionalNBT(Tag tag, HolderLookup.Provider provider) {
-        super.deserializeAdditionalNBT(tag, provider);
-        retypeLoadedConstants();
-    }
-
-    private void retypeLoadedConstants() {
-        // a plain copy: the node list keeps a null hole where a deleted node was
-        for (var node : new ArrayList<>(getNodeModels())) {
-            if (!(node instanceof NodeModel model)) {
-                continue;
-            }
-            for (PortModel port : new ArrayList<>(model.getInputsById().values())) {
-                Constant constant = model.getInputConstantsById().get(port.getUniqueName());
-                TypeHandle declared = port.getDataTypeHandle();
-                if (constant == null || declared == null || Objects.equals(constant.getTypeHandle(), declared)) {
-                    continue;
-                }
-                Object value = constant.getValue();
-                constant.init(declared);
-                if (value != null) {
-                    constant.trySetValue(value);
-                }
-            }
-        }
     }
 }
