@@ -79,7 +79,15 @@ public final class EntityNodeGameTest {
         var exec = new GraphExecutor(g, EvaluationEnvironment.with(Map.of("level", level)));
         List<?> out = exec.evaluate(node.getOutputsById().get("out"), List.class);
         assertTrue(helper, "radius result non-null", out != null);
-        assertTrue(helper, "radius contains both pigs", out.contains(a) && out.contains(b));
+        // Spelled out rather than assertTrue: this one has been seen to fail intermittently under a full
+        // suite run, and "expected true" says nothing about whether the query came back short, came back
+        // with the wrong centre, or the pigs were gone. Built only on the failing path.
+        if (!out.contains(a) || !out.contains(b)) {
+            helper.fail("radius contains both pigs: centre=" + center.getCenter()
+                    + " a=" + a.position() + (a.isRemoved() ? " (removed)" : "")
+                    + " b=" + b.position() + (b.isRemoved() ? " (removed)" : "")
+                    + " found=" + out);
+        }
         helper.succeed();
     }
 }
