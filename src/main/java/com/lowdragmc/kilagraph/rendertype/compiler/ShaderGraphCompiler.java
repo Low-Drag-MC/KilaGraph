@@ -569,6 +569,31 @@ public class ShaderGraphCompiler {
     // space (e.g. a subclass whose mesh position is already world, and whose object->world transform is not
     // a matrix) overrides whichever seams it needs — see Photon's PhotonShaderCompiler.
 
+    /**
+     * The <b>object&rarr;view</b> matrix. The default is Minecraft's per-draw {@code ModelViewMat}, which
+     * only holds for the vanilla model where the vertex input IS object space and the draw's model matrix is
+     * baked into the pose. A pipeline whose object&rarr;world lives somewhere else — GPU instancing, where
+     * each instance carries its own rotate/scale/translate and the vertices reach the shader already in
+     * (camera-relative) world space — overrides this to fold that per-instance matrix in; see Photon's
+     * {@code PhotonShaderCompiler}.
+     * <p>
+     * This is the seam the {@code Transform} node's object endpoint (and, through it, its tangent endpoint)
+     * and {@link #objectSpaceViewDir()} read, so "object" means the same thing there as it does at the
+     * {@link #objectSpacePosition()} / {@link #objectSpaceNormal()} seams. Deliberately NOT used by
+     * {@link #viewSpacePosition()} and the normal seams: those are already overridden wholesale by such
+     * pipelines, and routing them here would double-apply the instance matrix on a subclass whose
+     * {@link #objectNormal()} is not object-space.
+     */
+    protected ShaderExpr objectToViewMatrix() {
+        return new ShaderExpr(useBuiltinUniform("ModelViewMat", GlslType.MAT4), GlslType.MAT4);
+    }
+
+    /** The <b>view&rarr;object</b> matrix — the inverse of {@link #objectToViewMatrix()}. Default:
+     *  KilaGraph's precomputed {@code IModelViewMat}. */
+    protected ShaderExpr viewToObjectMatrix() {
+        return transformField("IModelViewMat", GlslType.MAT4);
+    }
+
     /** Object/model-space vertex position (the space the vertices were authored in). Base: the interpolated
      *  mesh position ({@link #meshPosition()}) — the Position node's "Object" output. */
     protected ShaderExpr objectSpacePosition() {
@@ -772,10 +797,12 @@ public class ShaderGraphCompiler {
     }
 
     /** Object-space surface&rarr;camera direction: the view-space direction rotated view&rarr;object by
-     *  {@code IModelViewMat} (MC's matrices are pure rotations, so the {@code mat3} preserves length) — the
-     *  View Direction node's "Object" output. */
+     *  {@link #viewToObjectMatrix()} (default {@code IModelViewMat}; MC's matrices are pure rotations, so the
+     *  {@code mat3} preserves length) — the View Direction node's "Object" output. Goes through the seam so it
+     *  agrees with the Position/Normal/Transform object endpoints on a pipeline whose object&rarr;world is
+     *  per-instance rather than the draw pose. */
     protected ShaderExpr objectSpaceViewDir() {
-        String iModelView = transformField("IModelViewMat", GlslType.MAT4).code();
+        String iModelView = viewToObjectMatrix().code();
         return new ShaderExpr("(mat3(" + iModelView + ") * " + viewSpaceViewDir().code() + ")", GlslType.VEC3);
     }
 

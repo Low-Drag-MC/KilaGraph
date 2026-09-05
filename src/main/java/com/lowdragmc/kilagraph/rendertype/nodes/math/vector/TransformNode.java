@@ -21,18 +21,26 @@ import java.util.List;
 
 /**
  * Converts a {@code vec3} between coordinate spaces — Unity's Transform node, adapted to Minecraft's
- * available matrices. Spaces: <b>object</b> (per-draw model space), <b>view</b> (eye space), <b>world</b>
+ * available matrices. Spaces: <b>object</b> (model space — per draw, or per instance on a GPU-instancing
+ * pipeline; see the seams below), <b>view</b> (eye space), <b>world</b>
  * (absolute world), <b>clip</b>. Reachable because MC exposes {@code ModelViewMat} (object→view) and
  * {@code ProjMat} (view→clip), and KilaGraph precomputes the inverses + camera view matrix into the
  * {@code KG_Transforms} block (+ the camera world position from {@code globals.glsl}). View is the hub:
- * {@code from → view → to}.
+ * {@code from → view → to}. The object↔view leg goes through the compiler's
+ * {@link ShaderCompileContext#objectToViewMatrix()} / {@link ShaderCompileContext#viewToObjectMatrix()}
+ * seams rather than reading {@code ModelViewMat} directly, so on a GPU-instancing pipeline (no per-draw
+ * model matrix — each instance carries its own transform) <b>object</b> still means the mesh's own local
+ * space, the same thing the Position/Normal nodes' "Object" outputs mean.
  *
  * <p>The whole transform runs in homogeneous {@code vec4} and the node <b>outputs a vec4</b>: the
  * {@code w} is set from {@code type} — <b>position</b> → {@code w=1} (affine, includes translation),
  * <b>direction</b>/<b>normal</b> → {@code w=0} (linear, the {@code mat4} multiply drops translation
- * automatically); <b>normal</b> additionally {@code normalize}s the result. (MC's matrices are pure
- * rotations, so a normal's correct inverse-transpose equals the matrix itself — Direction math + a
- * normalize is exact here; non-uniform scale, which MC doesn't have, would need the inverse-transpose.)
+ * automatically); <b>normal</b> additionally {@code normalize}s the result and, on the object↔view leg,
+ * transforms by the <b>inverse-transpose</b> — which here is just the transposed opposite seam, no
+ * {@code inverse()} call. Everywhere else the matrices are MC's own pure rotations, where the
+ * inverse-transpose IS the matrix, so direction and normal share a path (and the inverse-transpose is a
+ * no-op on the vanilla object leg too); it only bites when an overriding pipeline puts a SCALE in the
+ * object matrix, e.g. a particle's per-instance scale or a billboard's non-uniform width/height.
  * The <b>clip</b> target keeps the real perspective {@code w}, so {@code object → clip} equals exactly
  * {@code ProjMat * ModelViewMat * vec4(pos, 1)} and can drive {@code gl_Position} directly. As a
  * <b>source</b> space, {@code clip → view/world/object} is an inverse projection: for a <b>position</b> it
@@ -107,7 +115,7 @@ public class TransformNode extends ShaderNode {
             return;
         }
         ShaderExpr src = ctx.temp(GlslType.VEC4, "vec4(" + in + ", " + w + ")");
-        ShaderExpr view = ctx.temp(GlslType.VEC4, toView(ctx, from, src.code(), noTranslate));
+        ShaderExpr view = ctx.temp(GlslType.VEC4, toView(ctx, from, src.code(), noTranslate, normal));
 
         if ("screen".equals(to)) {
             // clip, then perspective divide → screen: xy in [0,1], z = NDC depth.
@@ -117,12 +125,12 @@ public class TransformNode extends ShaderNode {
                     "vec4(" + c + ".xy / " + c + ".w * 0.5 + 0.5, " + c + ".z / " + c + ".w, 1.0)", GlslType.VEC4));
             return;
         }
-        String result = fromView(ctx, to, view.code(), noTranslate);
+        String result = fromView(ctx, to, view.code(), noTranslate, normal);
         ctx.output("out", new ShaderExpr(normal ? "vec4(normalize((" + result + ").xyz), 0.0)" : result, GlslType.VEC4));
     }
 
     /** {@code space → view}, as a vec4 (preserves the homogeneous w). {@code noTranslate} = direction/normal. */
-    private String toView(ShaderCompileContext ctx, String space, String v4, boolean noTranslate) {
+    private String toView(ShaderCompileContext ctx, String space, String v4, boolean noTranslate, boolean normal) {
         return switch (space) {
             case "view" -> v4;
             // The tangent basis is derived in object space (ctx.tangentBasis), so tangent→view goes through
@@ -130,7 +138,7 @@ public class TransformNode extends ShaderNode {
             // rides along untouched whatever the type is.
             case "tangent" -> {
                 ShaderExpr obj = ctx.tangentToSpace("object", new ShaderExpr(v4 + ".xyz", GlslType.VEC3));
-                yield modelViewMat(ctx) + " * vec4(" + obj.code() + ", " + v4 + ".w)";
+                yield objectToView(ctx, normal) + " * vec4(" + obj.code() + ", " + v4 + ".w)";
             }
             // world is absolute; camera-relative = world - cameraPos (positions only), then rotate to view.
             case "world" -> noTranslate
@@ -144,12 +152,12 @@ public class TransformNode extends ShaderNode {
                 ShaderExpr h = ctx.temp(GlslType.VEC4, iProjMat(ctx) + " * " + v4);
                 yield "vec4(" + h.code() + ".xyz / " + h.code() + ".w, 1.0)";
             }
-            default /* object */ -> modelViewMat(ctx) + " * " + v4;
+            default /* object */ -> objectToView(ctx, normal) + " * " + v4;
         };
     }
 
     /** {@code view → space}, as a vec4. The clip target keeps the real perspective w (for gl_Position). */
-    private String fromView(ShaderCompileContext ctx, String space, String view4, boolean noTranslate) {
+    private String fromView(ShaderCompileContext ctx, String space, String view4, boolean noTranslate, boolean normal) {
         return switch (space) {
             case "view" -> view4;
             // un-rotate to camera-relative world, then add cameraPos back to get absolute world (positions only).
@@ -159,26 +167,49 @@ public class TransformNode extends ShaderNode {
             case "clip" -> projMat(ctx) + " * " + view4;
             // view→object, then project onto the object-space tangent basis (see toView).
             case "tangent" -> {
-                String obj = "(" + iModelViewMat(ctx) + " * " + view4 + ").xyz";
+                String obj = "(" + viewToObject(ctx, normal) + " * " + view4 + ").xyz";
                 ShaderExpr t = ctx.spaceToTangent("object", new ShaderExpr(obj, GlslType.VEC3));
                 yield "vec4(" + t.code() + ", " + (noTranslate ? "0.0" : "1.0") + ")";
             }
-            default /* object */ -> iModelViewMat(ctx) + " * " + view4;
+            default /* object */ -> viewToObject(ctx, normal) + " * " + view4;
         };
     }
 
     // ---- matrix accessors (register the owning UBO) -----------------------------------------
 
-    private String modelViewMat(ShaderCompileContext ctx) {
-        return ctx.useBuiltinUniform("ModelViewMat", GlslType.MAT4);
+    /**
+     * {@code object → view}. The object↔view leg is the only one that can carry a non-rotation, so it is the
+     * only one that reads a SEAM rather than a raw uniform. The seam's default IS Minecraft's per-draw
+     * {@code ModelViewMat}. But a pipeline that GPU-instances its geometry has no per-draw model matrix: each
+     * instance carries its own rotate/scale/translate and the vertices arrive already in (camera-relative)
+     * world space, so {@code ModelViewMat} there is the VIEW matrix and "object" would silently mean world.
+     * Such a pipeline overrides the seam (see Photon's {@code PhotonShaderCompiler}) so this node's object
+     * endpoint agrees with the Position/Normal nodes' "Object" outputs. The <b>tangent</b> endpoint rides
+     * along: its basis is derived in object space, so it reaches view through this same matrix.
+     * <p>
+     * <b>normal</b> transforms by the inverse-transpose instead, which for this leg is just the transposed
+     * <i>other</i> seam — no {@code inverse()} call. That matters precisely because an overriding pipeline can
+     * put a SCALE in here (a particle's per-instance {@code iScale}, and a billboard's non-uniform width/height),
+     * under which {@code M · n} is not perpendicular to the transformed surface. Everywhere else in this node
+     * the matrices are Minecraft's own pure rotations, where the inverse-transpose equals the matrix — which is
+     * why direction and normal share a path there, and why this stays a no-op on the vanilla default.
+     */
+    private String objectToView(ShaderCompileContext ctx, boolean normal) {
+        // mat4(mat3) puts the rotation in the upper-left with a zero translation column; the vector's w is 0
+        // for a normal, so the vec4 chain the rest of compile() runs in is unaffected.
+        return normal ? "mat4(transpose(mat3(" + ctx.viewToObjectMatrix().code() + ")))"
+                : ctx.objectToViewMatrix().code();
     }
 
     private String projMat(ShaderCompileContext ctx) {
         return ctx.useBuiltinUniform("ProjMat", GlslType.MAT4);
     }
 
-    private String iModelViewMat(ShaderCompileContext ctx) {
-        return ctx.transformField("IModelViewMat", GlslType.MAT4).code();
+    /** {@code view → object}: the inverse seam of {@link #objectToView} (default {@code IModelViewMat}), and
+     *  symmetrically the transposed forward seam for a normal. */
+    private String viewToObject(ShaderCompileContext ctx, boolean normal) {
+        return normal ? "mat4(transpose(mat3(" + ctx.objectToViewMatrix().code() + ")))"
+                : ctx.viewToObjectMatrix().code();
     }
 
     private String viewMat(ShaderCompileContext ctx) {

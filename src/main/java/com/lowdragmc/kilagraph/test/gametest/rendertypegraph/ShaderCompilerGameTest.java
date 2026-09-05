@@ -12,6 +12,7 @@ import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.KGSamplerGl;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
+import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
 import com.lowdragmc.kilagraph.rendertype.nodes.artistic.curve.SampleCurveNode;
@@ -133,6 +134,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.NbtOps;
@@ -1706,6 +1708,111 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "clip→world un-rotates via IViewMat", cwFsh.contains("kg_IViewMat"));
         assertTrue(helper, "clip→world adds the camera position", cwFsh.contains("kg_CameraBlockPos"));
         helper.succeed();
+    }
+
+    /**
+     * <b>Object space is the pipeline's to define.</b> The Transform node used to read {@code ModelViewMat} /
+     * {@code IModelViewMat} directly for its object endpoint, which silently assumes the vanilla model: the
+     * vertex input IS object space and the draw's model matrix is baked into the pose. A pipeline that
+     * GPU-instances its geometry has no per-draw model matrix at all — each instance carries its own
+     * rotate/scale/translate and the vertices reach the shader already in (camera-relative) world space, so
+     * {@code ModelViewMat} there is the VIEW matrix and "object" silently degenerated to world. The Position
+     * and Normal nodes never had that problem, because they have always gone through overridable seams; the
+     * two families therefore disagreed about what "object" meant.
+     *
+     * <p>This compiles the same graph with the stock compiler and with one that overrides only the new
+     * {@code objectToViewMatrix()} / {@code viewToObjectMatrix()} seams, and checks that the node followed
+     * the override — the whole mechanism, without needing the downstream pipeline (Photon) that motivated
+     * it. The stock half doubles as the guarantee that the default is still exactly {@code ModelViewMat}.</p>
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void transformObjectEndpointFollowsTheSeam(GameTestHelper helper) {
+        // Stock compiler: object->world still resolves through ModelViewMat, exactly as before.
+        String stock = transformFsh(STOCK, "object", "world", "position");
+        assertTrue(helper, "stock object->view is ModelViewMat", stock.contains("ModelViewMat"));
+        assertFalse(helper, "stock graph has no seam marker", stock.contains(SEAM_O2V));
+
+        // A pipeline that defines its own object space: the node must use ITS matrix, not ModelViewMat.
+        String seamed = transformFsh(SEAMED, "object", "world", "position");
+        assertTrue(helper, "object->view follows the overridden seam (fsh=" + seamed + ")",
+                seamed.contains(SEAM_O2V));
+
+        // ...and the reverse leg must use the INVERSE seam, not the same matrix again — otherwise
+        // clip->object could never return a mesh-local coordinate.
+        String reverse = transformFsh(SEAMED, "clip", "object", "position");
+        assertTrue(helper, "view->object follows the overridden inverse seam", reverse.contains(SEAM_V2O));
+        assertFalse(helper, "the reverse leg does not reuse the forward seam", reverse.contains(SEAM_O2V));
+
+        // The tangent endpoint derives its basis in object space, so it reaches view through the same seam.
+        String tangent = transformFsh(SEAMED, "tangent", "world", "position");
+        assertTrue(helper, "the tangent endpoint routes through the object seam too", tangent.contains(SEAM_O2V));
+        helper.succeed();
+    }
+
+    /**
+     * <b>type=normal transforms by the inverse-transpose across the object leg.</b> Direction and normal can
+     * share a matrix only while it is a pure rotation — true of every matrix Minecraft hands us, which is why
+     * they shared one before. But the seam above exists precisely so a pipeline can put a SCALE in the object
+     * matrix (a particle's per-instance scale, a billboard's non-uniform width/height), and {@code M · n} is
+     * then not perpendicular to the transformed surface. The inverse-transpose of one seam is the transpose of
+     * the other, so this costs a {@code transpose} and no {@code inverse()}.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void transformNormalUsesInverseTranspose(GameTestHelper helper) {
+        String normal = transformFsh(SEAMED, "object", "world", "normal");
+        assertTrue(helper, "object->view for a normal transposes the INVERSE seam (fsh=" + normal + ")",
+                normal.contains("transpose(mat3(" + SEAM_V2O));
+        assertFalse(helper, "a normal does not reuse the forward object matrix", normal.contains(SEAM_O2V));
+        assertFalse(helper, "no per-pixel inverse() is emitted", normal.contains("inverse("));
+
+        // A position through the very same leg still takes the forward matrix — the two must not converge.
+        String position = transformFsh(SEAMED, "object", "world", "position");
+        assertTrue(helper, "a position still uses the forward seam", position.contains(SEAM_O2V));
+        assertFalse(helper, "a position is not transposed", position.contains("transpose(mat3(" + SEAM_V2O));
+
+        // Direction is a tangent-like vector: it transforms by M, NOT the inverse-transpose.
+        String direction = transformFsh(SEAMED, "object", "world", "direction");
+        assertTrue(helper, "a direction uses the forward seam", direction.contains(SEAM_O2V));
+        helper.succeed();
+    }
+
+    /** Sentinel matrix expressions a test pipeline reports for its object space — chosen so they cannot be
+     *  confused with any real uniform name the compiler emits. */
+    private static final String SEAM_O2V = "kg_test_o2v";
+    private static final String SEAM_V2O = "kg_test_v2o";
+
+    /** The stock compiler — the vanilla-default half of the comparison. */
+    private static final Function<RenderTypeGraph, ShaderGraphCompiler> STOCK = ShaderGraphCompiler::new;
+
+    /** A pipeline that defines its own object space, the way Photon's particle compiler does. Only the two
+     *  matrix seams are overridden; everything else stays stock, so anything the node emits through them is
+     *  attributable to the seam alone. */
+    private static final Function<RenderTypeGraph, ShaderGraphCompiler> SEAMED = graph ->
+            new ShaderGraphCompiler(graph) {
+                @Override
+                protected ShaderExpr objectToViewMatrix() {
+                    return new ShaderExpr(SEAM_O2V, GlslType.MAT4);
+                }
+
+                @Override
+                protected ShaderExpr viewToObjectMatrix() {
+                    return new ShaderExpr(SEAM_V2O, GlslType.MAT4);
+                }
+            };
+
+    /** One Transform node driving Emission, compiled by the given compiler; returns the fragment source. */
+    private static String transformFsh(Function<RenderTypeGraph, ShaderGraphCompiler> compiler,
+                                       String from, String to, String type) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel transform = addNode(graph, TransformNode.class);
+        setOption(transform, "from", from);
+        setOption(transform, "to", to);
+        setOption(transform, "type", type);
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        wire(graph, emission.getInputsById().get("color"), transform.getOutputsById().get("out"));
+        return compiler.apply(graph).compile().fragmentSource();
     }
 
     /** The merged Exponential/Log nodes pick their GLSL variant from a {@code base} option dropdown. */

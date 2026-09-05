@@ -467,6 +467,22 @@ public final class ShaderCompileContext {
         return compiler.transformField(field, type);
     }
 
+    /**
+     * The <b>object&rarr;view</b> matrix (mat4). Prefer this over {@code useBuiltinUniform("ModelViewMat", ...)}
+     * whenever the object endpoint of a space conversion is involved: it is an overridable seam, so a
+     * pipeline whose object&rarr;world is per-instance rather than baked into the draw pose (GPU instancing —
+     * see Photon) reports its real matrix here, while the default is exactly Minecraft's {@code ModelViewMat}.
+     */
+    public ShaderExpr objectToViewMatrix() {
+        return compiler.objectToViewMatrix();
+    }
+
+    /** The <b>view&rarr;object</b> matrix (mat4) — the inverse seam of {@link #objectToViewMatrix()}.
+     *  Default: KilaGraph's {@code IModelViewMat}. */
+    public ShaderExpr viewToObjectMatrix() {
+        return compiler.viewToObjectMatrix();
+    }
+
     /** Minecraft's builtin {@code Globals.GameTime} (normalised day fraction, wraps every MC day). */
     public ShaderExpr mcGameTime() {
         return compiler.mcGameTime();
