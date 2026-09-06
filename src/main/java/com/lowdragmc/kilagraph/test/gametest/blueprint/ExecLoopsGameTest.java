@@ -95,7 +95,7 @@ public final class ExecLoopsGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 A_FINISHED_LOOP_STILL_REPORTS_ITS_LAST_INDEX, FOR_COUNTS, FOR_BREAK,
                 FOR_CONTINUE, WHILE_RUNS, WHILE_MAX_GUARD,

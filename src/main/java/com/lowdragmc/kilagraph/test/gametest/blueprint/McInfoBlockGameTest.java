@@ -72,7 +72,7 @@ public final class McInfoBlockGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 LEVEL_BLOCKS, ENTITY_BLOCKS, HEALTH_ON_A_NON_LIVING_ENTITY,
                 PLAYER_BLOCKS, BLOCK_ENTITY_BLOCKS

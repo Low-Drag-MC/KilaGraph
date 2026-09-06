@@ -74,7 +74,7 @@ public final class PreparedGraphGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 CYCLE_IS_DETECTED, A_LEAKED_VISITING_STACK_WOULD_RESURFACE_ON_AN_UNRELATED_BRANCH, SELF_CYCLE_IS_DETECTED,
                 PORT_SET_GROWTH_IS_NOTICED, REWIRING_IS_NOTICED, ADMITTING_A_NODE_DOES_NOT_LAUNDER_AN_EDIT,

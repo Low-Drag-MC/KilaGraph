@@ -62,7 +62,7 @@ public final class McMiscGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 DAMAGE_IS_WRITTEN_AND_CLAMPED, ENTITY_TAGS_ARE_READ_BACK_SORTED, VILLAGER_TRADES_ARE_LISTED,
                 CHUNK_LOADING_IS_DISTINGUISHED_FROM_OUT_OF_BOUNDS, STRUCTURE_SEARCH_IS_CONSISTENT_AND_FAILS_SOFTLY

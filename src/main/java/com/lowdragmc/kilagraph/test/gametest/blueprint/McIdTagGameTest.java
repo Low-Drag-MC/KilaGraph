@@ -54,7 +54,7 @@ public final class McIdTagGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 IDS_ARE_BUILT_AND_PARSED, REGISTRY_LOOKUPS_ROUND_TRIP, UNKNOWN_IDS_ARE_NOT_SILENTLY_DEFAULTED,
                 TAG_MEMBERSHIP_IS_TESTED_PER_REGISTRY, TAG_CONTENTS_ARE_LISTED_PER_REGISTRY

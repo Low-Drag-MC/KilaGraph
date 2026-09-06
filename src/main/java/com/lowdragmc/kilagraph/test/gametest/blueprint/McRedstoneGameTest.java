@@ -67,7 +67,7 @@ public final class McRedstoneGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 READS_POWER_FROM_A_REDSTONE_BLOCK, DIRECT_SIGNAL_IGNORES_WEAK_POWER, COMPARATOR_READS_CONTAINER_FULLNESS,
                 READS_AND_ADDS_ENCHANTMENTS, RAYCAST_FINDS_AN_ENTITY

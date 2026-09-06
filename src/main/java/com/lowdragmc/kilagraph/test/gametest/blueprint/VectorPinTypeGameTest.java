@@ -66,7 +66,7 @@ public final class VectorPinTypeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
+        var data = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, PIN_TYPE_NAMES, KGGameTests.functionKey(PIN_TYPE_NAMES), data);
         KGGameTests.registerFunctionTest(event, MAKE_NODE_WIDTHS, KGGameTests.functionKey(MAKE_NODE_WIDTHS), data);
         KGGameTests.registerFunctionTest(event, WIDTH_SURVIVES_SAVE, KGGameTests.functionKey(WIDTH_SURVIVES_SAVE), data);

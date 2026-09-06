@@ -62,9 +62,9 @@ public final class SealedGraphStressGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        KGGameTests.registerFunctionTest(event, SEAL_COST, KGGameTests.functionKey(SEAL_COST), KGGameTests.defaultTestData(environment, "empty", 6000));
-        KGGameTests.registerFunctionTest(event, SHAPES_AGREE, KGGameTests.functionKey(SHAPES_AGREE), KGGameTests.defaultTestData(environment, "empty", 6000));
-        KGGameTests.registerFunctionTest(event, SCALES, KGGameTests.functionKey(SCALES), KGGameTests.defaultTestData(environment, "empty", 6000));
+        KGGameTests.registerFunctionTest(event, SEAL_COST, KGGameTests.functionKey(SEAL_COST), KGGameTests.defaultTestData(environment, 6000));
+        KGGameTests.registerFunctionTest(event, SHAPES_AGREE, KGGameTests.functionKey(SHAPES_AGREE), KGGameTests.defaultTestData(environment, 6000));
+        KGGameTests.registerFunctionTest(event, SCALES, KGGameTests.functionKey(SCALES), KGGameTests.defaultTestData(environment, 6000));
     }
 
     private static final String SEAL_COST = "sealed_stress_seal_cost";

@@ -52,7 +52,7 @@ public final class Ldlib2UiDeterminismGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 A_STRAIGHT_BUILD_IS_DETERMINISTIC, A_LOOPED_BUILD_IS_DETERMINISTIC
         }) {

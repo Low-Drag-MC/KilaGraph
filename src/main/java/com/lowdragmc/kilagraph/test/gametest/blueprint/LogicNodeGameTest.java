@@ -38,7 +38,7 @@ public final class LogicNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
+        var data = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, NOT, KGGameTests.functionKey(NOT), data);
         KGGameTests.registerFunctionTest(event, XOR_2, KGGameTests.functionKey(XOR_2), data);
         KGGameTests.registerFunctionTest(event, XOR_3, KGGameTests.functionKey(XOR_3), data);

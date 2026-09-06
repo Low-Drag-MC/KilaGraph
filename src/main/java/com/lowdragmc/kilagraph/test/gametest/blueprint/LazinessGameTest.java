@@ -53,7 +53,7 @@ public final class LazinessGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 AND_SHORT_CIRCUITS, OR_SHORT_CIRCUITS, SELECT_EVALUATES_ONLY_THE_TAKEN_BRANCH,
                 DIAMOND_EVALUATES_THE_SHARED_NODE_ONCE, CACHE_PULLS_ITS_SOURCE_ONLY_ONCE, UNDEMANDED_NODES_ARE_NOT_EVALUATED

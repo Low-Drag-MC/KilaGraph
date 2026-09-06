@@ -55,7 +55,7 @@ public final class ShaderSubgraphGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, INLINE, KGGameTests.functionKey(INLINE), d);
         KGGameTests.registerFunctionTest(event, REDIRECT, KGGameTests.functionKey(REDIRECT), d);
         KGGameTests.registerFunctionTest(event, AFFINITY, KGGameTests.functionKey(AFFINITY), d);

@@ -58,7 +58,7 @@ public final class NbtPipelineGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 NESTED_COMPOUND_ROUND_TRIP, CHAINED_SETS_SHARE_ONE_TAG, NBT_THROUGH_A_LIST,
                 REMOVE_DROPS_ONLY_THE_NAMED_KEY, NBT_ACROSS_A_SUBGRAPH_BOUNDARY

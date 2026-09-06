@@ -63,7 +63,7 @@ public final class McGeometryGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 BLOCK_POS_ARITHMETIC, BLOCK_POS_VECTOR_CONVERSIONS_RESPECT_THE_CENTRE_OPTION, BETWEEN_ENUMERATES_AND_REPORTS_TRUNCATION,
                 BOUNDING_BOXES, BOUNDING_BOX_RELATIONS, CHUNK_COORDINATES,

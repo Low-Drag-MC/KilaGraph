@@ -51,7 +51,7 @@ public final class KGTypeHandlesGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 EVERY_CONSTANT_TYPE_HAS_A_NON_NULL_DEFAULT, DIRECTION_AND_NBT_DEFAULTS_ARE_THE_ONES_THE_NODES_USE, WIRE_ONLY_TYPES_ARE_PICKABLE_BUT_NOT_AUTHORABLE,
                 NEW_VALUE_TYPES_ARE_SURFACED_IN_BOTH_LISTS

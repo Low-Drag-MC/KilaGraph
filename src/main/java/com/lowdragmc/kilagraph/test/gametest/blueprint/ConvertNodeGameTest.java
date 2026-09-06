@@ -72,12 +72,12 @@ public final class ConvertNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        KGGameTests.registerFunctionTest(event, TO_INT_LARGE, KGGameTests.functionKey(TO_INT_LARGE), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, TO_INT_SATURATES, KGGameTests.functionKey(TO_INT_SATURATES), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, TO_LONG, KGGameTests.functionKey(TO_LONG), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, TO_DOUBLE, KGGameTests.functionKey(TO_DOUBLE), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, PARSE_NUMBER_WHOLE, KGGameTests.functionKey(PARSE_NUMBER_WHOLE), KGGameTests.defaultTestData(environment, "empty"));
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        KGGameTests.registerFunctionTest(event, TO_INT_LARGE, KGGameTests.functionKey(TO_INT_LARGE), KGGameTests.defaultTestData(environment));
+        KGGameTests.registerFunctionTest(event, TO_INT_SATURATES, KGGameTests.functionKey(TO_INT_SATURATES), KGGameTests.defaultTestData(environment));
+        KGGameTests.registerFunctionTest(event, TO_LONG, KGGameTests.functionKey(TO_LONG), KGGameTests.defaultTestData(environment));
+        KGGameTests.registerFunctionTest(event, TO_DOUBLE, KGGameTests.functionKey(TO_DOUBLE), KGGameTests.defaultTestData(environment));
+        KGGameTests.registerFunctionTest(event, PARSE_NUMBER_WHOLE, KGGameTests.functionKey(PARSE_NUMBER_WHOLE), KGGameTests.defaultTestData(environment));
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 TO_STRING, PARSE_NUMBER, PARSE_BOOL,
                 TO_INT, TO_FLOAT, NUMBER_FORMAT,

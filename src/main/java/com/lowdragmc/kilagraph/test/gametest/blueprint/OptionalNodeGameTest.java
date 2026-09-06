@@ -37,7 +37,7 @@ public final class OptionalNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
+        var data = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, IS_NULL, KGGameTests.functionKey(IS_NULL), data);
         KGGameTests.registerFunctionTest(event, NOT_NULL, KGGameTests.functionKey(NOT_NULL), data);
         KGGameTests.registerFunctionTest(event, DEFAULT_KEEPS, KGGameTests.functionKey(DEFAULT_KEEPS), data);

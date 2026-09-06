@@ -43,7 +43,7 @@ public final class MixedWorkloadGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 COMPUTES_EVERY_STAGE, IS_REPRODUCIBLE, IS_ACTUALLY_A_MIXED_GRAPH
         }) {

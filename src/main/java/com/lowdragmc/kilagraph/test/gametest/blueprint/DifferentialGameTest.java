@@ -52,13 +52,13 @@ public final class DifferentialGameTest {
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         KGGameTests.registerFunctionTest(event, EVERY_SCENARIO_AGREES_ACROSS_MODES, KGGameTests.functionKey(EVERY_SCENARIO_AGREES_ACROSS_MODES),
-                KGGameTests.defaultTestData(environment, "empty", 600));
+                KGGameTests.defaultTestData(environment, 600));
         KGGameTests.registerFunctionTest(event, OPTIMISATIONS_AGREE_WITH_THE_UNOPTIMISED_PATHS, KGGameTests.functionKey(OPTIMISATIONS_AGREE_WITH_THE_UNOPTIMISED_PATHS),
-                KGGameTests.defaultTestData(environment, "empty", 600));
+                KGGameTests.defaultTestData(environment, 600));
         KGGameTests.registerFunctionTest(event, THE_HARNESS_ACTUALLY_OBSERVES_SOMETHING, KGGameTests.functionKey(THE_HARNESS_ACTUALLY_OBSERVES_SOMETHING),
-                KGGameTests.defaultTestData(environment, "empty", 600));
+                KGGameTests.defaultTestData(environment, 600));
         KGGameTests.registerFunctionTest(event, THE_HARNESS_DETECTS_A_REAL_DIFFERENCE, KGGameTests.functionKey(THE_HARNESS_DETECTS_A_REAL_DIFFERENCE),
-                KGGameTests.defaultTestData(environment, "empty", 600));
+                KGGameTests.defaultTestData(environment, 600));
     }
 
     /** The graphs every mode is compared on. Shared with the behaviour tests and the benchmarks. */

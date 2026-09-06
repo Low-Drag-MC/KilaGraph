@@ -48,7 +48,7 @@ public final class McDataGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 BLOCK_POS_ROUND_TRIP, ITEM_STACK_CREATE_READ, BLOCK_ITEM_ROUND_TRIP,
                 ITEM_IN_TAG

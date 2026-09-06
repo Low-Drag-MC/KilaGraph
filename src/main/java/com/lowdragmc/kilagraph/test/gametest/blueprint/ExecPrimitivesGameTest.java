@@ -48,7 +48,7 @@ public final class ExecPrimitivesGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 SEQUENCE, BRANCH_TRUE, BRANCH_FALSE,
                 GATE_OPEN, GATE_CLOSED, SWITCH_MATCH,

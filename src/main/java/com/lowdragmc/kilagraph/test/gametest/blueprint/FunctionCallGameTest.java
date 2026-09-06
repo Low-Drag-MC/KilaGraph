@@ -62,7 +62,7 @@ public final class FunctionCallGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 MULTIPLE_PARAMETERS_AND_RETURNS, TWO_CALL_SITES_DO_NOT_SHARE_STATE, THREE_LEVELS_DEEP,
                 FUNCTION_CONTAINING_A_LOOP, LOOP_CONTAINING_A_FUNCTION_CALL, SAME_NAMED_VARIABLES_DO_NOT_COLLIDE,

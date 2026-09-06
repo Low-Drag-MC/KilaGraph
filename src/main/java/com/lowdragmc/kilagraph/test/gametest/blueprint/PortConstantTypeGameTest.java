@@ -62,7 +62,7 @@ public final class PortConstantTypeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        KGGameTests.registerFunctionTest(event, CANONICAL_HANDLE, KGGameTests.functionKey(CANONICAL_HANDLE), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, CANONICAL_HANDLE, KGGameTests.functionKey(CANONICAL_HANDLE), KGGameTests.defaultTestData(environment));
     }
 
     private PortConstantTypeGameTest() {}

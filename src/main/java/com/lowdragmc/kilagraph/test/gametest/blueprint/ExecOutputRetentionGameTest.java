@@ -43,7 +43,7 @@ public final class ExecOutputRetentionGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
+        var data = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, CLEAR_DROPS_BY_DEFAULT, KGGameTests.functionKey(CLEAR_DROPS_BY_DEFAULT), data);
         KGGameTests.registerFunctionTest(event, RETAINED_SURVIVE_CLEARS, KGGameTests.functionKey(RETAINED_SURVIVE_CLEARS), data);
         KGGameTests.registerFunctionTest(event, REPUBLICATION_WINS, KGGameTests.functionKey(REPUBLICATION_WINS), data);

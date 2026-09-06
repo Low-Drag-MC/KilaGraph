@@ -59,7 +59,7 @@ public final class SubgraphExecGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 STRAIGHT_THROUGH, DATA_IN_OUT, MULTI_EXIT_TRUE,
                 MULTI_EXIT_FALSE, NESTED, CHILD_VAR_ISOLATED

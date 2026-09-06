@@ -53,7 +53,7 @@ public final class DeepGraphGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 DEEP_DATA_CHAIN, DEEP_CHAIN_RECOMPUTES_AFTER_CLEAR_CACHE, WIDE_FAN_IN,
                 WIDE_FAN_OUT_EVALUATES_THE_SOURCE_ONCE, DEEP_EXEC_CHAIN, DEEP_CHAIN_DRIVING_A_BRANCH

@@ -272,6 +272,18 @@ public final class KGGameTests {
         return defaultTestData(environment, structurePath, 20);
     }
 
+    /** Test data in the {@link #DEFAULT_STRUCTURE} — what a test wants unless it needs a specific one. */
+    public static TestData<Holder<TestEnvironmentDefinition<?>>> defaultTestData(
+            Holder<TestEnvironmentDefinition<?>> environment) {
+        return defaultTestData(environment, DEFAULT_STRUCTURE, 20);
+    }
+
+    /** As {@link #defaultTestData(Holder)} with an explicit tick budget. */
+    public static TestData<Holder<TestEnvironmentDefinition<?>>> defaultTestData(
+            Holder<TestEnvironmentDefinition<?>> environment, int maxTicks) {
+        return defaultTestData(environment, DEFAULT_STRUCTURE, maxTicks);
+    }
+
     /**
      * As {@link #defaultTestData(Holder, String)} but with an explicit tick budget — {@code maxTicks}
      * is the third {@code TestData} component. The deep-graph, differential and benchmark tests run
@@ -280,10 +292,9 @@ public final class KGGameTests {
      */
     public static TestData<Holder<TestEnvironmentDefinition<?>>> defaultTestData(
             Holder<TestEnvironmentDefinition<?>> environment, String structurePath, int maxTicks) {
-        // Reuse LDLib2's empty structure — node-graph tests don't need any world blocks.
         return new TestData<>(
                 environment,
-                Identifier.fromNamespaceAndPath("ldlib2", structurePath),
+                structureId(structurePath),
                 maxTicks,
                 0,
                 true,
@@ -294,6 +305,34 @@ public final class KGGameTests {
                 false,
                 0
         );
+    }
+
+    /**
+     * The structure every test is placed in, unless it names another.
+     *
+     * <p><b>Why not LDLib2's 1&times;1&times;1 {@code empty}.</b> A test's chunks are force-loaded from
+     * its structure's bounding box alone ({@code TestInstanceBlockEntity#forceLoadChunks}), and only a
+     * force-loaded chunk is entity-ticking. Around a 1&times;1&times;1 structure that is a single chunk,
+     * so an entity spawned a few blocks away — which a dozen of these tests do, at relative coordinates
+     * out to (6, 2, 4) — lands in a merely <em>loaded</em> chunk whenever the structure sits near a chunk
+     * border. Such an entity is never published to the level's section index: {@code getEntity(id)} and
+     * every {@code getEntitiesOfClass(box)} miss it, while the entity object itself looks perfectly alive.
+     * Where the border falls depends on where the runner places the structure, which moves from run to
+     * run — so this surfaced as four entity tests failing about one run in five, with no relation to what
+     * the code under test was doing.</p>
+     *
+     * <p>This one is 8&times;<b>1</b>&times;8: chunks are columns, so {@code intersectingChunks()} ignores
+     * the box's height and only its footprint buys anything. Staying one block tall also leaves the barrier
+     * encasement exactly where {@code empty} put it — the ceiling goes at the box's top face, and raising it
+     * to y+4 puts it in the path of the tests that cast a ray down onto a block from above.</p>
+     */
+    public static final String DEFAULT_STRUCTURE = "kilagraph:test_area";
+
+    /** A structure path, as {@code namespace:path} or a bare LDLib2 path. */
+    private static Identifier structureId(String structurePath) {
+        return structurePath.indexOf(':') >= 0
+                ? Identifier.parse(structurePath)
+                : Identifier.fromNamespaceAndPath("ldlib2", structurePath);
     }
 
     static Identifier id(String path) {

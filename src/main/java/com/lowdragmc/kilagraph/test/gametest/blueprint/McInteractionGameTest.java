@@ -70,7 +70,7 @@ public final class McInteractionGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 SETS_AND_CLEARS_FIRE, NAMES_AN_ENTITY, MOUNTS_AND_DISMOUNTS,
                 SETS_EQUIPMENT, IGNITES_AND_EXTINGUISHES, BONE_MEALS_WHAT_CAN_GROW,

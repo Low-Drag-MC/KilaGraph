@@ -46,9 +46,9 @@ public final class VariableGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
+        var data = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, NULL_DEFAULT_READS_NULL, KGGameTests.functionKey(NULL_DEFAULT_READS_NULL), data);
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 INPUT_VAR_READ_FROM_STORE, OUTPUT_VAR_RUN_OUTPUTS, OUTPUT_VAR_DEFAULT_WHEN_UNWIRED,
                 STORE_NULL_OVERRIDES_DEFAULT

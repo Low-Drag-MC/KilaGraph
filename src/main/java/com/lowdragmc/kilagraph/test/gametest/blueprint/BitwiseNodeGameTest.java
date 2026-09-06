@@ -49,10 +49,10 @@ public final class BitwiseNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        KGGameTests.registerFunctionTest(event, LONG_WIDTH, KGGameTests.functionKey(LONG_WIDTH), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, SHIFT_WIDTH, KGGameTests.functionKey(SHIFT_WIDTH), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, INT_WIDTH, KGGameTests.functionKey(INT_WIDTH), KGGameTests.defaultTestData(environment, "empty"));
-        var d = KGGameTests.defaultTestData(environment, "empty");
+        KGGameTests.registerFunctionTest(event, LONG_WIDTH, KGGameTests.functionKey(LONG_WIDTH), KGGameTests.defaultTestData(environment));
+        KGGameTests.registerFunctionTest(event, SHIFT_WIDTH, KGGameTests.functionKey(SHIFT_WIDTH), KGGameTests.defaultTestData(environment));
+        KGGameTests.registerFunctionTest(event, INT_WIDTH, KGGameTests.functionKey(INT_WIDTH), KGGameTests.defaultTestData(environment));
+        var d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{AND, OR, XOR, NOT, SHL, SHR}) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }

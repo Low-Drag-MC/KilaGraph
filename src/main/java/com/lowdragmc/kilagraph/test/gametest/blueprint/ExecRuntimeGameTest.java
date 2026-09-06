@@ -42,7 +42,7 @@ public final class ExecRuntimeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
+        var d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{ENTRY_FIRES_NEXT, UNWIRED_FLOW_NO_OP, NOOP_PASSES_THROUGH,
                 ASSERT_TRUE_CONTINUES, ASSERT_FALSE_THROWS}) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);

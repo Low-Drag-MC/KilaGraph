@@ -70,7 +70,7 @@ public final class Ldlib2UiEventGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 HANDLER_RUNS_ONLY_WHEN_THE_EVENT_FIRES, THE_HANDLER_ACTS_ON_THE_CLICKED_INSTANCE, THE_HANDLER_SEES_CURRENT_VALUES_NOT_BUILD_TIME_ONES,
                 REGISTRATION_AND_DISPATCH_TAKE_DIFFERENT_OUTPUTS, ONE_EVENT_CAUSES_EXACTLY_ONE_DISPATCH, A_DRAG_CARRIES_ITS_PAYLOAD_TO_THE_DROP_HANDLER,

@@ -73,7 +73,7 @@ public final class ExecutorEdgeCaseGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 SPECIAL_FLOATS_SURVIVE_THE_NUMERIC_LANE, NUMERIC_LANE_RENDERS_AS_THE_RIGHT_TYPE, VALUES_CROSS_BETWEEN_INT_AND_FLOAT_PORTS,
                 A_DIAMOND_EVALUATES_THE_SHARED_NODE_ONCE, AN_EDITED_CONSTANT_IS_VISIBLE_AFTER_CLEAR_CACHE, TWO_EXECUTORS_OVER_ONE_GRAPH_BOTH_SEE_AN_EDIT,
@@ -82,7 +82,7 @@ public final class ExecutorEdgeCaseGameTest {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
         KGGameTests.registerFunctionTest(event, A_DEEP_CHAIN_GROWS_EVERY_TABLE, KGGameTests.functionKey(A_DEEP_CHAIN_GROWS_EVERY_TABLE),
-                KGGameTests.defaultTestData(environment, "empty", 400));
+                KGGameTests.defaultTestData(environment, 400));
     }
 
     // ---- special float values through the numeric lane --------------------------------------

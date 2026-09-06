@@ -315,7 +315,7 @@ public final class ShaderCompilerGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
+        var data = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, TRANSFORM_OBJECT_SEAM, KGGameTests.functionKey(TRANSFORM_OBJECT_SEAM), data);
         KGGameTests.registerFunctionTest(event, TRANSFORM_NORMAL_INVERSE_TRANSPOSE, KGGameTests.functionKey(TRANSFORM_NORMAL_INVERSE_TRANSPOSE), data);
         KGGameTests.registerFunctionTest(event, TANGENT_BASIS_PER_STAGE, KGGameTests.functionKey(TANGENT_BASIS_PER_STAGE), data);
@@ -325,7 +325,7 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunctionTest(event, NORMAL_OUTPUT_SPACE, KGGameTests.functionKey(NORMAL_OUTPUT_SPACE), data);
         KGGameTests.registerFunctionTest(event, TRIPLANAR_NORMAL, KGGameTests.functionKey(TRIPLANAR_NORMAL), data);
         KGGameTests.registerFunctionTest(event, PARALLAX_TANGENT_VIEW_DIR, KGGameTests.functionKey(PARALLAX_TANGENT_VIEW_DIR), data);
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, DEDUP, KGGameTests.functionKey(DEDUP), d);
         KGGameTests.registerFunctionTest(event, EMISSION, KGGameTests.functionKey(EMISSION), d);
         KGGameTests.registerFunctionTest(event, ALPHA_DISCARD, KGGameTests.functionKey(ALPHA_DISCARD), d);

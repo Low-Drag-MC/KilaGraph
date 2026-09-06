@@ -86,7 +86,7 @@ public final class McRecipeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 CRAFTING_RESULT_RESPECTS_THE_GRID, CRAFTING_RESULT_ASSEMBLES_COMPUTED_RECIPES, SMELTING_REPORTS_RESULT_TIME_AND_EXPERIENCE,
                 RECIPES_ARE_FOUND_BY_RESULT_AND_BY_ID, INGREDIENTS_NAME_ONE_ITEM_PER_SLOT, LOOT_TABLE_ROLLS_ARE_DRIVEN_BY_THE_TOOL,

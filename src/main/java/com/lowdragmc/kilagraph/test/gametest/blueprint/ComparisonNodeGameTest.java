@@ -46,7 +46,7 @@ public final class ComparisonNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
+        var data = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, NEQ_BY_VALUE, KGGameTests.functionKey(NEQ_BY_VALUE), data);
         KGGameTests.registerFunctionTest(event, NEQ_NON_NUMBERS, KGGameTests.functionKey(NEQ_NON_NUMBERS), data);
         KGGameTests.registerFunctionTest(event, GT, KGGameTests.functionKey(GT), data);

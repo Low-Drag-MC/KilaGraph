@@ -48,12 +48,25 @@ public final class EntityNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 IN_RADIUS
         }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
+    }
+
+    /**
+     * Enough to tell the two ways this can fail apart: a wrong query, or an entity the level cannot see.
+     *
+     * <p>{@code visible=false} means the entity exists but was never published to the level's section
+     * index — it is in a chunk that is loaded but not entity-ticking, which is what
+     * {@link KGGameTests#DEFAULT_STRUCTURE} exists to prevent. That is not a bug in the node.</p>
+     */
+    private static String diag(ServerLevel level, Entity e) {
+        return e.position() + (e.isRemoved() ? " removed" : "")
+                + " visible=" + (level.getEntity(e.getId()) != null)
+                + " ticking=" + level.isPositionEntityTicking(e.blockPosition());
     }
 
     private static PortModel source(BlueprintGraph g, String name, TypeHandle type) {
@@ -84,9 +97,7 @@ public final class EntityNodeGameTest {
         // with the wrong centre, or the pigs were gone. Built only on the failing path.
         if (!out.contains(a) || !out.contains(b)) {
             helper.fail("radius contains both pigs: centre=" + center.getCenter()
-                    + " a=" + a.position() + (a.isRemoved() ? " (removed)" : "")
-                    + " b=" + b.position() + (b.isRemoved() ? " (removed)" : "")
-                    + " found=" + out);
+                    + " | a=" + diag(level, a) + " | b=" + diag(level, b) + " | found=" + out);
         }
         helper.succeed();
     }

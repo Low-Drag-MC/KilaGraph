@@ -63,7 +63,7 @@ public final class McWorldEntityGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 WORLD_QUERIES, RAYCAST_FINDS_A_PLACED_BLOCK, ENTITY_QUERIES_AND_DATA,
                 ENCHANTMENT_PROBE_USES_THE_WORLD_REGISTRY

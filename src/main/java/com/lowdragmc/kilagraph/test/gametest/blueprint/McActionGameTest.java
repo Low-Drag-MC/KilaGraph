@@ -75,7 +75,7 @@ public final class McActionGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 SET_AND_BREAK_BLOCK, FILL_AND_REPLACE_BLOCKS, SPAWN_MOVE_AND_REMOVE_ENTITY,
                 DAMAGE_HEAL_AND_EFFECT, SOUND_AND_PARTICLES, DROP_ITEM,

@@ -47,7 +47,7 @@ public final class ExecVarInteractionGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 EXEC_SET_THEN_DATA_READ, A_VARIABLE_READ_IS_MEMOISED_UNTIL_CLEAR_CACHE, REMOVING_A_VARIABLE_RESTORES_ITS_DEFAULT,
                 EXEC_SET_THEN_RUN_OUTPUTS

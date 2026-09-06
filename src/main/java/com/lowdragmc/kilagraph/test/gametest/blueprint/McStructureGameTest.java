@@ -74,7 +74,7 @@ public final class McStructureGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 BLOCK_STATE_BASICS, BLOCK_STATE_PROPERTIES_READ_AND_WRITE, BLOCK_STATE_ROTATE_AND_MIRROR,
                 ITEM_STACK_COUNT_AND_EQUALITY, ITEM_STACK_COMPONENTS, FLUID_STACKS,

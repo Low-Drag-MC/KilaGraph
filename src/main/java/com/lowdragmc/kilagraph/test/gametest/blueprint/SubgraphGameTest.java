@@ -48,7 +48,7 @@ public final class SubgraphGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 DATA_PASSES_THROUGH_LOCAL_SUBGRAPH, UNRESOLVED_EXTERNAL_RETURNS_NULL, CONSTANT_INPUT_FEEDS_SUBGRAPH,
                 NESTED_SUBGRAPH

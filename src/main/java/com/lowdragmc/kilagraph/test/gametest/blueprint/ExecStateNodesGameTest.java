@@ -50,7 +50,7 @@ public final class ExecStateNodesGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
+        var data = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, DO_ONCE, KGGameTests.functionKey(DO_ONCE), data);
         KGGameTests.registerFunctionTest(event, DO_ONCE_START_CLOSED, KGGameTests.functionKey(DO_ONCE_START_CLOSED), data);
         KGGameTests.registerFunctionTest(event, DO_N, KGGameTests.functionKey(DO_N), data);

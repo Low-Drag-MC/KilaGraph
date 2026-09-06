@@ -46,7 +46,7 @@ public final class ExecSemanticsGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
+        var d = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, SEQUENCE_TO_COMPLETION, KGGameTests.functionKey(SEQUENCE_TO_COMPLETION), d);
         KGGameTests.registerFunctionTest(event, NESTED_FOR_OUTER_INDEX, KGGameTests.functionKey(NESTED_FOR_OUTER_INDEX), d);
     }

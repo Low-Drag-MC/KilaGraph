@@ -52,7 +52,7 @@ public final class WirePortalGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
+        var d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{EXEC, MULTI, STEP, VALUE}) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }

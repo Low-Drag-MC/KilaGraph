@@ -49,7 +49,7 @@ public final class ExecIntegrationGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var d = KGGameTests.defaultTestData(environment, "empty");
+        var d = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, SUM_OF_EVENS, KGGameTests.functionKey(SUM_OF_EVENS), d);
     }
 

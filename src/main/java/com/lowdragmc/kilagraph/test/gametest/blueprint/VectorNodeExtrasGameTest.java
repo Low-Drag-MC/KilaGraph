@@ -85,7 +85,7 @@ public final class VectorNodeExtrasGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
+        var data = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, SWIZZLE_WIDTH, KGGameTests.functionKey(SWIZZLE_WIDTH), data);
         KGGameTests.registerFunctionTest(event, SWIZZLE_REFUSES_BAD_MASK, KGGameTests.functionKey(SWIZZLE_REFUSES_BAD_MASK), data);
         KGGameTests.registerFunctionTest(event, CONCAT, KGGameTests.functionKey(CONCAT), data);

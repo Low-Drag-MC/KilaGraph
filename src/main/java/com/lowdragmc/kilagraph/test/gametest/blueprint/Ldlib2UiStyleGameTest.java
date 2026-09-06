@@ -58,7 +58,7 @@ public final class Ldlib2UiStyleGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 HIGHER_ORIGINS_WIN, REMOVING_ONE_LAYER_REVEALS_THE_ONE_BELOW, AN_LSS_BLOCK_MATCHES_THE_DECLARATION_PARSER,
                 AN_UNKNOWN_DECLARATION_DOES_NOT_FAIL_THE_BLOCK, AN_INTEGER_WIRED_INTO_A_COLOUR_IS_FORMATTED_AS_HEX, CLASS_OPERATIONS_BEHAVE,

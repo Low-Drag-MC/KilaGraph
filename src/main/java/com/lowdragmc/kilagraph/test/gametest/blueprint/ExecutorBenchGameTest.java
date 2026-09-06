@@ -78,13 +78,13 @@ public final class ExecutorBenchGameTest {
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         KGGameTests.registerFunctionTest(event, LERP_CHAIN16, KGGameTests.functionKey(LERP_CHAIN16),
-                KGGameTests.defaultTestData(environment, "empty", 4000));
+                KGGameTests.defaultTestData(environment, 4000));
         KGGameTests.registerFunctionTest(event, ADD_CHAIN16, KGGameTests.functionKey(ADD_CHAIN16),
-                KGGameTests.defaultTestData(environment, "empty", 4000));
+                KGGameTests.defaultTestData(environment, 4000));
         KGGameTests.registerFunctionTest(event, LOCOMOTION, KGGameTests.functionKey(LOCOMOTION),
-                KGGameTests.defaultTestData(environment, "empty", 4000));
+                KGGameTests.defaultTestData(environment, 4000));
         KGGameTests.registerFunctionTest(event, COST_BREAKDOWN, KGGameTests.functionKey(COST_BREAKDOWN),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
     }
 
     private static final int CHAIN_LENGTH = 16;

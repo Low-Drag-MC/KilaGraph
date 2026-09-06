@@ -84,7 +84,7 @@ public final class McContainerGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 RESOLVES_A_CHEST_AND_READS_IT, A_STONE_BLOCK_IS_NOT_A_CONTAINER, INSERTS_AND_EXTRACTS,
                 A_FULL_CHEST_REPORTS_THE_REMAINDER, A_PLAYER_INVENTORY_IS_A_CONTAINER, BLOCK_ENTITY_NBT_ROUND_TRIPS,

@@ -48,7 +48,7 @@ public final class InfoNodeBenchGameTest {
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         KGGameTests.registerFunctionTest(event, WHOLE_GRAPH_COST_OF_HAVING_ONE, KGGameTests.functionKey(WHOLE_GRAPH_COST_OF_HAVING_ONE),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
     }
 
     private static final Logger LOGGER = LogUtils.getLogger();

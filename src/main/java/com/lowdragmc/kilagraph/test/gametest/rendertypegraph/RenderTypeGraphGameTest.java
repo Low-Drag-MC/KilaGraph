@@ -135,7 +135,7 @@ public final class RenderTypeGraphGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, RESOURCE, KGGameTests.functionKey(RESOURCE), d);
         KGGameTests.registerFunctionTest(event, SUPPORTED_TYPES, KGGameTests.functionKey(SUPPORTED_TYPES), d);
         KGGameTests.registerFunctionTest(event, SUPPORTED_NODES, KGGameTests.functionKey(SUPPORTED_NODES), d);

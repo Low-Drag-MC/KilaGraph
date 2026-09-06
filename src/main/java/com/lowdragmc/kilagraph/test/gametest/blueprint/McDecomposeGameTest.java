@@ -89,7 +89,7 @@ public final class McDecomposeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 BLOCK_POS_UNPACK, AABB_UNPACK_AND_CENTRE, CHUNK_POS_UNPACK,
                 DIRECTION_DATA, ID_UNPACK, NBT_KEYS,

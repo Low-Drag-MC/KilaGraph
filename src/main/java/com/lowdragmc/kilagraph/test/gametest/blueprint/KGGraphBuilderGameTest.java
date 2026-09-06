@@ -46,7 +46,7 @@ public final class KGGraphBuilderGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 LOCOMOTION_MATCHES_HAND_BUILT, AMBIGUOUS_BARE_REFERENCE_IS_REJECTED, BAD_NAMES_FAIL_FAST,
                 ADD_MANY_BUILDS_A_CHAIN

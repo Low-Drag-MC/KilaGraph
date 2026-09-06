@@ -79,7 +79,7 @@ public final class NbtNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 ROUND_TRIP_INT, ROUND_TRIP_STRING, HAS_AND_REMOVE,
                 ITEM_STACK, BLOCK_ENTITY, PATH_READS_NESTED_VALUES,

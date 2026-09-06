@@ -73,7 +73,7 @@ public final class McCoverageGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 ENTITY_CASTS, ENTITY_CONTAINER, NEAREST_PLAYER,
                 FLUID_COMPONENTS, GIVE_ITEM_AND_SEND_MESSAGE

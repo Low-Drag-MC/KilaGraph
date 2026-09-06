@@ -59,7 +59,7 @@ public final class InfoNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 ONE_TARGET_MANY_BLOCKS, MISSING_TARGET_READS_NULL, CONTEXT_REFUSES_A_FOREIGN_BLOCK,
                 BLOCKS_ARE_SCOPED_TO_THEIR_CONTEXTS, POSITION_BLOCKS_USE_THE_GRAPH_VECTOR_TYPE

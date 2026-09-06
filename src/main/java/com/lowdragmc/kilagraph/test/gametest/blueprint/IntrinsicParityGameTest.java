@@ -92,20 +92,20 @@ public final class IntrinsicParityGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 EVERY_INTRINSIC_IS_COVERED, EVERY_EXEC_INTRINSIC_IS_COVERED
         }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
         KGGameTests.registerFunctionTest(event, INTRINSICS_MATCH_THEIR_NODES_WHEN_WIRED, KGGameTests.functionKey(INTRINSICS_MATCH_THEIR_NODES_WHEN_WIRED),
-                KGGameTests.defaultTestData(environment, "empty", 2000));
+                KGGameTests.defaultTestData(environment, 2000));
         KGGameTests.registerFunctionTest(event, INTRINSICS_MATCH_THEIR_NODES_WHEN_CONSTANT, KGGameTests.functionKey(INTRINSICS_MATCH_THEIR_NODES_WHEN_CONSTANT),
-                KGGameTests.defaultTestData(environment, "empty", 2000));
+                KGGameTests.defaultTestData(environment, 2000));
         KGGameTests.registerFunctionTest(event, INTRINSICS_MATCH_THEIR_NODES_ON_DEFAULTED_INPUTS, KGGameTests.functionKey(INTRINSICS_MATCH_THEIR_NODES_ON_DEFAULTED_INPUTS),
-                KGGameTests.defaultTestData(environment, "empty", 2000));
+                KGGameTests.defaultTestData(environment, 2000));
         KGGameTests.registerFunctionTest(event, INTRINSICS_MATCH_THEIR_NODES_ON_WHOLE_NUMBER_WIRES, KGGameTests.functionKey(INTRINSICS_MATCH_THEIR_NODES_ON_WHOLE_NUMBER_WIRES),
-                KGGameTests.defaultTestData(environment, "empty", 2000));
+                KGGameTests.defaultTestData(environment, 2000));
     }
 
     /**

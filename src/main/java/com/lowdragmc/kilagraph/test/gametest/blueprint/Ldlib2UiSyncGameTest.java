@@ -63,7 +63,7 @@ public final class Ldlib2UiSyncGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 A_SYNC_VALUE_IS_DECLARED_ON_ITS_ELEMENT, A_SOURCED_SYNC_VALUE_TRACKS_ITS_EXPRESSION, AN_UNTYPED_SYNC_VALUE_IS_REFUSED,
                 SYNC_VALUES_JOIN_AND_LEAVE_THE_MANAGER_WITH_THEIR_ELEMENT, AN_RPC_CALL_REACHES_THE_GRAPH_AND_RETURNS_A_VALUE, A_MESSAGE_HANDLER_RECEIVES_ITS_PAYLOAD

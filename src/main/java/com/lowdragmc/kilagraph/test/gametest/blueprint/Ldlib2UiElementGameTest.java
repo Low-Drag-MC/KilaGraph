@@ -64,7 +64,7 @@ public final class Ldlib2UiElementGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 ELEMENT_NEW_BUILDS_THE_REGISTERED_TYPE, CHILDREN_ARE_ADDED_IN_ORDER_AND_CYCLES_ARE_REFUSED, SELECTORS_FIND_BY_ID_CLASS_AND_TYPE,
                 SET_PROPERTY_GOES_THROUGH_THE_ANNOTATED_SETTER, AN_UNKNOWN_PROPERTY_REPORTS_FAILURE, THE_PROPERTY_REGISTRY_EXCLUDES_STYLE_GROUPS,

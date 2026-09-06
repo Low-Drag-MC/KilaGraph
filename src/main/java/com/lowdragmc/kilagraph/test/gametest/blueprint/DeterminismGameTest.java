@@ -49,7 +49,7 @@ public final class DeterminismGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 A_SEEDED_RUN_IS_REPRODUCIBLE, ADIFFERENT_SEED_PRODUCES_DIFFERENT_DRAWS, REPEATED_RUNS_AGREE_EXACTLY,
                 INTERLEAVED_EXECUTORS_DO_NOT_INTERFERE

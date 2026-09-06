@@ -64,7 +64,7 @@ public final class VectorNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 MAKE_AND_BREAK_ROUND_TRIP_EVERY_WIDTH, COMPONENT_WISE_OPERATIONS_KEEP_EVERY_COMPONENT, REDUCING_OPERATIONS_SUM_OVER_EVERY_COMPONENT,
                 NORMALIZE_OF_ZERO_IS_ZERO_NOT_NA_N, CROSS_FOLLOWS_THE_RIGHT_HAND_RULE, FLATTEN_DROPS_THE_CHOSEN_AXIS_ONLY,

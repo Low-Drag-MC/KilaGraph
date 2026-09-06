@@ -116,7 +116,7 @@ public final class McIntegrationGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 BUILDS_A_COLUMN, DAMAGES_ONLY_THE_MATCHING_ENTITIES, FILLS_ONLY_THE_AIR_IN_A_REGION,
                 ITEM_COMPONENTS_SURVIVE_INTO_THE_WORLD, COMMAND_OUTPUT_IS_PARSED_BACK_INTO_A_NUMBER, A_TAGS_CONTENTS_ARE_MEMBERS_OF_THAT_SAME_TAG,

@@ -50,7 +50,7 @@ public final class ExecDriverGameTest {
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         KGGameTests.registerFunctionTest(event, BOTH_DRIVERS_RUN_THE_SAME_NODES, KGGameTests.functionKey(BOTH_DRIVERS_RUN_THE_SAME_NODES),
-                KGGameTests.defaultTestData(environment, "empty", 600));
+                KGGameTests.defaultTestData(environment, 600));
     }
 
     private record Case(String name, Supplier<KGGraphBuilder> build) {}

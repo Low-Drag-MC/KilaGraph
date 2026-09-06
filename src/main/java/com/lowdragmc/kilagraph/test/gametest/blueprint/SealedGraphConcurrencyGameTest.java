@@ -52,10 +52,10 @@ public final class SealedGraphConcurrencyGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
+        var data = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, ADMITS_NOTHING, KGGameTests.functionKey(ADMITS_NOTHING), data);
         KGGameTests.registerFunctionTest(event, REFUSES_ADMISSION, KGGameTests.functionKey(REFUSES_ADMISSION), data);
-        KGGameTests.registerFunctionTest(event, MANY_THREADS, KGGameTests.functionKey(MANY_THREADS), KGGameTests.defaultTestData(environment, "empty", 2000));
+        KGGameTests.registerFunctionTest(event, MANY_THREADS, KGGameTests.functionKey(MANY_THREADS), KGGameTests.defaultTestData(environment, 2000));
         KGGameTests.registerFunctionTest(event, SEAL_IDEMPOTENT, KGGameTests.functionKey(SEAL_IDEMPOTENT), data);
     }
 

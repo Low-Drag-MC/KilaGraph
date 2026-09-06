@@ -86,7 +86,7 @@ public final class NumericPromotionGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        var data = KGGameTests.defaultTestData(environment, "empty");
+        var data = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, MODULO_TICK_COUNTER, KGGameTests.functionKey(MODULO_TICK_COUNTER), data);
         KGGameTests.registerFunctionTest(event, MODULO_EDGES, KGGameTests.functionKey(MODULO_EDGES), data);
         KGGameTests.registerFunctionTest(event, WHOLE_SURVIVES_OPS, KGGameTests.functionKey(WHOLE_SURVIVES_OPS), data);

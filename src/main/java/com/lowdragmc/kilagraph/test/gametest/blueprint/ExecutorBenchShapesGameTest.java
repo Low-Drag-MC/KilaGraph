@@ -95,33 +95,33 @@ public final class ExecutorBenchShapesGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        KGGameTests.registerFunctionTest(event, NUMERIC_PROMOTION_COST, KGGameTests.functionKey(NUMERIC_PROMOTION_COST), KGGameTests.defaultTestData(environment, "empty", 6000));
+        KGGameTests.registerFunctionTest(event, NUMERIC_PROMOTION_COST, KGGameTests.functionKey(NUMERIC_PROMOTION_COST), KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, DISPATCH_COST, KGGameTests.functionKey(DISPATCH_COST),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, OPTION_READ_COST, KGGameTests.functionKey(OPTION_READ_COST),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, EXEC_STEP_LOOKUP_COST, KGGameTests.functionKey(EXEC_STEP_LOOKUP_COST),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, INTRINSICS_COST, KGGameTests.functionKey(INTRINSICS_COST),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, EXEC_INTRINSICS_COST, KGGameTests.functionKey(EXEC_INTRINSICS_COST),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, EXEC_CHAIN32, KGGameTests.functionKey(EXEC_CHAIN32),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, BRANCH_LADDER16, KGGameTests.functionKey(BRANCH_LADDER16),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, VAR_PING_PONG16, KGGameTests.functionKey(VAR_PING_PONG16),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, WIDE_ADD32, KGGameTests.functionKey(WIDE_ADD32),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, VECTOR_CHAIN16, KGGameTests.functionKey(VECTOR_CHAIN16),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, FOR_LOOP1024, KGGameTests.functionKey(FOR_LOOP1024),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, SUBGRAPH_CALLS, KGGameTests.functionKey(SUBGRAPH_CALLS),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
         KGGameTests.registerFunctionTest(event, MIXED_WORKLOAD, KGGameTests.functionKey(MIXED_WORKLOAD),
-                KGGameTests.defaultTestData(environment, "empty", 6000));
+                KGGameTests.defaultTestData(environment, 6000));
     }
 
     private static final int CHAIN = 16;

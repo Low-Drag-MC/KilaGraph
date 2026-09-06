@@ -60,7 +60,7 @@ public final class ExecCombinationsGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{NESTED_ACCUM, BREAK_INNER_SCOPED, BREAK_IN_SEQUENCE, WHILE_TERMINATES, SEQUENCE_OF_LOOPS}) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }

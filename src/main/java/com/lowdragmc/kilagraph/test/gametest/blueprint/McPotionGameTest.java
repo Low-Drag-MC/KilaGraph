@@ -51,7 +51,7 @@ public final class McPotionGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 POTIONS_ARE_BUILT_AND_READ, CUSTOM_EFFECTS_STACK_ON_THE_BASE, EFFECTS_ARE_REMOVED
         }) {

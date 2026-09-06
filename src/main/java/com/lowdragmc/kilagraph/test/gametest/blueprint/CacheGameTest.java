@@ -37,7 +37,7 @@ public final class CacheGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{CACHE_MEMOIZES, CACHE_CLEAR_RECOMPUTES, CACHE_CLEAR_UNWIRED_NOOP, CACHE_CLEAR_SELECTIVE}) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }

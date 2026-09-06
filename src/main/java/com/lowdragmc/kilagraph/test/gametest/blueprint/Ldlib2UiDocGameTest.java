@@ -52,7 +52,7 @@ public final class Ldlib2UiDocGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 ALL_THREE_XML_FORMS_ARE_EQUIVALENT, AN_XML_DECLARATION_IS_TOLERATED_ON_A_FRAGMENT, XML_ATTRIBUTES_REACH_THE_ELEMENT,
                 BROKEN_XML_DEGRADES_TO_AN_EMPTY_UI, A_TEMPLATE_ROUND_TRIP_PRESERVES_THE_TREE, A_MISSING_TEMPLATE_PATH_DEGRADES_TO_MISSING,

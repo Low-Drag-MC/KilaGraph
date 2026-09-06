@@ -50,7 +50,7 @@ public final class ErrorPathGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
+        TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 EXEC_FLOW_SURVIVES_A_THROWING_NODE, A_THROWING_PULL_LEAVES_NO_STALE_STAGED_VALUE, BREAK_OUTSIDE_A_LOOP_IS_REPORTED,
                 A_THROW_INSIDE_A_LOOP_BODY_UNWINDS_CLEANLY, UNWIRED_INPUTS_FALL_BACK_TO_DEFAULTS
