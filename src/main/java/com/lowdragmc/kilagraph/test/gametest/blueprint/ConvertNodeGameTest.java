@@ -48,20 +48,20 @@ public final class ConvertNodeGameTest {
     private static final String TO_INT = "convert_to_int";
     private static final String TO_FLOAT = "convert_to_float";
 
-    private static final String TO_INT_KEEPS_LARGE_WHOLE_NUMBERS = "convert_to_int_keeps_large_whole_numbers";
-    private static final String TO_INT_SATURATES_RATHER_THAN_WRAPPING = "convert_to_int_saturates_rather_than_wrapping";
+    private static final String TO_INT_LARGE = "convert_to_int_large";
+    private static final String TO_INT_SATURATES = "convert_to_int_saturates";
     private static final String TO_LONG = "convert_to_long";
     private static final String TO_DOUBLE = "convert_to_double";
-    private static final String PARSE_NUMBER_KEEPS_WHOLE_TEXT_WHOLE = "convert_parse_number_keeps_whole_text_whole";
+    private static final String PARSE_NUMBER_WHOLE = "convert_parse_number_whole";
     private ConvertNodeGameTest() {}
 
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(TO_INT_KEEPS_LARGE_WHOLE_NUMBERS, ConvertNodeGameTest::toIntKeepsLargeWholeNumbers);
-        KGGameTests.registerFunction(TO_INT_SATURATES_RATHER_THAN_WRAPPING, ConvertNodeGameTest::toIntSaturatesRatherThanWrapping);
+        KGGameTests.registerFunction(TO_INT_LARGE, ConvertNodeGameTest::toIntKeepsLargeWholeNumbers);
+        KGGameTests.registerFunction(TO_INT_SATURATES, ConvertNodeGameTest::toIntSaturatesRatherThanWrapping);
         KGGameTests.registerFunction(TO_LONG, ConvertNodeGameTest::toLong);
         KGGameTests.registerFunction(TO_DOUBLE, ConvertNodeGameTest::toDouble);
-        KGGameTests.registerFunction(PARSE_NUMBER_KEEPS_WHOLE_TEXT_WHOLE, ConvertNodeGameTest::parseNumberKeepsWholeTextWhole);
+        KGGameTests.registerFunction(PARSE_NUMBER_WHOLE, ConvertNodeGameTest::parseNumberKeepsWholeTextWhole);
         KGGameTests.registerFunction(TO_STRING, ConvertNodeGameTest::toStringTest);
         KGGameTests.registerFunction(PARSE_NUMBER, ConvertNodeGameTest::parseNumber);
         KGGameTests.registerFunction(PARSE_BOOL, ConvertNodeGameTest::parseBool);
@@ -72,11 +72,11 @@ public final class ConvertNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        KGGameTests.registerFunctionTest(event, TO_INT_KEEPS_LARGE_WHOLE_NUMBERS, KGGameTests.functionKey(TO_INT_KEEPS_LARGE_WHOLE_NUMBERS), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, TO_INT_SATURATES_RATHER_THAN_WRAPPING, KGGameTests.functionKey(TO_INT_SATURATES_RATHER_THAN_WRAPPING), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, TO_INT_LARGE, KGGameTests.functionKey(TO_INT_LARGE), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, TO_INT_SATURATES, KGGameTests.functionKey(TO_INT_SATURATES), KGGameTests.defaultTestData(environment, "empty"));
         KGGameTests.registerFunctionTest(event, TO_LONG, KGGameTests.functionKey(TO_LONG), KGGameTests.defaultTestData(environment, "empty"));
         KGGameTests.registerFunctionTest(event, TO_DOUBLE, KGGameTests.functionKey(TO_DOUBLE), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, PARSE_NUMBER_KEEPS_WHOLE_TEXT_WHOLE, KGGameTests.functionKey(PARSE_NUMBER_KEEPS_WHOLE_TEXT_WHOLE), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, PARSE_NUMBER_WHOLE, KGGameTests.functionKey(PARSE_NUMBER_WHOLE), KGGameTests.defaultTestData(environment, "empty"));
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
         for (String p : new String[]{
                 TO_STRING, PARSE_NUMBER, PARSE_BOOL,

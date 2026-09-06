@@ -31,13 +31,13 @@ public final class ComparisonNodeGameTest {
     private static final String LE = "cmp_less_equal";
     private static final String NEQ = "cmp_not_equals";
 
-    private static final String NOT_EQUALS_COMPARES_NUMBERS_BY_VALUE = "cmp_not_equals_compares_numbers_by_value";
-    private static final String NOT_EQUALS_STILL_COMPARES_NON_NUMBERS_BY_EQUALS = "cmp_not_equals_still_compares_non_numbers_by_equals";
+    private static final String NEQ_BY_VALUE = "cmp_not_equals_by_value";
+    private static final String NEQ_NON_NUMBERS = "cmp_not_equals_non_numbers";
     private ComparisonNodeGameTest() {}
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(NOT_EQUALS_COMPARES_NUMBERS_BY_VALUE, ComparisonNodeGameTest::notEqualsComparesNumbersByValue);
-        KGGameTests.registerFunction(NOT_EQUALS_STILL_COMPARES_NON_NUMBERS_BY_EQUALS, ComparisonNodeGameTest::notEqualsStillComparesNonNumbersByEquals);
+        KGGameTests.registerFunction(NEQ_BY_VALUE, ComparisonNodeGameTest::notEqualsComparesNumbersByValue);
+        KGGameTests.registerFunction(NEQ_NON_NUMBERS, ComparisonNodeGameTest::notEqualsStillComparesNonNumbersByEquals);
         KGGameTests.registerFunction(GT, ComparisonNodeGameTest::greaterThan);
         KGGameTests.registerFunction(GE, ComparisonNodeGameTest::greaterEqual);
         KGGameTests.registerFunction(LT, ComparisonNodeGameTest::lessThan);
@@ -47,8 +47,8 @@ public final class ComparisonNodeGameTest {
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, NOT_EQUALS_COMPARES_NUMBERS_BY_VALUE, KGGameTests.functionKey(NOT_EQUALS_COMPARES_NUMBERS_BY_VALUE), data);
-        KGGameTests.registerFunctionTest(event, NOT_EQUALS_STILL_COMPARES_NON_NUMBERS_BY_EQUALS, KGGameTests.functionKey(NOT_EQUALS_STILL_COMPARES_NON_NUMBERS_BY_EQUALS), data);
+        KGGameTests.registerFunctionTest(event, NEQ_BY_VALUE, KGGameTests.functionKey(NEQ_BY_VALUE), data);
+        KGGameTests.registerFunctionTest(event, NEQ_NON_NUMBERS, KGGameTests.functionKey(NEQ_NON_NUMBERS), data);
         KGGameTests.registerFunctionTest(event, GT, KGGameTests.functionKey(GT), data);
         KGGameTests.registerFunctionTest(event, GE, KGGameTests.functionKey(GE), data);
         KGGameTests.registerFunctionTest(event, LT, KGGameTests.functionKey(LT), data);

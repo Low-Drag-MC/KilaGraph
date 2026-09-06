@@ -49,30 +49,30 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * split is only real if it is asserted.
  */
 public final class VectorPinTypeGameTest {
-    private static final String POLYMORPHIC_PINS_SAY_VECTOR_AND_THREE_DIMENSIONAL_ONES_SAY_VEC3 = "vector_pin_polymorphic_pins_say_vector_and_three_dimensional_ones_say_vec3";
-    private static final String THE_MAKE_NODES_ADVERTISE_THE_EXACT_WIDTH_THEY_PRODUCE = "vector_pin_the_make_nodes_advertise_the_exact_width_they_produce";
-    private static final String A_VECTOR_CONSTANT_KEEPS_ITS_WIDTH_ACROSS_A_SAVE = "vector_pin_a_vector_constant_keeps_its_width_across_a_save";
-    private static final String SCALAR_PINS_KEEP_THE_ORDINARY_SCALAR_HANDLES = "vector_pin_scalar_pins_keep_the_ordinary_scalar_handles";
-    private static final String EVERY_WIDTH_REACHES_A_VECTOR_PIN = "vector_pin_every_width_reaches_a_vector_pin";
-    private static final String A_FRESH_VECTOR_PIN_DEFAULTS_TO_WIDTH_THREE = "vector_pin_a_fresh_vector_pin_defaults_to_width_three";
+    private static final String PIN_TYPE_NAMES = "vector_pin_type_names";
+    private static final String MAKE_NODE_WIDTHS = "vector_pin_make_node_widths";
+    private static final String WIDTH_SURVIVES_SAVE = "vector_pin_width_survives_save";
+    private static final String SCALAR_PINS_UNCHANGED = "vector_pin_scalar_pins_unchanged";
+    private static final String EVERY_WIDTH_ACCEPTED = "vector_pin_every_width_accepted";
+    private static final String DEFAULT_WIDTH_THREE = "vector_pin_default_width_three";
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(POLYMORPHIC_PINS_SAY_VECTOR_AND_THREE_DIMENSIONAL_ONES_SAY_VEC3, VectorPinTypeGameTest::polymorphicPinsSayVectorAndThreeDimensionalOnesSayVec3);
-        KGGameTests.registerFunction(THE_MAKE_NODES_ADVERTISE_THE_EXACT_WIDTH_THEY_PRODUCE, VectorPinTypeGameTest::theMakeNodesAdvertiseTheExactWidthTheyProduce);
-        KGGameTests.registerFunction(A_VECTOR_CONSTANT_KEEPS_ITS_WIDTH_ACROSS_A_SAVE, VectorPinTypeGameTest::aVectorConstantKeepsItsWidthAcrossASave);
-        KGGameTests.registerFunction(SCALAR_PINS_KEEP_THE_ORDINARY_SCALAR_HANDLES, VectorPinTypeGameTest::scalarPinsKeepTheOrdinaryScalarHandles);
-        KGGameTests.registerFunction(EVERY_WIDTH_REACHES_A_VECTOR_PIN, VectorPinTypeGameTest::everyWidthReachesAVectorPin);
-        KGGameTests.registerFunction(A_FRESH_VECTOR_PIN_DEFAULTS_TO_WIDTH_THREE, VectorPinTypeGameTest::aFreshVectorPinDefaultsToWidthThree);
+        KGGameTests.registerFunction(PIN_TYPE_NAMES, VectorPinTypeGameTest::polymorphicPinsSayVectorAndThreeDimensionalOnesSayVec3);
+        KGGameTests.registerFunction(MAKE_NODE_WIDTHS, VectorPinTypeGameTest::theMakeNodesAdvertiseTheExactWidthTheyProduce);
+        KGGameTests.registerFunction(WIDTH_SURVIVES_SAVE, VectorPinTypeGameTest::aVectorConstantKeepsItsWidthAcrossASave);
+        KGGameTests.registerFunction(SCALAR_PINS_UNCHANGED, VectorPinTypeGameTest::scalarPinsKeepTheOrdinaryScalarHandles);
+        KGGameTests.registerFunction(EVERY_WIDTH_ACCEPTED, VectorPinTypeGameTest::everyWidthReachesAVectorPin);
+        KGGameTests.registerFunction(DEFAULT_WIDTH_THREE, VectorPinTypeGameTest::aFreshVectorPinDefaultsToWidthThree);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, POLYMORPHIC_PINS_SAY_VECTOR_AND_THREE_DIMENSIONAL_ONES_SAY_VEC3, KGGameTests.functionKey(POLYMORPHIC_PINS_SAY_VECTOR_AND_THREE_DIMENSIONAL_ONES_SAY_VEC3), data);
-        KGGameTests.registerFunctionTest(event, THE_MAKE_NODES_ADVERTISE_THE_EXACT_WIDTH_THEY_PRODUCE, KGGameTests.functionKey(THE_MAKE_NODES_ADVERTISE_THE_EXACT_WIDTH_THEY_PRODUCE), data);
-        KGGameTests.registerFunctionTest(event, A_VECTOR_CONSTANT_KEEPS_ITS_WIDTH_ACROSS_A_SAVE, KGGameTests.functionKey(A_VECTOR_CONSTANT_KEEPS_ITS_WIDTH_ACROSS_A_SAVE), data);
-        KGGameTests.registerFunctionTest(event, SCALAR_PINS_KEEP_THE_ORDINARY_SCALAR_HANDLES, KGGameTests.functionKey(SCALAR_PINS_KEEP_THE_ORDINARY_SCALAR_HANDLES), data);
-        KGGameTests.registerFunctionTest(event, EVERY_WIDTH_REACHES_A_VECTOR_PIN, KGGameTests.functionKey(EVERY_WIDTH_REACHES_A_VECTOR_PIN), data);
-        KGGameTests.registerFunctionTest(event, A_FRESH_VECTOR_PIN_DEFAULTS_TO_WIDTH_THREE, KGGameTests.functionKey(A_FRESH_VECTOR_PIN_DEFAULTS_TO_WIDTH_THREE), data);
+        KGGameTests.registerFunctionTest(event, PIN_TYPE_NAMES, KGGameTests.functionKey(PIN_TYPE_NAMES), data);
+        KGGameTests.registerFunctionTest(event, MAKE_NODE_WIDTHS, KGGameTests.functionKey(MAKE_NODE_WIDTHS), data);
+        KGGameTests.registerFunctionTest(event, WIDTH_SURVIVES_SAVE, KGGameTests.functionKey(WIDTH_SURVIVES_SAVE), data);
+        KGGameTests.registerFunctionTest(event, SCALAR_PINS_UNCHANGED, KGGameTests.functionKey(SCALAR_PINS_UNCHANGED), data);
+        KGGameTests.registerFunctionTest(event, EVERY_WIDTH_ACCEPTED, KGGameTests.functionKey(EVERY_WIDTH_ACCEPTED), data);
+        KGGameTests.registerFunctionTest(event, DEFAULT_WIDTH_THREE, KGGameTests.functionKey(DEFAULT_WIDTH_THREE), data);
     }
 
     private static final float EPS = 1e-4f;

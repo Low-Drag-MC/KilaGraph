@@ -8,7 +8,6 @@ import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
@@ -60,12 +59,6 @@ public class FlipbookNode extends ShaderNode {
     @Override
     protected String previewOutputPortId() {
         return "out";
-    }
-
-    private boolean flag(String id) {
-        INodeOption opt = getNodeOptionById(id);
-        Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
-        return raw instanceof Boolean b && b;
     }
 
     @Override

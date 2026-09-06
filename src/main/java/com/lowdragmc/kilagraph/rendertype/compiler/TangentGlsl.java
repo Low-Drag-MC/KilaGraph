@@ -1,7 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.compiler;
 
 /**
- * Shared GLSL for the tangent-basis seam ({@link ShaderGraphCompiler#objectTangentBasis()}), registered via
+ * Shared GLSL for the tangent-basis seam ({@link ShaderGraphCompiler#tangentBasis(String)}), registered via
  * {@code addFunction} (deduped by name, so every tangent-reading node shares one copy). Minecraft's vertex
  * formats carry no tangent attribute, so these two functions <em>derive</em> one; both write their result
  * into {@code out} parameters rather than returning a {@code mat3}, because the compiler has no {@code mat3}

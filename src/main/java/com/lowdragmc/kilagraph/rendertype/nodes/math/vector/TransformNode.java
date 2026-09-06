@@ -5,13 +5,13 @@ import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.GeometrySpaces;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
 import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
@@ -65,8 +65,12 @@ public class TransformNode extends ShaderNode {
     }
 
 
-    private static final List<String> SPACES = List.of("object", "view", "world", "clip", "tangent");
-    private static final List<String> TARGETS = List.of("object", "view", "world", "clip", "screen", "tangent");
+    // Transform reaches two spaces the surface-quantity nodes cannot (see GeometrySpaces#SURFACE): clip on
+    // both sides, and screen as a target only — a perspective divide has no inverse to read a value back in.
+    private static final List<String> SPACES = List.of(GeometrySpaces.OBJECT, GeometrySpaces.VIEW,
+            GeometrySpaces.WORLD, GeometrySpaces.CLIP, GeometrySpaces.TANGENT);
+    private static final List<String> TARGETS = List.of(GeometrySpaces.OBJECT, GeometrySpaces.VIEW,
+            GeometrySpaces.WORLD, GeometrySpaces.CLIP, GeometrySpaces.SCREEN, GeometrySpaces.TANGENT);
     private static final List<String> TYPES = List.of("position", "direction", "normal");
 
     @Override
@@ -91,12 +95,6 @@ public class TransformNode extends ShaderNode {
     @Override
     protected String previewOutputPortId() {
         return "out";
-    }
-
-    private String choice(String id, String def, List<String> valid) {
-        INodeOption opt = getNodeOptionById(id);
-        Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
-        return raw instanceof String s && valid.contains(s) ? s : def;
     }
 
     @Override

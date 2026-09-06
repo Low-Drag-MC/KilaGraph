@@ -59,45 +59,45 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * does not.</p>
  */
 public final class NumericPromotionGameTest {
-    private static final String MODULO_ON_A_TICK_COUNTER_IS_EXACT = "numeric_promotion_modulo_on_a_tick_counter_is_exact";
-    private static final String MODULO_EDGES_IN_THE_WHOLE_LANE = "numeric_promotion_modulo_edges_in_the_whole_lane";
-    private static final String WHOLE_NUMBERS_SURVIVE_EVERY_PROMOTED_OPERATION = "numeric_promotion_whole_numbers_survive_every_promoted_operation";
-    private static final String COMPARISONS_SEE_CONSECUTIVE_TICKS_APART = "numeric_promotion_comparisons_see_consecutive_ticks_apart";
-    private static final String CONSTANT_ONLY_GRAPHS_STAY_FLOAT = "numeric_promotion_constant_only_graphs_stay_float";
-    private static final String A_WHOLE_FLOAT_CONSTANT_DOES_NOT_FORCE_THE_FLOAT_LANE = "numeric_promotion_a_whole_float_constant_does_not_force_the_float_lane";
-    private static final String A_FRACTIONAL_CONSTANT_FORCES_THE_FLOAT_LANE = "numeric_promotion_a_fractional_constant_forces_the_float_lane";
+    private static final String MODULO_TICK_COUNTER = "numeric_promotion_modulo_tick_counter";
+    private static final String MODULO_EDGES = "numeric_promotion_modulo_edges";
+    private static final String WHOLE_SURVIVES_OPS = "numeric_promotion_whole_survives_ops";
+    private static final String COMPARE_CONSECUTIVE_TICKS = "numeric_promotion_compare_consecutive_ticks";
+    private static final String CONSTANTS_STAY_FLOAT = "numeric_promotion_constants_stay_float";
+    private static final String WHOLE_FLOAT_CONSTANT = "numeric_promotion_whole_float_constant";
+    private static final String FRACTIONAL_CONSTANT = "numeric_promotion_fractional_constant";
     private static final String DOUBLE_BEATS_WHOLE = "numeric_promotion_double_beats_whole";
-    private static final String THE_LANE_FOLDS_OVER_EVERY_VARIADIC_INPUT = "numeric_promotion_the_lane_folds_over_every_variadic_input";
-    private static final String REAL_VALUED_OPERATIONS_STAY_FLOAT = "numeric_promotion_real_valued_operations_stay_float";
-    private static final String THE_LANE_SURVIVES_A_CHAIN_OF_NODES = "numeric_promotion_the_lane_survives_a_chain_of_nodes";
+    private static final String VARIADIC_FOLD = "numeric_promotion_variadic_fold";
+    private static final String REAL_OPS_STAY_FLOAT = "numeric_promotion_real_ops_stay_float";
+    private static final String LANE_SURVIVES_CHAIN = "numeric_promotion_lane_survives_chain";
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(MODULO_ON_A_TICK_COUNTER_IS_EXACT, NumericPromotionGameTest::moduloOnATickCounterIsExact);
-        KGGameTests.registerFunction(MODULO_EDGES_IN_THE_WHOLE_LANE, NumericPromotionGameTest::moduloEdgesInTheWholeLane);
-        KGGameTests.registerFunction(WHOLE_NUMBERS_SURVIVE_EVERY_PROMOTED_OPERATION, NumericPromotionGameTest::wholeNumbersSurviveEveryPromotedOperation);
-        KGGameTests.registerFunction(COMPARISONS_SEE_CONSECUTIVE_TICKS_APART, NumericPromotionGameTest::comparisonsSeeConsecutiveTicksApart);
-        KGGameTests.registerFunction(CONSTANT_ONLY_GRAPHS_STAY_FLOAT, NumericPromotionGameTest::constantOnlyGraphsStayFloat);
-        KGGameTests.registerFunction(A_WHOLE_FLOAT_CONSTANT_DOES_NOT_FORCE_THE_FLOAT_LANE, NumericPromotionGameTest::aWholeFloatConstantDoesNotForceTheFloatLane);
-        KGGameTests.registerFunction(A_FRACTIONAL_CONSTANT_FORCES_THE_FLOAT_LANE, NumericPromotionGameTest::aFractionalConstantForcesTheFloatLane);
+        KGGameTests.registerFunction(MODULO_TICK_COUNTER, NumericPromotionGameTest::moduloOnATickCounterIsExact);
+        KGGameTests.registerFunction(MODULO_EDGES, NumericPromotionGameTest::moduloEdgesInTheWholeLane);
+        KGGameTests.registerFunction(WHOLE_SURVIVES_OPS, NumericPromotionGameTest::wholeNumbersSurviveEveryPromotedOperation);
+        KGGameTests.registerFunction(COMPARE_CONSECUTIVE_TICKS, NumericPromotionGameTest::comparisonsSeeConsecutiveTicksApart);
+        KGGameTests.registerFunction(CONSTANTS_STAY_FLOAT, NumericPromotionGameTest::constantOnlyGraphsStayFloat);
+        KGGameTests.registerFunction(WHOLE_FLOAT_CONSTANT, NumericPromotionGameTest::aWholeFloatConstantDoesNotForceTheFloatLane);
+        KGGameTests.registerFunction(FRACTIONAL_CONSTANT, NumericPromotionGameTest::aFractionalConstantForcesTheFloatLane);
         KGGameTests.registerFunction(DOUBLE_BEATS_WHOLE, NumericPromotionGameTest::doubleBeatsWhole);
-        KGGameTests.registerFunction(THE_LANE_FOLDS_OVER_EVERY_VARIADIC_INPUT, NumericPromotionGameTest::theLaneFoldsOverEveryVariadicInput);
-        KGGameTests.registerFunction(REAL_VALUED_OPERATIONS_STAY_FLOAT, NumericPromotionGameTest::realValuedOperationsStayFloat);
-        KGGameTests.registerFunction(THE_LANE_SURVIVES_A_CHAIN_OF_NODES, NumericPromotionGameTest::theLaneSurvivesAChainOfNodes);
+        KGGameTests.registerFunction(VARIADIC_FOLD, NumericPromotionGameTest::theLaneFoldsOverEveryVariadicInput);
+        KGGameTests.registerFunction(REAL_OPS_STAY_FLOAT, NumericPromotionGameTest::realValuedOperationsStayFloat);
+        KGGameTests.registerFunction(LANE_SURVIVES_CHAIN, NumericPromotionGameTest::theLaneSurvivesAChainOfNodes);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, MODULO_ON_A_TICK_COUNTER_IS_EXACT, KGGameTests.functionKey(MODULO_ON_A_TICK_COUNTER_IS_EXACT), data);
-        KGGameTests.registerFunctionTest(event, MODULO_EDGES_IN_THE_WHOLE_LANE, KGGameTests.functionKey(MODULO_EDGES_IN_THE_WHOLE_LANE), data);
-        KGGameTests.registerFunctionTest(event, WHOLE_NUMBERS_SURVIVE_EVERY_PROMOTED_OPERATION, KGGameTests.functionKey(WHOLE_NUMBERS_SURVIVE_EVERY_PROMOTED_OPERATION), data);
-        KGGameTests.registerFunctionTest(event, COMPARISONS_SEE_CONSECUTIVE_TICKS_APART, KGGameTests.functionKey(COMPARISONS_SEE_CONSECUTIVE_TICKS_APART), data);
-        KGGameTests.registerFunctionTest(event, CONSTANT_ONLY_GRAPHS_STAY_FLOAT, KGGameTests.functionKey(CONSTANT_ONLY_GRAPHS_STAY_FLOAT), data);
-        KGGameTests.registerFunctionTest(event, A_WHOLE_FLOAT_CONSTANT_DOES_NOT_FORCE_THE_FLOAT_LANE, KGGameTests.functionKey(A_WHOLE_FLOAT_CONSTANT_DOES_NOT_FORCE_THE_FLOAT_LANE), data);
-        KGGameTests.registerFunctionTest(event, A_FRACTIONAL_CONSTANT_FORCES_THE_FLOAT_LANE, KGGameTests.functionKey(A_FRACTIONAL_CONSTANT_FORCES_THE_FLOAT_LANE), data);
+        KGGameTests.registerFunctionTest(event, MODULO_TICK_COUNTER, KGGameTests.functionKey(MODULO_TICK_COUNTER), data);
+        KGGameTests.registerFunctionTest(event, MODULO_EDGES, KGGameTests.functionKey(MODULO_EDGES), data);
+        KGGameTests.registerFunctionTest(event, WHOLE_SURVIVES_OPS, KGGameTests.functionKey(WHOLE_SURVIVES_OPS), data);
+        KGGameTests.registerFunctionTest(event, COMPARE_CONSECUTIVE_TICKS, KGGameTests.functionKey(COMPARE_CONSECUTIVE_TICKS), data);
+        KGGameTests.registerFunctionTest(event, CONSTANTS_STAY_FLOAT, KGGameTests.functionKey(CONSTANTS_STAY_FLOAT), data);
+        KGGameTests.registerFunctionTest(event, WHOLE_FLOAT_CONSTANT, KGGameTests.functionKey(WHOLE_FLOAT_CONSTANT), data);
+        KGGameTests.registerFunctionTest(event, FRACTIONAL_CONSTANT, KGGameTests.functionKey(FRACTIONAL_CONSTANT), data);
         KGGameTests.registerFunctionTest(event, DOUBLE_BEATS_WHOLE, KGGameTests.functionKey(DOUBLE_BEATS_WHOLE), data);
-        KGGameTests.registerFunctionTest(event, THE_LANE_FOLDS_OVER_EVERY_VARIADIC_INPUT, KGGameTests.functionKey(THE_LANE_FOLDS_OVER_EVERY_VARIADIC_INPUT), data);
-        KGGameTests.registerFunctionTest(event, REAL_VALUED_OPERATIONS_STAY_FLOAT, KGGameTests.functionKey(REAL_VALUED_OPERATIONS_STAY_FLOAT), data);
-        KGGameTests.registerFunctionTest(event, THE_LANE_SURVIVES_A_CHAIN_OF_NODES, KGGameTests.functionKey(THE_LANE_SURVIVES_A_CHAIN_OF_NODES), data);
+        KGGameTests.registerFunctionTest(event, VARIADIC_FOLD, KGGameTests.functionKey(VARIADIC_FOLD), data);
+        KGGameTests.registerFunctionTest(event, REAL_OPS_STAY_FLOAT, KGGameTests.functionKey(REAL_OPS_STAY_FLOAT), data);
+        KGGameTests.registerFunctionTest(event, LANE_SURVIVES_CHAIN, KGGameTests.functionKey(LANE_SURVIVES_CHAIN), data);
     }
 
     private NumericPromotionGameTest() {}

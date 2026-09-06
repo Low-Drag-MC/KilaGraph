@@ -5,12 +5,12 @@ import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.GeometrySpaces;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
@@ -41,13 +41,13 @@ public class PositionNode extends ShaderNode {
         return Component.translatable("kg.node.rt_position.tooltip");
     }
 
-    private static final List<String> SPACES = List.of("object", "world", "view", "tangent");
+    private static final List<String> SPACES = GeometrySpaces.SURFACE;
 
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
-        context.addOption("space", TypeHandles.STRING).withDefaultValue("world")
+        context.addOption(GeometrySpaces.OPTION, TypeHandles.STRING).withDefaultValue(GeometrySpaces.WORLD)
                 .withTooltips(Tooltips.of("kg.node.rt_position.option.space.tooltip"))
-                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES, PositionNode::label)).build();
+                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES, GeometrySpaces::label)).build();
     }
 
     @Override
@@ -57,21 +57,19 @@ public class PositionNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        String space = choice("space", "world", SPACES);
+        String space = choice(GeometrySpaces.OPTION, GeometrySpaces.WORLD, SPACES);
         // Injection FIRST — injection implies isPreview(), and the preview branch's vPos is a preview-quad
         // varying that does NOT exist in an injected shaderpack fragment. The view-space position is
         // reconstructed from gl_FragCoord (reconstructedViewPos); object/world derive via KG_Transforms —
         // all three spaces are exact under a shaderpack.
         if (ctx.isInjection()) {
             ShaderExpr view = ctx.temp(GlslType.VEC3, ctx.reconstructedViewPos().code());
-            String object = "(" + ctx.transformField("IModelViewMat", GlslType.MAT4).code()
-                    + " * vec4(" + view.code() + ", 1.0)).xyz";
             String out = switch (space) {
-                case "view" -> view.code();
-                case "object" -> object;
-                // The basis is derived in object space, so project the object position onto it (the basis
-                // itself is reconstructed under injection too — see ShaderGraphCompiler#tangentFrameNormal).
-                case "tangent" -> ctx.spaceToTangent("object", new ShaderExpr(object, GlslType.VEC3)).code();
+                case GeometrySpaces.VIEW -> view.code();
+                case GeometrySpaces.OBJECT -> "(" + ctx.transformField("IModelViewMat", GlslType.MAT4).code()
+                        + " * vec4(" + view.code() + ", 1.0)).xyz";
+                // The seam reconstructs its own object position under injection, so it needs no help here.
+                case GeometrySpaces.TANGENT -> ctx.tangentSpacePosition().code();
                 default /* world */ -> "(mat3(" + ctx.transformField("IViewMat", GlslType.MAT4).code()
                         + ") * " + view.code() + " + (vec3("
                         + ctx.transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "
@@ -89,10 +87,9 @@ public class PositionNode extends ShaderNode {
         // the vertex input is not necessarily object space (e.g. a subclass whose vertices are already world,
         // and whose object->world is not a matrix). This node just dispatches to the chosen space.
         ShaderExpr out = switch (space) {
-            case "object" -> ctx.objectSpacePosition();
-            case "view" -> ctx.viewSpacePosition();
-            // The basis is derived in object space, so project the object position onto it.
-            case "tangent" -> ctx.spaceToTangent("object", ctx.objectSpacePosition());
+            case GeometrySpaces.OBJECT -> ctx.objectSpacePosition();
+            case GeometrySpaces.VIEW -> ctx.viewSpacePosition();
+            case GeometrySpaces.TANGENT -> ctx.tangentSpacePosition();
             default /* world */ -> ctx.worldSpacePosition();
         };
         ctx.output("out", out);
@@ -103,24 +100,9 @@ public class PositionNode extends ShaderNode {
         return "out";
     }
 
-    private static String label(String space) {
-        return switch (space) {
-            case "object" -> "Object";
-            case "view" -> "View";
-            case "tangent" -> "Tangent";
-            default -> "World";
-        };
-    }
-
-    private String choice(String id, String def, List<String> valid) {
-        INodeOption opt = getNodeOptionById(id);
-        Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
-        return raw instanceof String s && valid.contains(s) ? s : def;
-    }
-
     @Override
     public List<String> optionChoices(String optionId) {
-        return "space".equals(optionId) ? SPACES : List.of();
+        return GeometrySpaces.optionChoices(optionId);
     }
 
     @Override

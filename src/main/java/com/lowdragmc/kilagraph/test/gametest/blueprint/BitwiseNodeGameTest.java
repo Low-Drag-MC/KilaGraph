@@ -31,15 +31,15 @@ public final class BitwiseNodeGameTest {
     private static final String SHL = "bitwise_shift_left";
     private static final String SHR = "bitwise_shift_right";
 
-    private static final String LONG_OPERANDS_KEEP_ALL_SIXTY_FOUR_BITS = "bitwise_long_operands_keep_all_sixty_four_bits";
-    private static final String SHIFT_WIDTH_FOLLOWS_THE_VALUE_NOT_THE_DISTANCE = "bitwise_shift_width_follows_the_value_not_the_distance";
-    private static final String INTEGER_OPERANDS_STAY_THIRTY_TWO_BIT = "bitwise_integer_operands_stay_thirty_two_bit";
+    private static final String LONG_WIDTH = "bitwise_long_width";
+    private static final String SHIFT_WIDTH = "bitwise_shift_width";
+    private static final String INT_WIDTH = "bitwise_int_width";
     private BitwiseNodeGameTest() {}
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(LONG_OPERANDS_KEEP_ALL_SIXTY_FOUR_BITS, BitwiseNodeGameTest::longOperandsKeepAllSixtyFourBits);
-        KGGameTests.registerFunction(SHIFT_WIDTH_FOLLOWS_THE_VALUE_NOT_THE_DISTANCE, BitwiseNodeGameTest::shiftWidthFollowsTheValueNotTheDistance);
-        KGGameTests.registerFunction(INTEGER_OPERANDS_STAY_THIRTY_TWO_BIT, BitwiseNodeGameTest::integerOperandsStayThirtyTwoBit);
+        KGGameTests.registerFunction(LONG_WIDTH, BitwiseNodeGameTest::longOperandsKeepAllSixtyFourBits);
+        KGGameTests.registerFunction(SHIFT_WIDTH, BitwiseNodeGameTest::shiftWidthFollowsTheValueNotTheDistance);
+        KGGameTests.registerFunction(INT_WIDTH, BitwiseNodeGameTest::integerOperandsStayThirtyTwoBit);
         KGGameTests.registerFunction(AND, BitwiseNodeGameTest::and);
         KGGameTests.registerFunction(OR, BitwiseNodeGameTest::or);
         KGGameTests.registerFunction(XOR, BitwiseNodeGameTest::xor);
@@ -49,9 +49,9 @@ public final class BitwiseNodeGameTest {
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        KGGameTests.registerFunctionTest(event, LONG_OPERANDS_KEEP_ALL_SIXTY_FOUR_BITS, KGGameTests.functionKey(LONG_OPERANDS_KEEP_ALL_SIXTY_FOUR_BITS), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, SHIFT_WIDTH_FOLLOWS_THE_VALUE_NOT_THE_DISTANCE, KGGameTests.functionKey(SHIFT_WIDTH_FOLLOWS_THE_VALUE_NOT_THE_DISTANCE), KGGameTests.defaultTestData(environment, "empty"));
-        KGGameTests.registerFunctionTest(event, INTEGER_OPERANDS_STAY_THIRTY_TWO_BIT, KGGameTests.functionKey(INTEGER_OPERANDS_STAY_THIRTY_TWO_BIT), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, LONG_WIDTH, KGGameTests.functionKey(LONG_WIDTH), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, SHIFT_WIDTH, KGGameTests.functionKey(SHIFT_WIDTH), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, INT_WIDTH, KGGameTests.functionKey(INT_WIDTH), KGGameTests.defaultTestData(environment, "empty"));
         var d = KGGameTests.defaultTestData(environment, "empty");
         for (String p : new String[]{AND, OR, XOR, NOT, SHL, SHR}) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);

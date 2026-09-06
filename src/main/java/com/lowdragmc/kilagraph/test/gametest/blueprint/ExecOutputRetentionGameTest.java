@@ -30,24 +30,24 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * behaviour the executor always had, and the first test pins it.
  */
 public final class ExecOutputRetentionGameTest {
-    private static final String BY_DEFAULT_A_CLEAR_DROPS_WHAT_AN_EXEC_NODE_PUBLISHED = "exec_output_retention_by_default_a_clear_drops_what_an_exec_node_published";
-    private static final String RETAINED_PUBLICATIONS_SURVIVE_CLEARS_ON_BOTH_LANES_UNTIL_THE_SWITCH_IS_OFF = "exec_output_retention_retained_publications_survive_clears_on_both_lanes_until_the_switch_is_off";
-    private static final String A_REPUBLICATION_WHILE_RETAINING_IS_WHAT_IS_READ_AFTERWARDS = "exec_output_retention_a_republication_while_retaining_is_what_is_read_afterwards";
-    private static final String AN_INVALIDATED_PUBLICATION_IS_NOT_BROUGHT_BACK_BY_RETENTION = "exec_output_retention_an_invalidated_publication_is_not_brought_back_by_retention";
+    private static final String CLEAR_DROPS_BY_DEFAULT = "exec_output_retention_clear_drops_by_default";
+    private static final String RETAINED_SURVIVE_CLEARS = "exec_output_retention_retained_survive_clears";
+    private static final String REPUBLICATION_WINS = "exec_output_retention_republication_wins";
+    private static final String INVALIDATION_STICKS = "exec_output_retention_invalidation_sticks";
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(BY_DEFAULT_A_CLEAR_DROPS_WHAT_AN_EXEC_NODE_PUBLISHED, ExecOutputRetentionGameTest::byDefaultAClearDropsWhatAnExecNodePublished);
-        KGGameTests.registerFunction(RETAINED_PUBLICATIONS_SURVIVE_CLEARS_ON_BOTH_LANES_UNTIL_THE_SWITCH_IS_OFF, ExecOutputRetentionGameTest::retainedPublicationsSurviveClearsOnBothLanesUntilTheSwitchIsOff);
-        KGGameTests.registerFunction(A_REPUBLICATION_WHILE_RETAINING_IS_WHAT_IS_READ_AFTERWARDS, ExecOutputRetentionGameTest::aRepublicationWhileRetainingIsWhatIsReadAfterwards);
-        KGGameTests.registerFunction(AN_INVALIDATED_PUBLICATION_IS_NOT_BROUGHT_BACK_BY_RETENTION, ExecOutputRetentionGameTest::anInvalidatedPublicationIsNotBroughtBackByRetention);
+        KGGameTests.registerFunction(CLEAR_DROPS_BY_DEFAULT, ExecOutputRetentionGameTest::byDefaultAClearDropsWhatAnExecNodePublished);
+        KGGameTests.registerFunction(RETAINED_SURVIVE_CLEARS, ExecOutputRetentionGameTest::retainedPublicationsSurviveClearsOnBothLanesUntilTheSwitchIsOff);
+        KGGameTests.registerFunction(REPUBLICATION_WINS, ExecOutputRetentionGameTest::aRepublicationWhileRetainingIsWhatIsReadAfterwards);
+        KGGameTests.registerFunction(INVALIDATION_STICKS, ExecOutputRetentionGameTest::anInvalidatedPublicationIsNotBroughtBackByRetention);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, BY_DEFAULT_A_CLEAR_DROPS_WHAT_AN_EXEC_NODE_PUBLISHED, KGGameTests.functionKey(BY_DEFAULT_A_CLEAR_DROPS_WHAT_AN_EXEC_NODE_PUBLISHED), data);
-        KGGameTests.registerFunctionTest(event, RETAINED_PUBLICATIONS_SURVIVE_CLEARS_ON_BOTH_LANES_UNTIL_THE_SWITCH_IS_OFF, KGGameTests.functionKey(RETAINED_PUBLICATIONS_SURVIVE_CLEARS_ON_BOTH_LANES_UNTIL_THE_SWITCH_IS_OFF), data);
-        KGGameTests.registerFunctionTest(event, A_REPUBLICATION_WHILE_RETAINING_IS_WHAT_IS_READ_AFTERWARDS, KGGameTests.functionKey(A_REPUBLICATION_WHILE_RETAINING_IS_WHAT_IS_READ_AFTERWARDS), data);
-        KGGameTests.registerFunctionTest(event, AN_INVALIDATED_PUBLICATION_IS_NOT_BROUGHT_BACK_BY_RETENTION, KGGameTests.functionKey(AN_INVALIDATED_PUBLICATION_IS_NOT_BROUGHT_BACK_BY_RETENTION), data);
+        KGGameTests.registerFunctionTest(event, CLEAR_DROPS_BY_DEFAULT, KGGameTests.functionKey(CLEAR_DROPS_BY_DEFAULT), data);
+        KGGameTests.registerFunctionTest(event, RETAINED_SURVIVE_CLEARS, KGGameTests.functionKey(RETAINED_SURVIVE_CLEARS), data);
+        KGGameTests.registerFunctionTest(event, REPUBLICATION_WINS, KGGameTests.functionKey(REPUBLICATION_WINS), data);
+        KGGameTests.registerFunctionTest(event, INVALIDATION_STICKS, KGGameTests.functionKey(INVALIDATION_STICKS), data);
     }
 
     private ExecOutputRetentionGameTest() {}

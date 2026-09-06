@@ -5,12 +5,12 @@ import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.GeometrySpaces;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
@@ -39,13 +39,13 @@ public class TangentNode extends ShaderNode {
         return Component.translatable("kg.node.rt_tangent.tooltip");
     }
 
-    private static final List<String> SPACES = List.of("object", "world", "view", "tangent");
+    private static final List<String> SPACES = GeometrySpaces.SURFACE;
 
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
-        context.addOption("space", TypeHandles.STRING).withDefaultValue("world")
+        context.addOption(GeometrySpaces.OPTION, TypeHandles.STRING).withDefaultValue(GeometrySpaces.WORLD)
                 .withTooltips(Tooltips.of("kg.node.rt_tangent.option.space.tooltip"))
-                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES, TangentNode::label)).build();
+                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES, GeometrySpaces::label)).build();
     }
 
     @Override
@@ -55,9 +55,9 @@ public class TangentNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        String space = choice("space", "world", SPACES);
+        String space = choice(GeometrySpaces.OPTION, GeometrySpaces.WORLD, SPACES);
         // In its own space the tangent is the basis' first axis, by construction — no basis needed.
-        if ("tangent".equals(space)) {
+        if (GeometrySpaces.TANGENT.equals(space)) {
             ctx.output("out", new ShaderExpr("vec3(1.0, 0.0, 0.0)", GlslType.VEC3));
             return;
         }
@@ -69,9 +69,19 @@ public class TangentNode extends ShaderNode {
         return "out";
     }
 
+    /**
+     * A flat quad shows one constant colour for a basis vector — the uv there has no rotation to follow, so
+     * the thumbnail says nothing. Preview on the sphere instead, where the derived frame actually turns,
+     * for the same reason {@code FresnelNode} does.
+     */
+    @Override
+    protected String defaultPreviewContentKey() {
+        return "sphere";
+    }
+
     @Override
     public List<String> optionChoices(String optionId) {
-        return "space".equals(optionId) ? SPACES : List.of();
+        return GeometrySpaces.optionChoices(optionId);
     }
 
     @Override
@@ -83,20 +93,5 @@ public class TangentNode extends ShaderNode {
                 // world
                 out = mat3(IViewMat)
                     * mat3(ModelViewMat) * T;""";
-    }
-
-    private static String label(String space) {
-        return switch (space) {
-            case "object" -> "Object";
-            case "view" -> "View";
-            case "tangent" -> "Tangent";
-            default -> "World";
-        };
-    }
-
-    private String choice(String id, String def, List<String> valid) {
-        INodeOption opt = getNodeOptionById(id);
-        Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
-        return raw instanceof String s && valid.contains(s) ? s : def;
     }
 }

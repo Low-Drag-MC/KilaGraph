@@ -33,12 +33,12 @@ public final class VariableGameTest {
     private static final String OUTPUT_VAR_DEFAULT_WHEN_UNWIRED = "var_output_default_when_unwired";
     private static final String STORE_NULL_OVERRIDES_DEFAULT = "var_store_null_overrides_default";
 
-    private static final String NULL_DEFAULT_READS_NULL_RATHER_THAN_THROWING = "variable_null_default_reads_null_rather_than_throwing";
+    private static final String NULL_DEFAULT_READS_NULL = "var_null_default_reads_null";
     private VariableGameTest() {}
 
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(NULL_DEFAULT_READS_NULL_RATHER_THAN_THROWING, VariableGameTest::nullDefaultReadsNullRatherThanThrowing);
+        KGGameTests.registerFunction(NULL_DEFAULT_READS_NULL, VariableGameTest::nullDefaultReadsNullRatherThanThrowing);
         KGGameTests.registerFunction(INPUT_VAR_READ_FROM_STORE, VariableGameTest::inputVarReadFromStore);
         KGGameTests.registerFunction(OUTPUT_VAR_RUN_OUTPUTS, VariableGameTest::outputVarRunOutputs);
         KGGameTests.registerFunction(OUTPUT_VAR_DEFAULT_WHEN_UNWIRED, VariableGameTest::outputVarDefaultWhenUnwired);
@@ -47,7 +47,7 @@ public final class VariableGameTest {
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, NULL_DEFAULT_READS_NULL_RATHER_THAN_THROWING, KGGameTests.functionKey(NULL_DEFAULT_READS_NULL_RATHER_THAN_THROWING), data);
+        KGGameTests.registerFunctionTest(event, NULL_DEFAULT_READS_NULL, KGGameTests.functionKey(NULL_DEFAULT_READS_NULL), data);
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
         for (String p : new String[]{
                 INPUT_VAR_READ_FROM_STORE, OUTPUT_VAR_RUN_OUTPUTS, OUTPUT_VAR_DEFAULT_WHEN_UNWIRED,

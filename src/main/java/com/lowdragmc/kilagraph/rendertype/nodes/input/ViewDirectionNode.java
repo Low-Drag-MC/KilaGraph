@@ -5,12 +5,12 @@ import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.GeometrySpaces;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
@@ -39,13 +39,13 @@ public class ViewDirectionNode extends ShaderNode {
         return Component.translatable("kg.node.rt_view_direction.tooltip");
     }
 
-    private static final List<String> SPACES = List.of("world", "object", "view", "tangent");
+    private static final List<String> SPACES = GeometrySpaces.SURFACE;
 
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
-        context.addOption("space", TypeHandles.STRING).withDefaultValue("world")
+        context.addOption(GeometrySpaces.OPTION, TypeHandles.STRING).withDefaultValue(GeometrySpaces.WORLD)
                 .withTooltips(Tooltips.of("kg.node.rt_view_direction.option.space.tooltip"))
-                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES, ViewDirectionNode::label)).build();
+                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES, GeometrySpaces::label)).build();
         // Off by default: the raw vector carries the surface->camera distance in its length; turn on only
         // when a unit-length direction is wanted.
         context.addOption("normalize", TypeHandles.BOOL).withDefaultValue(false)
@@ -59,7 +59,7 @@ public class ViewDirectionNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        String space = choice("space", "world", SPACES);
+        String space = choice(GeometrySpaces.OPTION, GeometrySpaces.WORLD, SPACES);
         // Camera is at the view-space origin, so the surface->camera direction is -viewPos; its length is the
         // distance to the camera. MC's matrices are pure rotation (mat3) + translation, so the view->world /
         // view->object rotations preserve that length across spaces.
@@ -69,13 +69,12 @@ public class ViewDirectionNode extends ShaderNode {
             // position from gl_FragCoord + our own UBOs, then rotate that -viewPos into the chosen space
             // (reconstruction needs gl_FragCoord, so this can't go through the vanilla *SpaceViewDir seams).
             ShaderExpr vd = ctx.temp(GlslType.VEC3, "-" + ctx.reconstructedViewPos().code());
-            String object = "mat3(" + ctx.transformField("IModelViewMat", GlslType.MAT4).code() + ") * " + vd.code();
             String out = switch (space) {
-                case "object" -> object;
-                case "view" -> vd.code();
-                // The basis is derived in object space, so project the object-space direction onto it (the
-                // basis itself is reconstructed under injection too — see ShaderGraphCompiler#tangentFrameNormal).
-                case "tangent" -> ctx.spaceToTangent("object", new ShaderExpr(object, GlslType.VEC3)).code();
+                case GeometrySpaces.OBJECT ->
+                        "mat3(" + ctx.transformField("IModelViewMat", GlslType.MAT4).code() + ") * " + vd.code();
+                case GeometrySpaces.VIEW -> vd.code();
+                // The seam reconstructs its own object-space direction under injection.
+                case GeometrySpaces.TANGENT -> ctx.tangentSpaceViewDir().code();
                 default /* world */ -> "mat3(" + ctx.transformField("IViewMat", GlslType.MAT4).code() + ") * " + vd.code();
             };
             dir = new ShaderExpr(out, GlslType.VEC3);
@@ -83,11 +82,11 @@ public class ViewDirectionNode extends ShaderNode {
             // The render pipeline owns the coordinate spaces (see ShaderGraphCompiler's *SpaceViewDir seams):
             // each seam rotates -viewPos into the chosen space. This node just dispatches.
             dir = switch (space) {
-                case "object" -> ctx.objectSpaceViewDir();
-                case "view" -> ctx.viewSpaceViewDir();
-                // The basis is derived in object space, so project the object-space direction onto it. The basis
-                // is orthonormal, so this preserves the length (= distance to the camera) like the rotations do.
-                case "tangent" -> ctx.spaceToTangent("object", ctx.objectSpaceViewDir());
+                case GeometrySpaces.OBJECT -> ctx.objectSpaceViewDir();
+                case GeometrySpaces.VIEW -> ctx.viewSpaceViewDir();
+                // The basis is orthonormal, so tangent keeps the length (= camera distance) like the
+                // rotations do.
+                case GeometrySpaces.TANGENT -> ctx.tangentSpaceViewDir();
                 default /* world */ -> ctx.worldSpaceViewDir();
             };
         }
@@ -102,30 +101,9 @@ public class ViewDirectionNode extends ShaderNode {
         return "out";
     }
 
-    private static String label(String space) {
-        return switch (space) {
-            case "object" -> "Object";
-            case "view" -> "View";
-            case "tangent" -> "Tangent";
-            default -> "World";
-        };
-    }
-
-    private String choice(String id, String def, List<String> valid) {
-        INodeOption opt = getNodeOptionById(id);
-        Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
-        return raw instanceof String s && valid.contains(s) ? s : def;
-    }
-
-    private boolean flag(String id) {
-        INodeOption opt = getNodeOptionById(id);
-        Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
-        return raw instanceof Boolean b && b;
-    }
-
     @Override
     public List<String> optionChoices(String optionId) {
-        return "space".equals(optionId) ? SPACES : List.of();
+        return GeometrySpaces.optionChoices(optionId);
     }
 
     @Override

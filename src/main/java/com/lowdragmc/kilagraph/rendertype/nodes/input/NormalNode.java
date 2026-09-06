@@ -5,12 +5,12 @@ import net.minecraft.network.chat.Component;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.GeometrySpaces;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
@@ -40,13 +40,13 @@ public class NormalNode extends ShaderNode {
         return Component.translatable("kg.node.rt_normal.tooltip");
     }
 
-    private static final List<String> SPACES = List.of("object", "world", "view", "tangent");
+    private static final List<String> SPACES = GeometrySpaces.SURFACE;
 
     @Override
     public void onDefineOptions(IOptionDefinitionContext context) {
-        context.addOption("space", TypeHandles.STRING).withDefaultValue("world")
+        context.addOption(GeometrySpaces.OPTION, TypeHandles.STRING).withDefaultValue(GeometrySpaces.WORLD)
                 .withTooltips(Tooltips.of("kg.node.rt_normal.option.space.tooltip"))
-                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES, NormalNode::label)).build();
+                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, SPACES, GeometrySpaces::label)).build();
     }
 
     @Override
@@ -56,10 +56,10 @@ public class NormalNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        String space = choice("space", "world", SPACES);
+        String space = choice(GeometrySpaces.OPTION, GeometrySpaces.WORLD, SPACES);
         // Tangent space needs no basis at all: N is the basis' own third axis, so it is +Z by construction
         // (checked before the injection and preview branches — the identity holds under both).
-        if ("tangent".equals(space)) {
+        if (GeometrySpaces.TANGENT.equals(space)) {
             ctx.output("out", new ShaderExpr("vec3(0.0, 0.0, 1.0)", GlslType.VEC3));
             return;
         }
@@ -87,8 +87,8 @@ public class NormalNode extends ShaderNode {
         // The render pipeline owns the coordinate spaces (see ShaderGraphCompiler's *SpaceNormal seams);
         // each seam returns the already-normalized normal for its space. This node just dispatches.
         ShaderExpr out = switch (space) {
-            case "object" -> ctx.objectSpaceNormal();
-            case "view" -> ctx.viewSpaceNormal();
+            case GeometrySpaces.OBJECT -> ctx.objectSpaceNormal();
+            case GeometrySpaces.VIEW -> ctx.viewSpaceNormal();
             default /* world */ -> ctx.worldSpaceNormal();
         };
         ctx.output("out", out);
@@ -99,24 +99,9 @@ public class NormalNode extends ShaderNode {
         return "out";
     }
 
-    private static String label(String space) {
-        return switch (space) {
-            case "object" -> "Object";
-            case "view" -> "View";
-            case "tangent" -> "Tangent";
-            default -> "World";
-        };
-    }
-
-    private String choice(String id, String def, List<String> valid) {
-        INodeOption opt = getNodeOptionById(id);
-        Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
-        return raw instanceof String s && valid.contains(s) ? s : def;
-    }
-
     @Override
     public List<String> optionChoices(String optionId) {
-        return "space".equals(optionId) ? SPACES : List.of();
+        return GeometrySpaces.optionChoices(optionId);
     }
 
     @Override

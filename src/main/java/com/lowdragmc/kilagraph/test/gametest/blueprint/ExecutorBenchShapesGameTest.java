@@ -73,7 +73,7 @@ public final class ExecutorBenchShapesGameTest {
     private static final String SUBGRAPH_CALLS = "executor_bench_shapes_subgraph_calls";
     private static final String MIXED_WORKLOAD = "executor_bench_shapes_mixed_workload";
 
-    private static final String NUMERIC_PROMOTION_COST = "bench_shapes_numeric_promotion_cost";
+    private static final String NUMERIC_PROMOTION_COST = "executor_bench_shapes_numeric_promotion_cost";
     private ExecutorBenchShapesGameTest() {}
 
 

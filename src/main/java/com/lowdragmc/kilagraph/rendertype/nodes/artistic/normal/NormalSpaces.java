@@ -1,9 +1,9 @@
 package com.lowdragmc.kilagraph.rendertype.nodes.artistic.normal;
 
+import com.lowdragmc.kilagraph.rendertype.compiler.GeometrySpaces;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 
 import java.util.List;
 
@@ -20,11 +20,9 @@ public final class NormalSpaces {
     private NormalSpaces() {}
 
     public static final String OPTION = "space";
-    public static final List<String> SPACES = List.of("tangent", "world");
-
-    public static String label(String space) {
-        return "world".equals(space) ? "World" : "Tangent";
-    }
+    /** The two of {@link GeometrySpaces#SURFACE} a normal-producing node can hand back: the space it
+     *  computes in, and the one you can light. */
+    public static final List<String> SPACES = List.of(GeometrySpaces.TANGENT, GeometrySpaces.WORLD);
 
     public static List<String> optionChoices(String optionId) {
         return OPTION.equals(optionId) ? SPACES : List.of();
@@ -35,13 +33,9 @@ public final class NormalSpaces {
      * or run through {@link ShaderCompileContext#tangentToSpace(String, ShaderExpr)} for {@code world}.
      */
     public static ShaderExpr toChosenSpace(ShaderNode node, ShaderCompileContext ctx, ShaderExpr tangentSpaceNormal) {
-        if (!"world".equals(choice(node))) return tangentSpaceNormal;
-        return ctx.tangentToSpace("world", tangentSpaceNormal);
-    }
-
-    private static String choice(ShaderNode node) {
-        INodeOption opt = node.getNodeOptionById(OPTION);
-        Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
-        return raw instanceof String s && SPACES.contains(s) ? s : "tangent";
+        if (!GeometrySpaces.WORLD.equals(node.choice(OPTION, GeometrySpaces.TANGENT, SPACES))) {
+            return tangentSpaceNormal;
+        }
+        return ctx.tangentToSpace(GeometrySpaces.WORLD, tangentSpaceNormal);
     }
 }

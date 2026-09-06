@@ -31,33 +31,33 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * executor, so the node's state carries over between runs the way it does between two frames.
  */
 public final class ExecStateNodesGameTest {
-    private static final String DO_ONCE_PASSES_ONCE_UNTIL_RESET = "exec_state_do_once_passes_once_until_reset";
-    private static final String DO_ONCE_START_CLOSED_NEEDS_A_RESET_FIRST = "exec_state_do_once_start_closed_needs_a_reset_first";
-    private static final String DO_N_PASSES_N_TIMES_AND_COUNTS_THEM = "exec_state_do_n_passes_n_times_and_counts_them";
-    private static final String FLIP_FLOP_ALTERNATES_AND_SAYS_WHICH = "exec_state_flip_flop_alternates_and_says_which";
-    private static final String THE_TOGGLE_GATE_OPENS_CLOSES_AND_TOGGLES_BY_WHICH_PIN_WAS_ENTERED = "exec_state_the_toggle_gate_opens_closes_and_toggles_by_which_pin_was_entered";
-    private static final String MULTI_GATE_FIRES_EACH_OUTPUT_ONCE_IN_ORDER_THEN_NOTHING_UNLESS_IT_LOOPS = "exec_state_multi_gate_fires_each_output_once_in_order_then_nothing_unless_it_loops";
-    private static final String MULTI_GATE_START_INDEX_PICKS_WHERE_A_ROUND_BEGINS = "exec_state_multi_gate_start_index_picks_where_a_round_begins";
+    private static final String DO_ONCE = "exec_state_do_once";
+    private static final String DO_ONCE_START_CLOSED = "exec_state_do_once_start_closed";
+    private static final String DO_N = "exec_state_do_n";
+    private static final String FLIP_FLOP = "exec_state_flip_flop";
+    private static final String TOGGLE_GATE = "exec_state_toggle_gate";
+    private static final String MULTI_GATE = "exec_state_multi_gate";
+    private static final String MULTI_GATE_START_INDEX = "exec_state_multi_gate_start_index";
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(DO_ONCE_PASSES_ONCE_UNTIL_RESET, ExecStateNodesGameTest::doOncePassesOnceUntilReset);
-        KGGameTests.registerFunction(DO_ONCE_START_CLOSED_NEEDS_A_RESET_FIRST, ExecStateNodesGameTest::doOnceStartClosedNeedsAResetFirst);
-        KGGameTests.registerFunction(DO_N_PASSES_N_TIMES_AND_COUNTS_THEM, ExecStateNodesGameTest::doNPassesNTimesAndCountsThem);
-        KGGameTests.registerFunction(FLIP_FLOP_ALTERNATES_AND_SAYS_WHICH, ExecStateNodesGameTest::flipFlopAlternatesAndSaysWhich);
-        KGGameTests.registerFunction(THE_TOGGLE_GATE_OPENS_CLOSES_AND_TOGGLES_BY_WHICH_PIN_WAS_ENTERED, ExecStateNodesGameTest::theToggleGateOpensClosesAndTogglesByWhichPinWasEntered);
-        KGGameTests.registerFunction(MULTI_GATE_FIRES_EACH_OUTPUT_ONCE_IN_ORDER_THEN_NOTHING_UNLESS_IT_LOOPS, ExecStateNodesGameTest::multiGateFiresEachOutputOnceInOrderThenNothingUnlessItLoops);
-        KGGameTests.registerFunction(MULTI_GATE_START_INDEX_PICKS_WHERE_A_ROUND_BEGINS, ExecStateNodesGameTest::multiGateStartIndexPicksWhereARoundBegins);
+        KGGameTests.registerFunction(DO_ONCE, ExecStateNodesGameTest::doOncePassesOnceUntilReset);
+        KGGameTests.registerFunction(DO_ONCE_START_CLOSED, ExecStateNodesGameTest::doOnceStartClosedNeedsAResetFirst);
+        KGGameTests.registerFunction(DO_N, ExecStateNodesGameTest::doNPassesNTimesAndCountsThem);
+        KGGameTests.registerFunction(FLIP_FLOP, ExecStateNodesGameTest::flipFlopAlternatesAndSaysWhich);
+        KGGameTests.registerFunction(TOGGLE_GATE, ExecStateNodesGameTest::theToggleGateOpensClosesAndTogglesByWhichPinWasEntered);
+        KGGameTests.registerFunction(MULTI_GATE, ExecStateNodesGameTest::multiGateFiresEachOutputOnceInOrderThenNothingUnlessItLoops);
+        KGGameTests.registerFunction(MULTI_GATE_START_INDEX, ExecStateNodesGameTest::multiGateStartIndexPicksWhereARoundBegins);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, DO_ONCE_PASSES_ONCE_UNTIL_RESET, KGGameTests.functionKey(DO_ONCE_PASSES_ONCE_UNTIL_RESET), data);
-        KGGameTests.registerFunctionTest(event, DO_ONCE_START_CLOSED_NEEDS_A_RESET_FIRST, KGGameTests.functionKey(DO_ONCE_START_CLOSED_NEEDS_A_RESET_FIRST), data);
-        KGGameTests.registerFunctionTest(event, DO_N_PASSES_N_TIMES_AND_COUNTS_THEM, KGGameTests.functionKey(DO_N_PASSES_N_TIMES_AND_COUNTS_THEM), data);
-        KGGameTests.registerFunctionTest(event, FLIP_FLOP_ALTERNATES_AND_SAYS_WHICH, KGGameTests.functionKey(FLIP_FLOP_ALTERNATES_AND_SAYS_WHICH), data);
-        KGGameTests.registerFunctionTest(event, THE_TOGGLE_GATE_OPENS_CLOSES_AND_TOGGLES_BY_WHICH_PIN_WAS_ENTERED, KGGameTests.functionKey(THE_TOGGLE_GATE_OPENS_CLOSES_AND_TOGGLES_BY_WHICH_PIN_WAS_ENTERED), data);
-        KGGameTests.registerFunctionTest(event, MULTI_GATE_FIRES_EACH_OUTPUT_ONCE_IN_ORDER_THEN_NOTHING_UNLESS_IT_LOOPS, KGGameTests.functionKey(MULTI_GATE_FIRES_EACH_OUTPUT_ONCE_IN_ORDER_THEN_NOTHING_UNLESS_IT_LOOPS), data);
-        KGGameTests.registerFunctionTest(event, MULTI_GATE_START_INDEX_PICKS_WHERE_A_ROUND_BEGINS, KGGameTests.functionKey(MULTI_GATE_START_INDEX_PICKS_WHERE_A_ROUND_BEGINS), data);
+        KGGameTests.registerFunctionTest(event, DO_ONCE, KGGameTests.functionKey(DO_ONCE), data);
+        KGGameTests.registerFunctionTest(event, DO_ONCE_START_CLOSED, KGGameTests.functionKey(DO_ONCE_START_CLOSED), data);
+        KGGameTests.registerFunctionTest(event, DO_N, KGGameTests.functionKey(DO_N), data);
+        KGGameTests.registerFunctionTest(event, FLIP_FLOP, KGGameTests.functionKey(FLIP_FLOP), data);
+        KGGameTests.registerFunctionTest(event, TOGGLE_GATE, KGGameTests.functionKey(TOGGLE_GATE), data);
+        KGGameTests.registerFunctionTest(event, MULTI_GATE, KGGameTests.functionKey(MULTI_GATE), data);
+        KGGameTests.registerFunctionTest(event, MULTI_GATE_START_INDEX, KGGameTests.functionKey(MULTI_GATE_START_INDEX), data);
     }
 
     private ExecStateNodesGameTest() {}

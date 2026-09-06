@@ -52,22 +52,22 @@ import java.util.function.Supplier;
  * right answer and the comparison stays exact rather than approximate.</p>
  */
 public final class SealedGraphStressGameTest {
-    private static final String EVERY_SHAPE_AGREES_UNDER_CONCURRENCY = "sealed_stress_every_shape_agrees_under_concurrency";
-    private static final String CONCURRENT_EXECUTION_ACTUALLY_SCALES = "sealed_stress_concurrent_execution_actually_scales";
+    private static final String SHAPES_AGREE = "sealed_stress_shapes_agree";
+    private static final String SCALES = "sealed_stress_scales";
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(SEALING_COSTS_NOTHING_MEASURABLE, SealedGraphStressGameTest::sealingCostsNothingMeasurable);
-        KGGameTests.registerThrowingFunction(EVERY_SHAPE_AGREES_UNDER_CONCURRENCY, SealedGraphStressGameTest::everyShapeAgreesUnderConcurrency);
-        KGGameTests.registerThrowingFunction(CONCURRENT_EXECUTION_ACTUALLY_SCALES, SealedGraphStressGameTest::concurrentExecutionActuallyScales);
+        KGGameTests.registerFunction(SEAL_COST, SealedGraphStressGameTest::sealingCostsNothingMeasurable);
+        KGGameTests.registerThrowingFunction(SHAPES_AGREE, SealedGraphStressGameTest::everyShapeAgreesUnderConcurrency);
+        KGGameTests.registerThrowingFunction(SCALES, SealedGraphStressGameTest::concurrentExecutionActuallyScales);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        KGGameTests.registerFunctionTest(event, SEALING_COSTS_NOTHING_MEASURABLE, KGGameTests.functionKey(SEALING_COSTS_NOTHING_MEASURABLE), KGGameTests.defaultTestData(environment, "empty", 6000));
-        KGGameTests.registerFunctionTest(event, EVERY_SHAPE_AGREES_UNDER_CONCURRENCY, KGGameTests.functionKey(EVERY_SHAPE_AGREES_UNDER_CONCURRENCY), KGGameTests.defaultTestData(environment, "empty", 6000));
-        KGGameTests.registerFunctionTest(event, CONCURRENT_EXECUTION_ACTUALLY_SCALES, KGGameTests.functionKey(CONCURRENT_EXECUTION_ACTUALLY_SCALES), KGGameTests.defaultTestData(environment, "empty", 6000));
+        KGGameTests.registerFunctionTest(event, SEAL_COST, KGGameTests.functionKey(SEAL_COST), KGGameTests.defaultTestData(environment, "empty", 6000));
+        KGGameTests.registerFunctionTest(event, SHAPES_AGREE, KGGameTests.functionKey(SHAPES_AGREE), KGGameTests.defaultTestData(environment, "empty", 6000));
+        KGGameTests.registerFunctionTest(event, SCALES, KGGameTests.functionKey(SCALES), KGGameTests.defaultTestData(environment, "empty", 6000));
     }
 
-    private static final String SEALING_COSTS_NOTHING_MEASURABLE = "sealed_stress_sealing_costs_nothing_measurable";
+    private static final String SEAL_COST = "sealed_stress_seal_cost";
     private SealedGraphStressGameTest() {}
 
     private static final Logger LOGGER = LogUtils.getLogger();

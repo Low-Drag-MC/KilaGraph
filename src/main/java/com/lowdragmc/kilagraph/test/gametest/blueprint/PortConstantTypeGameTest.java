@@ -55,14 +55,14 @@ import java.util.List;
  * {@code KGTypeHandles} tomorrow is covered without anyone remembering to come back here.
  */
 public final class PortConstantTypeGameTest {
-    private static final String OVERRIDDEN_TYPES_USE_THE_CANONICAL_HANDLE = "port_constant_overridden_types_use_the_canonical_handle";
+    private static final String CANONICAL_HANDLE = "port_constant_canonical_handle";
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(OVERRIDDEN_TYPES_USE_THE_CANONICAL_HANDLE, PortConstantTypeGameTest::overriddenTypesUseTheCanonicalHandle);
+        KGGameTests.registerFunction(CANONICAL_HANDLE, PortConstantTypeGameTest::overriddenTypesUseTheCanonicalHandle);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
-        KGGameTests.registerFunctionTest(event, OVERRIDDEN_TYPES_USE_THE_CANONICAL_HANDLE, KGGameTests.functionKey(OVERRIDDEN_TYPES_USE_THE_CANONICAL_HANDLE), KGGameTests.defaultTestData(environment, "empty"));
+        KGGameTests.registerFunctionTest(event, CANONICAL_HANDLE, KGGameTests.functionKey(CANONICAL_HANDLE), KGGameTests.defaultTestData(environment, "empty"));
     }
 
     private PortConstantTypeGameTest() {}

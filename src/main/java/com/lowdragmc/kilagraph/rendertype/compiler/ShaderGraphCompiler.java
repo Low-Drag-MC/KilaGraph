@@ -109,7 +109,7 @@ public class ShaderGraphCompiler {
      *  constant was substituted) — surfaced as editor warnings so the user knows a default degraded. */
     private final Set<String> missingAttributes = new LinkedHashSet<>();
     /** Whether a tangent basis fell back to the normal-only approximation (no uv to anchor it, so it is
-     *  useless for normal maps) — surfaced as an editor warning. See {@link #objectTangentBasis()}. */
+     *  useless for normal maps) — surfaced as an editor warning. See {@link #tangentBasis(String)}. */
     private boolean tangentBasisDegraded;
 
     /** Sampler name for an unconnected Sampler2D fallback — bound to the MC missing-texture. */
@@ -1015,14 +1015,10 @@ public class ShaderGraphCompiler {
     // land the right way round), and an arbitrary-but-stable basis built from the normal alone.
 
     /**
-     * The <b>object-space</b> tangent basis — the single source the per-space {@link #tangentBasis(String)}
-     * rotates, mirroring how {@link #objectNormal()} is the single source of the normal seams. Memoised per
-     * stage: the columns are hoisted temps, so N readers share one derivation.
+     * Builds the <b>object-space</b> basis — the single source {@link #tangentBasis(String)} rotates into the
+     * other spaces, mirroring how {@link #objectNormal()} is the single source of the normal seams. Called
+     * once per stage; the columns are hoisted temps, so every reader shares one derivation.
      */
-    protected TangentBasis objectTangentBasis() {
-        return tangentBasis("object");
-    }
-
     private TangentBasis buildObjectTangentBasis() {
         ShaderExpr n = hoist(GlslType.VEC3, tangentFrameNormal().code());
 
@@ -1080,9 +1076,10 @@ public class ShaderGraphCompiler {
         return varyingInput("kg_objectTangent", type, () -> attribute(element, type, fallback), fallback);
     }
 
-    /** The position whose screen-space gradient anchors the cotangent frame: the object-space surface point,
-     *  or — in a per-node preview, where {@link #meshPosition()} is a constant — the preview quad's {@code
-     *  vPos}, so previews of a normal-map graph show a real basis instead of the degenerate fallback. */
+    /** The object-space surface point, in whichever compile mode we are in — the thing whose screen-space
+     *  gradient anchors the cotangent frame, and what {@link #tangentSpacePosition()} projects. In a per-node
+     *  preview {@link #meshPosition()} is a constant, so the preview quad's {@code vPos} stands in and a
+     *  normal-map graph previews against a real basis instead of the degenerate fallback. */
     private ShaderExpr tangentFramePosition() {
         // Injection first: it implies preview, but vPos is a preview-quad varying the pack program lacks.
         if (injection) {
@@ -1108,10 +1105,43 @@ public class ShaderGraphCompiler {
     }
 
     /**
-     * The tangent basis expressed in {@code space} ({@code "object"}/{@code "view"}/{@code "world"}) — the
-     * object basis rotated by the same matrices the normal seams use, which keeps the frame orthonormal
-     * (Minecraft's matrices are pure rotations). A per-node preview has no meaningful camera, so every space
-     * yields the object basis — matching how the Normal/Position nodes preview.
+     * The surface position in <b>tangent space</b> — the Position node's "Tangent" output. Completes the
+     * {@code objectSpacePosition/viewSpacePosition/worldSpacePosition} family, so the node dispatches on
+     * its dropdown instead of hand-rolling the projection.
+     */
+    protected ShaderExpr tangentSpacePosition() {
+        return spaceToTangent(GeometrySpaces.OBJECT, tangentFramePosition());
+    }
+
+    /**
+     * The surface&rarr;camera direction in <b>tangent space</b> — the View Direction node's "Tangent"
+     * output, and what the parallax nodes march along (the uv offset they want is just its {@code xy}).
+     * Completes the {@code objectSpaceViewDir/viewSpaceViewDir/worldSpaceViewDir} family.
+     *
+     * <p>Not simply {@code spaceToTangent(OBJECT, objectSpaceViewDir())}: that chain runs through
+     * {@link #meshPosition()}, which under injection returns the <em>world</em> position, so it would hand
+     * back a plausible-looking but wrong direction — valid GLSL, past the leak gate, wrong on screen under
+     * a shaderpack. {@link #objectViewDirForTangent()} reconstructs it instead.</p>
+     */
+    protected ShaderExpr tangentSpaceViewDir() {
+        return spaceToTangent(GeometrySpaces.OBJECT, objectViewDirForTangent());
+    }
+
+    /** The object-space surface&rarr;camera direction the tangent seam projects, in whichever compile mode
+     *  we are in: the vanilla {@link #objectSpaceViewDir()}, or the reconstruction under injection. */
+    private ShaderExpr objectViewDirForTangent() {
+        if (!injection) return objectSpaceViewDir();
+        return new ShaderExpr("(mat3(" + transformField("IModelViewMat", GlslType.MAT4).code() + ") * (-"
+                + reconstructedViewPos().code() + "))", GlslType.VEC3);
+    }
+
+    /**
+     * The tangent basis expressed in {@code space} — one of {@link GeometrySpaces#OBJECT},
+     * {@link GeometrySpaces#VIEW} or {@link GeometrySpaces#WORLD}. The object basis is rotated through the
+     * {@link #objectToViewMatrix()} seam, which keeps the frame orthonormal (Minecraft's matrices are pure
+     * rotations) and keeps it agreeing with the object endpoint of the Transform node on a pipeline that
+     * overrides that seam. A per-node preview has no meaningful camera, so every space yields the object
+     * basis — matching how the Normal/Position nodes preview.
      *
      * <p>Every column is a hoisted temp, memoised per stage <em>and</em> space. That matters: the callers
      * that convert a vector read all three columns in one expression, so an inlined rotation would repeat
@@ -1121,13 +1151,13 @@ public class ShaderGraphCompiler {
         // The preview quad has no meaningful camera, so its every space is the object basis — share the memo
         // slot too, or the same three temps would be hoisted once per space asked for. Injection also sets
         // `preview`, but there the camera is real (reconstructed), so its spaces stay distinct.
-        String key = preview && !injection ? "object" : space;
+        String key = preview && !injection ? GeometrySpaces.OBJECT : space;
         TangentBasis cached = current.tangentBases.get(key);
         if (cached != null) return cached;
 
         TangentBasis basis = switch (key) {
-            case "view" -> rotate(objectTangentBasis(), this::rotateObjectToView);
-            case "world" -> rotate(objectTangentBasis(), this::rotateObjectToWorld);
+            case GeometrySpaces.VIEW -> rotate(tangentBasis(GeometrySpaces.OBJECT), this::rotateObjectToView);
+            case GeometrySpaces.WORLD -> rotate(tangentBasis(GeometrySpaces.OBJECT), this::rotateObjectToWorld);
             default /* object */ -> buildObjectTangentBasis();
         };
         current.tangentBases.put(key, basis);
@@ -1162,17 +1192,18 @@ public class ShaderGraphCompiler {
                 + in.code() + ", " + basis.normal().code() + "))", GlslType.VEC3);
     }
 
-    /** Rotate an object-space direction into view space (the rotation {@link #viewSpaceNormal()} uses). */
+    /** Rotate an object-space direction into view space through the {@link #objectToViewMatrix()} seam —
+     *  the basis is derived in object space, so it has to travel by whatever that pipeline calls
+     *  object&rarr;view, exactly as {@code TransformNode}'s tangent endpoint does. */
     private ShaderExpr rotateObjectToView(ShaderExpr v) {
-        String mv = transformField("ModelViewMat", GlslType.MAT4).code();
-        return new ShaderExpr("(mat3(" + mv + ") * " + v.code() + ")", GlslType.VEC3);
+        return new ShaderExpr("(mat3(" + objectToViewMatrix().code() + ") * " + v.code() + ")", GlslType.VEC3);
     }
 
-    /** Rotate an object-space direction into world space (the rotation {@link #worldSpaceNormal()} uses). */
+    /** Rotate an object-space direction into world space — {@link #rotateObjectToView} then {@code IViewMat}. */
     private ShaderExpr rotateObjectToWorld(ShaderExpr v) {
-        String mv = transformField("ModelViewMat", GlslType.MAT4).code();
         String iView = transformField("IViewMat", GlslType.MAT4).code();
-        return new ShaderExpr("(mat3(" + iView + ") * mat3(" + mv + ") * " + v.code() + ")", GlslType.VEC3);
+        return new ShaderExpr("(mat3(" + iView + ") * mat3(" + objectToViewMatrix().code() + ") * "
+                + v.code() + ")", GlslType.VEC3);
     }
 
     /** View-space surface&rarr;camera direction (<b>unnormalized</b>; its length is the distance to the
@@ -1220,7 +1251,7 @@ public class ShaderGraphCompiler {
     }
 
     /** Whether the current emission scope is the fragment stage — i.e. whether screen-space derivatives
-     *  ({@code dFdx}/{@code dFdy}) are legal here. See {@link #objectTangentBasis()}. */
+     *  ({@code dFdx}/{@code dFdy}) are legal here. See {@link #tangentBasis(String)}. */
     protected boolean isFragmentStage() {
         return current == fragment;
     }

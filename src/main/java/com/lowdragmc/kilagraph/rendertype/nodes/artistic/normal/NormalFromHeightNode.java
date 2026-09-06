@@ -5,6 +5,7 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
+import com.lowdragmc.kilagraph.rendertype.compiler.GeometrySpaces;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderCompileContext;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity;
@@ -45,7 +46,7 @@ public class NormalFromHeightNode extends ArtisticNode {
     public void onDefineOptions(IOptionDefinitionContext context) {
         context.addOption("space", TypeHandles.STRING).withDefaultValue("tangent")
                 .withTooltips(Tooltips.of("kg.node.rt_normal_from_height.option.space.tooltip"))
-                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, NormalSpaces.SPACES, NormalSpaces::label))
+                .withConfigurable((vc, t) -> ChoiceConfigurator.build(vc, NormalSpaces.SPACES, GeometrySpaces::label))
                 .build();
     }
 

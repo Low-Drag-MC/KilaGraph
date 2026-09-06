@@ -34,7 +34,7 @@ public final class KGVertexElements {
     /**
      * The reserved registry key for a per-vertex tangent. <b>Nothing registers it</b> — Minecraft has no
      * tangent vertex element, so the shader compiler derives a tangent basis instead (see
-     * {@code ShaderGraphCompiler#objectTangentBasis()}). The key is reserved so a mod that <em>does</em> feed
+     * {@code ShaderGraphCompiler#tangentBasis(String)}). The key is reserved so a mod that <em>does</em> feed
      * its own geometry can opt in: register an element under this key and every tangent-reading node
      * (Tangent/Bitangent, the Tangent space of Position/View Direction/Transform, and any normal-map graph
      * built on them) switches from the derived basis to the real attribute, with no graph edits.

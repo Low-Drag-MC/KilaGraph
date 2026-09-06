@@ -52,8 +52,7 @@ public class ParallaxMappingNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         ShaderExpr sampler = ctx.isConnected("heightmap") ? ctx.input("heightmap") : ctx.missingSampler();
-        ShaderExpr viewTS = ctx.temp(GlslType.VEC3,
-                "normalize(" + ctx.spaceToTangent("object", ctx.objectSpaceViewDir()).code() + ")");
+        ShaderExpr viewTS = ctx.temp(GlslType.VEC3, "normalize(" + ctx.tangentSpaceViewDir().code() + ")");
         ctx.function(ParallaxGlsl.OFFSET_NAME, ParallaxGlsl.OFFSET);
         ctx.output("out", new ShaderExpr(ParallaxGlsl.OFFSET_NAME + "(" + sampler.code() + ", "
                 + ctx.input("uv").code() + ", " + viewTS.code() + ", "

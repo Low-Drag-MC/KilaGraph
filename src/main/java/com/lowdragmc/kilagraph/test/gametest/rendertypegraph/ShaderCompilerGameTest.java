@@ -1,19 +1,21 @@
 package com.lowdragmc.kilagraph.test.gametest.rendertypegraph;
 
-import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
-
+import com.lowdragmc.kilagraph.editor.ExportShaderFunction;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
+import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
+import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
-import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
-import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
 import com.lowdragmc.kilagraph.rendertype.nodes.artistic.curve.SampleCurveNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.artistic.gradient.SampleGradientNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.artistic.normal.NormalFromHeightNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.artistic.normal.NormalFromTextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.CombineNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.FlipNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
@@ -23,6 +25,7 @@ import com.lowdragmc.kilagraph.rendertype.nodes.constant.GradientNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.constant.TimeNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.ApplyFogNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogSphericalDistanceNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogUboNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.TotalFogValueNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaDiscardBlock;
@@ -51,72 +54,68 @@ import com.lowdragmc.kilagraph.rendertype.nodes.logic.ExpressionNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.logic.NotNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.logic.OrNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.AbsNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.LengthNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.NormalizeNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.AddNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.PowNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.derivative.DDXNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.interpolation.LerpNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4ConstructNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4SplitNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4TransformNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.range.ClampNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.range.MinNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.trigonometry.SinNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.CrossNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.DotNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.FresnelNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.SphereMaskNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.fog.FogUboNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.scene.GlobalsUboNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.vector.TransformNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomFloatBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.TilingAndOffsetNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.RotateNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.TwirlNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.SpherizeNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.RadialShearNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.PolarCoordinatesNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.FlipbookNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.uv.TriplanarNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.scene.ScreenPositionNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.scene.GlobalsUboNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.scene.SceneColorNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.scene.SceneDepthNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.transform.CameraNode;
-import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
-import com.lowdragmc.kilagraph.editor.ExportShaderFunction;
-import com.lowdragmc.lowdraglib2.Platform;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.GraphElementModel;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
-import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec2Block;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.LengthNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.interpolation.LerpNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.range.MinNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.NormalizeNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.PowNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.scene.ScreenPositionNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.LightMapTextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.OverlayTextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.AddNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.MultiplyNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4ConstructNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4SplitNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4TransformNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.derivative.DDXNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.trigonometry.SinNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.artistic.normal.NormalFromHeightNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.artistic.normal.NormalFromTextureNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.transform.CameraNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.FlipbookNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.uv.ParallaxMappingNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.uv.ParallaxOcclusionMappingNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.PolarCoordinatesNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.RadialShearNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.RotateNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.SpherizeNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.TilingAndOffsetNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.TriplanarNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.uv.TwirlNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomFloatBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec2Block;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec3Block;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingCustomVec4Block;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelNormalBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexPositionBlock;
+import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
+import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.math.GradientColor;
 import com.lowdragmc.lowdraglib2.math.curve.ExplicitCubicBezierCurve2;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.BlockNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.GraphElementModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.ModifierFlags;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableScope;
 import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
+import net.minecraft.nbt.NbtOps;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
@@ -216,27 +215,27 @@ public final class ShaderCompilerGameTest {
     private static final String INJECTION_UNIVERSAL = "rendertype_injection_all_nodes";
     private static final String INJECTION_GATE = "rendertype_injection_blacklist_gate";
 
-    private static final String TANGENT_BASIS_IS_DERIVED_PER_STAGE = "shader_compiler_tangent_basis_is_derived_per_stage";
-    private static final String REAL_TANGENT_ATTRIBUTE_REPLACES_THE_DERIVED_BASIS = "shader_compiler_real_tangent_attribute_replaces_the_derived_basis";
-    private static final String TANGENT_BASIS_IS_SHARED_WITHIN_A_STAGE = "shader_compiler_tangent_basis_is_shared_within_a_stage";
-    private static final String TANGENT_SPACE_NORMAL_ROUND_TRIP = "shader_compiler_tangent_space_normal_round_trip";
-    private static final String NORMAL_NODES_CAN_OUTPUT_WORLD_SPACE = "shader_compiler_normal_nodes_can_output_world_space";
-    private static final String TRIPLANAR_NORMAL_NEEDS_NO_TANGENT_BASIS = "shader_compiler_triplanar_normal_needs_no_tangent_basis";
-    private static final String PARALLAX_NODES_USE_TANGENT_SPACE_VIEW_DIR = "shader_compiler_parallax_nodes_use_tangent_space_view_dir";
-    private static final String TRANSFORM_OBJECT_ENDPOINT_FOLLOWS_THE_SEAM = "shader_compiler_transform_object_endpoint_follows_the_seam";
-    private static final String TRANSFORM_NORMAL_USES_INVERSE_TRANSPOSE = "shader_compiler_transform_normal_uses_inverse_transpose";
+    private static final String TANGENT_BASIS_PER_STAGE = "rendertype_tangent_basis_per_stage";
+    private static final String TANGENT_ATTRIBUTE = "rendertype_tangent_attribute";
+    private static final String TANGENT_BASIS_SHARED = "rendertype_tangent_basis_shared";
+    private static final String TANGENT_NORMAL_ROUND_TRIP = "rendertype_tangent_normal_round_trip";
+    private static final String NORMAL_OUTPUT_SPACE = "rendertype_normal_output_space";
+    private static final String TRIPLANAR_NORMAL = "rendertype_triplanar_normal";
+    private static final String PARALLAX_TANGENT_VIEW_DIR = "rendertype_parallax_tangent_view_dir";
+    private static final String TRANSFORM_OBJECT_SEAM = "rendertype_transform_object_seam";
+    private static final String TRANSFORM_NORMAL_INVERSE_TRANSPOSE = "rendertype_transform_normal_inverse_transpose";
     private ShaderCompilerGameTest() {}
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(TRANSFORM_OBJECT_ENDPOINT_FOLLOWS_THE_SEAM, ShaderCompilerGameTest::transformObjectEndpointFollowsTheSeam);
-        KGGameTests.registerFunction(TRANSFORM_NORMAL_USES_INVERSE_TRANSPOSE, ShaderCompilerGameTest::transformNormalUsesInverseTranspose);
-        KGGameTests.registerFunction(TANGENT_BASIS_IS_DERIVED_PER_STAGE, ShaderCompilerGameTest::tangentBasisIsDerivedPerStage);
-        KGGameTests.registerFunction(REAL_TANGENT_ATTRIBUTE_REPLACES_THE_DERIVED_BASIS, ShaderCompilerGameTest::realTangentAttributeReplacesTheDerivedBasis);
-        KGGameTests.registerFunction(TANGENT_BASIS_IS_SHARED_WITHIN_A_STAGE, ShaderCompilerGameTest::tangentBasisIsSharedWithinAStage);
-        KGGameTests.registerFunction(TANGENT_SPACE_NORMAL_ROUND_TRIP, ShaderCompilerGameTest::tangentSpaceNormalRoundTrip);
-        KGGameTests.registerFunction(NORMAL_NODES_CAN_OUTPUT_WORLD_SPACE, ShaderCompilerGameTest::normalNodesCanOutputWorldSpace);
-        KGGameTests.registerFunction(TRIPLANAR_NORMAL_NEEDS_NO_TANGENT_BASIS, ShaderCompilerGameTest::triplanarNormalNeedsNoTangentBasis);
-        KGGameTests.registerFunction(PARALLAX_NODES_USE_TANGENT_SPACE_VIEW_DIR, ShaderCompilerGameTest::parallaxNodesUseTangentSpaceViewDir);
+        KGGameTests.registerFunction(TRANSFORM_OBJECT_SEAM, ShaderCompilerGameTest::transformObjectEndpointFollowsTheSeam);
+        KGGameTests.registerFunction(TRANSFORM_NORMAL_INVERSE_TRANSPOSE, ShaderCompilerGameTest::transformNormalUsesInverseTranspose);
+        KGGameTests.registerFunction(TANGENT_BASIS_PER_STAGE, ShaderCompilerGameTest::tangentBasisIsDerivedPerStage);
+        KGGameTests.registerFunction(TANGENT_ATTRIBUTE, ShaderCompilerGameTest::realTangentAttributeReplacesTheDerivedBasis);
+        KGGameTests.registerFunction(TANGENT_BASIS_SHARED, ShaderCompilerGameTest::tangentBasisIsSharedWithinAStage);
+        KGGameTests.registerFunction(TANGENT_NORMAL_ROUND_TRIP, ShaderCompilerGameTest::tangentSpaceNormalRoundTrip);
+        KGGameTests.registerFunction(NORMAL_OUTPUT_SPACE, ShaderCompilerGameTest::normalNodesCanOutputWorldSpace);
+        KGGameTests.registerFunction(TRIPLANAR_NORMAL, ShaderCompilerGameTest::triplanarNormalNeedsNoTangentBasis);
+        KGGameTests.registerFunction(PARALLAX_TANGENT_VIEW_DIR, ShaderCompilerGameTest::parallaxNodesUseTangentSpaceViewDir);
         KGGameTests.registerFunction(DEDUP, ShaderCompilerGameTest::sharedSubexpressionCompiledOnce);
         KGGameTests.registerFunction(EMISSION, ShaderCompilerGameTest::emissionBlockAddsToBaseColor);
         KGGameTests.registerFunction(ALPHA_DISCARD, ShaderCompilerGameTest::alphaDiscardEmitsDiscard);
@@ -317,15 +316,15 @@ public final class ShaderCompilerGameTest {
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, TRANSFORM_OBJECT_ENDPOINT_FOLLOWS_THE_SEAM, KGGameTests.functionKey(TRANSFORM_OBJECT_ENDPOINT_FOLLOWS_THE_SEAM), data);
-        KGGameTests.registerFunctionTest(event, TRANSFORM_NORMAL_USES_INVERSE_TRANSPOSE, KGGameTests.functionKey(TRANSFORM_NORMAL_USES_INVERSE_TRANSPOSE), data);
-        KGGameTests.registerFunctionTest(event, TANGENT_BASIS_IS_DERIVED_PER_STAGE, KGGameTests.functionKey(TANGENT_BASIS_IS_DERIVED_PER_STAGE), data);
-        KGGameTests.registerFunctionTest(event, REAL_TANGENT_ATTRIBUTE_REPLACES_THE_DERIVED_BASIS, KGGameTests.functionKey(REAL_TANGENT_ATTRIBUTE_REPLACES_THE_DERIVED_BASIS), data);
-        KGGameTests.registerFunctionTest(event, TANGENT_BASIS_IS_SHARED_WITHIN_A_STAGE, KGGameTests.functionKey(TANGENT_BASIS_IS_SHARED_WITHIN_A_STAGE), data);
-        KGGameTests.registerFunctionTest(event, TANGENT_SPACE_NORMAL_ROUND_TRIP, KGGameTests.functionKey(TANGENT_SPACE_NORMAL_ROUND_TRIP), data);
-        KGGameTests.registerFunctionTest(event, NORMAL_NODES_CAN_OUTPUT_WORLD_SPACE, KGGameTests.functionKey(NORMAL_NODES_CAN_OUTPUT_WORLD_SPACE), data);
-        KGGameTests.registerFunctionTest(event, TRIPLANAR_NORMAL_NEEDS_NO_TANGENT_BASIS, KGGameTests.functionKey(TRIPLANAR_NORMAL_NEEDS_NO_TANGENT_BASIS), data);
-        KGGameTests.registerFunctionTest(event, PARALLAX_NODES_USE_TANGENT_SPACE_VIEW_DIR, KGGameTests.functionKey(PARALLAX_NODES_USE_TANGENT_SPACE_VIEW_DIR), data);
+        KGGameTests.registerFunctionTest(event, TRANSFORM_OBJECT_SEAM, KGGameTests.functionKey(TRANSFORM_OBJECT_SEAM), data);
+        KGGameTests.registerFunctionTest(event, TRANSFORM_NORMAL_INVERSE_TRANSPOSE, KGGameTests.functionKey(TRANSFORM_NORMAL_INVERSE_TRANSPOSE), data);
+        KGGameTests.registerFunctionTest(event, TANGENT_BASIS_PER_STAGE, KGGameTests.functionKey(TANGENT_BASIS_PER_STAGE), data);
+        KGGameTests.registerFunctionTest(event, TANGENT_ATTRIBUTE, KGGameTests.functionKey(TANGENT_ATTRIBUTE), data);
+        KGGameTests.registerFunctionTest(event, TANGENT_BASIS_SHARED, KGGameTests.functionKey(TANGENT_BASIS_SHARED), data);
+        KGGameTests.registerFunctionTest(event, TANGENT_NORMAL_ROUND_TRIP, KGGameTests.functionKey(TANGENT_NORMAL_ROUND_TRIP), data);
+        KGGameTests.registerFunctionTest(event, NORMAL_OUTPUT_SPACE, KGGameTests.functionKey(NORMAL_OUTPUT_SPACE), data);
+        KGGameTests.registerFunctionTest(event, TRIPLANAR_NORMAL, KGGameTests.functionKey(TRIPLANAR_NORMAL), data);
+        KGGameTests.registerFunctionTest(event, PARALLAX_TANGENT_VIEW_DIR, KGGameTests.functionKey(PARALLAX_TANGENT_VIEW_DIR), data);
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment, "empty");
         KGGameTests.registerFunctionTest(event, DEDUP, KGGameTests.functionKey(DEDUP), d);
         KGGameTests.registerFunctionTest(event, EMISSION, KGGameTests.functionKey(EMISSION), d);
@@ -842,6 +841,16 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "the step count is baked in as a constant", pomFsh.contains(", 32)"));
         // An implicit-lod fetch inside a non-uniform loop is undefined; the march must ask for an explicit one.
         assertTrue(helper, "the march samples at an explicit lod", pomFsh.contains("textureLod("));
+
+        // Under a shaderpack the vanilla object-position seam returns the WORLD position (meshPosition ->
+        // injectionWorldPos), so building the view direction through it yields a plausible-looking but wrong
+        // ray — valid GLSL that sails past the leak gate and is only wrong on screen. tangentSpaceViewDir()
+        // reconstructs from the view position instead; pin which of the two reconstructions gets emitted.
+        String injected = snippetText(injectionSnippet(graph));
+        assertTrue(helper, "parallax reconstructs the view position under injection",
+                injected.contains("kg_recon_viewPos"));
+        assertFalse(helper, "and does not build its ray from the world position",
+                injected.contains("kg_recon_worldPos"));
         helper.succeed();
     }
 

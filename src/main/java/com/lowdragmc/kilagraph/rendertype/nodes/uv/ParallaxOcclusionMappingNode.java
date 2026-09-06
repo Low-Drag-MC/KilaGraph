@@ -11,7 +11,6 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderNode;
 import com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity;
 import com.lowdragmc.kilagraph.rendertype.gui.ChoiceConfigurator;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
@@ -61,8 +60,7 @@ public class ParallaxOcclusionMappingNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         ShaderExpr sampler = ctx.isConnected("heightmap") ? ctx.input("heightmap") : ctx.missingSampler();
-        ShaderExpr viewTS = ctx.temp(GlslType.VEC3,
-                "normalize(" + ctx.spaceToTangent("object", ctx.objectSpaceViewDir()).code() + ")");
+        ShaderExpr viewTS = ctx.temp(GlslType.VEC3, "normalize(" + ctx.tangentSpaceViewDir().code() + ")");
         ctx.function(ParallaxGlsl.OCCLUSION_NAME, ParallaxGlsl.OCCLUSION);
         ctx.output("out", new ShaderExpr(ParallaxGlsl.OCCLUSION_NAME + "(" + sampler.code() + ", "
                 + ctx.input("uv").code() + ", " + viewTS.code() + ", "
@@ -71,9 +69,7 @@ public class ParallaxOcclusionMappingNode extends ShaderNode {
 
     /** The march length as a GLSL int literal — a constant, so the loop unrolls. */
     private String steps() {
-        INodeOption opt = getNodeOptionById("steps");
-        Object raw = opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
-        return raw instanceof String s && STEPS.contains(s) ? s : "16";
+        return choice("steps", "16", STEPS);
     }
 
     @Override

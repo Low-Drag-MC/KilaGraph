@@ -373,6 +373,12 @@ public final class ShaderCompileContext {
         return compiler.worldSpacePosition();
     }
 
+    /** The surface position in tangent space — the Position node's "Tangent" output.
+     *  See {@link #tangentBasis(String)}. */
+    public ShaderExpr tangentSpacePosition() {
+        return compiler.tangentSpacePosition();
+    }
+
     /** The surface normal in object/model space (normalized) — the Normal node's "Object" output. */
     public ShaderExpr objectSpaceNormal() {
         return compiler.objectSpaceNormal();
@@ -428,6 +434,13 @@ public final class ShaderCompileContext {
     /** The surface&rarr;camera direction in world space (unnormalized) — the View Direction node's "World" output. */
     public ShaderExpr worldSpaceViewDir() {
         return compiler.worldSpaceViewDir();
+    }
+
+    /** The surface&rarr;camera direction in tangent space (unnormalized) — the View Direction node's
+     *  "Tangent" output, and the ray the parallax nodes march along. Correct in every compile mode,
+     *  including injection; see {@link #tangentBasis(String)}. */
+    public ShaderExpr tangentSpaceViewDir() {
+        return compiler.tangentSpaceViewDir();
     }
 
     /** The interpolated {@code sphericalVertexDistance} varying (float) — vanilla's spherical fog distance,

@@ -4,11 +4,14 @@ import com.lowdragmc.kilagraph.rendertype.preview.ShaderPreviewSupport;
 import com.lowdragmc.kilagraph.graph.util.NodeDescriptions;
 import com.lowdragmc.kilagraph.graph.util.NodeTooltipHelper;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.INodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.node.NodePreviewContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * Base class for all RenderTypeGraph shader value nodes. Beyond declaring ports
@@ -67,6 +70,31 @@ public abstract class ShaderNode extends Node implements IShaderNodeDescription 
      */
     public StageAffinity stageAffinity() {
         return StageAffinity.ANY;
+    }
+
+    /**
+     * The value of a string choice option, or {@code def} when it is unset or holds something outside
+     * {@code valid} (a graph saved before the option existed, or with a choice since removed).
+     *
+     * <p>Here rather than copied into each node: a dropdown option is read the same way everywhere, and
+     * the {@code valid} check is the part that is easy to leave out — without it a stale saved value
+     * reaches {@code compile()} and lands in the {@code default} arm of a space/mode switch, which is a
+     * silently wrong shader rather than a visible failure.</p>
+     */
+    public String choice(String id, String def, List<String> valid) {
+        Object raw = optionValue(id);
+        return raw instanceof String s && valid.contains(s) ? s : def;
+    }
+
+    /** The value of a boolean option; {@code false} when unset. @see #choice */
+    public boolean flag(String id) {
+        return optionValue(id) instanceof Boolean b && b;
+    }
+
+    @Nullable
+    private Object optionValue(String id) {
+        INodeOption opt = getNodeOptionById(id);
+        return opt == null ? null : opt.tryGetValue(Object.class).result().orElse(null);
     }
 
     /** The output port id to render a live preview for, or {@code null} (default) for no preview. */

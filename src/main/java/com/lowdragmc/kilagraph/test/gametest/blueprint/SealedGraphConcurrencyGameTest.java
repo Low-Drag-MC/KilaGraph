@@ -39,24 +39,24 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
  * the value check is the one that happens to be quiet. Do not delete it as noise.</p>
  */
 public final class SealedGraphConcurrencyGameTest {
-    private static final String A_FULLY_WIRED_GRAPH_ADMITS_NOTHING = "sealed_concurrency_a_fully_wired_graph_admits_nothing";
-    private static final String SEALING_REFUSES_ADMISSION_AND_RECORDS_IT = "sealed_concurrency_sealing_refuses_admission_and_records_it";
-    private static final String ONE_SEALED_GRAPH_DRIVES_MANY_THREADS = "sealed_concurrency_one_sealed_graph_drives_many_threads";
-    private static final String SEAL_IS_IDEMPOTENT_AND_UNSEAL_IS_PAIRED = "sealed_concurrency_seal_is_idempotent_and_unseal_is_paired";
+    private static final String ADMITS_NOTHING = "sealed_concurrency_admits_nothing";
+    private static final String REFUSES_ADMISSION = "sealed_concurrency_refuses_admission";
+    private static final String MANY_THREADS = "sealed_concurrency_many_threads";
+    private static final String SEAL_IDEMPOTENT = "sealed_concurrency_seal_idempotent";
 
     public static void registerFunctions() {
-        KGGameTests.registerFunction(A_FULLY_WIRED_GRAPH_ADMITS_NOTHING, SealedGraphConcurrencyGameTest::aFullyWiredGraphAdmitsNothing);
-        KGGameTests.registerFunction(SEALING_REFUSES_ADMISSION_AND_RECORDS_IT, SealedGraphConcurrencyGameTest::sealingRefusesAdmissionAndRecordsIt);
-        KGGameTests.registerThrowingFunction(ONE_SEALED_GRAPH_DRIVES_MANY_THREADS, SealedGraphConcurrencyGameTest::oneSealedGraphDrivesManyThreads);
-        KGGameTests.registerFunction(SEAL_IS_IDEMPOTENT_AND_UNSEAL_IS_PAIRED, SealedGraphConcurrencyGameTest::sealIsIdempotentAndUnsealIsPaired);
+        KGGameTests.registerFunction(ADMITS_NOTHING, SealedGraphConcurrencyGameTest::aFullyWiredGraphAdmitsNothing);
+        KGGameTests.registerFunction(REFUSES_ADMISSION, SealedGraphConcurrencyGameTest::sealingRefusesAdmissionAndRecordsIt);
+        KGGameTests.registerThrowingFunction(MANY_THREADS, SealedGraphConcurrencyGameTest::oneSealedGraphDrivesManyThreads);
+        KGGameTests.registerFunction(SEAL_IDEMPOTENT, SealedGraphConcurrencyGameTest::sealIsIdempotentAndUnsealIsPaired);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         var data = KGGameTests.defaultTestData(environment, "empty");
-        KGGameTests.registerFunctionTest(event, A_FULLY_WIRED_GRAPH_ADMITS_NOTHING, KGGameTests.functionKey(A_FULLY_WIRED_GRAPH_ADMITS_NOTHING), data);
-        KGGameTests.registerFunctionTest(event, SEALING_REFUSES_ADMISSION_AND_RECORDS_IT, KGGameTests.functionKey(SEALING_REFUSES_ADMISSION_AND_RECORDS_IT), data);
-        KGGameTests.registerFunctionTest(event, ONE_SEALED_GRAPH_DRIVES_MANY_THREADS, KGGameTests.functionKey(ONE_SEALED_GRAPH_DRIVES_MANY_THREADS), KGGameTests.defaultTestData(environment, "empty", 2000));
-        KGGameTests.registerFunctionTest(event, SEAL_IS_IDEMPOTENT_AND_UNSEAL_IS_PAIRED, KGGameTests.functionKey(SEAL_IS_IDEMPOTENT_AND_UNSEAL_IS_PAIRED), data);
+        KGGameTests.registerFunctionTest(event, ADMITS_NOTHING, KGGameTests.functionKey(ADMITS_NOTHING), data);
+        KGGameTests.registerFunctionTest(event, REFUSES_ADMISSION, KGGameTests.functionKey(REFUSES_ADMISSION), data);
+        KGGameTests.registerFunctionTest(event, MANY_THREADS, KGGameTests.functionKey(MANY_THREADS), KGGameTests.defaultTestData(environment, "empty", 2000));
+        KGGameTests.registerFunctionTest(event, SEAL_IDEMPOTENT, KGGameTests.functionKey(SEAL_IDEMPOTENT), data);
     }
 
     private SealedGraphConcurrencyGameTest() {}
