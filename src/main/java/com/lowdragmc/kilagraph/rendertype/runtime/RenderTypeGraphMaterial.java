@@ -127,7 +127,13 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         return values.setCurve(variableName, value);
     }
 
-    /** Bind a texture to a Sampler2D variable by display name (or raw sampler name). Returns false if unknown. */
+    /** Bind a Sampler2D variable's whole value — texture + filter/address/mipmap — by display name. */
+    public boolean setSampler(String name, RenderTypeGraphTypes.Sampler2DValue value) {
+        return values.setSampler(name, value);
+    }
+
+    /** Swap only the texture of a Sampler2D variable by display name (or raw sampler name), keeping the
+     *  graph's sampler params. Returns false if unknown. To apply params too, use {@link #setSampler}. */
     public boolean setTexture(String name, ResourceLocation texture) {
         return values.setTexture(name, texture);
     }

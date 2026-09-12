@@ -121,7 +121,22 @@ public final class KGMaterialValues {
         return true;
     }
 
-    /** Bind a texture to a Sampler2D variable by display name (or raw sampler name), keeping its sampler params. */
+    /**
+     * Bind a Sampler2D variable's WHOLE value by display name (or raw sampler name): the texture <i>and</i>
+     * the filter/address/mipmap the value carries. This is what an inspector that edits a
+     * {@link RenderTypeGraphTypes.Sampler2DValue} must call — {@link #setTexture} keeps the graph's baked
+     * params, so routing an edited value through it silently drops the wrap/filter the user picked.
+     * Returns false (changing nothing) if the value has no parseable texture location.
+     */
+    public boolean setSampler(String name, RenderTypeGraphTypes.Sampler2DValue value) {
+        SamplerDefault def = SamplerDefault.of(value);
+        if (def == null) return false;
+        samplerBindings.put(variableSamplers.getOrDefault(name, name), def);
+        return true;
+    }
+
+    /** Swap only the texture of a Sampler2D variable by display name (or raw sampler name), keeping the
+     *  sampler params the graph baked. To apply a value's params too, use {@link #setSampler}. */
     public boolean setTexture(String name, ResourceLocation texture) {
         String sampler = variableSamplers.getOrDefault(name, name);
         SamplerDefault current = samplerBindings.get(sampler);
