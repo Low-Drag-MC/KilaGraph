@@ -2280,9 +2280,10 @@
 
   "kg.node.exec_set_var.tooltip": "Writes a value into a graph variable.",
   "kg.node.exec_set_var.desc.1": "Stores the value under the named graph variable. Variables marked as outputs end up in the run's result map, which is how a blueprint hands data back to whatever invoked it.",
-  "kg.node.exec_set_var.in.value": "The value to store.",
-  "kg.node.exec_set_var.option.varName.tooltip": "Which graph variable to write.",
-  "kg.node.exec_set_var.note.1": "Reading goes the other way, through a variable node on the data side — there is no Get Var exec node.",
+  "kg.node.exec_set_var.in.value": "The value to store. Typed as the variable is declared, once one is chosen.",
+  "kg.node.exec_set_var.option.varName.tooltip": "Which graph variable to write — a list of the ones this graph declares. It follows a rename: the node remembers the declaration, not the spelling.",
+  "kg.node.exec_set_var.note.1": "Reading goes the other way, through a variable node on the data side — there is no Get Var exec node. Dragging a variable onto the canvas offers both.",
+  "graph.variable": "Variable",
 
   "kg.node.exec_cache.tooltip": "Computes a value once and reuses it for the rest of the run.",
   "kg.node.exec_cache.desc.1": "The first pull evaluates the input and stores the result; every later pull returns the stored copy. The value survives loop iterations, so an expensive computation that does not change can sit outside the work without being re-derived each time round.",
