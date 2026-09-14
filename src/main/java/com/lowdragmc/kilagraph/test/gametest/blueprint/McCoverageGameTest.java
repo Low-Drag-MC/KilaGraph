@@ -161,6 +161,56 @@ public final class McCoverageGameTest {
         helper.succeed();
     }
 
+    /**
+     * The nearest entity to a point: the closest one wins, the excluded one and the non-living are
+     * skipped when asked, the radius is a sphere, and an empty radius is an honest miss.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void nearestEntity(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        // the asker at (1, 2, 1); a boat one block off, a pig two blocks off, another pig five off
+        Entity asker = helper.spawn(EntityType.ARMOR_STAND, new BlockPos(1, 2, 1));
+        Entity boat = helper.spawn(EntityType.BOAT, new BlockPos(2, 2, 1));
+        Entity near = helper.spawn(EntityType.PIG, new BlockPos(3, 2, 1));
+        Entity far = helper.spawn(EntityType.PIG, new BlockPos(6, 2, 1));
+        var at = new org.joml.Vector3f((float) asker.getX(), (float) asker.getY(), (float) asker.getZ());
+
+        var living = probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+                "center", at, "radius", 8.0, "exclude", asker, "livingOnly", true);
+        assertTrue(helper, "something living is within eight blocks", living.eval("found", Boolean.class));
+        assertEq(helper, "the near pig, not the asker and not the boat", near, living.eval("out", Object.class));
+        assertEq(helper, "two blocks away", 2f, living.eval("distance", Double.class).floatValue(), 0.01f);
+
+        var anything = probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+                "center", at, "radius", 8.0, "exclude", asker, "livingOnly", false);
+        assertEq(helper, "with the living-only switch off the boat is closer", boat, anything.eval("out", Object.class));
+
+        var unexcluded = probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+                "center", at, "radius", 8.0, "livingOnly", true);
+        assertEq(helper, "with nothing excluded the asker finds itself", asker, unexcluded.eval("out", Object.class));
+
+        // a sphere: the far pig sits inside the 4.5-block box but outside the 4.5-block sphere once the
+        // near one is gone
+        near.discard();
+        var sphere = probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+                "center", new org.joml.Vector3f(at.x, at.y + 3f, at.z), "radius", 5.5, "exclude", asker, "livingOnly", true);
+        assertFalse(helper, "five along and three up is 5.83 away: outside a 5.5 sphere though inside its box",
+                sphere.eval("found", Boolean.class));
+        assertEq(helper, "and the distance reads the radius", 5.5f, sphere.eval("distance", Double.class).floatValue(), 0.01f);
+        assertEq(helper, "the far pig is still there for a wider search", far,
+                probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+                        "center", at, "radius", 8.0, "exclude", asker, "livingOnly", true).eval("out", Object.class));
+
+        assertFalse(helper, "a zero radius finds nothing",
+                probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+                        "center", at, "radius", 0.0).eval("found", Boolean.class));
+        assertFalse(helper, "and no centre finds nothing",
+                probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+                        "radius", 8.0).eval("found", Boolean.class));
+        helper.succeed();
+    }
+
     /** A fluid stack's data components, listed. */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
