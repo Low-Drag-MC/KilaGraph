@@ -134,6 +134,14 @@ final class NodeMetadata {
         }
     }
 
+    /**
+     * ⚠️ <b>Every builder is {@code build()}ed here, before this returns.</b> A port takes its place
+     * in the node's display order at the moment it is built, and a builder left unbuilt is finished
+     * off by {@code PortDefinitionContext.finish()} — which runs <b>after</b>
+     * {@code onDefineDynamicPorts}. Leaving them to it put every dynamic port <i>above</i> the
+     * declared ones, so an rpc entry's parameters sat on top of its {@code trigger} and the ordering
+     * this method's own loop exists to produce was thrown away for any node that has both.
+     */
     private void applyPort(IPortDefinitionContext ctx, Node node, FieldDef d) {
         if (d.kind == Kind.INPUT_PORT) {
             IInputPortBuilder<?> b = ctx.addInputPort(d.id, d.typeHandle);
@@ -150,10 +158,12 @@ final class NodeMetadata {
                 // such a pin blank while the same handle drew fine on a blackboard variable.
                 b.withoutConfigurator();
             }
+            b.build();
         } else {
             IOutputPortBuilder<?> b = ctx.addOutputPort(d.id, d.typeHandle);
             if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
             if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
+            b.build();
         }
     }
 
