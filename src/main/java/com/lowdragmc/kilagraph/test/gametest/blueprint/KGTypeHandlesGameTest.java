@@ -123,7 +123,7 @@ public final class KGTypeHandlesGameTest {
         List<TypeHandle> authorable = graph.getLibrarySupportTypes();
 
         for (TypeHandle value : List.of(KGTypeHandles.RESOURCE_LOCATION, KGTypeHandles.AABB,
-                KGTypeHandles.CHUNK_POS, KGTypeHandles.TEXT, KGTypeHandles.ROTATION,
+                KGTypeHandles.TEXT, KGTypeHandles.ROTATION,
                 KGTypeHandles.MIRROR, KGTypeHandles.AXIS, KGTypeHandles.EQUIPMENT_SLOT,
                 KGTypeHandles.NBT_COMPOUND)) {
             assertTrue(helper, value.getIdentification() + " missing from getSupportTypes()",
@@ -131,6 +131,12 @@ public final class KGTypeHandlesGameTest {
             assertTrue(helper, value.getIdentification() + " missing from getLibrarySupportTypes()",
                     authorable.contains(value));
         }
+        // CHUNK_POS is pickable only: it has a default but no ConfiguratorAccessor, so its constant
+        // would render an empty inspector row. See BlueprintGraph.LIBRARY_EXCLUDED.
+        assertTrue(helper, "CHUNK_POS missing from getSupportTypes()",
+                pickable.contains(KGTypeHandles.CHUNK_POS));
+        assertTrue(helper, "CHUNK_POS must not be offered as a constant",
+                !authorable.contains(KGTypeHandles.CHUNK_POS));
         helper.succeed();
     }
 }
