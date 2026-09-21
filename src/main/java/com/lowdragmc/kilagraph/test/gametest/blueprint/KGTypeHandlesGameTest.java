@@ -120,6 +120,32 @@ public final class KGTypeHandlesGameTest {
             assertTrue(helper, wireOnly.getIdentification() + " must not be offered as a constant",
                     !authorable.contains(wireOnly));
         }
+
+        // The library list is derived from the supported types now, and the supported types are
+        // partly detected from the ports of every registered node — so the plumbing handles a node
+        // carries are in the input. None of them is a literal anyone can author.
+        for (TypeHandle plumbing : List.of(TypeHandles.EXECUTION_FLOW, TypeHandles.UNKNOWN,
+                TypeHandles.MISSING, KGTypeHandles.CONTAINER, KGTypeHandles.FLUID_CONTAINER)) {
+            assertTrue(helper, plumbing.getIdentification() + " must not be offered as a constant",
+                    !authorable.contains(plumbing));
+        }
+
+        // …and the derivation must still be offering everything the hand-written list did.
+        for (TypeHandle value : List.of(TypeHandles.BOOL, TypeHandles.INT, TypeHandles.LONG,
+                TypeHandles.FLOAT, TypeHandles.DOUBLE, TypeHandles.STRING,
+                TypeHandles.DIRECTION, TypeHandles.BLOCK, TypeHandles.ITEM, TypeHandles.FLUID,
+                TypeHandles.ENTITY_TYPE, TypeHandles.ITEM_STACK, TypeHandles.FLUID_STACK,
+                KGTypeHandles.VEC2, KGTypeHandles.VEC3, KGTypeHandles.VEC4,
+                KGTypeHandles.BLOCK_POS, KGTypeHandles.BLOCK_STATE)) {
+            assertTrue(helper, value.getIdentification() + " should still be offered as a constant",
+                    authorable.contains(value));
+        }
+
+        // VECTOR is the one authorable-looking type held back on purpose: a constant has to commit
+        // to a width, and the whole point of the handle is that it does not. See LIBRARY_EXCLUDED.
+        assertTrue(helper, "VECTOR is pickable", pickable.contains(KGTypeHandles.VECTOR));
+        assertTrue(helper, "VECTOR must not be offered as a constant",
+                !authorable.contains(KGTypeHandles.VECTOR));
         helper.succeed();
     }
 
@@ -136,7 +162,7 @@ public final class KGTypeHandlesGameTest {
         List<TypeHandle> authorable = graph.getLibrarySupportTypes();
 
         for (TypeHandle value : List.of(KGTypeHandles.RESOURCE_LOCATION, KGTypeHandles.AABB,
-                KGTypeHandles.CHUNK_POS, KGTypeHandles.TEXT, KGTypeHandles.ROTATION,
+                KGTypeHandles.TEXT, KGTypeHandles.ROTATION,
                 KGTypeHandles.MIRROR, KGTypeHandles.AXIS, KGTypeHandles.EQUIPMENT_SLOT,
                 KGTypeHandles.NBT_COMPOUND)) {
             assertTrue(helper, value.getIdentification() + " missing from getSupportTypes()",
@@ -144,6 +170,12 @@ public final class KGTypeHandlesGameTest {
             assertTrue(helper, value.getIdentification() + " missing from getLibrarySupportTypes()",
                     authorable.contains(value));
         }
+        // CHUNK_POS is pickable only: it has a default but no ConfiguratorAccessor, so its constant
+        // would render an empty inspector row. See BlueprintGraph.LIBRARY_EXCLUDED.
+        assertTrue(helper, "CHUNK_POS missing from getSupportTypes()",
+                pickable.contains(KGTypeHandles.CHUNK_POS));
+        assertTrue(helper, "CHUNK_POS must not be offered as a constant",
+                !authorable.contains(KGTypeHandles.CHUNK_POS));
         helper.succeed();
     }
 }

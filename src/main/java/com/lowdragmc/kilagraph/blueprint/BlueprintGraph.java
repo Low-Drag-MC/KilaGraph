@@ -8,12 +8,14 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphNodeRegistry;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandleHelpers;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
 import net.minecraft.resources.Identifier;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * The first KilaGraph graph: a pure data-flow graph (no exec ports yet) used to validate the
@@ -43,8 +45,6 @@ public class BlueprintGraph extends Graph {
      */
     @Override
     public List<TypeHandle> getSupportTypes() {
-        KGTypeHandles.init();
-        KGUITypeHandles.init();
         var types = new HashSet<>(CustomGraphModelImpl.detectSupportedTypes(graphModel));
         // scalars
         types.add(TypeHandles.BOOL);
@@ -89,33 +89,41 @@ public class BlueprintGraph extends Graph {
     }
 
     /**
-     * The types the item library offers as draggable Constant nodes.
+     * Types the library will not offer even though {@link TypeHandleHelpers#canAuthorLiteral} says a
+     * constant of them would hold a value. Two entries, each for a reason no predicate states:
      *
-     * <p>Overridden because the default is {@link #getSupportTypes()}, which is the wrong list for
-     * this question. A type belongs in the type-picker dropdowns as soon as a port can carry it, but
-     * it only belongs here if a literal of it can be authored: {@code Level}, {@code Entity},
-     * {@code Player} and {@code BlockEntity} are deliberately wire-only — they have no
-     * {@code AccessorRegistries} entry, so their constant node renders an empty inspector row and
-     * emits {@code null}. Offering four nodes that cannot do anything is worse than not offering
-     * them.</p>
+     * <ul>
+     *   <li>{@link KGTypeHandles#VECTOR} is width-polymorphic on purpose — a VECTOR pin takes 2, 3
+     *       or 4 and answers in kind — and a constant has to commit to a width. Drag VEC2/VEC3/VEC4
+     *       instead.</li>
+     *   <li>{@link KGTypeHandles#CHUNK_POS} has a syncdata accessor and a default value but no
+     *       {@code ConfiguratorAccessor}, so its constant renders an empty inspector row. That is
+     *       the one case the predicate structurally cannot see: whether a widget exists is a
+     *       client-only fact ({@code LDLib2Registries.CONFIGURATOR_ACCESSORS} is
+     *       {@code @OnlyIn(Dist.CLIENT)}), and this list is read on both sides. Delete this entry
+     *       the day LDLib2 gains a ChunkPos configurator accessor.</li>
+     * </ul>
+     */
+    private static final Set<TypeHandle> LIBRARY_EXCLUDED =
+            Set.of(KGTypeHandles.VECTOR, KGTypeHandles.CHUNK_POS);
+
+    /**
+     * The types the item library offers as draggable Constant nodes: every supported type a literal
+     * can be authored of, minus {@link #LIBRARY_EXCLUDED}.
      *
-     * <p>{@code LIST}, {@code MAP} and {@code NODE_REF} are excluded for the same reason — they are
-     * registered without a default constant on purpose (see {@link KGTypeHandles}).</p>
+     * <p>The rule the hand-written list was trying to express — "a literal of it can be authored" —
+     * is now the one asked. A wire-only handle ({@code Level}, {@code Entity}, {@code Player},
+     * {@code BlockEntity}, the {@code ResourceHandler} pair, every LDLib2 UI handle) is registered
+     * without a default on purpose, and so are {@code LIST}, {@code MAP} and {@code NODE_REF}; all of
+     * them fall out here for that reason rather than by being left off a list.</p>
+     *
+     * <p>The hand-written list is also what let {@code CHUNK_POS} ship as a constant that renders
+     * nothing — it was on the list precisely because a person put it there.</p>
      */
     @Override
     public List<TypeHandle> getLibrarySupportTypes() {
-        KGTypeHandles.init();
-        return List.of(
-                TypeHandles.BOOL, TypeHandles.INT, TypeHandles.LONG, TypeHandles.FLOAT,
-                TypeHandles.DOUBLE, TypeHandles.STRING,
-                KGTypeHandles.VEC2, KGTypeHandles.VEC3, KGTypeHandles.VEC4,
-                // Minecraft (LDLib2-provided) — all accessor-backed, all have pickers
-                TypeHandles.DIRECTION, TypeHandles.BLOCK, TypeHandles.ITEM, TypeHandles.FLUID,
-                TypeHandles.ENTITY_TYPE, TypeHandles.ITEM_STACK, TypeHandles.FLUID_STACK,
-                // Minecraft (KilaGraph-provided)
-                KGTypeHandles.BLOCK_POS, KGTypeHandles.BLOCK_STATE, KGTypeHandles.NBT_COMPOUND,
-                KGTypeHandles.RESOURCE_LOCATION, KGTypeHandles.AABB, KGTypeHandles.CHUNK_POS,
-                KGTypeHandles.TEXT, KGTypeHandles.ROTATION, KGTypeHandles.MIRROR,
-                KGTypeHandles.AXIS, KGTypeHandles.EQUIPMENT_SLOT);
+        return TypeHandleHelpers.authorableTypes(graphModel.getSupportTypes()).stream()
+                .filter(type -> !LIBRARY_EXCLUDED.contains(type))
+                .toList();
     }
 }
