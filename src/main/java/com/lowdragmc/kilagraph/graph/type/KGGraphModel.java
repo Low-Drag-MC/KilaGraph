@@ -1,10 +1,14 @@
 package com.lowdragmc.kilagraph.graph.type;
 
+import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.Graph;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.itemlibrary.NodeModelLibraryItem;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.CustomGraphModelImpl;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -42,6 +46,38 @@ public class KGGraphModel extends CustomGraphModelImpl {
         List<TypeHandle> types = new ArrayList<>(super.getVariableSupportTypes());
         if (!types.contains(TypeHandles.EXECUTION_FLOW)) types.add(TypeHandles.EXECUTION_FLOW);
         return types;
+    }
+
+    /**
+     * Dropping a variable on a blueprint canvas offers Set as well as Get, because a blueprint has a
+     * node that writes one. The spawned node is pointed at the declaration that was dragged, so its
+     * value pin arrives typed rather than {@code UNKNOWN}.
+     */
+    @Override
+    public NodeModelLibraryItem createVariableSetterItem(VariableDeclarationModelBase variable) {
+        return new NodeModelLibraryItem("exec_set_var", data -> {
+            var created = createNodeFromData(data, SetVarNode.class);
+            if (created instanceof NodeModel node) {
+                SetVarNode.prefill(node, variable);
+            }
+            return created;
+        });
+    }
+
+    /**
+     * Before the graph is written out, every {@code Set Var} writes down the declaration it points
+     * at — the name a rename changed, and the type its pin will need on the next load, before the
+     * variables exist to be asked. See {@link SetVarNode}.
+     *
+     * <p>{@code beforeSerialize()} rather than 26.1-has-no-such-thing {@code serializeNBT}: the
+     * model layer serializes through {@code PersistedParser}, which calls this on the root object
+     * first and {@code serializeAdditionalNBT} (where {@code GraphModel} writes the nodes) after —
+     * so this is the last moment at which an option constant can still be changed and be saved.</p>
+     */
+    @Override
+    public void beforeSerialize() {
+        SetVarNode.syncDeclarations(this);
+        super.beforeSerialize();
     }
 
     /** Every vector pin: the three concrete widths, plus the any-width {@code VECTOR}. */
