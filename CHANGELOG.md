@@ -1,12 +1,13 @@
-## v26.1.0.14
-* Fixed whole numbers exact in math, compare, bitwise and convert nodes
-* Fixed collection ports the canonical LIST handle instead of the bare class
-* Improved one prepared graph be executed by several threads
-* Refactored Vector nodes of blueprint
-* Added tangent space support to the shader graph
-* Added the missing node wiki entries for ports and options
-* Fixed a variable with a null default crashing
-* Added the exec pin a node was entered through, and the Do Once, Do N, Flip Flop, Multi Gate and Toggle Gate nodes
-* Added retainExecOutputs for exec node output cache
-* Added object transform API slots
-* Fixed DynamicTransforms being declared on pipelines that never bind it
+## v26.1.0.15
+* Added quaternion type and rotation nodes (axis angle, euler, from-to, compose, inverse, slerp, rotate vector, angle between, Vec4 bridge)
+* Added vector nodes (direction to, set length, slerp, perpendicular, wrap, Vec2/Vec3/Vec4 conversions)
+* Added math nodes (wrap, snap, step, smoothstep, inverse lerp, delta angle, move towards, nearly equal, wave)
+* Added hyperbolic sine, cosine and tangent to the Trig node
+* Added a per-node declaration of whether a graph may run it off the game thread
+* Added a variable store access API
+* Added a Set Var that points at a variable's declaration instead of at its spelling
+* Added setSampler, binding a Sampler2D value's params and not only its texture
+* Improved the item library's constant types, now derived rather than hand-listed (Chunk Pos is no longer offered as a constant it cannot edit)
+* Fixed a node's declared ports landing below the dynamic ones it defines
+* Fixed a port with no accessor losing the editor its own type registered
+* Fixed a loaded pin's constant keeping the type it was saved under instead of the pin's declared type
