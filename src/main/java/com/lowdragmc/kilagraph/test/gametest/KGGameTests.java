@@ -39,6 +39,7 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.Ldlib2UiSyncGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.ListNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.LogicNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.MapNodeGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.MathNodeExtrasGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.MathNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McActionGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McContainerGameTest;
@@ -61,10 +62,12 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.MixedWorkloadGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NbtNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NbtPipelineGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NodeContractGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.NodeRegistrationGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NumericPromotionGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.OptionalNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.PortConstantTypeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.PreparedGraphGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.QuaternionNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.SealedGraphConcurrencyGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.SealedGraphStressGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.SetVarGameTest;
@@ -208,6 +211,9 @@ public final class KGGameTests {
             new Group(VectorNodeGameTest::registerFunctions, VectorNodeGameTest::register),
             new Group(VectorNodeExtrasGameTest::registerFunctions, VectorNodeExtrasGameTest::register),
             new Group(VectorPinTypeGameTest::registerFunctions, VectorPinTypeGameTest::register),
+            new Group(MathNodeExtrasGameTest::registerFunctions, MathNodeExtrasGameTest::register),
+            new Group(QuaternionNodeGameTest::registerFunctions, QuaternionNodeGameTest::register),
+            new Group(NodeRegistrationGameTest::registerFunctions, NodeRegistrationGameTest::register),
             new Group(NodeContractGameTest::registerFunctions, NodeContractGameTest::register));
 
     /** Every render-type-graph test group. @see Group */

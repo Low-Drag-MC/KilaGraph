@@ -6,6 +6,7 @@ import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorConvertNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorGeometryNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorMathNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorStructNodes;
@@ -61,6 +62,12 @@ public final class VectorNodeExtrasGameTest {
     private static final String ROTATION_DIRECTION = "vector_extras_rotation_direction";
     private static final String MOVE_TOWARDS = "vector_extras_move_towards";
     private static final String NEARLY_EQUALS = "vector_extras_nearly_equals";
+    private static final String WIDTH_CONVERSIONS = "vector_extras_width_conversions";
+    private static final String DIRECTION_TO = "vector_extras_direction_to";
+    private static final String SET_LENGTH = "vector_extras_set_length";
+    private static final String SLERP = "vector_extras_slerp";
+    private static final String PERPENDICULAR = "vector_extras_perpendicular";
+    private static final String WRAP = "vector_extras_wrap";
 
     public static void registerFunctions() {
         KGGameTests.registerFunction(SWIZZLE_WIDTH, VectorNodeExtrasGameTest::swizzleMaskDecidesTheOutputWidth);
@@ -82,6 +89,12 @@ public final class VectorNodeExtrasGameTest {
         KGGameTests.registerFunction(ROTATION_DIRECTION, VectorNodeExtrasGameTest::rotationAndDirectionAgreeWithTheGame);
         KGGameTests.registerFunction(MOVE_TOWARDS, VectorNodeExtrasGameTest::moveTowardsLandsExactlyOnTheTarget);
         KGGameTests.registerFunction(NEARLY_EQUALS, VectorNodeExtrasGameTest::nearlyEqualsComparesOverTheWiderWidth);
+        KGGameTests.registerFunction(WIDTH_CONVERSIONS, VectorNodeExtrasGameTest::widthConversionsAnswerTheTypeTheirPinNames);
+        KGGameTests.registerFunction(DIRECTION_TO, VectorNodeExtrasGameTest::directionToAnswersAUnitVectorAndTheDistance);
+        KGGameTests.registerFunction(SET_LENGTH, VectorNodeExtrasGameTest::setLengthKeepsTheDirection);
+        KGGameTests.registerFunction(SLERP, VectorNodeExtrasGameTest::slerpSweepsTheArcRatherThanCuttingAcross);
+        KGGameTests.registerFunction(PERPENDICULAR, VectorNodeExtrasGameTest::perpendicularIsOrthogonalAndUnit);
+        KGGameTests.registerFunction(WRAP, VectorNodeExtrasGameTest::vectorWrapFoldsEveryComponent);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -105,6 +118,12 @@ public final class VectorNodeExtrasGameTest {
         KGGameTests.registerFunctionTest(event, ROTATION_DIRECTION, KGGameTests.functionKey(ROTATION_DIRECTION), data);
         KGGameTests.registerFunctionTest(event, MOVE_TOWARDS, KGGameTests.functionKey(MOVE_TOWARDS), data);
         KGGameTests.registerFunctionTest(event, NEARLY_EQUALS, KGGameTests.functionKey(NEARLY_EQUALS), data);
+        KGGameTests.registerFunctionTest(event, WIDTH_CONVERSIONS, KGGameTests.functionKey(WIDTH_CONVERSIONS), data);
+        KGGameTests.registerFunctionTest(event, DIRECTION_TO, KGGameTests.functionKey(DIRECTION_TO), data);
+        KGGameTests.registerFunctionTest(event, SET_LENGTH, KGGameTests.functionKey(SET_LENGTH), data);
+        KGGameTests.registerFunctionTest(event, SLERP, KGGameTests.functionKey(SLERP), data);
+        KGGameTests.registerFunctionTest(event, PERPENDICULAR, KGGameTests.functionKey(PERPENDICULAR), data);
+        KGGameTests.registerFunctionTest(event, WRAP, KGGameTests.functionKey(WRAP), data);
     }
 
     private static final float EPS = 1e-4f;
@@ -234,6 +253,150 @@ public final class VectorNodeExtrasGameTest {
         Object two = withComponent(new Vector2f(1f, 2f), 2, 9f);
         assertTrue(helper, "a Vec2 stays a Vec2, got " + two, two instanceof Vector2f);
         assertVec(helper, "an axis past the width changes nothing", new float[] {1f, 2f}, two);
+        helper.succeed();
+    }
+
+    /**
+     * The width conversions answer the JOML class their output pin names, and fill what the input did
+     * not carry.
+     */
+    public static void widthConversionsAnswerTheTypeTheirPinNames(GameTestHelper helper) {
+        Object two = unary(VectorConvertNodes.ToVec2.class, new Vector4f(1f, 2f, 3f, 4f));
+        assertTrue(helper, "To Vector 2 answers a Vector2f, got " + two, two instanceof Vector2f);
+        assertVec(helper, "Vec4 to Vec2", new float[] {1f, 2f}, two);
+
+        Object three = converted(VectorConvertNodes.ToVec3.class, new Vector4f(1f, 2f, 3f, 4f), 9f);
+        assertTrue(helper, "To Vector 3 answers a Vector3f, got " + three, three instanceof Vector3f);
+        // narrowing: the fill is irrelevant, every component was already there
+        assertVec(helper, "Vec4 to Vec3", new float[] {1f, 2f, 3f}, three);
+
+        assertVec(helper, "Vec2 to Vec3", new float[] {1f, 2f, 9f},
+                converted(VectorConvertNodes.ToVec3.class, new Vector2f(1f, 2f), 9f));
+        assertVec(helper, "Vec3 to Vec4", new float[] {1f, 2f, 3f, 9f},
+                converted(VectorConvertNodes.ToVec4.class, new Vector3f(1f, 2f, 3f), 9f));
+        assertVec(helper, "Vec2 to Vec4", new float[] {1f, 2f, 9f, 9f},
+                converted(VectorConvertNodes.ToVec4.class, new Vector2f(1f, 2f), 9f));
+
+        Object four = converted(VectorConvertNodes.ToVec4.class, new Vector4f(1f, 2f, 3f, 4f), 9f);
+        assertTrue(helper, "To Vector 4 answers a Vector4f, got " + four, four instanceof Vector4f);
+        assertVec(helper, "Vec4 to Vec4", new float[] {1f, 2f, 3f, 4f}, four);
+
+        assertVec(helper, "default fill", new float[] {1f, 2f, 0f},
+                unary(VectorConvertNodes.ToVec3.class, new Vector2f(1f, 2f)));
+        assertVec(helper, "default fill, two components short", new float[] {1f, 2f, 0f, 0f},
+                unary(VectorConvertNodes.ToVec4.class, new Vector2f(1f, 2f)));
+        helper.succeed();
+    }
+
+    /** Direction To answers both halves from one subtraction, and both are checked. */
+    public static void directionToAnswersAUnitVectorAndTheDistance(GameTestHelper helper) {
+        BlueprintGraph g = newGraph();
+        NodeModel n = addNode(g, VectorGeometryNodes.DirectionTo.class);
+        setInputConstant(n, "from", new Vector3f(1f, 2f, 3f));
+        setInputConstant(n, "to", new Vector3f(1f, 2f, 6f));
+        GraphExecutor exec = new GraphExecutor(g);
+        assertVec(helper, "straight along +Z", new float[] {0f, 0f, 1f},
+                exec.evaluate(n.getOutputsById().get("out"), Object.class));
+        assertEq(helper, "and the gap", 3f,
+                exec.evaluate(n.getOutputsById().get("distance"), Float.class), EPS);
+
+        assertVec(helper, "a diagonal", new float[] {0.6f, 0.8f, 0f},
+                directionTo(new Vector3f(0f, 0f, 0f), new Vector3f(3f, 4f, 0f)));
+        assertEq(helper, "its length", 5f,
+                distanceTo(new Vector3f(0f, 0f, 0f), new Vector3f(3f, 4f, 0f)), EPS);
+
+        Object two = directionTo(new Vector2f(0f, 0f), new Vector2f(0f, 2f));
+        assertTrue(helper, "a Vec2 pair answers a Vec2, got " + two, two instanceof Vector2f);
+        assertVec(helper, "in two components", new float[] {0f, 1f}, two);
+
+        assertVec(helper, "two points in the same place", new float[] {0f, 0f, 0f},
+                directionTo(new Vector3f(4f, 4f, 4f), new Vector3f(4f, 4f, 4f)));
+        assertEq(helper, "and no distance between them", 0f,
+                distanceTo(new Vector3f(4f, 4f, 4f), new Vector3f(4f, 4f, 4f)), EPS);
+        helper.succeed();
+    }
+
+    public static void setLengthKeepsTheDirection(GameTestHelper helper) {
+        assertVec(helper, "a 3-4-5 vector at length 10", new float[] {6f, 8f, 0f},
+                withLength(new Vector3f(3f, 4f, 0f), 10f));
+        assertVec(helper, "shortening", new float[] {0.6f, 0.8f, 0f},
+                withLength(new Vector3f(3f, 4f, 0f), 1f));
+        assertVec(helper, "a negative length points back", new float[] {-0.6f, -0.8f, 0f},
+                withLength(new Vector3f(3f, 4f, 0f), -1f));
+        assertVec(helper, "zero length", new float[] {0f, 0f, 0f},
+                withLength(new Vector3f(3f, 4f, 0f), 0f));
+
+        assertVec(helper, "a zero input stays zero", new float[] {0f, 0f, 0f},
+                withLength(new Vector3f(0f, 0f, 0f), 5f));
+        helper.succeed();
+    }
+
+    /** The three branches of the arc formula, including the two the obvious one divides by zero in. */
+    public static void slerpSweepsTheArcRatherThanCuttingAcross(GameTestHelper helper) {
+        Vector3f x = new Vector3f(1f, 0f, 0f);
+        Vector3f y = new Vector3f(0f, 1f, 0f);
+
+        assertVec(helper, "t=0 is a", new float[] {1f, 0f, 0f}, slerp(x, y, 0f));
+        assertVec(helper, "t=1 is b", new float[] {0f, 1f, 0f}, slerp(x, y, 1f));
+
+        float half = (float) (Math.sqrt(2d) / 2d);
+        assertVec(helper, "halfway is 45 degrees", new float[] {half, half, 0f}, slerp(x, y, 0.5f));
+        // a lerp would land at (0.5, 0.5, 0) - length 0.707, not 1. This is the whole difference.
+        assertEq(helper, "and still unit length", 1f, length(slerp(x, y, 0.5f)), EPS);
+
+        assertEq(helper, "between lengths 2 and 4", 3f,
+                length(slerp(new Vector3f(2f, 0f, 0f), new Vector3f(0f, 4f, 0f), 0.5f)), EPS);
+
+        assertVec(helper, "t below zero clamps to a", new float[] {1f, 0f, 0f}, slerp(x, y, -5f));
+        assertVec(helper, "t above one clamps to b", new float[] {0f, 1f, 0f}, slerp(x, y, 5f));
+
+        Vector3f almost = new Vector3f(1f, 1e-7f, 0f);
+        Object nudged = slerp(x, almost, 0.5f);
+        assertEq(helper, "a vanishing arc stays unit length", 1f, length(nudged), EPS);
+
+        Object flipped = slerp(x, new Vector3f(-1f, 0f, 0f), 0.5f);
+        assertEq(helper, "half of a reversal is still unit length", 1f, length(flipped), EPS);
+        assertVec(helper, "and the reversal itself lands on b", new float[] {-1f, 0f, 0f},
+                slerp(x, new Vector3f(-1f, 0f, 0f), 1f));
+
+        assertVec(helper, "zero to (2,0,0) halfway", new float[] {1f, 0f, 0f},
+                slerp(new Vector3f(0f, 0f, 0f), new Vector3f(2f, 0f, 0f), 0.5f));
+        helper.succeed();
+    }
+
+    /** Which perpendicular is unspecified, so the properties are what can be asserted. */
+    public static void perpendicularIsOrthogonalAndUnit(GameTestHelper helper) {
+        Object[] inputs = {
+                new Vector3f(1f, 0f, 0f), new Vector3f(0f, 1f, 0f), new Vector3f(0f, 0f, 1f),
+                new Vector3f(1f, 1f, 1f), new Vector3f(-3f, 0.5f, 7f),
+                new Vector2f(1f, 0f), new Vector2f(3f, 4f),
+                new Vector4f(1f, 2f, 3f, 4f),
+        };
+        for (Object in : inputs) {
+            Object perp = unary(VectorGeometryNodes.Perpendicular.class, in);
+            float[] a = Vectors.components(in);
+            float[] b = Vectors.components(perp);
+            assertEq(helper, "perpendicular of " + in + " keeps the width", a.length, b.length);
+            assertEq(helper, "perpendicular of " + in + " is unit length", 1f, length(perp), EPS);
+
+            assertEq(helper, "perpendicular of " + in + " is orthogonal", 0f, Vectors.dot(a, b), 1e-3f);
+        }
+        assertVec(helper, "a zero input has no right angle to be at", new float[] {0f, 0f, 0f},
+                unary(VectorGeometryNodes.Perpendicular.class, new Vector3f(0f, 0f, 0f)));
+        helper.succeed();
+    }
+
+    public static void vectorWrapFoldsEveryComponent(GameTestHelper helper) {
+        assertVec(helper, "a mix of inside, over and under",
+                new float[] {0.25f, 0.75f, 0.5f},
+                wrapped(new Vector3f(0.25f, -0.25f, 2.5f), 0f, 1f));
+
+        Object angles = wrapped(new Vector4f(190f, -190f, 370f, 0f), -180f, 180f);
+        assertTrue(helper, "a Vec4 stays a Vec4, got " + angles, angles instanceof Vector4f);
+        assertVec(helper, "Euler angles into [-180,180)", new float[] {-170f, 170f, 10f, 0f}, angles);
+
+        assertVec(helper, "an empty range answers min", new float[] {5f, 5f},
+                wrapped(new Vector2f(9f, -9f), 5f, 5f));
         helper.succeed();
     }
 
@@ -645,6 +808,61 @@ public final class VectorNodeExtrasGameTest {
         NodeModel n = addNode(g, nodeClass);
         setInputConstant(n, "a", a);
         setInputConstant(n, "b", b);
+        return eval(g, n, "out");
+    }
+
+    private static Object directionTo(Object from, Object to) {
+        BlueprintGraph g = newGraph();
+        NodeModel n = addNode(g, VectorGeometryNodes.DirectionTo.class);
+        setInputConstant(n, "from", from);
+        setInputConstant(n, "to", to);
+        return eval(g, n, "out");
+    }
+
+    private static float distanceTo(Object from, Object to) {
+        BlueprintGraph g = newGraph();
+        NodeModel n = addNode(g, VectorGeometryNodes.DirectionTo.class);
+        setInputConstant(n, "from", from);
+        setInputConstant(n, "to", to);
+        return evalF(g, n, "distance");
+    }
+
+    private static Object withLength(Object in, float length) {
+        BlueprintGraph g = newGraph();
+        NodeModel n = addNode(g, VectorGeometryNodes.SetLength.class);
+        setInputConstant(n, "in", in);
+        setInputConstant(n, "length", length);
+        return eval(g, n, "out");
+    }
+
+    private static Object slerp(Object a, Object b, float t) {
+        BlueprintGraph g = newGraph();
+        NodeModel n = addNode(g, VectorGeometryNodes.Slerp.class);
+        setInputConstant(n, "a", a);
+        setInputConstant(n, "b", b);
+        setInputConstant(n, "t", t);
+        return eval(g, n, "out");
+    }
+
+    private static Object wrapped(Object in, float min, float max) {
+        BlueprintGraph g = newGraph();
+        NodeModel n = addNode(g, VectorMathNodes.Wrap.class);
+        setInputConstant(n, "in", in);
+        setInputConstant(n, "min", min);
+        setInputConstant(n, "max", max);
+        return eval(g, n, "out");
+    }
+
+    private static float length(Object v) {
+        return (float) Math.sqrt(Vectors.lengthSquared(Vectors.components(v)));
+    }
+
+    /** A width conversion, with its {@code fill} set. */
+    private static Object converted(Class<? extends Node> nodeClass, Object in, float fill) {
+        BlueprintGraph g = newGraph();
+        NodeModel n = addNode(g, nodeClass);
+        setInputConstant(n, "in", in);
+        setInputConstant(n, "fill", fill);
         return eval(g, n, "out");
     }
 

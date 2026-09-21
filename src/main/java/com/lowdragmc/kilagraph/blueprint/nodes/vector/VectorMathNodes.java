@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.vector;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.WrapNode;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.Option;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
@@ -150,6 +151,31 @@ public final class VectorMathNodes {
             // max(lo, min(hi, v)), so an inverted range answers lo — the same resolution math_clamp
             // reaches, rather than the two nodes disagreeing about a nonsense input.
             map(ctx, v -> Math.max(lo, Math.min(hi, v)));
+        }
+    }
+
+    /**
+     * Every component folded into the same half-open range {@code [min, max)}.
+     *
+     * <p>Scalar bounds for the same reason {@link Clamp} has them, and the fold itself is
+     * {@link WrapNode#wrap} so the vector and scalar nodes cannot disagree about where a value
+     * exactly on a boundary lands.</p>
+     */
+    @NodeAttribute(name = "vector_wrap", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class Wrap extends AnnotatedNode {
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.in(ctx, "in");
+            ctx.addInputPort("min", Float.class).withDefaultValue(0f);
+            ctx.addInputPort("max", Float.class).withDefaultValue(1f);
+            VectorPorts.out(ctx, "out");
+        }
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            float lo = ctx.getFloat("min", 0f);
+            float hi = ctx.getFloat("max", 1f);
+            map(ctx, v -> WrapNode.wrap(v, lo, hi));
         }
     }
 

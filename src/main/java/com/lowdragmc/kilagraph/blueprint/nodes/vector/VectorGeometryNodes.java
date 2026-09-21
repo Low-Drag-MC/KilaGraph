@@ -12,6 +12,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
+import java.util.Arrays;
+
 import static com.lowdragmc.kilagraph.graph.type.Vectors.at;
 import static com.lowdragmc.kilagraph.graph.type.Vectors.carrier;
 import static com.lowdragmc.kilagraph.graph.type.Vectors.components;
@@ -373,6 +375,211 @@ public final class VectorGeometryNodes {
             }
             ctx.setOutput("out", equal);
         }
+    }
+
+    /**
+     * The unit direction from {@code from} to {@code to}, and how far apart they are.
+     *
+     * <p>Both halves in one node because asking for one almost always means wanting the other, and
+     * doing it as {@code subtract → normalize} beside {@code subtract → length} computes the
+     * difference twice and the square root twice. Degenerate case: coincident points have no
+     * direction, so {@code out} is zero and {@code distance} is 0.</p>
+     */
+    @NodeAttribute(name = "vector_direction_to", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class DirectionTo extends AnnotatedNode {
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.in(ctx, "from");
+            VectorPorts.in(ctx, "to");
+            VectorPorts.out(ctx, "out");
+            ctx.addOutputPort("distance", Float.class);
+        }
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            float[] p = components(ctx.getInputRaw("from"));
+            float[] q = components(ctx.getInputRaw("to"));
+            int width = Math.max(p.length, q.length);
+            float[] delta = new float[width];
+            for (int i = 0; i < width; i++) delta[i] = at(q, i) - at(p, i);
+            float distance = (float) Math.sqrt(lengthSquared(delta));
+            if (distance >= Vectors.EPSILON) {
+                for (int i = 0; i < width; i++) delta[i] /= distance;
+            } else {
+                Arrays.fill(delta, 0f);
+            }
+            ctx.setOutput("out", carrier(delta));
+            ctx.setOutput("distance", distance);
+        }
+    }
+
+    /**
+     * Rescales {@code in} to the given length, keeping its direction — "normalize, then multiply"
+     * without the intermediate.
+     *
+     * <p>Degenerate case: a zero vector has no direction to keep, so it stays zero rather than
+     * becoming an arbitrary one of the requested length.</p>
+     */
+    @NodeAttribute(name = "vector_set_length", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class SetLength extends AnnotatedNode {
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.in(ctx, "in");
+            ctx.addInputPort("length", Float.class).withDefaultValue(1f);
+            VectorPorts.out(ctx, "out");
+        }
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            float[] v = components(ctx.getInputRaw("in"));
+            float length = (float) Math.sqrt(lengthSquared(v));
+            if (length >= Vectors.EPSILON) {
+                float k = ctx.getFloat("length", 1f) / length;
+                for (int i = 0; i < v.length; i++) v[i] *= k;
+            } else {
+                Arrays.fill(v, 0f);
+            }
+            ctx.setOutput("out", carrier(v));
+        }
+    }
+
+    /**
+     * Interpolates {@code a → b} along the <b>arc</b> between them, at constant angular speed, with
+     * the length interpolated linearly. What {@code vector_lerp} cannot do: a straight line between
+     * two directions of equal length dips towards the origin in the middle and sweeps fastest at the
+     * ends, so a camera or a turret driven by it visibly slows down and speeds up.
+     *
+     * <p>Three cases the formula cannot state:</p>
+     * <ul>
+     *   <li><b>Either input is zero</b> — there is no arc between a direction and nothing, so this
+     *       degrades to a plain lerp rather than answering a NaN.</li>
+     *   <li><b>Nearly parallel</b> — {@code sin θ} underflows, so lerp-and-renormalize, which is
+     *       accurate precisely where the arc is short.</li>
+     *   <li><b>Nearly opposite</b> — the shortest arc is not defined (every half-plane is equally
+     *       short), so one is chosen via {@link #perpendicular} and swept at constant speed. Without
+     *       this the result would flip discontinuously as the inputs drift through antiparallel.</li>
+     * </ul>
+     *
+     * <p>{@code t} is clamped to [0, 1]: extrapolating an angle is a different operation, and one
+     * that silently wraps.</p>
+     */
+    @NodeAttribute(name = "vector_slerp", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class Slerp extends AnnotatedNode {
+        /** |cos θ| beyond which θ is too small (or too close to π) for the arc formula to be stable. */
+        private static final float PARALLEL = 1f - 1e-6f;
+
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.in(ctx, "a");
+            VectorPorts.in(ctx, "b");
+            ctx.addInputPort("t", Float.class).withDefaultValue(0f);
+            VectorPorts.out(ctx, "out");
+        }
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            float[] p = components(ctx.getInputRaw("a"));
+            float[] q = components(ctx.getInputRaw("b"));
+            int width = Math.max(p.length, q.length);
+            float t = Math.min(1f, Math.max(0f, ctx.getFloat("t", 0f)));
+
+            float la = (float) Math.sqrt(lengthSquared(p));
+            float lb = (float) Math.sqrt(lengthSquared(q));
+            if (la < Vectors.EPSILON || lb < Vectors.EPSILON) {
+                float[] lerped = new float[width];
+                for (int i = 0; i < width; i++) {
+                    lerped[i] = at(p, i) + (at(q, i) - at(p, i)) * t;
+                }
+                ctx.setOutput("out", carrier(lerped));
+                return;
+            }
+
+            float[] ua = new float[width];
+            float[] ub = new float[width];
+            for (int i = 0; i < width; i++) {
+                ua[i] = at(p, i) / la;
+                ub[i] = at(q, i) / lb;
+            }
+            float cos = Math.max(-1f, Math.min(1f, dot(ua, ub)));
+            float[] dir;
+            if (cos > PARALLEL) {
+                dir = new float[width];
+                for (int i = 0; i < width; i++) dir[i] = ua[i] + (ub[i] - ua[i]) * t;
+                normalizeInPlace(dir, ua);
+            } else if (cos < -PARALLEL) {
+                float[] perp = perpendicular(ua);
+                double theta = Math.PI * t;
+                float c = (float) Math.cos(theta);
+                float s = (float) Math.sin(theta);
+                dir = new float[width];
+                for (int i = 0; i < width; i++) dir[i] = ua[i] * c + perp[i] * s;
+            } else {
+                double theta = Math.acos(cos);
+                double sin = Math.sin(theta);
+                float k0 = (float) (Math.sin((1d - t) * theta) / sin);
+                float k1 = (float) (Math.sin(t * theta) / sin);
+                dir = new float[width];
+                for (int i = 0; i < width; i++) dir[i] = ua[i] * k0 + ub[i] * k1;
+            }
+
+            float length = la + (lb - la) * t;
+            for (int i = 0; i < width; i++) dir[i] *= length;
+            ctx.setOutput("out", carrier(dir));
+        }
+    }
+
+    /**
+     * Some unit vector at right angles to {@code in}, of the same width.
+     *
+     * <p><b>Which</b> one is unspecified — in 3D there is a whole circle of them — but it is
+     * deterministic and continuous enough to build a basis from. Degenerate case: the zero vector
+     * has no perpendicular, and answers zero.</p>
+     */
+    @NodeAttribute(name = "vector_perpendicular", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class Perpendicular extends AnnotatedNode {
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.unary(ctx);
+        }
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            ctx.setOutput("out", carrier(perpendicular(components(ctx.getInputRaw("in")))));
+        }
+    }
+
+    /**
+     * A unit vector perpendicular to {@code v}, by rejecting {@code v}'s smallest axis off it.
+     *
+     * <p>The smallest component is the axis <em>least</em> parallel to {@code v}, so the rejection is
+     * the longest available and the normalization the best conditioned — picking a fixed axis instead
+     * would collapse whenever {@code v} happened to point along it.</p>
+     */
+    private static float[] perpendicular(float[] v) {
+        int width = v.length;
+        float[] out = new float[width];
+        float vv = lengthSquared(v);
+        if (vv < Vectors.EPSILON * Vectors.EPSILON) return out;
+        int axis = 0;
+        for (int i = 1; i < width; i++) {
+            if (Math.abs(v[i]) < Math.abs(v[axis])) axis = i;
+        }
+        float k = v[axis] / vv;
+        for (int i = 0; i < width; i++) out[i] = (i == axis ? 1f : 0f) - v[i] * k;
+        float length = (float) Math.sqrt(lengthSquared(out));
+        if (length < Vectors.EPSILON) return new float[width];
+        for (int i = 0; i < width; i++) out[i] /= length;
+        return out;
+    }
+
+    /** Normalizes in place, falling back to {@code ifZero} when there is no direction to keep. */
+    private static void normalizeInPlace(float[] v, float[] ifZero) {
+        float length = (float) Math.sqrt(lengthSquared(v));
+        if (length < Vectors.EPSILON) {
+            System.arraycopy(ifZero, 0, v, 0, v.length);
+            return;
+        }
+        for (int i = 0; i < v.length; i++) v[i] /= length;
     }
 
     /**

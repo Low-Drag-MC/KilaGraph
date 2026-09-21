@@ -7,6 +7,7 @@ import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorConvertNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorGeometryNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorMathNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes;
@@ -55,6 +56,7 @@ public final class VectorPinTypeGameTest {
     private static final String SCALAR_PINS_UNCHANGED = "vector_pin_scalar_pins_unchanged";
     private static final String EVERY_WIDTH_ACCEPTED = "vector_pin_every_width_accepted";
     private static final String DEFAULT_WIDTH_THREE = "vector_pin_default_width_three";
+    private static final String WIDTH_CONVERSIONS = "vector_pin_width_conversions";
 
     public static void registerFunctions() {
         KGGameTests.registerFunction(PIN_TYPE_NAMES, VectorPinTypeGameTest::polymorphicPinsSayVectorAndThreeDimensionalOnesSayVec3);
@@ -63,6 +65,7 @@ public final class VectorPinTypeGameTest {
         KGGameTests.registerFunction(SCALAR_PINS_UNCHANGED, VectorPinTypeGameTest::scalarPinsKeepTheOrdinaryScalarHandles);
         KGGameTests.registerFunction(EVERY_WIDTH_ACCEPTED, VectorPinTypeGameTest::everyWidthReachesAVectorPin);
         KGGameTests.registerFunction(DEFAULT_WIDTH_THREE, VectorPinTypeGameTest::aFreshVectorPinDefaultsToWidthThree);
+        KGGameTests.registerFunction(WIDTH_CONVERSIONS, VectorPinTypeGameTest::theWidthConversionsTakeAnyWidthAndNameTheOneTheyProduce);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -73,6 +76,7 @@ public final class VectorPinTypeGameTest {
         KGGameTests.registerFunctionTest(event, SCALAR_PINS_UNCHANGED, KGGameTests.functionKey(SCALAR_PINS_UNCHANGED), data);
         KGGameTests.registerFunctionTest(event, EVERY_WIDTH_ACCEPTED, KGGameTests.functionKey(EVERY_WIDTH_ACCEPTED), data);
         KGGameTests.registerFunctionTest(event, DEFAULT_WIDTH_THREE, KGGameTests.functionKey(DEFAULT_WIDTH_THREE), data);
+        KGGameTests.registerFunctionTest(event, WIDTH_CONVERSIONS, KGGameTests.functionKey(WIDTH_CONVERSIONS), data);
     }
 
     private static final float EPS = 1e-4f;
@@ -93,7 +97,9 @@ public final class VectorPinTypeGameTest {
             VectorGeometryNodes.ClampLength.class, VectorGeometryNodes.Project.class,
             VectorGeometryNodes.Reject.class, VectorGeometryNodes.Reflect.class,
             VectorGeometryNodes.AngleBetween.class, VectorGeometryNodes.MoveTowards.class,
-            VectorGeometryNodes.NearlyEquals.class);
+            VectorGeometryNodes.NearlyEquals.class, VectorGeometryNodes.DirectionTo.class,
+            VectorGeometryNodes.SetLength.class, VectorGeometryNodes.Slerp.class,
+            VectorGeometryNodes.Perpendicular.class, VectorMathNodes.Wrap.class);
 
     /** Reads the first three of anything and answers a Vector3 — every vector pin must be VEC3. */
     private static final List<Class<? extends Node>> THREE_DIMENSIONAL = List.of(
@@ -149,6 +155,27 @@ public final class VectorPinTypeGameTest {
         assertEq(helper, "vector_make2 out", KGTypeHandles.VEC2, outputHandle(VectorNodes.Make2.class));
         assertEq(helper, "vector_make4 out", KGTypeHandles.VEC4, outputHandle(VectorNodes.Make4.class));
         helper.succeed();
+    }
+
+    /**
+     * The conversions are the one family that is polymorphic in and concrete out: any width reaches
+     * them, and the pin on the far side names the width that came out. That asymmetry is the whole
+     * reason they exist, so it is asserted rather than assumed.
+     */
+    public static void theWidthConversionsTakeAnyWidthAndNameTheOneTheyProduce(GameTestHelper helper) {
+        assertConverts(helper, "vector_to_vec2", VectorConvertNodes.ToVec2.class, KGTypeHandles.VEC2);
+        assertConverts(helper, "vector_to_vec3", VectorConvertNodes.ToVec3.class, KGTypeHandles.VEC3);
+        assertConverts(helper, "vector_to_vec4", VectorConvertNodes.ToVec4.class, KGTypeHandles.VEC4);
+        helper.succeed();
+    }
+
+    private static void assertConverts(GameTestHelper helper, String label,
+                                       Class<? extends Node> cls, TypeHandle produced) {
+        NodeModel model = addNode(newGraph(), cls);
+        assertEq(helper, label + " in", KGTypeHandles.VECTOR,
+                model.getInputsById().get("in").getDataTypeHandle());
+        assertEq(helper, label + " out", produced,
+                model.getOutputsById().get("out").getDataTypeHandle());
     }
 
     /**
