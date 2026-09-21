@@ -7,6 +7,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.IInputPortBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.IOutputPortBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.PortCapacity;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.PortConnectorUI;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.ITypeConfigurable;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
@@ -142,7 +143,11 @@ final class NodeMetadata {
                 Object def = readFieldValue(d.field, node);
                 if (def != null) b.withDefaultValue(def);
                 b.withFieldContext(d.field, node);
-            } else {
+            } else if (!hasOwnConfigurable(d.typeHandle)) {
+                // ⚠️ Only when the type brings NO editor of its own. "No accessor" answers whether
+                // the DEFAULT field configurator can render the value — a type that registered its
+                // own ITypeConfigurable has already answered otherwise, and silencing it here left
+                // such a pin blank while the same handle drew fine on a blackboard variable.
                 b.withoutConfigurator();
             }
         } else {
@@ -150,6 +155,11 @@ final class NodeMetadata {
             if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
             if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
         }
+    }
+
+    /** Whether the type registered an {@code ITypeConfigurable} of its own — an editor no accessor is needed for. */
+    private static boolean hasOwnConfigurable(TypeHandle typeHandle) {
+        return typeHandle != null && typeHandle.resolveConfigurable() != ITypeConfigurable.DEFAULT;
     }
 
     /**
