@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.sync;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -76,7 +76,7 @@ public final class UIBindingNodes {
      * often selected out of a tree that is built later.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_binding", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Create extends AnnotatedNode {
+    public static class Create extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_binding.tooltip");
@@ -193,7 +193,7 @@ public final class UIBindingNodes {
      * {@code ok = false}; use a sync value and a handler instead.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_bind", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Bind extends AnnotatedNode {
+    public static class Bind extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_bind.tooltip");
@@ -236,7 +236,7 @@ public final class UIBindingNodes {
 
     /** Detaches a binding, so the element stops mirroring it. */
     @NodeAttribute(name = "ldlib2_ui_unbind", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Unbind extends AnnotatedNode {
+    public static class Unbind extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_unbind.tooltip");

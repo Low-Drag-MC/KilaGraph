@@ -1,7 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.action;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -36,7 +35,7 @@ public final class BlockActionNodes {
      * physics — the same reason the game's own structure placement does it.
      */
     @NodeAttribute(name = "mc_set_block", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetBlock extends AnnotatedNode {
+    public static class SetBlock extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_set_block.tooltip");
@@ -78,7 +77,7 @@ public final class BlockActionNodes {
      * creative mode. Breaking air reports false — there was nothing to break.</p>
      */
     @NodeAttribute(name = "mc_break_block", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class BreakBlock extends AnnotatedNode {
+    public static class BreakBlock extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_break_block.tooltip");
@@ -117,7 +116,7 @@ public final class BlockActionNodes {
      * a fill one physics pass instead of N.
      */
     @NodeAttribute(name = "mc_fill_blocks", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class FillBlocks extends AnnotatedNode {
+    public static class FillBlocks extends ActionNode {
         /** Roughly a 32-block cube, matching {@code mc_block_pos_between}. */
         public static final int LIMIT = 32768;
 
@@ -181,7 +180,7 @@ public final class BlockActionNodes {
      * action closes that window. {@code ok} is false when the position did not hold {@code expected}.</p>
      */
     @NodeAttribute(name = "mc_replace_block", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class ReplaceBlock extends AnnotatedNode {
+    public static class ReplaceBlock extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_replace_block.tooltip");

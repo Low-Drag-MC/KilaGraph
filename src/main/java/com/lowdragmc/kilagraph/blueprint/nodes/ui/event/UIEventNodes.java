@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.event;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -73,7 +73,7 @@ public final class UIEventNodes {
      * needs to be listenable.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_on_event", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class OnEvent extends AnnotatedNode {
+    public static class OnEvent extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_on_event.tooltip");
@@ -136,7 +136,7 @@ public final class UIEventNodes {
      * RPC ids will not line up. Building the same tree on both sides is what guarantees that.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_on_server_event", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class OnServerEvent extends AnnotatedNode {
+    public static class OnServerEvent extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_on_server_event.tooltip");
@@ -196,7 +196,7 @@ public final class UIEventNodes {
      * small. A value that changes rarely belongs on a sync value's {@code onReceived} instead.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_on_tick", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class OnTick extends AnnotatedNode {
+    public static class OnTick extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_on_tick.tooltip");
@@ -238,7 +238,7 @@ public final class UIEventNodes {
      * own content box without transforming anything.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_event_info", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class EventInfo extends AnnotatedNode {
+    public static class EventInfo extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_event_info.tooltip");
@@ -317,7 +317,7 @@ public final class UIEventNodes {
      * command <em>is</em> handled.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_event_stop", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Stop extends AnnotatedNode {
+    public static class Stop extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_event_stop.tooltip");
@@ -360,7 +360,7 @@ public final class UIEventNodes {
      * thinking about before it reaches the server.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_event_dispatch", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Dispatch extends AnnotatedNode {
+    public static class Dispatch extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_event_dispatch.tooltip");

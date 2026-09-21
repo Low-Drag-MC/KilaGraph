@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.style;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -66,7 +66,7 @@ public final class UIStylesheetNodes {
      * one later means removing that exact instance. See {@link UIActions#produce}.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_stylesheet_parse", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Parse extends AnnotatedNode {
+    public static class Parse extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_stylesheet_parse.tooltip");
@@ -106,7 +106,7 @@ public final class UIStylesheetNodes {
      * in every loaded pack, merged.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_stylesheet_load", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Load extends AnnotatedNode {
+    public static class Load extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_stylesheet_load.tooltip");
@@ -156,7 +156,7 @@ public final class UIStylesheetNodes {
 
     /** One of LDLib2's own stylesheets, without having to remember its resource location. */
     @NodeAttribute(name = "ldlib2_ui_stylesheet_builtin", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Builtin extends AnnotatedNode {
+    public static class Builtin extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_stylesheet_builtin.tooltip");
@@ -182,7 +182,7 @@ public final class UIStylesheetNodes {
      * manager owns edits it for every UI in the game. Merge into one this graph parsed.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_stylesheet_merge", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Merge extends AnnotatedNode {
+    public static class Merge extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_stylesheet_merge.tooltip");
@@ -224,7 +224,7 @@ public final class UIStylesheetNodes {
      * bound.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_stylesheet_register", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Register extends AnnotatedNode {
+    public static class Register extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_stylesheet_register.tooltip");
@@ -277,7 +277,7 @@ public final class UIStylesheetNodes {
      * few rules of its own.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_local_stylesheet", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class LocalStylesheet extends AnnotatedNode {
+    public static class LocalStylesheet extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_local_stylesheet.tooltip");
@@ -343,7 +343,7 @@ public final class UIStylesheetNodes {
      * through the style engine. No-ops on the server, which has no style engine to speak of.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_global_stylesheet", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class GlobalStylesheet extends AnnotatedNode {
+    public static class GlobalStylesheet extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_global_stylesheet.tooltip");
@@ -395,7 +395,7 @@ public final class UIStylesheetNodes {
      * find things throughout a subtree.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_apply_stylesheet", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class ApplyStylesheet extends AnnotatedNode {
+    public static class ApplyStylesheet extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_apply_stylesheet.tooltip");

@@ -1,7 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.action;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -48,7 +47,7 @@ import net.minecraft.world.phys.Vec3;
  * nothing. This is the same distinction as {@code /execute as} versus {@code /execute positioned}.
  */
 @NodeAttribute(name = "mc_run_command", group = "mc/action", graphTypes = BlueprintGraph.class)
-public class RunCommandNode extends AnnotatedNode {
+public class RunCommandNode extends ActionNode {
 
     /** Command-block parity. Deliberately not configurable — see the class javadoc. */
     private static final int PERMISSION_LEVEL = 2;

@@ -48,7 +48,8 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param <T> the type whose properties the contained blocks read
  */
-public abstract class InfoContextNode<T> extends ContextNode implements INodeDescription {
+public abstract class InfoContextNode<T> extends ContextNode
+        implements INodeDescription, com.lowdragmc.kilagraph.graph.core.IThreadSafeNode {
 
     /** The class whose properties this context's blocks read. Drives the {@code target} port. */
     protected abstract Class<T> targetClass();

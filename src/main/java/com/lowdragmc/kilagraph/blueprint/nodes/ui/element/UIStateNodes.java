@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.element;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -38,7 +38,7 @@ public final class UIStateNodes {
 
     /** Sets an element's id — the handle a selector, a stylesheet and {@code find_by_id} all use. */
     @NodeAttribute(name = "ldlib2_ui_set_id", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetId extends AnnotatedNode {
+    public static class SetId extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_set_id.tooltip");
@@ -106,7 +106,7 @@ public final class UIStateNodes {
      * harder to read, not easier.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_set_flag", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetFlag extends AnnotatedNode {
+    public static class SetFlag extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_set_flag.tooltip");
@@ -177,7 +177,7 @@ public final class UIStateNodes {
      * an event handler's job rather than a build step.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_focus", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Focus extends AnnotatedNode {
+    public static class Focus extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_focus.tooltip");

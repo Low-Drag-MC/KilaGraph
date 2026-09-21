@@ -2,6 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.sync;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
@@ -100,7 +101,7 @@ public final class UISyncNodes {
      * throwing, so a half-configured graph still builds its UI.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_sync_value", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Declare extends AnnotatedNode {
+    public static class Declare extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_sync_value.tooltip");
@@ -228,7 +229,7 @@ public final class UISyncNodes {
 
     /** The value a sync value currently holds, on whichever side asks. */
     @NodeAttribute(name = "ldlib2_ui_sync_get", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Get extends AnnotatedNode {
+    public static class Get extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_sync_get.tooltip");
@@ -266,7 +267,7 @@ public final class UISyncNodes {
      * not refuse that, because {@code BOTH} makes it legitimate; it is simply worth knowing.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_sync_set", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Set extends AnnotatedNode {
+    public static class Set extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_sync_set.tooltip");

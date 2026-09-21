@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.doc;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -70,7 +70,7 @@ public final class UIDocNodes {
 
     /** A UI xml file, loaded through the resource manager. */
     @NodeAttribute(name = "ldlib2_ui_load_xml", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class LoadXml extends AnnotatedNode {
+    public static class LoadXml extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_load_xml.tooltip");
@@ -112,7 +112,7 @@ public final class UIDocNodes {
      * }</pre>
      */
     @NodeAttribute(name = "ldlib2_ui_parse_xml", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class ParseXml extends AnnotatedNode {
+    public static class ParseXml extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_parse_xml.tooltip");
@@ -143,7 +143,7 @@ public final class UIDocNodes {
 
     /** A UI from a root element and the stylesheets it should be styled with. */
     @NodeAttribute(name = "ldlib2_ui_create", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Create extends AnnotatedNode {
+    public static class Create extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_create.tooltip");
@@ -210,7 +210,7 @@ public final class UIDocNodes {
      * the player resizes.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_create_sized", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class CreateSized extends AnnotatedNode {
+    public static class CreateSized extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_create_sized.tooltip");
@@ -261,7 +261,7 @@ public final class UIDocNodes {
      * the same root.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_unpack", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Unpack extends AnnotatedNode {
+    public static class Unpack extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_unpack.tooltip");
@@ -281,7 +281,7 @@ public final class UIDocNodes {
 
     /** A snapshot of a UI, as a template. */
     @NodeAttribute(name = "ldlib2_ui_to_template", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class ToTemplate extends AnnotatedNode {
+    public static class ToTemplate extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_to_template.tooltip");
@@ -328,7 +328,7 @@ public final class UIDocNodes {
      * rather than a construction.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_template_load", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class TemplateLoad extends AnnotatedNode {
+    public static class TemplateLoad extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_template_load.tooltip");
@@ -350,7 +350,7 @@ public final class UIDocNodes {
 
     /** A fresh UI stamped out of a template. Each pass through builds a new tree. */
     @NodeAttribute(name = "ldlib2_ui_template_create_ui", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class TemplateCreateUI extends AnnotatedNode {
+    public static class TemplateCreateUI extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_template_create_ui.tooltip");
@@ -387,7 +387,7 @@ public final class UIDocNodes {
      * parented into a bigger tree.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_template_init", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class TemplateInit extends AnnotatedNode {
+    public static class TemplateInit extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_template_init.tooltip");
@@ -422,7 +422,7 @@ public final class UIDocNodes {
 
     /** Replaces a template's styles: an inline LSS block plus a list of stylesheet ids. */
     @NodeAttribute(name = "ldlib2_ui_template_styles", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class TemplateStyles extends AnnotatedNode {
+    public static class TemplateStyles extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_template_styles.tooltip");
@@ -466,7 +466,7 @@ public final class UIDocNodes {
      * disagree about what they were stamped from.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_template_copy", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class TemplateCopy extends AnnotatedNode {
+    public static class TemplateCopy extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_template_copy.tooltip");
@@ -506,7 +506,7 @@ public final class UIDocNodes {
      * still deterministic, and still requires both sides to build the same tree.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_modular_create", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class ModularCreate extends AnnotatedNode {
+    public static class ModularCreate extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_modular_create.tooltip");

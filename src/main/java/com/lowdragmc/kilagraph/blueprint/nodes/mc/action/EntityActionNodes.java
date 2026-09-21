@@ -1,7 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.action;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -53,7 +52,7 @@ public final class EntityActionNodes {
      * spawning.
      */
     @NodeAttribute(name = "mc_spawn_entity", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SpawnEntity extends AnnotatedNode {
+    public static class SpawnEntity extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_spawn_entity.tooltip");
@@ -92,7 +91,7 @@ public final class EntityActionNodes {
      * disconnecting, and discarding one leaves the server in a state it does not expect.</p>
      */
     @NodeAttribute(name = "mc_remove_entity", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class RemoveEntity extends AnnotatedNode {
+    public static class RemoveEntity extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_remove_entity.tooltip");
@@ -118,7 +117,7 @@ public final class EntityActionNodes {
 
     /** Moves an entity to a position instantly. */
     @NodeAttribute(name = "mc_teleport_entity", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class TeleportEntity extends AnnotatedNode {
+    public static class TeleportEntity extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_teleport_entity.tooltip");
@@ -155,7 +154,7 @@ public final class EntityActionNodes {
      * knows the entity is moving and nothing on screen does.</p>
      */
     @NodeAttribute(name = "mc_set_entity_velocity", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetVelocity extends AnnotatedNode {
+    public static class SetVelocity extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_set_entity_velocity.tooltip");
@@ -190,7 +189,7 @@ public final class EntityActionNodes {
      * dead, or is not a living entity at all.</p>
      */
     @NodeAttribute(name = "mc_damage_entity", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class DamageEntity extends AnnotatedNode {
+    public static class DamageEntity extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_damage_entity.tooltip");
@@ -217,7 +216,7 @@ public final class EntityActionNodes {
 
     /** Restores health, up to the entity's maximum. */
     @NodeAttribute(name = "mc_heal_entity", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class HealEntity extends AnnotatedNode {
+    public static class HealEntity extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_heal_entity.tooltip");
@@ -250,7 +249,7 @@ public final class EntityActionNodes {
      * matching {@code mc_entity_has_effect}, which reads it back the same way. Duration is in ticks.</p>
      */
     @NodeAttribute(name = "mc_add_effect", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class AddEffect extends AnnotatedNode {
+    public static class AddEffect extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_add_effect.tooltip");
@@ -294,7 +293,7 @@ public final class EntityActionNodes {
      * buff was there. An unknown effect id reads the same way, since neither case changed anything.</p>
      */
     @NodeAttribute(name = "mc_remove_effect", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class RemoveEffect extends AnnotatedNode {
+    public static class RemoveEffect extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_remove_effect.tooltip");
@@ -331,7 +330,7 @@ public final class EntityActionNodes {
      * graph that means "remove the debuffs" wants {@code mc_remove_effect} in a loop instead.</p>
      */
     @NodeAttribute(name = "mc_clear_effects", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class ClearEffects extends AnnotatedNode {
+    public static class ClearEffects extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_clear_effects.tooltip");
@@ -367,7 +366,7 @@ public final class EntityActionNodes {
      * this shape exists to avoid.</p>
      */
     @NodeAttribute(name = "mc_give_item", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class GiveItem extends AnnotatedNode {
+    public static class GiveItem extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_give_item.tooltip");

@@ -1,7 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.action;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -39,7 +38,7 @@ public final class ContainerActionNodes {
      * shape exists to avoid, the same as {@code mc_give_item}.</p>
      */
     @NodeAttribute(name = "mc_container_insert", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Insert extends AnnotatedNode {
+    public static class Insert extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_container_insert.tooltip");
@@ -86,7 +85,7 @@ public final class ContainerActionNodes {
      * {@code ok = false} mean the slot had nothing to give.</p>
      */
     @NodeAttribute(name = "mc_container_extract", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Extract extends AnnotatedNode {
+    public static class Extract extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_container_extract.tooltip");
@@ -128,7 +127,7 @@ public final class ContainerActionNodes {
      * {@code mc_container_insert} unless you specifically mean to overwrite.
      */
     @NodeAttribute(name = "mc_container_set", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Set extends AnnotatedNode {
+    public static class Set extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_container_set.tooltip");

@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.ctx;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -45,7 +45,7 @@ public final class UIContextNodes {
      * — a resource reload, a worker.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_side", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Side extends AnnotatedNode {
+    public static class Side extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_side.tooltip");
@@ -68,7 +68,7 @@ public final class UIContextNodes {
      * take it as an input instead of deriving it: during a build there is nothing to derive.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_modular_of", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class ModularOf extends AnnotatedNode {
+    public static class ModularOf extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_modular_of.tooltip");
@@ -89,7 +89,7 @@ public final class UIContextNodes {
 
     /** Everything about a live UI a graph is likely to ask for. */
     @NodeAttribute(name = "ldlib2_ui_mui_info", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class MuiInfo extends AnnotatedNode {
+    public static class MuiInfo extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_mui_info.tooltip");
@@ -135,7 +135,7 @@ public final class UIContextNodes {
      * agree on, and the client's screen follows.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_close", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Close extends AnnotatedNode {
+    public static class Close extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_close.tooltip");

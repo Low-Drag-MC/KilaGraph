@@ -76,6 +76,16 @@ public final class LootNodes {
             return Component.translatable("kg.node.mc_loot_table_roll.tooltip");
         }
 
+        /**
+         * ⚠️ Has no exec pin and is still not safe: rolling a table advances the level's random
+         * source, so this writes shared state while looking like a query. The class javadoc above
+         * already says "Random, and therefore not cacheable" — this is the same fact, for threads.
+         */
+        @Override
+        public boolean isThreadSafe() {
+            return false;
+        }
+
         @InputPort public Level level;
         @InputPort public ResourceLocation table;
         @InputPort public BlockPos pos = BlockPos.ZERO;
@@ -155,6 +165,12 @@ public final class LootNodes {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_block_drops.tooltip");
+        }
+
+        /** Rolls a table — see {@link Roll}. */
+        @Override
+        public boolean isThreadSafe() {
+            return false;
         }
 
         @InputPort public Level level;

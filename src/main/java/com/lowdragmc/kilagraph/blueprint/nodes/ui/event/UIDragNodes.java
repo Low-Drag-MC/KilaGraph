@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.event;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -61,7 +61,7 @@ public final class UIDragNodes {
      * there.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_start_drag", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class StartDrag extends AnnotatedNode {
+    public static class StartDrag extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_start_drag.tooltip");
@@ -107,7 +107,7 @@ public final class UIDragNodes {
      * has no drag event to hand but can still ask its UI whether a drag is in progress.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_drag_info", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class DragInfo extends AnnotatedNode {
+    public static class DragInfo extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_drag_info.tooltip");
