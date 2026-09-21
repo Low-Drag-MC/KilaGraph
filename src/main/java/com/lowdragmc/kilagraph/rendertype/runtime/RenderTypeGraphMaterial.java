@@ -4,6 +4,7 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
@@ -265,9 +266,32 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     // ---- texture setters ---------------------------------------------------------------------
 
     /**
-     * Bind a texture to a sampler dynamically (no RenderType rebuild). {@code name} may be a Sampler2D
-     * variable's display name or the raw sampler uniform name. Returns false if this material doesn't
-     * manage that sampler (e.g. overlay/lightmap, owned by vanilla). Takes effect on the next draw.
+     * Bind a Sampler2D variable's <b>whole value</b> — the texture <i>and</i> the filter/address/mipmap
+     * the value carries — by display name (or raw sampler uniform name).
+     *
+     * <p>This is what an inspector that edits a {@link RenderTypeGraphTypes.Sampler2DValue} must call.
+     * {@link #setTexture} deliberately keeps the params the graph baked, so routing an edited value
+     * through it silently drops the wrap/filter the user picked.</p>
+     *
+     * <p>Returns false (changing nothing) when the value has no parseable texture location, or when
+     * this material does not manage that sampler — the same contract as {@link #setTexture}. The
+     * membership check is not decoration here: {@link #apply} binds every entry of the dynamic texture
+     * map, so inventing a key would have it try to bind a sampler the program does not declare.</p>
+     */
+    public boolean setSampler(String name, RenderTypeGraphTypes.Sampler2DValue value) {
+        String sampler = variableSamplers.getOrDefault(name, name);
+        if (!textures.containsKey(sampler)) return false;
+        SamplerDefault def = SamplerDefault.of(value);
+        if (def == null) return false;
+        textures.put(sampler, def);
+        return true;
+    }
+
+    /**
+     * Bind a texture to a sampler dynamically (no RenderType rebuild), keeping the sampler params the
+     * graph baked. {@code name} may be a Sampler2D variable's display name or the raw sampler uniform
+     * name. Returns false if this material doesn't manage that sampler (e.g. overlay/lightmap, owned by
+     * vanilla). Takes effect on the next draw. To apply a value's params too, use {@link #setSampler}.
      */
     public boolean setTexture(String name, Identifier texture) {
         String sampler = variableSamplers.getOrDefault(name, name);
