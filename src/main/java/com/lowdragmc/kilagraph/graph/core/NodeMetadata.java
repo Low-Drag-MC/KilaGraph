@@ -134,6 +134,21 @@ final class NodeMetadata {
         }
     }
 
+    /**
+     * ⚠️ <b>Every builder is {@code build()}ed here, before this returns.</b> A port takes its place
+     * in the node's display order at the moment it is built — {@code PortBuilder.build()} is what
+     * calls {@code NodeModel.addInputPort} — so building here is what makes {@link #applyPorts}'s
+     * ordering a fact rather than a hope.
+     *
+     * <p>A builder left unbuilt is instead finished off by {@code PortDefinitionContext.finish()},
+     * which runs <b>after</b> {@code onDefineDynamicPorts}. Today that still lands the declared
+     * ports first, because {@code finish()} drains its pending list from the front and these were
+     * created first — but only for as long as <i>no</i> dynamic hook builds a port of its own. The
+     * first one that does jumps the whole declared block: adding a {@code .build()} to the rpc
+     * call's argument loop reorders its pins to {@code [arg1, arg2, trigger, rpc]} without this.
+     * Building eagerly costs nothing and removes the dependency on that.
+     * {@code NodeContractGameTest.declaredPortsComeBeforeDynamicOnes} is what holds the invariant.
+     */
     private void applyPort(IPortDefinitionContext ctx, Node node, FieldDef d) {
         if (d.kind == Kind.INPUT_PORT) {
             IInputPortBuilder<?> b = ctx.addInputPort(d.id, d.typeHandle);
@@ -150,10 +165,12 @@ final class NodeMetadata {
                 // such a pin blank while the same handle drew fine on a blackboard variable.
                 b.withoutConfigurator();
             }
+            b.build();
         } else {
             IOutputPortBuilder<?> b = ctx.addOutputPort(d.id, d.typeHandle);
             if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
             if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
+            b.build();
         }
     }
 

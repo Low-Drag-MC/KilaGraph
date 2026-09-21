@@ -60,6 +60,7 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.McWorldQueryGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.MixedWorkloadGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NbtNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NbtPipelineGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.NodeContractGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.NumericPromotionGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.OptionalNodeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.PortConstantTypeGameTest;
@@ -206,7 +207,8 @@ public final class KGGameTests {
             new Group(SealedGraphStressGameTest::registerFunctions, SealedGraphStressGameTest::register),
             new Group(VectorNodeGameTest::registerFunctions, VectorNodeGameTest::register),
             new Group(VectorNodeExtrasGameTest::registerFunctions, VectorNodeExtrasGameTest::register),
-            new Group(VectorPinTypeGameTest::registerFunctions, VectorPinTypeGameTest::register));
+            new Group(VectorPinTypeGameTest::registerFunctions, VectorPinTypeGameTest::register),
+            new Group(NodeContractGameTest::registerFunctions, NodeContractGameTest::register));
 
     /** Every render-type-graph test group. @see Group */
     private static final List<Group> RENDER_TYPE_GRAPH = List.of(
