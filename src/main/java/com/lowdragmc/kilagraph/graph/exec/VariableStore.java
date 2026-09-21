@@ -52,6 +52,91 @@ public final class VariableStore {
     }
 
     /**
+     * Writes a number <b>without boxing it</b>.
+     */
+    public void putFloat(String name, float value) {
+        cell(name).setNum(GraphExecutor.KIND_FLOAT, Float.floatToRawIntBits(value));
+    }
+
+    /** @see #putFloat */
+    public void putInt(String name, int value) {
+        cell(name).setNum(GraphExecutor.KIND_INT, value);
+    }
+
+    /** @see #putFloat */
+    public void putDouble(String name, double value) {
+        cell(name).setNum(GraphExecutor.KIND_DOUBLE, Double.doubleToRawLongBits(value));
+    }
+
+    /** @see #putFloat */
+    public void putLong(String name, long value) {
+        cell(name).setNum(GraphExecutor.KIND_LONG, value);
+    }
+
+    /**
+     * Reads a number <b>without boxing it</b>.
+     * @param fallback what an absent name, or a value that is not a number at all, reads as
+     */
+    public float getFloat(String name, float fallback) {
+        VarCell c = cells.get(name);
+        if (c == null || !c.present) {
+            return fallback;
+        }
+        return switch (c.kind) {
+            case GraphExecutor.KIND_FLOAT -> Float.intBitsToFloat((int) c.num);
+            case GraphExecutor.KIND_DOUBLE -> (float) Double.longBitsToDouble(c.num);
+            case GraphExecutor.KIND_INT, GraphExecutor.KIND_LONG -> (float) c.num;
+            default -> c.value instanceof Number number ? number.floatValue()
+                    : c.value instanceof Boolean flag ? (flag ? 1f : 0f)
+                    : fallback;
+        };
+    }
+
+    /** @see #getFloat */
+    public int getInt(String name, int fallback) {
+        VarCell c = cells.get(name);
+        if (c == null || !c.present) {
+            return fallback;
+        }
+        return switch (c.kind) {
+            case GraphExecutor.KIND_FLOAT -> (int) Float.intBitsToFloat((int) c.num);
+            case GraphExecutor.KIND_DOUBLE -> (int) Double.longBitsToDouble(c.num);
+            case GraphExecutor.KIND_INT, GraphExecutor.KIND_LONG -> (int) c.num;
+            default -> c.value instanceof Number number ? number.intValue() : fallback;
+        };
+    }
+
+    /** @see #getFloat */
+    public double getDouble(String name, double fallback) {
+        VarCell c = cells.get(name);
+        if (c == null || !c.present) {
+            return fallback;
+        }
+        return switch (c.kind) {
+            case GraphExecutor.KIND_FLOAT -> Float.intBitsToFloat((int) c.num);
+            case GraphExecutor.KIND_DOUBLE -> Double.longBitsToDouble(c.num);
+            case GraphExecutor.KIND_INT, GraphExecutor.KIND_LONG -> (double) c.num;
+            default -> c.value instanceof Number number ? number.doubleValue()
+                    : c.value instanceof Boolean flag ? (flag ? 1d : 0d)
+                    : fallback;
+        };
+    }
+
+    /** @see #getFloat */
+    public long getLong(String name, long fallback) {
+        VarCell c = cells.get(name);
+        if (c == null || !c.present) {
+            return fallback;
+        }
+        return switch (c.kind) {
+            case GraphExecutor.KIND_FLOAT -> (long) Float.intBitsToFloat((int) c.num);
+            case GraphExecutor.KIND_DOUBLE -> (long) Double.longBitsToDouble(c.num);
+            case GraphExecutor.KIND_INT, GraphExecutor.KIND_LONG -> c.num;
+            default -> c.value instanceof Number number ? number.longValue() : fallback;
+        };
+    }
+
+    /**
      * Sentinel returned by {@link #getOrAbsent} for a name with no entry, so "absent" and
      * "present but null" stay distinguishable in a single lookup.
      */
