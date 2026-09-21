@@ -29,6 +29,7 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Quaternionf;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -85,6 +86,8 @@ public final class KGTypeHandles {
      * is what applies both, so no node does this by hand.
      */
     public static final TypeHandle VECTOR;
+
+    public static final TypeHandle QUAT;
 
     // Minecraft context/value handles not exposed as constants by LDLib2's TypeHandles.
     // (LDLib2 already registers DIRECTION/BLOCK/ITEM/FLUID/ENTITY_TYPE/ITEM_STACK/FLUID_STACK —
@@ -155,9 +158,10 @@ public final class KGTypeHandles {
     private static final Map<Type, TypeHandle> OVERRIDES = new ConcurrentHashMap<>();
 
     static {
-        VEC2 = vector(Vector2f.class, "VEC2", "Vector2", 0xFF7ED3F0, Vector2f::new);
-        VEC3 = vector(Vector3f.class, "VEC3", "Vector3", 0xFFF3C13A, Vector3f::new);
-        VEC4 = vector(Vector4f.class, "VEC4", "Vector4", 0xFFE08A3C, Vector4f::new);
+        VEC2 = jomlType(Vector2f.class, "VEC2", "Vector2", 0xFF7ED3F0, Vector2f::new);
+        VEC3 = jomlType(Vector3f.class, "VEC3", "Vector3", 0xFFF3C13A, Vector3f::new);
+        VEC4 = jomlType(Vector4f.class, "VEC4", "Vector4", 0xFFE08A3C, Vector4f::new);
+        QUAT = jomlType(Quaternionf.class, "QUAT", "Quaternion", 0xFFE05C8A, Quaternionf::new);
 
         // Not through vector(): that registers the Java type's override, and Vector3f must keep
         // resolving to VEC3 so that an annotated Vector3f field still means "genuinely 3D".
@@ -247,15 +251,15 @@ public final class KGTypeHandles {
     private KGTypeHandles() {}
 
     /**
-     * A vector handle, fully described in the one call that mints it.
+     * A JOML-backed handle, fully described in the one call that mints it.
      *
      * <p>LDLib2 caches colour, default value and configurator lazily <b>per handle instance</b>, so
      * a property attached after something has already asked for it is silently ignored. The default
      * is not cosmetic either: an unconnected port builds its constant from it and hands it straight
-     * to the accessor, which reads {@code .x} off it — a vector type without a default is a null
+     * to the accessor, which reads {@code .x} off it — one of these without a default is a null
      * dereference the first time anyone drops the node.
      */
-    private static TypeHandle vector(Class<?> javaType, String id, String display, int colour,
+    private static TypeHandle jomlType(Class<?> javaType, String id, String display, int colour,
                                      Supplier<Object> defaultValue) {
         TypeHandle handle = TypeHandleHelpers.customType(javaType, id, display);
         TypeHandleHelpers.setCustomColor(handle, colour);

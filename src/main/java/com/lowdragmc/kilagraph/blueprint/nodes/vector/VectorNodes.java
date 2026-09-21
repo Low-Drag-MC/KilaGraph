@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.vector;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.WrapNode;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.Option;
@@ -310,9 +311,7 @@ public final class VectorNodes {
             float[] p = components(ctx.getInputRaw("from"));
             float[] q = components(ctx.getInputRaw("to"));
             double angle = Math.toDegrees(Math.atan2(-at(q, 0), at(q, 2)) - Math.atan2(-at(p, 0), at(p, 2)));
-            // folded into [-180, 180): a turn of 350 degrees is a turn of -10
-            angle = ((angle + 180d) % 360d + 360d) % 360d - 180d;
-            ctx.setOutput("out", (float) angle);
+            ctx.setOutput("out", WrapNode.wrap((float) angle, -180f, 180f));
         }
     }
 

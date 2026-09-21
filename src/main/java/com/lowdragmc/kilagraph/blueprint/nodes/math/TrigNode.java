@@ -17,7 +17,7 @@ import java.util.List;
 @NodeAttribute(name = "math_trig", group = "math", graphTypes = BlueprintGraph.class)
 public class TrigNode extends AnnotatedNode {
 
-    public enum Op { SIN, COS, TAN, ASIN, ACOS, ATAN }
+    public enum Op { SIN, COS, TAN, ASIN, ACOS, ATAN, SINH, COSH, TANH }
 
     @Option public Op op = Op.SIN;
     @InputPort public float in = 0f;
@@ -33,6 +33,9 @@ public class TrigNode extends AnnotatedNode {
             case ASIN -> Math.asin(v);
             case ACOS -> Math.acos(v);
             case ATAN -> Math.atan(v);
+            case SINH -> Math.sinh(v);
+            case COSH -> Math.cosh(v);
+            case TANH -> Math.tanh(v);
             default -> Math.sin(v);
         };
         ctx.setOutput("out", (float) r);
@@ -40,6 +43,8 @@ public class TrigNode extends AnnotatedNode {
 
     @Override
     public List<String> optionChoices(String optionId) {
-        return "op".equals(optionId) ? List.of("SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN") : List.of();
+        return "op".equals(optionId)
+                ? List.of("SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN", "SINH", "COSH", "TANH")
+                : List.of();
     }
 }

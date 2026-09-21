@@ -12,6 +12,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
+import java.util.Arrays;
+
 import static com.lowdragmc.kilagraph.graph.type.Vectors.at;
 import static com.lowdragmc.kilagraph.graph.type.Vectors.carrier;
 import static com.lowdragmc.kilagraph.graph.type.Vectors.components;
@@ -373,6 +375,160 @@ public final class VectorGeometryNodes {
             }
             ctx.setOutput("out", equal);
         }
+    }
+
+    @NodeAttribute(name = "vector_direction_to", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class DirectionTo extends AnnotatedNode {
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.in(ctx, "from");
+            VectorPorts.in(ctx, "to");
+            VectorPorts.out(ctx, "out");
+            ctx.addOutputPort("distance", Float.class);
+        }
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            float[] p = components(ctx.getInputRaw("from"));
+            float[] q = components(ctx.getInputRaw("to"));
+            int width = Math.max(p.length, q.length);
+            float[] delta = new float[width];
+            for (int i = 0; i < width; i++) delta[i] = at(q, i) - at(p, i);
+            float distance = (float) Math.sqrt(lengthSquared(delta));
+            if (distance >= Vectors.EPSILON) {
+                for (int i = 0; i < width; i++) delta[i] /= distance;
+            } else {
+                Arrays.fill(delta, 0f);
+            }
+            ctx.setOutput("out", carrier(delta));
+            ctx.setOutput("distance", distance);
+        }
+    }
+
+    @NodeAttribute(name = "vector_set_length", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class SetLength extends AnnotatedNode {
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.in(ctx, "in");
+            ctx.addInputPort("length", Float.class).withDefaultValue(1f);
+            VectorPorts.out(ctx, "out");
+        }
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            float[] v = components(ctx.getInputRaw("in"));
+            float length = (float) Math.sqrt(lengthSquared(v));
+            if (length >= Vectors.EPSILON) {
+                float k = ctx.getFloat("length", 1f) / length;
+                for (int i = 0; i < v.length; i++) v[i] *= k;
+            } else {
+                Arrays.fill(v, 0f);
+            }
+            ctx.setOutput("out", carrier(v));
+        }
+    }
+
+    @NodeAttribute(name = "vector_slerp", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class Slerp extends AnnotatedNode {
+        private static final float PARALLEL = 1f - 1e-6f;
+
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.in(ctx, "a");
+            VectorPorts.in(ctx, "b");
+            ctx.addInputPort("t", Float.class).withDefaultValue(0f);
+            VectorPorts.out(ctx, "out");
+        }
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            float[] p = components(ctx.getInputRaw("a"));
+            float[] q = components(ctx.getInputRaw("b"));
+            int width = Math.max(p.length, q.length);
+            float t = Math.min(1f, Math.max(0f, ctx.getFloat("t", 0f)));
+
+            float la = (float) Math.sqrt(lengthSquared(p));
+            float lb = (float) Math.sqrt(lengthSquared(q));
+            if (la < Vectors.EPSILON || lb < Vectors.EPSILON) {
+                float[] lerped = new float[width];
+                for (int i = 0; i < width; i++) {
+                    lerped[i] = at(p, i) + (at(q, i) - at(p, i)) * t;
+                }
+                ctx.setOutput("out", carrier(lerped));
+                return;
+            }
+
+            float[] ua = new float[width];
+            float[] ub = new float[width];
+            for (int i = 0; i < width; i++) {
+                ua[i] = at(p, i) / la;
+                ub[i] = at(q, i) / lb;
+            }
+            float cos = Math.max(-1f, Math.min(1f, dot(ua, ub)));
+            float[] dir;
+            if (cos > PARALLEL) {
+                dir = new float[width];
+                for (int i = 0; i < width; i++) dir[i] = ua[i] + (ub[i] - ua[i]) * t;
+                normalizeInPlace(dir, ua);
+            } else if (cos < -PARALLEL) {
+                float[] perp = perpendicular(ua);
+                double theta = Math.PI * t;
+                float c = (float) Math.cos(theta);
+                float s = (float) Math.sin(theta);
+                dir = new float[width];
+                for (int i = 0; i < width; i++) dir[i] = ua[i] * c + perp[i] * s;
+            } else {
+                double theta = Math.acos(cos);
+                double sin = Math.sin(theta);
+                float k0 = (float) (Math.sin((1d - t) * theta) / sin);
+                float k1 = (float) (Math.sin(t * theta) / sin);
+                dir = new float[width];
+                for (int i = 0; i < width; i++) dir[i] = ua[i] * k0 + ub[i] * k1;
+            }
+
+            float length = la + (lb - la) * t;
+            for (int i = 0; i < width; i++) dir[i] *= length;
+            ctx.setOutput("out", carrier(dir));
+        }
+    }
+
+    @NodeAttribute(name = "vector_perpendicular", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class Perpendicular extends AnnotatedNode {
+        @Override
+        protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
+            VectorPorts.unary(ctx);
+        }
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            ctx.setOutput("out", carrier(perpendicular(components(ctx.getInputRaw("in")))));
+        }
+    }
+
+    private static float[] perpendicular(float[] v) {
+        int width = v.length;
+        float[] out = new float[width];
+        float vv = lengthSquared(v);
+        if (vv < Vectors.EPSILON * Vectors.EPSILON) return out;
+        int axis = 0;
+        for (int i = 1; i < width; i++) {
+            if (Math.abs(v[i]) < Math.abs(v[axis])) axis = i;
+        }
+        float k = v[axis] / vv;
+        for (int i = 0; i < width; i++) out[i] = (i == axis ? 1f : 0f) - v[i] * k;
+        float length = (float) Math.sqrt(lengthSquared(out));
+        if (length < Vectors.EPSILON) return new float[width];
+        for (int i = 0; i < width; i++) out[i] /= length;
+        return out;
+    }
+
+    private static void normalizeInPlace(float[] v, float[] ifZero) {
+        float length = (float) Math.sqrt(lengthSquared(v));
+        if (length < Vectors.EPSILON) {
+            System.arraycopy(ifZero, 0, v, 0, v.length);
+            return;
+        }
+        for (int i = 0; i < v.length; i++) v[i] /= length;
     }
 
     /**

@@ -3,6 +3,7 @@ package com.lowdragmc.kilagraph.test.gametest.blueprint;
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorConvertNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorGeometryNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorMathNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes;
@@ -65,7 +66,9 @@ public final class VectorPinTypeGameTest {
             VectorGeometryNodes.ClampLength.class, VectorGeometryNodes.Project.class,
             VectorGeometryNodes.Reject.class, VectorGeometryNodes.Reflect.class,
             VectorGeometryNodes.AngleBetween.class, VectorGeometryNodes.MoveTowards.class,
-            VectorGeometryNodes.NearlyEquals.class);
+            VectorGeometryNodes.NearlyEquals.class, VectorGeometryNodes.DirectionTo.class,
+            VectorGeometryNodes.SetLength.class, VectorGeometryNodes.Slerp.class,
+            VectorGeometryNodes.Perpendicular.class, VectorMathNodes.Wrap.class);
 
     /** Reads the first three of anything and answers a Vector3 — every vector pin must be VEC3. */
     private static final List<Class<? extends Node>> THREE_DIMENSIONAL = List.of(
@@ -125,6 +128,24 @@ public final class VectorPinTypeGameTest {
         assertEq(helper, "vector_make2 out", KGTypeHandles.VEC2, outputHandle(VectorNodes.Make2.class));
         assertEq(helper, "vector_make4 out", KGTypeHandles.VEC4, outputHandle(VectorNodes.Make4.class));
         helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void theWidthConversionsTakeAnyWidthAndNameTheOneTheyProduce(GameTestHelper helper) {
+        assertConverts(helper, "vector_to_vec2", VectorConvertNodes.ToVec2.class, KGTypeHandles.VEC2);
+        assertConverts(helper, "vector_to_vec3", VectorConvertNodes.ToVec3.class, KGTypeHandles.VEC3);
+        assertConverts(helper, "vector_to_vec4", VectorConvertNodes.ToVec4.class, KGTypeHandles.VEC4);
+        helper.succeed();
+    }
+
+    private static void assertConverts(GameTestHelper helper, String label,
+                                       Class<? extends Node> cls, TypeHandle produced) {
+        NodeModel model = addNode(newGraph(), cls);
+        assertEq(helper, label + " in", KGTypeHandles.VECTOR,
+                model.getInputsById().get("in").getDataTypeHandle());
+        assertEq(helper, label + " out", produced,
+                model.getOutputsById().get("out").getDataTypeHandle());
     }
 
     /**
