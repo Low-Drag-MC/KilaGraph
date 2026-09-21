@@ -2,6 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.element;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
@@ -86,7 +87,7 @@ public final class UIValueNodes {
      * field with a translation key on the server.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_set_text", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetText extends AnnotatedNode {
+    public static class SetText extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_set_text.tooltip");
@@ -117,7 +118,7 @@ public final class UIValueNodes {
 
     /** Reads the caption back. Empty for an element that has none. */
     @NodeAttribute(name = "ldlib2_ui_get_text", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class GetText extends AnnotatedNode {
+    public static class GetText extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_get_text.tooltip");
@@ -176,7 +177,7 @@ public final class UIValueNodes {
      * anything-goes pin.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_get_value", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class GetValue extends AnnotatedNode {
+    public static class GetValue extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_get_value.tooltip");
@@ -215,7 +216,7 @@ public final class UIValueNodes {
      * change listener — the classic feedback loop in a two-way binding.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_set_value", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetValue extends AnnotatedNode {
+    public static class SetValue extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_set_value.tooltip");
@@ -303,7 +304,7 @@ public final class UIValueNodes {
      * against the element that actually arrives, so pointing the node at a subclass still works.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_set_property", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetProperty extends AnnotatedNode {
+    public static class SetProperty extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_set_property.tooltip");
@@ -357,7 +358,7 @@ public final class UIValueNodes {
 
     /** Reads one of the element's {@code @Configurable} fields. Same option pair as the setter. */
     @NodeAttribute(name = "ldlib2_ui_get_property", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class GetProperty extends AnnotatedNode {
+    public static class GetProperty extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_get_property.tooltip");
@@ -387,7 +388,7 @@ public final class UIValueNodes {
 
     /** Lists the {@code @Configurable} property keys of the chosen element type, for documentation. */
     @NodeAttribute(name = "ldlib2_ui_list_properties", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class ListProperties extends AnnotatedNode {
+    public static class ListProperties extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_list_properties.tooltip");

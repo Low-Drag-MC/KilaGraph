@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.style;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -97,7 +97,7 @@ public final class UIStyleNodes {
      * colour parser accepts.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_lss_set", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class LssSet extends AnnotatedNode {
+    public static class LssSet extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_lss_set.tooltip");
@@ -163,7 +163,7 @@ public final class UIStyleNodes {
      * erasing the element's normal appearance.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_lss_remove", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class LssRemove extends AnnotatedNode {
+    public static class LssRemove extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_lss_remove.tooltip");
@@ -212,7 +212,7 @@ public final class UIStyleNodes {
      * is what the xml path does too.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_lss_block", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class LssBlock extends AnnotatedNode {
+    public static class LssBlock extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_lss_block.tooltip");
@@ -266,7 +266,7 @@ public final class UIStyleNodes {
      * with, and a poor one to store a graph's own state in.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_lss_get", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class LssGet extends AnnotatedNode {
+    public static class LssGet extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_lss_get.tooltip");
@@ -335,7 +335,7 @@ public final class UIStyleNodes {
      * writes six inline properties has to remember and reverse all six.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_class", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class ClassNames extends AnnotatedNode {
+    public static class ClassNames extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_class.tooltip");
@@ -387,7 +387,7 @@ public final class UIStyleNodes {
 
     /** Whether an element carries a class name. */
     @NodeAttribute(name = "ldlib2_ui_has_class", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class HasClass extends AnnotatedNode {
+    public static class HasClass extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_has_class.tooltip");

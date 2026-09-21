@@ -44,6 +44,17 @@ public final class UIElementInfoBlocks {
         protected final Class<UIElement> targetClass() {
             return UIElement.class;
         }
+
+        /**
+         * ⚠️ Stated here rather than inherited from {@code UINode}: these blocks extend
+         * {@link InfoPropertyBlock}, which the {@code mc/} info blocks share and which is safe —
+         * so the UI base cannot be pushed up the chain without making the world blocks unsafe too.
+         * Reading a live element is still a read of a tree the draw thread is rewriting.
+         */
+        @Override
+        public boolean isThreadSafe() {
+            return false;
+        }
     }
 
     // ---- identity ----------------------------------------------------------------------------

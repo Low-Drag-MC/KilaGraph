@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.style;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -58,7 +58,7 @@ public final class UIAnimationNodes {
      * it with {@code ldlib2_ui_lss_remove} at the {@code INLINE} origin afterwards.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_animate", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Animate extends AnnotatedNode {
+    public static class Animate extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_animate.tooltip");
@@ -117,7 +117,7 @@ public final class UIAnimationNodes {
      * applies.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_tooltip", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Tooltip extends AnnotatedNode {
+    public static class Tooltip extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_tooltip.tooltip");

@@ -30,4 +30,13 @@ public class UIElementInfoNode extends InfoContextNode<UIElement> {
     protected Class<UIElement> targetClass() {
         return UIElement.class;
     }
+
+    /**
+     * ⚠️ Stated here rather than inherited from {@code UINode}: this extends
+     * {@link InfoContextNode}, shared with the {@code mc/} info nodes, which are safe.
+     */
+    @Override
+    public boolean isThreadSafe() {
+        return false;
+    }
 }

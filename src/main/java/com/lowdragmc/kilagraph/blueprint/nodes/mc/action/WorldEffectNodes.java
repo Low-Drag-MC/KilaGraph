@@ -1,7 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.action;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -45,7 +44,7 @@ public final class WorldEffectNodes {
      * sound, and it is worth knowing before turning it up and hearing no difference up close.
      */
     @NodeAttribute(name = "mc_play_sound", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class PlaySound extends AnnotatedNode {
+    public static class PlaySound extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_play_sound.tooltip");
@@ -97,7 +96,7 @@ public final class WorldEffectNodes {
      * every particle exactly on the point.
      */
     @NodeAttribute(name = "mc_spawn_particle", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SpawnParticle extends AnnotatedNode {
+    public static class SpawnParticle extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_spawn_particle.tooltip");
@@ -143,7 +142,7 @@ public final class WorldEffectNodes {
      * a deliberate placement wants; the game's own random scatter is for breaking blocks.</p>
      */
     @NodeAttribute(name = "mc_drop_item", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class DropItem extends AnnotatedNode {
+    public static class DropItem extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_drop_item.tooltip");
@@ -186,7 +185,7 @@ public final class WorldEffectNodes {
      * {@code mc_text_literal} is the explicit form.</p>
      */
     @NodeAttribute(name = "mc_send_message", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SendMessage extends AnnotatedNode {
+    public static class SendMessage extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_send_message.tooltip");

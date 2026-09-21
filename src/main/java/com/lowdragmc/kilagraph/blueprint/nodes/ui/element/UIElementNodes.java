@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.element;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -70,7 +70,7 @@ public final class UIElementNodes {
      * container element rather than failing the build.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_element_new", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class New extends AnnotatedNode {
+    public static class New extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_element_new.tooltip");
@@ -118,7 +118,7 @@ public final class UIElementNodes {
      * so a fragment naming several siblings does not silently lose the rest.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_element_from_xml", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class FromXml extends AnnotatedNode {
+    public static class FromXml extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_element_from_xml.tooltip");
@@ -155,7 +155,7 @@ public final class UIElementNodes {
      * sibling order is what a flex layout lays out in.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_add_child", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class AddChild extends AnnotatedNode {
+    public static class AddChild extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_add_child.tooltip");
@@ -203,7 +203,7 @@ public final class UIElementNodes {
 
     /** Adds every element of a list to a parent, in list order. */
     @NodeAttribute(name = "ldlib2_ui_add_children", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class AddChildren extends AnnotatedNode {
+    public static class AddChildren extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_add_children.tooltip");
@@ -246,7 +246,7 @@ public final class UIElementNodes {
 
     /** Removes a child from its parent. */
     @NodeAttribute(name = "ldlib2_ui_remove_child", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class RemoveChild extends AnnotatedNode {
+    public static class RemoveChild extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_remove_child.tooltip");
@@ -269,7 +269,7 @@ public final class UIElementNodes {
 
     /** Removes an element from whatever parent it currently has. */
     @NodeAttribute(name = "ldlib2_ui_remove_self", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class RemoveSelf extends AnnotatedNode {
+    public static class RemoveSelf extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_remove_self.tooltip");
@@ -297,7 +297,7 @@ public final class UIElementNodes {
      * children a graph or an XML file added, which is what "clear the children" almost always means.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_clear_children", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class ClearChildren extends AnnotatedNode {
+    public static class ClearChildren extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_clear_children.tooltip");
@@ -335,7 +335,7 @@ public final class UIElementNodes {
      * look at and does nothing when clicked. Attach behaviour after copying, not before.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_copy", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Copy extends AnnotatedNode {
+    public static class Copy extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_copy.tooltip");
@@ -363,7 +363,7 @@ public final class UIElementNodes {
 
     /** An element's tree as NBT — the same shape a {@code UITemplate} stores. */
     @NodeAttribute(name = "ldlib2_ui_serialize", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Serialize extends AnnotatedNode {
+    public static class Serialize extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_serialize.tooltip");
@@ -390,7 +390,7 @@ public final class UIElementNodes {
 
     /** Loads an NBT tree into an existing element, replacing what was there. */
     @NodeAttribute(name = "ldlib2_ui_deserialize", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Deserialize extends AnnotatedNode {
+    public static class Deserialize extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_deserialize.tooltip");

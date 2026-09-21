@@ -2,6 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.sync;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
@@ -72,7 +73,7 @@ public final class UIRpcNodes {
      * with {@code returnType} left as {@code Unknown} — the call is one-way.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_rpc_define", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Define extends AnnotatedNode {
+    public static class Define extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_rpc_define.tooltip");
@@ -178,7 +179,7 @@ public final class UIRpcNodes {
      * whenever it is not itself nested inside another. Wiring it is only needed to disambiguate.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_rpc_return", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Return extends AnnotatedNode {
+    public static class Return extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_rpc_return.tooltip");
@@ -219,7 +220,7 @@ public final class UIRpcNodes {
      * no names. Getting one wrong throws on the receiving side rather than here.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_rpc_send", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Send extends AnnotatedNode {
+    public static class Send extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_rpc_send.tooltip");
@@ -288,7 +289,7 @@ public final class UIRpcNodes {
      * its messages, so adding a second listener does not add a second wire id.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_on_message", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class OnMessage extends AnnotatedNode {
+    public static class OnMessage extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_on_message.tooltip");
@@ -330,7 +331,7 @@ public final class UIRpcNodes {
 
     /** Sends a named message with an NBT payload to the same element on the other side. */
     @NodeAttribute(name = "ldlib2_ui_send_message", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SendMessage extends AnnotatedNode {
+    public static class SendMessage extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_send_message.tooltip");

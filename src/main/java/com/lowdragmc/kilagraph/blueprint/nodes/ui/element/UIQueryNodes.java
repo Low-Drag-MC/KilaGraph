@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.blueprint.nodes.ui.element;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.ui.UIActions;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.ui.UINode;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
@@ -47,7 +47,7 @@ public final class UIQueryNodes {
 
     /** An element's parent, and whether it has one. */
     @NodeAttribute(name = "ldlib2_ui_parent", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Parent extends AnnotatedNode {
+    public static class Parent extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_parent.tooltip");
@@ -67,7 +67,7 @@ public final class UIQueryNodes {
 
     /** An element's direct children. */
     @NodeAttribute(name = "ldlib2_ui_children", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Children extends AnnotatedNode {
+    public static class Children extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_children.tooltip");
@@ -90,7 +90,7 @@ public final class UIQueryNodes {
 
     /** Every descendant, depth-first — the whole subtree flattened. */
     @NodeAttribute(name = "ldlib2_ui_descendants", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Descendants extends AnnotatedNode {
+    public static class Descendants extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_descendants.tooltip");
@@ -119,7 +119,7 @@ public final class UIQueryNodes {
 
     /** The child at an index, or nothing if the index is out of range. */
     @NodeAttribute(name = "ldlib2_ui_child_at", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class ChildAt extends AnnotatedNode {
+    public static class ChildAt extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_child_at.tooltip");
@@ -143,7 +143,7 @@ public final class UIQueryNodes {
 
     /** The nearest ancestor of a chosen element type — how a child finds the panel it lives in. */
     @NodeAttribute(name = "ldlib2_ui_ancestor_of_type", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class AncestorOfType extends AnnotatedNode {
+    public static class AncestorOfType extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_ancestor_of_type.tooltip");
@@ -179,7 +179,7 @@ public final class UIQueryNodes {
      * single-element list to get at it is pure noise.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_select", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Select extends AnnotatedNode {
+    public static class Select extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_select.tooltip");
@@ -202,7 +202,7 @@ public final class UIQueryNodes {
 
     /** Elements whose id matches exactly, searched from {@code root} downwards. */
     @NodeAttribute(name = "ldlib2_ui_select_id", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SelectId extends AnnotatedNode {
+    public static class SelectId extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_select_id.tooltip");
@@ -231,7 +231,7 @@ public final class UIQueryNodes {
      * without knowing how many there are.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_select_regex", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SelectRegex extends AnnotatedNode {
+    public static class SelectRegex extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_select_regex.tooltip");
@@ -259,7 +259,7 @@ public final class UIQueryNodes {
      * tree is invisible here, which is the usual reason this returns nothing during a build.</p>
      */
     @NodeAttribute(name = "ldlib2_ui_find_by_id", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class FindById extends AnnotatedNode {
+    public static class FindById extends UINode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.ldlib2_ui_find_by_id.tooltip");

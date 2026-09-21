@@ -1,7 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.action;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -48,7 +47,7 @@ public final class WorldInteractionNodes {
      * Lighting the block <em>above</em> something flammable is the usual intent.</p>
      */
     @NodeAttribute(name = "mc_ignite", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Ignite extends AnnotatedNode {
+    public static class Ignite extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_ignite.tooltip");
@@ -79,7 +78,7 @@ public final class WorldInteractionNodes {
 
     /** Puts out a fire. False when there was no fire there. */
     @NodeAttribute(name = "mc_extinguish", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Extinguish extends AnnotatedNode {
+    public static class Extinguish extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_extinguish.tooltip");
@@ -112,7 +111,7 @@ public final class WorldInteractionNodes {
      * {@code ok} is false when the block was not bonemealable or was already fully grown.</p>
      */
     @NodeAttribute(name = "mc_bonemeal", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class BoneMeal extends AnnotatedNode {
+    public static class BoneMeal extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_bonemeal.tooltip");
@@ -145,7 +144,7 @@ public final class WorldInteractionNodes {
      * pig-to-zombified-piglin conversions — for weather effects that are not meant to be dangerous.</p>
      */
     @NodeAttribute(name = "mc_strike_lightning", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class StrikeLightning extends AnnotatedNode {
+    public static class StrikeLightning extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_strike_lightning.tooltip");
@@ -197,7 +196,7 @@ public final class WorldInteractionNodes {
      * server down.
      */
     @NodeAttribute(name = "mc_explode", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Explode extends AnnotatedNode {
+    public static class Explode extends ActionNode {
         /** Well past a charged creeper, well short of anything that stalls a tick. */
         public static final float MAX_RADIUS = 16f;
 

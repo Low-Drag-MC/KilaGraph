@@ -149,6 +149,12 @@ public final class FluidContainerNodes {
             return Component.translatable("kg.node.mc_fluid_container_fill.tooltip");
         }
 
+        /** Writes a tank. ⚠️ The only two nodes in {@code mc/container} that do. */
+        @Override
+        public boolean isThreadSafe() {
+            return false;
+        }
+
         @ExecInputPort public ExecutionFlow trigger;
         @ExecOutputPort public ExecutionFlow next;
 
@@ -185,6 +191,12 @@ public final class FluidContainerNodes {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_fluid_container_drain.tooltip");
+        }
+
+        /** Writes a tank — see {@link Fill}. */
+        @Override
+        public boolean isThreadSafe() {
+            return false;
         }
 
         @ExecInputPort public ExecutionFlow trigger;

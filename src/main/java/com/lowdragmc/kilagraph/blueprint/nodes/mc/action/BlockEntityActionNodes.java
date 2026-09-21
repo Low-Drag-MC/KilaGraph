@@ -1,7 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.action;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -54,7 +53,7 @@ public final class BlockEntityActionNodes {
      * capability, work on modded blocks, and cannot corrupt anything.
      */
     @NodeAttribute(name = "mc_set_block_entity_nbt", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetNbt extends AnnotatedNode {
+    public static class SetNbt extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_set_block_entity_nbt.tooltip");

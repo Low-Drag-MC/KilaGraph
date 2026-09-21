@@ -1,7 +1,6 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.mc.action;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
-import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
 import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.InputPort;
@@ -39,7 +38,7 @@ public final class EntityInteractionNodes {
      * happens, and a graph that wanted to know can ask.</p>
      */
     @NodeAttribute(name = "mc_set_entity_fire", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetFire extends AnnotatedNode {
+    public static class SetFire extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_set_entity_fire.tooltip");
@@ -87,7 +86,7 @@ public final class EntityInteractionNodes {
      * cleared. Checking the string is what makes "leave it unset to clear" actually work.
      */
     @NodeAttribute(name = "mc_set_entity_name", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetName extends AnnotatedNode {
+    public static class SetName extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_set_entity_name.tooltip");
@@ -124,7 +123,7 @@ public final class EntityInteractionNodes {
      * enforces its own rules about who may carry whom.</p>
      */
     @NodeAttribute(name = "mc_mount_entity", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Mount extends AnnotatedNode {
+    public static class Mount extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_mount_entity.tooltip");
@@ -154,7 +153,7 @@ public final class EntityInteractionNodes {
 
     /** Gets an entity off whatever it is riding. False when it was not riding anything. */
     @NodeAttribute(name = "mc_dismount_entity", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class Dismount extends AnnotatedNode {
+    public static class Dismount extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_dismount_entity.tooltip");
@@ -193,7 +192,7 @@ public final class EntityInteractionNodes {
      * {@code mc_teleport_entity}, which says so in its name.
      */
     @NodeAttribute(name = "mc_set_entity_nbt", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetNbt extends AnnotatedNode {
+    public static class SetNbt extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_set_entity_nbt.tooltip");
@@ -236,7 +235,7 @@ public final class EntityInteractionNodes {
      * anything else reports {@code ok = false} — a dropped item has no hands.</p>
      */
     @NodeAttribute(name = "mc_set_equipment", group = GROUP, graphTypes = BlueprintGraph.class)
-    public static class SetEquipment extends AnnotatedNode {
+    public static class SetEquipment extends ActionNode {
         @Override
         protected Component getNodeTooltip() {
             return Component.translatable("kg.node.mc_set_equipment.tooltip");

@@ -26,7 +26,8 @@ import org.jetbrains.annotations.Nullable;
  * {@code @UseWithContext(SomeContext.class)} to say which contexts will accept it. Without the second
  * one it is compatible with no context and can never be placed.
  */
-public abstract class AnnotatedBlockNode extends BlockNode implements IGraphEvaluable, INodeDescription {
+public abstract class AnnotatedBlockNode extends BlockNode
+        implements IGraphEvaluable, INodeDescription, IThreadSafeNode {
 
     private NodeMetadata metadata;
 
