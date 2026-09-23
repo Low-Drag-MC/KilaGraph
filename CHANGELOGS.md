@@ -1,4 +1,7 @@
 # ChangeLogs
+## v26.2.0.15
+* hello 26.2!
+
 ## v26.1.0.15
 * Added quaternion type and rotation nodes (axis angle, euler, from-to, compose, inverse, slerp, rotate vector, angle between, Vec4 bridge)
 * Added vector nodes (direction to, set length, slerp, perpendicular, wrap, Vec2/Vec3/Vec4 conversions)
