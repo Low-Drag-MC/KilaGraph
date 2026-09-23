@@ -17,11 +17,10 @@ import java.util.Map;
 /**
  * The GPU-side {@code KG_Material} uniform buffer for one material instance. Holds the per-field
  * values on the Java side, packs them std140 in {@link MaterialUniformLayout} order, and uploads to
- * a persistent {@link GpuBuffer} that {@code RenderTypeMixin} binds during {@code RenderType.draw}.
+ * a persistent {@link GpuBuffer} that {@code PreparedRenderTypeMixin} binds during the draw.
  *
- * <p>Values are set with {@link #set}; the GPU buffer is (re)uploaded lazily on the render thread the
- * next time {@link #slice()} is requested after a change. Empty layouts allocate nothing and return a
- * {@code null} slice (the mixin then binds no custom UBO).</p>
+ * <p>Values are set with {@link #set}; {@link #prepareUpload()} re-uploads the GPU buffer after a change.
+ * Empty layouts allocate nothing and return a {@code null} slice (the mixin then binds no custom UBO).</p>
  */
 public final class MaterialUniformBuffer implements AutoCloseable {
 
@@ -52,7 +51,7 @@ public final class MaterialUniformBuffer implements AutoCloseable {
     /**
      * Create (if needed) and upload the GPU buffer when values changed. Performs a
      * {@code writeToBuffer}, which is only legal <em>outside</em> an open render pass — call this
-     * before {@code RenderType.draw} opens its pass (mirrors how vanilla writes {@code DynamicTransforms}
+     * before any render pass opens (mirrors how vanilla writes {@code DynamicTransforms}
      * before {@code createRenderPass}). Must run on the render thread.
      */
     public void prepareUpload() {

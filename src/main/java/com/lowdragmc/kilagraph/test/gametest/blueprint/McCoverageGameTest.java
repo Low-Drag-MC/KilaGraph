@@ -23,7 +23,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -94,8 +94,8 @@ public final class McCoverageGameTest {
      */
     public static void entityCasts(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
-        Entity arrow = helper.spawn(EntityType.ARROW, new BlockPos(2, 2, 2));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
+        Entity arrow = helper.spawn(EntityTypes.ARROW, new BlockPos(2, 2, 2));
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
 
         var asPlayer = probe(level, EntityCastNodes.AsPlayer.class, "entity", player);
@@ -126,8 +126,8 @@ public final class McCoverageGameTest {
      */
     public static void entityContainer(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        Entity cart = helper.spawn(EntityType.CHEST_MINECART, new BlockPos(1, 2, 1));
-        var pig = helper.spawn(EntityType.PIG, new BlockPos(3, 2, 3));
+        Entity cart = helper.spawn(EntityTypes.CHEST_MINECART, new BlockPos(1, 2, 1));
+        var pig = helper.spawn(EntityTypes.PIG, new BlockPos(3, 2, 3));
 
         var g = newGraph();
         var resolve = addNode(g, ContainerNodes.EntityContainer.class);

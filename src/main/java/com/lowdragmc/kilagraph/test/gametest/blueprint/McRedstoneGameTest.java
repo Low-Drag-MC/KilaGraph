@@ -21,7 +21,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -258,7 +258,7 @@ public final class McRedstoneGameTest {
 
     public static void raycastFindsAnEntity(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(2, 2, 2));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(2, 2, 2));
         // A tick to let the pig land and settle, so the position snapped below is the one it keeps.
         helper.runAfterDelay(1, () -> raycastAssertions(helper, level, pig));
     }

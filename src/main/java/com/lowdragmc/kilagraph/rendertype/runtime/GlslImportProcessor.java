@@ -18,8 +18,8 @@ import java.util.Set;
  * {@code ShaderManager} does for asset shaders, inlining the imported {@code shaders/include/*.glsl}
  * files and merging {@code #version} lines via Mojang's {@link GlslPreprocessor}.
  *
- * <p>Necessary because the GL device receives whatever {@code ShaderManager.getShader} returns and
- * compiles it directly — the driver does not understand {@code #moj_import}. Asset shaders are
+ * <p>Necessary because the device receives whatever {@code ShaderManager.getShader} returns and
+ * compiles it directly — the shader compiler does not understand {@code #moj_import}. Asset shaders are
  * preprocessed at load; our generated shaders must be preprocessed here before registration.</p>
  */
 public final class GlslImportProcessor {

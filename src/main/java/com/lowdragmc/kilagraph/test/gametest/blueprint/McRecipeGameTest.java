@@ -161,7 +161,7 @@ public final class McRecipeGameTest {
     public static void craftingResultAssemblesComputedRecipes(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
 
-        var dyed = craft(level, List.of(new ItemStack(Items.LEATHER_HELMET), new ItemStack(Items.RED_DYE)), 2, 1);
+        var dyed = craft(level, List.of(new ItemStack(Items.LEATHER_HELMET), new ItemStack(Items.DYE.red())), 2, 1);
         assertTrue(helper, "dyeing is a recipe", dyed.eval("found", Boolean.class));
         ItemStack helmet = dyed.eval("out", ItemStack.class);
         assertEq(helper, "and gives back the helmet", Items.LEATHER_HELMET, helmet.getItem());

@@ -10,7 +10,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import java.util.List;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -100,7 +100,7 @@ public final class McIdTagGameTest {
         assertRoundTrip(helper, "fluid", McIdNodes.FluidFromId.class, McIdNodes.FluidId.class,
                 "minecraft:water", Fluids.WATER);
         assertRoundTrip(helper, "entity type", McIdNodes.EntityTypeFromId.class,
-                McIdNodes.EntityTypeId.class, "minecraft:pig", EntityType.PIG);
+                McIdNodes.EntityTypeId.class, "minecraft:pig", EntityTypes.PIG);
         helper.succeed();
     }
 
@@ -142,7 +142,7 @@ public final class McIdTagGameTest {
                 "tag", id("minecraft:planks"));
         assertTrue(helper, "a plank stack is planks", eval(stack, "out", Boolean.class));
 
-        var skeleton = node(McTagNodes.EntityTypeInTag.class, "type", EntityType.SKELETON,
+        var skeleton = node(McTagNodes.EntityTypeInTag.class, "type", EntityTypes.SKELETON,
                 "tag", id("minecraft:skeletons"));
         assertTrue(helper, "a skeleton is a skeleton", eval(skeleton, "out", Boolean.class));
 
@@ -186,7 +186,7 @@ public final class McIdTagGameTest {
         var skeletons = node(TagContentsNodes.EntityTypesInTag.class, "tag", id("minecraft:skeletons"));
         assertTrue(helper, "the skeletons tag exists", eval(skeletons, "found", Boolean.class));
         assertTrue(helper, "and holds the skeleton",
-                eval(skeletons, "out", List.class).contains(EntityType.SKELETON));
+                eval(skeletons, "out", List.class).contains(EntityTypes.SKELETON));
 
         var water = node(TagContentsNodes.FluidsInTag.class, "tag", id("minecraft:water"));
         assertTrue(helper, "the water tag exists", eval(water, "found", Boolean.class));

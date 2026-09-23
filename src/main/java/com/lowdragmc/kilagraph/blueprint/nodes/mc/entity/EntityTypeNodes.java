@@ -8,6 +8,7 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 
 /**
  * What an entity <em>type</em> is, as opposed to what a live entity is doing.
@@ -51,7 +52,7 @@ public final class EntityTypeNodes {
         @Override
         public void evaluate(EvalContext ctx) {
             EntityType<?> type = ctx.getInput("in", EntityType.class, null);
-            if (type == null) type = EntityType.PIG;
+            if (type == null) type = EntityTypes.PIG;
             ctx.setOutput("name", (Object) type.getDescription());
             ctx.setOutput("width", type.getWidth());
             ctx.setOutput("height", type.getHeight());

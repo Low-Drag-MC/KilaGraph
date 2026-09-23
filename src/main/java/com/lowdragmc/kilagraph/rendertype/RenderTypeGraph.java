@@ -495,23 +495,33 @@ public class RenderTypeGraph extends Graph {
             boolean cull,
             OutputTarget outputTarget,
             boolean affectsOutline,
-            boolean sortOnUpload
+            boolean sortOnUpload,
+            // Format of the colour target the pipeline writes; must match the render target it draws into.
+            ColorFormat colorFormat,
+            // Depth bias; positive pulls the surface toward the camera (decals, overlays, z-fighting).
+            float depthOffsetFactor,
+            float depthOffsetUnits
     ) {
+        public Settings(List<String> vertexFormatElements, VertexFormatMode vertexFormatMode, BlendMode blend,
+                        DepthTest depthTest, boolean depthWrite, boolean cull, OutputTarget outputTarget,
+                        boolean affectsOutline, boolean sortOnUpload) {
+            this(vertexFormatElements, vertexFormatMode, blend, depthTest, depthWrite, cull, outputTarget,
+                    affectsOutline, sortOnUpload, ColorFormat.RGBA8, 0f, 0f);
+        }
+
         public Settings {
             // A vertex format is semantically a *set* of elements: both the GPU (attributes bind by name)
             // and the CPU writer (VertexConsumer setters write by element offset) are order-independent.
-            // So canonicalise — dedupe and sort by element id — giving a stable equals/hash/content-hash and
-            // serialization, and reproducing DefaultVertexFormat.ENTITY/BLOCK's layout (id order) for reuse.
+            // So canonicalise — dedupe and sort by registration order — giving a stable equals/hash/content-hash
+            // and serialization, and reproducing DefaultVertexFormat.ENTITY's layout for reuse.
             vertexFormatElements = canonicalizeElements(vertexFormatElements);
+            if (colorFormat == null) colorFormat = ColorFormat.RGBA8;
         }
 
-        /** Dedupe + sort the element keys into the canonical id order (unknown keys kept, sorted last). */
+        /** Dedupe + sort the element keys into the canonical order (unknown keys kept, sorted last). */
         private static List<String> canonicalizeElements(List<String> keys) {
             var unique = new java.util.ArrayList<>(new java.util.LinkedHashSet<>(keys));
-            unique.sort(java.util.Comparator.comparingInt(key -> {
-                var element = KGVertexElements.get(key);
-                return element == null ? Integer.MAX_VALUE : element.mcElementId();
-            }));
+            unique.sort(java.util.Comparator.comparingInt(KGVertexElements::orderOf));
             return List.copyOf(unique);
         }
 
@@ -546,7 +556,27 @@ public class RenderTypeGraph extends Graph {
             OVERLAY,
             TRANSLUCENT_PREMULTIPLIED_ALPHA,
             ENTITY_OUTLINE_BLIT,
-            INVERT
+            INVERT,
+            MULTIPLY,
+            /** dst − src. */
+            SUBTRACT,
+            MIN,
+            MAX
+        }
+
+        /** Colour target formats; the name of the matching {@code GpuFormat} is resolved on the client. */
+        public enum ColorFormat {
+            RGBA8("RGBA8_UNORM"),
+            RGBA16F("RGBA16_FLOAT"),
+            RGBA32F("RGBA32_FLOAT"),
+            RG11B10F("RG11B10_FLOAT"),
+            RGB10A2("RGB10A2_UNORM");
+
+            public final String gpuFormat;
+
+            ColorFormat(String gpuFormat) {
+                this.gpuFormat = gpuFormat;
+            }
         }
 
         public enum DepthTest {

@@ -71,7 +71,11 @@ public record CompiledShaderGraph(
         // The fragment surface compiled as a kg_surface() function for injection into an Iris shaderpack's
         // gbuffers program (see InjectionSnippet / IrisShaderInjector). Null when the graph isn't
         // injection-compatible or for editor previews. Metadata — NOT part of contentHash().
-        @Nullable InjectionSnippet injectionSnippet
+        @Nullable InjectionSnippet injectionSnippet,
+        // Per-instance attributes (vertex binding 1), sorted by name. Declared in the GLSL, so hashed via it.
+        List<InstanceAttribute> instanceAttributes,
+        // Extra colour targets (MRT), sorted by location. Format and blend aren't in the GLSL, so hashed explicitly.
+        List<ColorTarget> colorTargets
 ) {
 
     /** Whether stage-affinity violations were found (the generated GLSL is then not safe to compile). */
@@ -87,6 +91,7 @@ public record CompiledShaderGraph(
         crc.update(fragmentSource.getBytes(StandardCharsets.UTF_8));
         crc.update((byte) 0);
         crc.update(String.valueOf(settings).getBytes(StandardCharsets.UTF_8));
+        if (!colorTargets.isEmpty()) crc.update(String.valueOf(colorTargets).getBytes(StandardCharsets.UTF_8));
         return Long.toHexString(crc.getValue());
     }
 }

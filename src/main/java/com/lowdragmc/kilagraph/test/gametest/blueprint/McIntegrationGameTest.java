@@ -47,7 +47,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
@@ -189,8 +189,8 @@ public final class McIntegrationGameTest {
      */
     public static void damagesOnlyTheMatchingEntities(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        LivingEntity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
-        LivingEntity cow = helper.spawn(EntityType.COW, new BlockPos(2, 2, 2));
+        LivingEntity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
+        LivingEntity cow = helper.spawn(EntityTypes.COW, new BlockPos(2, 2, 2));
         float pigFull = pig.getHealth();
         float cowFull = cow.getHealth();
 
@@ -207,7 +207,7 @@ public final class McIntegrationGameTest {
 
         var isPig = addNode(g, EntityDataNodes.IsType.class);
         wire(g, isPig.getInputsById().get("entity"), each.getOutputsById().get("item"));
-        setInputConstant(isPig, "type", EntityType.PIG);
+        setInputConstant(isPig, "type", EntityTypes.PIG);
 
         var branch = addNode(g, BranchNode.class);
         wire(g, branch.getInputsById().get("cond"), isPig.getOutputsById().get("out"));
@@ -661,7 +661,7 @@ public final class McIntegrationGameTest {
      */
     public static void anEffectFlowRunsInOrderOverOneEntity(GameTestHelper helper) {
         // No level variable: none of the effect actions take a world port, they reach it through the entity.
-        LivingEntity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        LivingEntity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
 
         BlueprintGraph g = newGraph();
         var entityVar = (VariableDeclarationModelBase)

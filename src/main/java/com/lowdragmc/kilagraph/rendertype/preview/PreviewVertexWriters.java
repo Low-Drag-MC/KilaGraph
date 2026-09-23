@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.preview;
 
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
@@ -8,12 +9,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Client-only registry mapping a {@link VertexFormatElement}'s id to the call that fills it for a preview
+ * Client-only registry mapping a {@link VertexFormatElement}'s name to the call that fills it for a preview
  * vertex. {@link PreviewRenderer} writes Position (via {@code addVertex}) then, for every other element the
  * target format declares, invokes the matching writer — so a preview vertex always carries exactly the
- * attributes the buffer expects (no "Missing elements in vertex"). Seeded with the built-ins; a mod that
- * registers a custom {@link com.lowdragmc.kilagraph.rendertype.format.KGVertexElement} should also
- * {@link #register} a writer for it, or preview of a format containing it can't be completed.
+ * attributes the buffer expects (no "Missing elements in vertex"). Only built-in attributes can be written
+ * ({@code BufferBuilder} writes nothing else).
  */
 public final class PreviewVertexWriters {
 
@@ -23,24 +23,24 @@ public final class PreviewVertexWriters {
         void write(VertexConsumer vc, PoseStack.Pose pose, PreviewVertex v);
     }
 
-    private static final Map<Integer, Writer> BY_ID = new HashMap<>();
+    private static final Map<String, Writer> BY_NAME = new HashMap<>();
 
     static {
-        register(VertexFormatElement.COLOR, (vc, pose, v) -> vc.setColor(v.color));
-        register(VertexFormatElement.UV0, (vc, pose, v) -> vc.setUv(v.u, v.v));
-        register(VertexFormatElement.UV1, (vc, pose, v) -> vc.setOverlay(v.overlay));
-        register(VertexFormatElement.UV2, (vc, pose, v) -> vc.setLight(v.light));
-        register(VertexFormatElement.NORMAL, (vc, pose, v) -> vc.setNormal(pose, v.nx, v.ny, v.nz));
-        register(VertexFormatElement.LINE_WIDTH, (vc, pose, v) -> vc.setLineWidth(v.lineWidth));
+        register(DefaultVertexFormat.COLOR_SEMANTIC_NAME, (vc, pose, v) -> vc.setColor(v.color));
+        register(DefaultVertexFormat.UV0_SEMANTIC_NAME, (vc, pose, v) -> vc.setUv(v.u, v.v));
+        register(DefaultVertexFormat.UV1_SEMANTIC_NAME, (vc, pose, v) -> vc.setOverlay(v.overlay));
+        register(DefaultVertexFormat.UV2_SEMANTIC_NAME, (vc, pose, v) -> vc.setLight(v.light));
+        register(DefaultVertexFormat.NORMAL_SEMANTIC_NAME, (vc, pose, v) -> vc.setNormal(pose, v.nx, v.ny, v.nz));
+        register(DefaultVertexFormat.LINE_WIDTH_SEMANTIC_NAME, (vc, pose, v) -> vc.setLineWidth(v.lineWidth));
     }
 
     private PreviewVertexWriters() {}
 
-    public static void register(VertexFormatElement element, Writer writer) {
-        BY_ID.put(element.id(), writer);
+    public static void register(String attribName, Writer writer) {
+        BY_NAME.put(attribName, writer);
     }
 
     public static Writer get(VertexFormatElement element) {
-        return BY_ID.get(element.id());
+        return BY_NAME.get(element.name());
     }
 }

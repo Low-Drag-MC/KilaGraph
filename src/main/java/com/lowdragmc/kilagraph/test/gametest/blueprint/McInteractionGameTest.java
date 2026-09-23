@@ -18,7 +18,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
@@ -87,7 +87,7 @@ public final class McInteractionGameTest {
 
     public static void setsAndClearsFire(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
 
         assertTrue(helper, "setting fire reported success",
                 run(level, EntityInteractionNodes.SetFire.class, "entity", pig, "seconds", 5).ok());
@@ -100,7 +100,7 @@ public final class McInteractionGameTest {
         assertTrue(helper, "and put the fire out", pig.getRemainingFireTicks() <= 0);
 
         // A fire-immune entity refuses rather than silently doing nothing.
-        Entity blaze = helper.spawn(EntityType.BLAZE, new BlockPos(2, 2, 2));
+        Entity blaze = helper.spawn(EntityTypes.BLAZE, new BlockPos(2, 2, 2));
         assertFalse(helper, "a blaze cannot be set alight",
                 run(level, EntityInteractionNodes.SetFire.class, "entity", blaze, "seconds", 5).ok());
         helper.succeed();
@@ -108,7 +108,7 @@ public final class McInteractionGameTest {
 
     public static void namesAnEntity(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
 
         assertTrue(helper, "naming reported success",
                 run(level, EntityInteractionNodes.SetName.class,
@@ -126,8 +126,8 @@ public final class McInteractionGameTest {
 
     public static void mountsAndDismounts(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
-        Entity cart = helper.spawn(EntityType.MINECART, new BlockPos(1, 2, 1));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
+        Entity cart = helper.spawn(EntityTypes.MINECART, new BlockPos(1, 2, 1));
 
         assertTrue(helper, "mounting reported success",
                 run(level, EntityInteractionNodes.Mount.class, "entity", pig, "vehicle", cart).ok());
@@ -147,7 +147,7 @@ public final class McInteractionGameTest {
 
     public static void setsEquipment(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        LivingEntity zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(1, 2, 1));
+        LivingEntity zombie = helper.spawn(EntityTypes.ZOMBIE, new BlockPos(1, 2, 1));
 
         assertTrue(helper, "equipping reported success",
                 run(level, EntityInteractionNodes.SetEquipment.class, "entity", zombie,
@@ -162,7 +162,7 @@ public final class McInteractionGameTest {
                 zombie.getItemBySlot(EquipmentSlot.HEAD).getItem());
 
         // Not a living entity: refused.
-        Entity arrow = helper.spawn(EntityType.ARROW, new BlockPos(2, 2, 2));
+        Entity arrow = helper.spawn(EntityTypes.ARROW, new BlockPos(2, 2, 2));
         assertFalse(helper, "an arrow has no hands",
                 run(level, EntityInteractionNodes.SetEquipment.class, "entity", arrow,
                         "stack", new ItemStack(Items.DIAMOND_SWORD)).ok());

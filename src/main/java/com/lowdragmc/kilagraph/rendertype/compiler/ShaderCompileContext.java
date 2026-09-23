@@ -289,6 +289,16 @@ public final class ShaderCompileContext {
         return compiler.cameraFar();
     }
 
+    /** Unity's "Z Buffer Sign": {@code -1} for a reversed depth buffer, else {@code 1}. */
+    public ShaderExpr zBufferSign() {
+        return compiler.zBufferSign();
+    }
+
+    /** A per-instance value from vertex binding 1 (see {@link ShaderGraphCompiler#instanceData}). */
+    public ShaderExpr instanceData(String name, InstanceAttribute.Type type) {
+        return compiler.instanceData(name, type);
+    }
+
     /** Allocate a temp variable in the current stage holding {@code expr}, returning a reference. */
     public ShaderExpr temp(GlslType type, String code) {
         return compiler.hoist(type, code);

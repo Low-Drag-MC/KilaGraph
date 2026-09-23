@@ -26,6 +26,7 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import org.joml.Vector3f;
 
@@ -311,7 +312,7 @@ public final class WorldQueryNodes {
             Level l = level(ctx);
             Player p = null;
             if (l != null) {
-                var center = pos(ctx).getCenter();
+                var center = Vec3.atCenterOf(pos(ctx));
                 // false = do not include creative-mode players in the search... it means the opposite:
                 // the flag asks whether creative players count. Include them; a blueprint asking "who is
                 // near" means everyone.

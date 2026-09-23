@@ -16,11 +16,11 @@ import static net.minecraft.commands.Commands.literal;
 /**
  * Client-only {@code /kgiris} debug command for the Iris-compatibility work:
  * <ul>
- *   <li>{@code /kgiris status} — prints whether Iris is loaded, a shaderpack is active, and how many
- *       KilaGraph pipelines have been registered with Iris.</li>
+ *   <li>{@code /kgiris status} — prints whether Iris is loaded, a shaderpack is active, how many
+ *       KilaGraph pipelines have been registered with Iris, and the injected draw count.</li>
  *   <li>{@code /kgiris tint} — toggles {@link IrisShaderInjector#DEBUG_FORCE_TINT} (seam test: all our
- *       geometry tinted red, ignoring the per-draw discriminator). Takes effect on the next shader reload
- *       (press <b>F3+T</b>), since the injection happens when Iris compiles the shaderpack programs.</li>
+ *       geometry tinted red, ignoring the per-draw discriminator). Takes effect on the next shaderpack
+ *       recompile (toggle shaders off/on; F3+T doesn't recompile Iris).</li>
  *   <li>{@code /kgiris surfaces} — dumps the live surface registry (ids, hashes, generation) and the
  *       generation baked into the current programs (mismatch = reload pending).</li>
  *   <li>{@code /kgiris draw} / {@code drawvanilla} — toggles an in-world test cube drawn with a default
@@ -52,6 +52,7 @@ public final class IrisDebugCommand {
                             "[KilaGraph/Iris] loaded=" + IrisCompat.LOADED
                                     + ", shaderpack=" + IrisCompat.isShaderPackInUse()
                                     + ", assignedPipelines=" + IrisCompat.assignedCount()
+                                    + ", injectedDraws=" + IrisSurfaceUniform.injectedDraws()
                                     + ", forceTint=" + IrisShaderInjector.DEBUG_FORCE_TINT), false);
                     return 1;
                 }))

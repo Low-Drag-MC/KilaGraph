@@ -9,6 +9,7 @@ import com.lowdragmc.kilagraph.graph.mc.McConvert;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
@@ -134,7 +135,7 @@ public final class BlockPosNodes {
      * <p>The distinction matters and is the reason for the option rather than two nodes: a
      * {@code BlockPos} is a block, not a point, so "where is it" has two defensible answers. Entity
      * positions and ray endpoints want the centre; anything reconstructing a grid wants the corner.
-     * Centre is the default because it is what {@code BlockPos.getCenter()} exists for.</p>
+     * Centre is the default because it is what {@code Vec3.atCenterOf(BlockPos)} exists for.</p>
      */
     @NodeAttribute(name = "mc_block_pos_to_vector", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class ToVector extends AnnotatedNode {
@@ -155,7 +156,7 @@ public final class BlockPosNodes {
             BlockPos p = pos(ctx, "in");
             boolean middle = ctx.getInput("center", Boolean.class, true);
             ctx.setOutput("out", (Object) (middle
-                    ? McConvert.toJoml(p.getCenter())
+                    ? McConvert.toJoml(Vec3.atCenterOf(p))
                     : new Vector3f(p.getX(), p.getY(), p.getZ())));
         }
     }

@@ -5,6 +5,8 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.ShaderFunctionGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.ColorTarget;
+import com.lowdragmc.kilagraph.rendertype.compiler.InstanceAttribute;
 import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderExpr;
@@ -30,6 +32,7 @@ import com.lowdragmc.kilagraph.rendertype.nodes.fog.TotalFogValueNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaDiscardBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentBaseColorBlock;
+import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentColorTargetBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentEmissionBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.BitangentNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.NormalNode;
@@ -44,6 +47,7 @@ import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec4Node;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.FragmentCoordinateNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.FrontFacingNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.fragment.PrimitiveIdNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceDataNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceIdNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexIdNode;
@@ -199,6 +203,8 @@ public final class ShaderCompilerGameTest {
     private static final String EXPORT_FUNCTION = "rendertype_compile_export_function";
     private static final String BUILTIN_FRAG_KEYWORDS = "rendertype_compile_builtin_frag_keywords";
     private static final String BUILTIN_VERTEX_IDS = "rendertype_compile_builtin_vertex_ids";
+    private static final String INSTANCE_DATA = "rendertype_compile_instance_data";
+    private static final String COLOR_TARGETS = "rendertype_compile_color_targets";
     private static final String POSITION_NORMAL_SPACES = "rendertype_compile_position_normal_spaces";
     private static final String INPUT_NODES_VERTEX_STAGE = "rendertype_compile_input_nodes_vertex_stage";
     private static final String VIEW_DIRECTION_NORMALIZE = "rendertype_compile_view_direction_normalize";
@@ -297,6 +303,8 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunction(EXPORT_FUNCTION, ShaderCompilerGameTest::exportBuildsFunctionGraph);
         KGGameTests.registerFunction(BUILTIN_FRAG_KEYWORDS, ShaderCompilerGameTest::builtinFragmentKeywordsEmitGlsl);
         KGGameTests.registerFunction(BUILTIN_VERTEX_IDS, ShaderCompilerGameTest::idNodesWorkInBothStages);
+        KGGameTests.registerFunction(INSTANCE_DATA, ShaderCompilerGameTest::instanceDataDeclaresAttributes);
+        KGGameTests.registerFunction(COLOR_TARGETS, ShaderCompilerGameTest::colorTargetsDeclareOutputs);
         KGGameTests.registerFunction(POSITION_NORMAL_SPACES, ShaderCompilerGameTest::positionNormalNodesEmitSpaceGlsl);
         KGGameTests.registerFunction(INPUT_NODES_VERTEX_STAGE, ShaderCompilerGameTest::uvAndVertexColorUsableInVertexStage);
         KGGameTests.registerFunction(VIEW_DIRECTION_NORMALIZE, ShaderCompilerGameTest::viewDirectionNormalizeOption);
@@ -387,6 +395,8 @@ public final class ShaderCompilerGameTest {
         KGGameTests.registerFunctionTest(event, EXPORT_FUNCTION, KGGameTests.functionKey(EXPORT_FUNCTION), d);
         KGGameTests.registerFunctionTest(event, BUILTIN_FRAG_KEYWORDS, KGGameTests.functionKey(BUILTIN_FRAG_KEYWORDS), d);
         KGGameTests.registerFunctionTest(event, BUILTIN_VERTEX_IDS, KGGameTests.functionKey(BUILTIN_VERTEX_IDS), d);
+        KGGameTests.registerFunctionTest(event, INSTANCE_DATA, KGGameTests.functionKey(INSTANCE_DATA), d);
+        KGGameTests.registerFunctionTest(event, COLOR_TARGETS, KGGameTests.functionKey(COLOR_TARGETS), d);
         KGGameTests.registerFunctionTest(event, POSITION_NORMAL_SPACES, KGGameTests.functionKey(POSITION_NORMAL_SPACES), d);
         KGGameTests.registerFunctionTest(event, INPUT_NODES_VERTEX_STAGE, KGGameTests.functionKey(INPUT_NODES_VERTEX_STAGE), d);
         KGGameTests.registerFunctionTest(event, VIEW_DIRECTION_NORMALIZE, KGGameTests.functionKey(VIEW_DIRECTION_NORMALIZE), d);
@@ -620,6 +630,62 @@ public final class ShaderCompilerGameTest {
         helper.succeed();
     }
 
+    /** Instance Data declares binding-1 attributes (a mat4 as four vec4 columns), reaches the fragment through
+     *  flat varyings, is reported sorted by name, and keeps the graph out of Iris injection. */
+    public static void instanceDataDeclaresAttributes(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel emission = addBlock(graph, graph.getFragmentStageModel(), FragmentEmissionBlock.class);
+        NodeModel transform = addNode(graph, Mat4TransformNode.class);
+        NodeModel matrix = addNode(graph, InstanceDataNode.class);
+        setOption(matrix, InstanceDataNode.OPTION_NAME, "Transform");
+        setOption(matrix, InstanceDataNode.OPTION_TYPE, "MAT4");
+        NodeModel tint = addNode(graph, InstanceDataNode.class);
+        setOption(tint, InstanceDataNode.OPTION_NAME, "Tint");
+        setOption(tint, InstanceDataNode.OPTION_TYPE, "VEC4");
+        wire(graph, transform.getInputsById().get("m"), matrix.getOutputsById().get("out"));
+        wire(graph, transform.getInputsById().get("v"), tint.getOutputsById().get("out"));
+        wire(graph, emission.getInputsById().get("color"), transform.getOutputsById().get("out"));
+        CompiledShaderGraph compiled = compile(graph);
+        String vsh = compiled.vertexSource(), fsh = compiled.fragmentSource();
+        assertFalse(helper, "no stage error", compiled.hasStageErrors());
+        assertTrue(helper, "vec4 attribute", vsh.contains("in vec4 kg_inst_Tint;"));
+        assertTrue(helper, "mat4 as four columns", vsh.contains("in vec4 kg_inst_Transform_0;")
+                && vsh.contains("in vec4 kg_inst_Transform_3;"));
+        assertTrue(helper, "mat4 assembled for the varying", vsh.contains(
+                "kg_iv_Transform = mat4(kg_inst_Transform_0, kg_inst_Transform_1, kg_inst_Transform_2, kg_inst_Transform_3);"));
+        assertTrue(helper, "flat varyings", fsh.contains("flat in vec4 kg_iv_Tint;") && fsh.contains("flat in mat4 kg_iv_Transform;"));
+        assertEq(helper, "attributes sorted by name", java.util.List.of("Tint", "Transform"),
+                compiled.instanceAttributes().stream().map(InstanceAttribute::name).toList());
+        assertTrue(helper, "not injectable under Iris", compiled.injectionSnippet() == null);
+        helper.succeed();
+    }
+
+    /** Color Target blocks write one output array up to the highest target; the format is in the pipeline key, not the GLSL. */
+    public static void colorTargetsDeclareOutputs(GameTestHelper helper) {
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel third = addBlock(graph, graph.getFragmentStageModel(), FragmentColorTargetBlock.class);
+        setOption(third, FragmentColorTargetBlock.OPTION_TARGET, "3");
+        addBlock(graph, graph.getFragmentStageModel(), FragmentColorTargetBlock.class);
+        NodeModel duplicate = addBlock(graph, graph.getFragmentStageModel(), FragmentColorTargetBlock.class);
+        setOption(duplicate, FragmentColorTargetBlock.OPTION_TARGET, "3");
+        CompiledShaderGraph rgba8 = compile(graph);
+        String fsh = rgba8.fragmentSource();
+        assertFalse(helper, "no stage error", rgba8.hasStageErrors());
+        assertTrue(helper, "one array through target 3", fsh.contains("layout(location = 0) out vec4 kg_outputs[4];"));
+        assertTrue(helper, "main output is element 0", fsh.contains("kg_outputs[0] = vec4(kg_baseColor, kg_alpha);"));
+        assertTrue(helper, "targets written, the gap left alone", fsh.contains("kg_outputs[1] = ")
+                && fsh.contains("kg_outputs[3] = ") && !fsh.contains("kg_outputs[2]"));
+        assertEq(helper, "sorted by location, the first block per location wins", java.util.List.of(1, 3),
+                rgba8.colorTargets().stream().map(ColorTarget::location).toList());
+        setOption(third, FragmentColorTargetBlock.OPTION_FORMAT, "RGBA16F");
+        CompiledShaderGraph rgba16f = compile(graph);
+        assertEq(helper, "the format is not in the GLSL", fsh, rgba16f.fragmentSource());
+        assertFalse(helper, "but is in the pipeline key", rgba8.contentHash().equals(rgba16f.contentHash()));
+        assertTrue(helper, "not injectable under Iris", rgba8.injectionSnippet() == null);
+        assertTrue(helper, "no targets: plain fragColor", compile(new RenderTypeGraph()).fragmentSource().contains("\nout vec4 fragColor;"));
+        helper.succeed();
+    }
+
     /** The Position/Normal nodes emit the chosen coordinate space's matrix math and are usable in both stages.
      *  World uses the camera-relative→absolute chain (ModelViewMat, kg_transforms.IViewMat, CameraBlockPos);
      *  View uses ModelViewMat; Object reads the interpolated object-space source. */
@@ -704,7 +770,7 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "no tangent element is registered out of the box",
                 KGVertexElements.tangent() == null);
         KGVertexElements.register(new KGVertexElement(KGVertexElements.TANGENT_KEY,
-                KGVertexElements.TANGENT_ATTRIB_NAME, "vec4", 6));
+                KGVertexElements.TANGENT_ATTRIB_NAME, "vec4", "RGBA32_FLOAT"));
         try {
             RenderTypeGraph graph = new RenderTypeGraph();
             var s = graph.getSettings();

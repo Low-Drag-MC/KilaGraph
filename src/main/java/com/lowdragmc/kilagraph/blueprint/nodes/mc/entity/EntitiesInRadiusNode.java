@@ -34,7 +34,7 @@ public class EntitiesInRadiusNode extends AnnotatedNode {
         if (l == null) { ctx.setOutput("out", List.of()); return; }
         BlockPos c = ctx.getInput("center", BlockPos.class, BlockPos.ZERO);
         double r = ctx.getDouble("radius", 8.0);
-        Vec3 cv = c.getCenter();
+        Vec3 cv = Vec3.atCenterOf(c);
         AABB box = AABB.ofSize(cv, r * 2, r * 2, r * 2);
         ctx.setOutput("out", l.getEntitiesOfClass(Entity.class, box));
     }

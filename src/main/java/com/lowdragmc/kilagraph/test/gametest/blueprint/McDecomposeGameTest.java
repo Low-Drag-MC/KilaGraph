@@ -21,7 +21,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -346,18 +346,18 @@ public final class McDecomposeGameTest {
     // ---- entity types ------------------------------------------------------------------------
 
     public static void entityTypeProps(GameTestHelper helper) {
-        var pig = probe(EntityTypeNodes.Props.class, "in", EntityType.PIG);
-        assertEq(helper, "width", EntityType.PIG.getWidth(), pig.eval("width", Float.class), EPS);
-        assertEq(helper, "height", EntityType.PIG.getHeight(), pig.eval("height", Float.class), EPS);
+        var pig = probe(EntityTypeNodes.Props.class, "in", EntityTypes.PIG);
+        assertEq(helper, "width", EntityTypes.PIG.getWidth(), pig.eval("width", Float.class), EPS);
+        assertEq(helper, "height", EntityTypes.PIG.getHeight(), pig.eval("height", Float.class), EPS);
         assertFalse(helper, "a pig burns", pig.eval("fireImmune", Boolean.class));
-        assertEq(helper, "category", EntityType.PIG.getCategory().getName(), pig.eval("category", String.class));
-        assertEq(helper, "name", EntityType.PIG.getDescription().getString(),
+        assertEq(helper, "category", EntityTypes.PIG.getCategory().getName(), pig.eval("category", String.class));
+        assertEq(helper, "name", EntityTypes.PIG.getDescription().getString(),
                 pig.eval("name", Component.class).getString());
 
         // The serialized category name, not the enum constant — lower case is what commands use.
         assertEq(helper, "category is serialized form", "creature", pig.eval("category", String.class));
         assertTrue(helper, "a blaze is fire immune",
-                probe(EntityTypeNodes.Props.class, "in", EntityType.BLAZE).eval("fireImmune", Boolean.class));
+                probe(EntityTypeNodes.Props.class, "in", EntityTypes.BLAZE).eval("fireImmune", Boolean.class));
         helper.succeed();
     }
 

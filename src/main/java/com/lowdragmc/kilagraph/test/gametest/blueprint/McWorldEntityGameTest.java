@@ -18,7 +18,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.Fluids;
@@ -146,7 +146,7 @@ public final class McWorldEntityGameTest {
 
     public static void entityQueriesAndData(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
 
         // --- the box-based world queries find it ---
         AABB wide = new AABB(pig.blockPosition()).inflate(8);
@@ -154,20 +154,20 @@ public final class McWorldEntityGameTest {
         assertTrue(helper, "the pig is in the box", inBox.eval("out", List.class).contains(pig));
 
         var ofType = probe(level, WorldQueryNodes.EntitiesOfTypeInBox.class,
-                "box", wide, "type", EntityType.PIG);
+                "box", wide, "type", EntityTypes.PIG);
         assertTrue(helper, "and is found by type", ofType.eval("out", List.class).contains(pig));
         var wrongType = probe(level, WorldQueryNodes.EntitiesOfTypeInBox.class,
-                "box", wide, "type", EntityType.COW);
+                "box", wide, "type", EntityTypes.COW);
         assertTrue(helper, "but not as a cow", wrongType.eval("out", List.class).isEmpty());
 
         // --- its own data ---
         // Position, block position and hitbox are property blocks now, asserted in McInfoBlockGameTest;
         // what is left here is the queries that take a second argument, which no block can express.
         assertTrue(helper, "is a pig",
-                probe(level, EntityDataNodes.IsType.class, "entity", pig, "type", EntityType.PIG)
+                probe(level, EntityDataNodes.IsType.class, "entity", pig, "type", EntityTypes.PIG)
                         .eval("out", Boolean.class));
         assertFalse(helper, "is not a cow",
-                probe(level, EntityDataNodes.IsType.class, "entity", pig, "type", EntityType.COW)
+                probe(level, EntityDataNodes.IsType.class, "entity", pig, "type", EntityTypes.COW)
                         .eval("out", Boolean.class));
 
         // a pig holds nothing, and asking is not an error

@@ -11,7 +11,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionF
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.item.BoneMealItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -168,7 +168,7 @@ public final class WorldInteractionNodes {
                 McActions.done(ctx, false);
                 return;
             }
-            var bolt = EntityType.LIGHTNING_BOLT.create(world, EntitySpawnReason.TRIGGERED);
+            var bolt = EntityTypes.LIGHTNING_BOLT.create(world, EntitySpawnReason.TRIGGERED);
             if (bolt == null) {
                 ctx.setOutput("entity", null);
                 McActions.done(ctx, false);

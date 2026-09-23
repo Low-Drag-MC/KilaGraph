@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * Collects a preview content's geometry as format-agnostic primitives: quads (4 verts, CCW from the front),
  * triangles (3 verts, CCW), and lines (2 verts). {@link PreviewTessellator} turns these into the vertex
- * stream a specific {@code VertexFormat.Mode} expects. Client-safe (no GL).
+ * stream a specific {@code PrimitiveTopology} expects. Client-safe (no GL).
  */
 public final class PreviewMeshBuilder {
     public final List<PreviewVertex[]> quads = new ArrayList<>();

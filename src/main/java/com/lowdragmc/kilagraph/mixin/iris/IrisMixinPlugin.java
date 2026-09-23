@@ -65,7 +65,7 @@ public class IrisMixinPlugin implements IMixinConfigPlugin {
         // Kill-switch: read the property directly (this runs at mixin-bootstrap; must not load IrisCompat,
         // which reads the same property for the runtime paths).
         if (!irisLoaded || Boolean.getBoolean("kilagraph.iris.disabled")) return false;
-        // MixinGlCommandEncoder only works around a dev-only Iris crash (#3137) — skip it outside dev.
+        // MixinGlCommandEncoder only works around dev-only Iris crashes (GL draw validation) — skip it outside dev.
         // NB: mixinClassName is OUR mixin (the 2nd arg); targetClassName is the Iris class being transformed.
         boolean apply = !mixinClassName.endsWith("MixinGlCommandEncoder") || Platform.isDevEnv();
         LOGGER.debug("[KilaGraph][Iris] shouldApplyMixin {} -> {} (apply={})", mixinClassName, targetClassName, apply);

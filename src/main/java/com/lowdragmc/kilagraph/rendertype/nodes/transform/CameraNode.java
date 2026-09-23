@@ -21,7 +21,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  *   <li>{@code Right} — camera right (world space), {@code IViewMat * (1,0,0)}.</li>
  *   <li>{@code Orthographic} — {@code 1.0} if the projection is orthographic, {@code 0.0} if perspective.</li>
  *   <li>{@code NearPlane}/{@code FarPlane} — clip plane distances in world units (reconstructed from {@code IProjMat}).</li>
- *   <li>{@code ZBufferSign} — {@code 1.0} for our pipeline (depth increases away from the camera).</li>
+ *   <li>{@code ZBufferSign} — {@code -1.0} for a reversed depth buffer (vanilla), else {@code 1.0}.</li>
  *   <li>{@code ScreenSize} — viewport size in pixels.</li>
  * </ul>
  */
@@ -67,6 +67,6 @@ public class CameraNode extends ShaderNode {
 
         ctx.output("NearPlane", ctx.cameraNear());
         ctx.output("FarPlane", ctx.cameraFar());
-        ctx.output("ZBufferSign", new ShaderExpr("1.0", GlslType.FLOAT));
+        ctx.output("ZBufferSign", ctx.zBufferSign());
     }
 }

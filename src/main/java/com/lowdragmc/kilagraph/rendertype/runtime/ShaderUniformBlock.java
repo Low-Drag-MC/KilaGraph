@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>A shader node opts a graph into a block by registering it with the compiler
  * ({@code ShaderCompileContext.useUniformBlock(block)}); the compiler then emits {@link #declareGlsl()}
  * into the source, the pipeline declares {@link #uboName()}, and the material drives {@link #prepareUpload()}
- * (at {@code RenderType.draw} HEAD, before the pass) + {@link #slice()} (bound inside the pass). This is the
+ * (at the start of each draw, before its pass opens) + {@link #slice()} (bound inside the pass). This is the
  * single extension point for new engine UBOs — implement it, hand a node your instance, and nothing in the
  * compiler / factory / material needs to change. {@link KGEngineUniforms}/{@link KGTransformUniforms} are the
  * built-in implementations.</p>

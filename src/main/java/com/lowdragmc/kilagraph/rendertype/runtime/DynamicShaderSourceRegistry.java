@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * and {@link ShaderType}.
  *
  * <p>This registry is consulted by {@code ShaderManagerMixin}, which patches
- * {@code ShaderManager.getShader(id, type)} — the source used by the GL device for both lazy
+ * {@code ShaderManager.getShader(id, type)} — the source used by the device for both lazy
  * {@code setPipeline} compilation and explicit {@code precompilePipeline}. Because the device always
  * resolves shader source through that method, generated pipelines survive resource reloads with no
  * manual re-precompile: the reload rebuilds the device's pipeline cache, and each recompile re-reads

@@ -10,30 +10,31 @@ import java.util.Map;
 /**
  * The registry of {@link KGVertexElement}s users can compose into a vertex format. Seeded with
  * Minecraft's built-in elements (Position, Color, UV0/UV1/UV2, Normal, LineWidth); other mods may
- * {@link #register} their own (typically alongside a {@code VertexFormatElement.register(findNextId(),…)}
- * call so {@link KGVertexElement#mcElementId()} resolves).
+ * {@link #register} their own.
  *
- * <p><b>Client-safe.</b> Holds no {@code com.mojang.blaze3d} types; the ids it stores are turned into
- * real {@code VertexFormatElement}s only when {@link KGVertexFormat} builds a format on the client.
- * Iteration order is registration order (built-ins first), which is what the Settings UI offers.</p>
+ * <p><b>Client-safe.</b> Holds no {@code com.mojang.blaze3d} types; the {@code GpuFormat} names it stores
+ * are resolved only when {@link KGVertexFormat} builds a format on the client. Iteration order is
+ * registration order (built-ins first), which is what the Settings UI offers.</p>
  */
 public final class KGVertexElements {
 
     private static final Map<String, KGVertexElement> BY_KEY = new LinkedHashMap<>();
-    private static final Map<Integer, KGVertexElement> BY_MC_ID = new LinkedHashMap<>();
+    private static final Map<String, KGVertexElement> BY_ATTRIB = new LinkedHashMap<>();
+    /** First-registration index per key: the canonical layout order. */
+    private static final Map<String, Integer> ORDER = new LinkedHashMap<>();
 
-    // Minecraft built-ins (ids match VertexFormatElement.POSITION..LINE_WIDTH).
-    public static final KGVertexElement POSITION = register(new KGVertexElement("position", "Position", "vec3", 0));
-    public static final KGVertexElement COLOR = register(new KGVertexElement("color", "Color", "vec4", 1));
-    public static final KGVertexElement UV0 = register(new KGVertexElement("uv0", "UV0", "vec2", 2));
-    public static final KGVertexElement UV1 = register(new KGVertexElement("uv1", "UV1", "ivec2", 3));
-    public static final KGVertexElement UV2 = register(new KGVertexElement("uv2", "UV2", "ivec2", 4));
-    public static final KGVertexElement NORMAL = register(new KGVertexElement("normal", "Normal", "vec3", 5));
-    public static final KGVertexElement LINE_WIDTH = register(new KGVertexElement("line_width", "LineWidth", "float", 6));
+    // Minecraft built-ins, with DefaultVertexFormat's GpuFormats.
+    public static final KGVertexElement POSITION = register(new KGVertexElement("position", "Position", "vec3", "RGB32_FLOAT"));
+    public static final KGVertexElement COLOR = register(new KGVertexElement("color", "Color", "vec4", "RGBA8_UNORM"));
+    public static final KGVertexElement UV0 = register(new KGVertexElement("uv0", "UV0", "vec2", "RG32_FLOAT"));
+    public static final KGVertexElement UV1 = register(new KGVertexElement("uv1", "UV1", "ivec2", "RG16_SINT"));
+    public static final KGVertexElement UV2 = register(new KGVertexElement("uv2", "UV2", "ivec2", "RG16_SINT"));
+    public static final KGVertexElement NORMAL = register(new KGVertexElement("normal", "Normal", "vec3", "RGBA8_SNORM"));
+    public static final KGVertexElement LINE_WIDTH = register(new KGVertexElement("line_width", "LineWidth", "float", "R32_FLOAT"));
 
     /**
      * The reserved registry key for a per-vertex tangent. <b>Nothing registers it</b> — Minecraft has no
-     * tangent vertex element, so the shader compiler derives a tangent basis instead (see
+     * tangent vertex attribute, so the shader compiler derives a tangent basis instead (see
      * {@code ShaderGraphCompiler#tangentBasis(String)}). The key is reserved so a mod that <em>does</em> feed
      * its own geometry can opt in: register an element under this key and every tangent-reading node
      * (Tangent/Bitangent, the Tangent space of Position/View Direction/Transform, and any normal-map graph
@@ -41,10 +42,8 @@ public final class KGVertexElements {
      *
      * <p>The contract: bind name {@code Tangent}; GLSL type {@code vec4} — {@code xyz} the unit tangent in
      * the same space as {@code Normal}, {@code w} the bitangent handedness ({@code ±1}, the glTF/Unity
-     * convention) — or {@code vec3} for a right-handed-only tangent. The {@code mcElementId} <b>must</b>
-     * resolve through {@code VertexFormatElement.byId} on the client: {@link KGVertexFormat} silently skips
-     * an element it cannot resolve, while the generated vertex shader still declares the {@code in}, leaving
-     * the attribute unbound.</p>
+     * convention) — or {@code vec3} for a right-handed-only tangent; a float {@code GpuFormat}. Note that
+     * {@code BufferBuilder} only writes the built-in attributes, so the mod must upload such vertices itself.</p>
      */
     public static final String TANGENT_KEY = "tangent";
 
@@ -61,11 +60,19 @@ public final class KGVertexElements {
     }
 
     /** Register an element. Replaces any element with the same key; the last registration for a given
-     * Minecraft id wins the reverse lookup. Returns the registered element for static-field convenience. */
+     * attribute name wins the reverse lookup. Returns the registered element for static-field convenience. */
     public static KGVertexElement register(KGVertexElement element) {
         BY_KEY.put(element.key(), element);
-        BY_MC_ID.put(element.mcElementId(), element);
+        BY_ATTRIB.put(element.attribName(), element);
+        ORDER.computeIfAbsent(element.key(), k -> ORDER.size());
         return element;
+    }
+
+    /** Canonical layout position of a key (its first registration index); unknown keys sort last. */
+    public static int orderOf(String key) {
+        // ORDER survives unregister, so gate on the live registry.
+        Integer order = BY_KEY.containsKey(key) ? ORDER.get(key) : null;
+        return order == null ? Integer.MAX_VALUE : order;
     }
 
     /** Drop a previously {@link #register}ed element (both lookups). Returns the removed element, or
@@ -73,7 +80,7 @@ public final class KGVertexElements {
     @Nullable
     public static KGVertexElement unregister(String key) {
         KGVertexElement removed = BY_KEY.remove(key);
-        if (removed != null) BY_MC_ID.remove(removed.mcElementId(), removed);
+        if (removed != null) BY_ATTRIB.remove(removed.attribName(), removed);
         return removed;
     }
 
@@ -82,11 +89,11 @@ public final class KGVertexElements {
         return BY_KEY.get(key);
     }
 
-    /** The element bound to a Minecraft {@code VertexFormatElement} id, or {@code null} — used when
-     * mapping a built {@code VertexFormat}'s elements back to descriptors (e.g. for preview writing). */
+    /** The element bound to a {@code VertexFormat} attribute name, or {@code null} — used when mapping a
+     * built {@code VertexFormat}'s attributes back to descriptors (e.g. for preview writing). */
     @Nullable
-    public static KGVertexElement byMcId(int mcElementId) {
-        return BY_MC_ID.get(mcElementId);
+    public static KGVertexElement byAttribName(String attribName) {
+        return BY_ATTRIB.get(attribName);
     }
 
     public static Collection<KGVertexElement> all() {

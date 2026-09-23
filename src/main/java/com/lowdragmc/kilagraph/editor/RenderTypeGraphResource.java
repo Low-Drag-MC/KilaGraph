@@ -99,6 +99,9 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
         tag.putString("outputTarget", settings.outputTarget().name());
         tag.putBoolean("affectsOutline", settings.affectsOutline());
         tag.putBoolean("sortOnUpload", settings.sortOnUpload());
+        tag.putString("colorFormat", settings.colorFormat().name());
+        tag.putFloat("depthOffsetFactor", settings.depthOffsetFactor());
+        tag.putFloat("depthOffsetUnits", settings.depthOffsetUnits());
         return tag;
     }
 
@@ -114,7 +117,10 @@ public class RenderTypeGraphResource extends GraphResource<RenderTypeGraph> {
                 tag.getBoolean("cull").orElse(defaults.cull()),
                 readEnum(tag, "outputTarget", RenderTypeGraph.Settings.OutputTarget.class, defaults.outputTarget()),
                 tag.getBoolean("affectsOutline").orElse(defaults.affectsOutline()),
-                tag.getBoolean("sortOnUpload").orElse(defaults.sortOnUpload())
+                tag.getBoolean("sortOnUpload").orElse(defaults.sortOnUpload()),
+                readEnum(tag, "colorFormat", RenderTypeGraph.Settings.ColorFormat.class, defaults.colorFormat()),
+                tag.getFloat("depthOffsetFactor").orElse(defaults.depthOffsetFactor()),
+                tag.getFloat("depthOffsetUnits").orElse(defaults.depthOffsetUnits())
         );
     }
 

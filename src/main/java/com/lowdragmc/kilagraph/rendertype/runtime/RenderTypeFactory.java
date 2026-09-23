@@ -4,6 +4,7 @@ import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerAddress;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes.SamplerFilter;
+import com.lowdragmc.kilagraph.rendertype.compiler.ColorTarget;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
@@ -11,11 +12,16 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat;
 import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
 import com.lowdragmc.kilagraph.rendertype.iris.IrisSurfaceRegistry;
+import com.mojang.blaze3d.GpuFormat;
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.pipeline.BindGroupLayout;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.pipeline.DepthStencilState;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.platform.BlendFactor;
+import com.mojang.blaze3d.platform.BlendOp;
 import com.mojang.blaze3d.platform.CompareOp;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.shaders.UniformType;
@@ -38,6 +44,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -53,7 +60,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * material frees its UBO {@link GpuBuffer}). This bounds our heap to live
  * materials — important for the live preview, which churns a new hash on every edit.</p>
  *
- * <p><b>Known limitation:</b> the GL device's pipeline cache has no per-pipeline release API (only a
+ * <p><b>Known limitation:</b> the device's pipeline cache has no per-pipeline release API (only a
  * global {@code clearPipelineCache}), so a generated shader program already compiled on the GPU
  * lingers in the device until a resource reload. We avoid creating <em>duplicate</em> device entries
  * by reusing one {@link RenderPipeline} object per live hash, but cannot free dead ones individually.</p>
@@ -75,6 +82,8 @@ public final class RenderTypeFactory {
     private static final Set<String> SCENE_ON_OPAQUE_WARNED = ConcurrentHashMap.newKeySet();
     /** Graph hashes already warned about a vertex format the Iris integration can't route (warn once each). */
     private static final Set<String> IRIS_FORMAT_WARNED = ConcurrentHashMap.newKeySet();
+    private static final String IRIS_ALBEDO_SAMPLER = "Sampler0";
+    private static final Identifier NEUTRAL_WHITE = Identifier.fromNamespaceAndPath(Kilagraph.MODID, "textures/misc/white.png");
 
     private RenderTypeFactory() {}
 
@@ -116,10 +125,16 @@ public final class RenderTypeFactory {
             return null;
         }
 
-        // Overlay/lightmap binding is driven by graph node presence (Overlay/LightMap nodes), not Settings.
-        boolean useLightmap = compiled.usesLightmap();
-        boolean useOverlay = compiled.usesOverlay();
+        // A pack's entity program reads Sampler0/1/2 like a vanilla entity type does; unbound, it reads stale textures.
+        boolean irisRouted = IrisCompat.ENABLED
+                && compiled.settings().colorFormat() == RenderTypeGraph.Settings.ColorFormat.RGBA8
+                && compiled.instanceAttributes().isEmpty()
+                && compiled.colorTargets().isEmpty()
+                && IrisCompat.supportsVertexFormat(vertexFormat(compiled.settings().vertexFormatElements()));
+        boolean useLightmap = compiled.usesLightmap() || irisRouted;
+        boolean useOverlay = compiled.usesOverlay() || irisRouted;
         RenderSetup.RenderSetupBuilder setup = RenderSetup.builder(pipeline);
+        if (irisRouted) setup.withTexture(IRIS_ALBEDO_SAMPLER, NEUTRAL_WHITE);
         // Baked Sampler2D default textures + sampler params (per-instance dynamic textures are applied
         // later via RenderTypeGraphMaterial.setTexture, re-bound each draw by the mixin).
         Map<String, SamplerDefault> samplerDefaults = compiled.samplerDefaults();
@@ -184,6 +199,8 @@ public final class RenderTypeFactory {
                 renderType, compiled.layout(), compiled.uniformBlocks(), injectionOnly, hash,
                 compiled.uniformFields(), compiled.variableSamplers(), buildMaterialTextures(compiled),
                 injectionOnlyTextures, compiled.usesSceneColor(), compiled.usesSceneDepth());
+        material.setInstanceLayout(KGInstanceLayout.of(compiled.instanceAttributes()));
+        material.setColorTargets(compiled.colorTargets());
         // Bake EXPOSED-variable defaults into the material UBO; callers may override later via setUniform.
         for (Map.Entry<String, float[]> e : compiled.uniformDefaults().entrySet()) {
             material.setUniformField(e.getKey(), e.getValue());
@@ -197,7 +214,7 @@ public final class RenderTypeFactory {
         // re-checks nothing (see IrisCompat.supportsVertexFormat) — routing another layout there draws
         // silently-wrong geometry, so such a graph is left out of the integration entirely.
         if (IrisCompat.ENABLED) {
-            if (IrisCompat.supportsVertexFormat(vertexFormat(compiled.settings().vertexFormatElements()))) {
+            if (irisRouted) {
                 material.setIrisSurfaceId(IrisSurfaceRegistry.register(compiled));
                 boolean translucent = compiled.settings().blend() != RenderTypeGraph.Settings.BlendMode.OPAQUE;
                 IrisCompat.assignToEntities(pipeline, translucent, compiled.alphaDiscards());
@@ -259,35 +276,43 @@ public final class RenderTypeFactory {
                 .withLocation(Identifier.fromNamespaceAndPath(Kilagraph.MODID, "pipeline/" + compiled.contentHash()))
                 .withVertexShader(shaderId)
                 .withFragmentShader(shaderId)
-                .withVertexFormat(vertexFormat(settings.vertexFormatElements()), vertexMode(settings.vertexFormatMode()))
-                .withColorTargetState(colorTarget(settings.blend()))
-                .withDepthStencilState(depthState(settings.depthTest(), settings.depthWrite()))
+                .withVertexBinding(0, vertexFormat(settings.vertexFormatElements()))
+                .withPrimitiveTopology(primitiveTopology(settings.vertexFormatMode()))
+                .withColorTargetState(colorTarget(blendFunction(settings.blend()), settings.colorFormat()))
+                .withDepthStencilState(depthState(settings))
                 .withCull(settings.cull());
+        for (ColorTarget target : compiled.colorTargets()) {
+            b.withColorTargetState(target.location(), colorTarget(blendFunction(settings.blend()), target.format()));
+        }
 
-        // Builtin UBOs actually referenced by the generated GLSL, plus DynamicTransforms: RenderType.draw
-        // binds it on EVERY draw, so a pipeline of ours must declare it whether or not a node read it.
+        // One bind group for the whole program (Vulkan rejects anything the shader declares but the layout lacks).
+        BindGroupLayout.Builder layout = BindGroupLayout.builder();
+
+        // Builtin UBOs actually referenced by the generated GLSL, plus DynamicTransforms: the vanilla draw
+        // path binds it on EVERY draw, so a pipeline of ours must declare it whether or not a node read it.
         // That requirement belongs here and not in the compiler — builtinUniforms() means "what the GLSL
         // references", and a consumer driving its own draw (Photon's fullscreen post-effect passes) binds
         // nothing of Minecraft's, so a declaration it can't honour is a hard "Missing uniform" at draw.
         Set<String> builtins = new LinkedHashSet<>(compiled.builtinUniforms());
         builtins.add("DynamicTransforms");
         for (String ubo : builtins) {
-            b.withUniform(ubo, UniformType.UNIFORM_BUFFER);
+            layout.withUniform(ubo, UniformType.UNIFORM_BUFFER);
         }
         // Per-material UBO + samplers exposed by the graph.
         if (!compiled.layout().isEmpty()) {
-            b.withUniform(MaterialUniformLayout.UBO_NAME,
-                    UniformType.UNIFORM_BUFFER);
+            layout.withUniform(MaterialUniformLayout.UBO_NAME, UniformType.UNIFORM_BUFFER);
         }
         // KilaGraph-managed UBOs the graph uses (engine globals / transforms / a mod's own), uploaded by us
         // each frame. Generic — adding a new engine UBO needs no change here.
         for (ShaderUniformBlock block : compiled.uniformBlocks()) {
-            b.withUniform(block.uboName(), UniformType.UNIFORM_BUFFER);
+            layout.withUniform(block.uboName(), UniformType.UNIFORM_BUFFER);
         }
         for (String sampler : compiled.layout().samplers()) {
-            b.withSampler(sampler);
+            layout.withSampler(sampler);
         }
-        return b.build();
+        KGInstanceLayout instances = KGInstanceLayout.of(compiled.instanceAttributes());
+        if (instances != null) b.withVertexBinding(1, instances.format());
+        return b.withBindGroupLayout(layout.build()).build();
     }
 
     /**
@@ -327,38 +352,60 @@ public final class RenderTypeFactory {
         return KGVertexFormat.of(elementKeys);
     }
 
-    public static VertexFormat.Mode vertexMode(RenderTypeGraph.Settings.VertexFormatMode mode) {
+    public static PrimitiveTopology primitiveTopology(RenderTypeGraph.Settings.VertexFormatMode mode) {
         return switch (mode) {
-            case QUADS -> VertexFormat.Mode.QUADS;
-            case TRIANGLES -> VertexFormat.Mode.TRIANGLES;
-            case TRIANGLE_STRIP -> VertexFormat.Mode.TRIANGLE_STRIP;
-            case LINES -> VertexFormat.Mode.LINES;
-            case LINE_STRIP -> VertexFormat.Mode.DEBUG_LINE_STRIP;
+            case QUADS -> PrimitiveTopology.QUADS;
+            case TRIANGLES -> PrimitiveTopology.TRIANGLES;
+            case TRIANGLE_STRIP -> PrimitiveTopology.TRIANGLE_STRIP;
+            case LINES -> PrimitiveTopology.LINES;
+            case LINE_STRIP -> PrimitiveTopology.DEBUG_LINE_STRIP;
         };
     }
 
-    private static ColorTargetState colorTarget(RenderTypeGraph.Settings.BlendMode blend) {
+    private static ColorTargetState colorTarget(Optional<BlendFunction> function,
+                                                RenderTypeGraph.Settings.ColorFormat format) {
+        return new ColorTargetState(function, GpuFormat.valueOf(format.gpuFormat), ColorTargetState.WRITE_ALL);
+    }
+
+    private static Optional<BlendFunction> blendFunction(RenderTypeGraph.Settings.BlendMode blend) {
         return switch (blend) {
-            case OPAQUE -> ColorTargetState.DEFAULT;
-            case TRANSLUCENT -> new ColorTargetState(BlendFunction.TRANSLUCENT);
-            case ADDITIVE -> new ColorTargetState(BlendFunction.ADDITIVE);
-            case LIGHTNING -> new ColorTargetState(BlendFunction.LIGHTNING);
-            case GLINT -> new ColorTargetState(BlendFunction.GLINT);
-            case OVERLAY -> new ColorTargetState(BlendFunction.OVERLAY);
-            case TRANSLUCENT_PREMULTIPLIED_ALPHA -> new ColorTargetState(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA);
-            case ENTITY_OUTLINE_BLIT -> new ColorTargetState(BlendFunction.ENTITY_OUTLINE_BLIT);
-            case INVERT -> new ColorTargetState(BlendFunction.INVERT);
+            case OPAQUE -> Optional.empty();
+            case TRANSLUCENT -> Optional.of(BlendFunction.TRANSLUCENT);
+            case ADDITIVE -> Optional.of(BlendFunction.ADDITIVE);
+            case LIGHTNING -> Optional.of(BlendFunction.LIGHTNING);
+            case GLINT -> Optional.of(BlendFunction.GLINT);
+            case OVERLAY -> Optional.of(BlendFunction.OVERLAY);
+            case TRANSLUCENT_PREMULTIPLIED_ALPHA -> Optional.of(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA);
+            case ENTITY_OUTLINE_BLIT -> Optional.of(BlendFunction.ENTITY_OUTLINE_BLIT);
+            case INVERT -> Optional.of(BlendFunction.INVERT);
+            // The colour operations below keep the destination alpha.
+            case MULTIPLY -> Optional.of(colorOp(BlendFactor.DST_COLOR, BlendFactor.ZERO, BlendOp.ADD));
+            case SUBTRACT -> Optional.of(colorOp(BlendFactor.ONE, BlendFactor.ONE, BlendOp.REVERSE_SUBTRACT));
+            case MIN -> Optional.of(colorOp(BlendFactor.ONE, BlendFactor.ONE, BlendOp.MIN));
+            case MAX -> Optional.of(colorOp(BlendFactor.ONE, BlendFactor.ONE, BlendOp.MAX));
         };
     }
 
-    private static DepthStencilState depthState(RenderTypeGraph.Settings.DepthTest test, boolean write) {
-        CompareOp op = switch (test) {
-            case LEQUAL -> CompareOp.LESS_THAN_OR_EQUAL;
-            case LESS -> CompareOp.LESS_THAN;
+    private static BlendFunction colorOp(BlendFactor src, BlendFactor dst, BlendOp op) {
+        return new BlendFunction(src, dst, op, BlendFactor.ZERO, BlendFactor.ONE, BlendOp.ADD);
+    }
+
+    /** Minecraft renders reversed-Z, so "nearer" ({@code LEQUAL}/{@code LESS}) is a greater-than compare, and a
+     *  positive bias pulls toward the camera. */
+    private static DepthStencilState depthState(RenderTypeGraph.Settings settings) {
+        CompareOp op = switch (settings.depthTest()) {
+            case LEQUAL -> CompareOp.GREATER_THAN_OR_EQUAL;
+            case LESS -> CompareOp.GREATER_THAN;
             case EQUAL -> CompareOp.EQUAL;
             case ALWAYS, NONE -> CompareOp.ALWAYS_PASS;
         };
-        return new DepthStencilState(op, write);
+        float factor = settings.depthOffsetFactor(), units = settings.depthOffsetUnits();
+        // Minecraft's Vulkan backend only enables depth bias when both are non-zero (GL: either).
+        if ((factor == 0) != (units == 0)) {
+            if (factor == 0) factor = Float.MIN_VALUE;
+            else units = Float.MIN_VALUE;
+        }
+        return new DepthStencilState(op, settings.depthWrite(), factor, units);
     }
 
     private static OutputTarget outputTarget(RenderTypeGraph.Settings.OutputTarget target) {

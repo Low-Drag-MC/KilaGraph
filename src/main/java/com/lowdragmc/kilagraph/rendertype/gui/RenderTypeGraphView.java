@@ -18,7 +18,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.GraphPanel;
 import com.lowdragmc.kilagraph.graph.util.KGGraphView;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.GraphView;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.GraphElementModel;
-import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
 import dev.vfyjxf.taffy.style.TaffyDisplay;
 import lombok.Getter;
 import net.minecraft.nbt.CompoundTag;
@@ -28,7 +27,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 
-@MethodsReturnNonnullByDefault
 public class RenderTypeGraphView extends KGGraphView {
     @Getter
     private final RenderTypeSettingsTool settingsTool;

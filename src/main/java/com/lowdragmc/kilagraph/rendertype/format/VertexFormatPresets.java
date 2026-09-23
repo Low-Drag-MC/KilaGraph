@@ -6,9 +6,8 @@ import java.util.Map;
 
 /**
  * Named {@link KGVertexElement} key lists used as quick-fill shortcuts in the Settings UI and as the
- * graph default. These reproduce the formats the old {@code VertexFormatPreset} enum mapped to, so a
- * graph built from a preset yields the same Minecraft {@code VertexFormat} (see
- * {@link KGVertexFormat}, which reuses the matching {@code DefaultVertexFormat}).
+ * graph default. These carry the attribute sets the old {@code VertexFormatPreset} enum mapped to (in
+ * canonical order, so only {@link #ENTITY} builds a stock {@code DefaultVertexFormat} exactly).
  *
  * <p>Client-safe (plain string keys).</p>
  */
@@ -16,15 +15,14 @@ public final class VertexFormatPresets {
 
     /** {@code DefaultVertexFormat.ENTITY}: Position, Color, UV0, UV1, UV2, Normal. */
     public static final List<String> ENTITY = List.of("position", "color", "uv0", "uv1", "uv2", "normal");
-    /** {@code DefaultVertexFormat.BLOCK}: Position, Color, UV0, UV2, Normal. (The stock BLOCK format
-     *  really does carry a Normal — 3 bytes + 1 padding; omitting it here made {@code hasAttribute(NORMAL)}
-     *  fail for block-format graphs, degrading Fresnel/normal defaults to a constant up vector.) */
+    /** Position, Color, UV0, UV2, Normal: {@code DefaultVertexFormat.BLOCK} plus the Normal that Fresnel /
+     *  normal defaults need. */
     public static final List<String> BLOCK = List.of("position", "color", "uv0", "uv2", "normal");
-    /** {@code DefaultVertexFormat.POSITION_TEX_COLOR}: Position, UV0, Color. */
-    public static final List<String> POSITION_COLOR_TEX = List.of("position", "uv0", "color");
-    /** {@code DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL}: Position, UV0, Color, Normal. Used by the
-     *  node-preview (so previews carry a real surface normal for Fresnel/normal nodes). */
-    public static final List<String> POSITION_COLOR_TEX_NORMAL = List.of("position", "uv0", "color", "normal");
+    /** Position, Color, UV0 ({@code DefaultVertexFormat.POSITION_TEX_COLOR}'s attributes). */
+    public static final List<String> POSITION_COLOR_TEX = List.of("position", "color", "uv0");
+    /** Position, Color, UV0, Normal. Used by the node-preview (so previews carry a real surface normal for
+     *  Fresnel/normal nodes). */
+    public static final List<String> POSITION_COLOR_TEX_NORMAL = List.of("position", "color", "uv0", "normal");
 
     /** Ordered name -> key list, for the UI's preset menu. */
     public static final Map<String, List<String>> ALL = new LinkedHashMap<>();

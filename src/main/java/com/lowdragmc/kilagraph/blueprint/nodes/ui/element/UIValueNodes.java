@@ -160,8 +160,8 @@ public final class UIValueNodes {
         return switch (element) {
             case Button button -> button.text.getText();
             case TextElement textElement -> textElement.getText();
-            // No null guard: TextField is @MethodsReturnNonnullByDefault, so getValue() is empty
-            // rather than null for an empty field.
+            // No null guard: TextField.setValue stores null as "", so getValue() is empty rather than
+            // null for an empty field.
             case TextField field -> Component.literal(field.getValue());
             case null, default -> Component.empty();
         };

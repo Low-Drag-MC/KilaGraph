@@ -8,7 +8,6 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.utils.LocalizationUtils;
 import com.lowdragmc.lowdraglib2.utils.search.IResultHandler;
-import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
 import java.util.Collection;
 import java.util.function.Supplier;
 import net.minecraft.network.chat.Component;
@@ -56,7 +55,6 @@ public final class KGSearchConfigurators {
         return id.isEmpty() ? TypeHandles.UNKNOWN : TypeHandle.create(id);
     }
 
-    @MethodsReturnNonnullByDefault
     public static SearchComponentConfigurator.ISearchConfigurator<TypeHandle> typeHandleSearch(
             Supplier<Collection<TypeHandle>> candidatesSupplier) {
         return new SearchComponentConfigurator.ISearchConfigurator<>() {

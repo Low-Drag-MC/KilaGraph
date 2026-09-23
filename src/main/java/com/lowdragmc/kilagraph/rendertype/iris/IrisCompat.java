@@ -15,7 +15,7 @@ import java.util.WeakHashMap;
 
 /**
  * Soft bridge to the Iris public API ({@code net.irisshaders.iris.api.v0}). Iris is an optional
- * dependency (dev-only {@code localImplementation}, not bundled), so every Iris reference is isolated in
+ * dependency (dev-only, not bundled), so every Iris reference is isolated in
  * the nested {@link Api} holder, which is only class-loaded when a method is actually called — and those
  * calls are all guarded by {@link #LOADED}. When Iris is absent the holder never loads, so there is no
  * {@code NoClassDefFoundError}.
@@ -55,8 +55,8 @@ public final class IrisCompat {
     private static volatile boolean seamDead;
     /** Hard latch (never cleared): a critical mixin didn't apply at all — see {@link #warnOnceIfSeamsMissing}. */
     private static volatile boolean mixinsMissing;
-    /** Hard latch: the reflective shadow-pass mapping registration failed (future Iris changed
-     *  {@code IrisPipelines.assignToShadow}) — our geometry is then skipped during the shadow pass. */
+    /** Hard latch: the shadow-pass mapping registration failed — our geometry is then skipped during the
+     *  shadow pass. */
     private static volatile boolean shadowAssignBroken;
     private static boolean seamCheckDone;
     private static long retryBackoffUntilNanos;
@@ -104,18 +104,14 @@ public final class IrisCompat {
      * disabled attribute yields the generic default) — the geometry draws lightmap-black with garbage uv, with
      * no GL error and no driver warning anywhere.</p>
      *
-     * <p><b>Why identity and not {@code equals}.</b> Iris upgrades exactly the {@code DefaultVertexFormat}
-     * constants to its extended formats ({@code ENTITY → IrisVertexFormats.ENTITY}) — and extends the vertex
-     * writes to match — by that same identity test, so a structurally-equal-but-distinct format silently
-     * misses both halves. {@code KGVertexFormat} returns the stock constant whenever a graph's composition
-     * matches one, which is precisely what makes entity-format graphs work today.</p>
+     * <p>{@code equals}, because that is how Iris decides which formats to upgrade to its extended ones.</p>
      *
      * <p>Only {@link DefaultVertexFormat#ENTITY} qualifies for now: {@code assignToEntities} is the only
      * routing we implement. Supporting BLOCK-format graphs means mapping them to {@code TERRAIN_*} /
      * {@code SHADOW_TERRAIN_CUTOUT} instead, which is a separate (unverified) piece of work.</p>
      */
     public static boolean supportsVertexFormat(VertexFormat format) {
-        return format == DefaultVertexFormat.ENTITY;
+        return DefaultVertexFormat.ENTITY.equals(format);
     }
 
     /**
@@ -153,8 +149,8 @@ public final class IrisCompat {
         // override list" during its shadow pass and falls back to OUR OWN program — which then rasterises
         // into the shadow framebuffer with main-pass uniforms, CORRUPTING the shadow map (view-dependent
         // black/red artifacts on our geometry via the pack's shadow sampling; confirmed in the debugger).
-        // assignToShadow is private → reflection; on failure we latch shadowAssignBroken and the draw path
-        // SKIPS our geometry during the shadow pass instead (no shadow cast, but nothing corrupted).
+        // On failure we latch shadowAssignBroken and the draw path SKIPS our geometry during the shadow pass
+        // instead (no shadow cast, but nothing corrupted).
         if (!shadowAssignBroken) {
             try {
                 Api.assignShadow(pipeline);
@@ -221,7 +217,7 @@ public final class IrisCompat {
      * Reload the shaderpack if the live {@link IrisSurfaceRegistry} has advanced past what the current programs
      * were injected with (a new world graph appeared since they compiled, e.g. a material created lazily after
      * the pack loaded) — so {@code ShaderCreator.createShader} re-runs and bakes in the new
-     * {@code kg_surface_<id>}. Until then that geometry hits the dispatch fallback (renders black/passthrough).
+     * {@code kg_surface_<id>}. Until then that geometry hits the dispatch fallback (a black surface).
      *
      * <p><b>Must be called from the client tick</b> (see {@link #clientTick}), NOT mid-frame:
      * {@code Iris.reload()} destroys + recreates the world rendering pipeline, and doing that during
@@ -341,27 +337,20 @@ public final class IrisCompat {
             return net.irisshaders.iris.api.v0.IrisApi.getInstance().isRenderingShadowPass();
         }
 
-        /** Cached private {@code IrisPipelines.assignToShadow(RenderPipeline, Function)}. */
-        private static java.lang.reflect.Method assignToShadowMethod;
-
         /**
          * Register {@code pipeline} in Iris's <b>shadow-pass</b> override map → {@code SHADOW_ENTITIES_CUTOUT}
          * (the entity-vertex-format shadow program; alpha-tested, so cutout surfaces shadow correctly — the
          * same key vanilla entities use). The shadow program is also injected by {@code IrisShaderInjector}
          * (it samples the albedo), so our per-draw {@code kg_surface_id}/bindings apply there too.
-         * Idempotent on Iris's side (re-registration only warns).
+         * Needs Iris 1.11.4+ (an older one fails here and latches {@code shadowAssignBroken}).
          */
-        static void assignShadow(RenderPipeline pipeline) throws Exception {
-            if (assignToShadowMethod == null) {
-                var m = net.irisshaders.iris.pipeline.IrisPipelines.class.getDeclaredMethod(
-                        "assignToShadow", RenderPipeline.class, it.unimi.dsi.fastutil.Function.class);
-                m.setAccessible(true);
-                assignToShadowMethod = m;
+        static void assignShadow(RenderPipeline pipeline) {
+            try {
+                net.irisshaders.iris.pipeline.IrisPipelines.assignPipelineShadow(pipeline,
+                        net.irisshaders.iris.pipeline.programs.ShaderKey.SHADOW_ENTITIES_CUTOUT);
+            } catch (IllegalStateException alreadyAssigned) {
+                // A mapping is already registered for this pipeline — which is the state we wanted.
             }
-            it.unimi.dsi.fastutil.Function<net.irisshaders.iris.pipeline.IrisRenderingPipeline,
-                    net.irisshaders.iris.pipeline.programs.ShaderKey> fn =
-                    p -> net.irisshaders.iris.pipeline.programs.ShaderKey.SHADOW_ENTITIES_CUTOUT;
-            assignToShadowMethod.invoke(null, pipeline, fn);
         }
 
         /** Cached {@link java.lang.reflect.Field} for {@code IrisRenderingPipeline.renderTargets} — the ONE

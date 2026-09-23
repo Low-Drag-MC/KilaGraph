@@ -33,6 +33,11 @@ import java.nio.ByteBuffer;
  *     mat4 ViewMat;        // world -> view    (camera rotation)
  *     mat4 IViewMat;       // view  -> world   = inverse(ViewMat)
  *     mat4 IProjMat;       // clip  -> view    = inverse(ProjMat)
+ *     mat4 ModelViewMat;   // object -> view
+ *     mat4 ProjMat;        // view  -> clip
+ *     ivec3 CameraBlockPos;
+ *     vec3 CameraOffset;
+ *     vec2 DepthZRemap;    // window depth -> clip z: (scale, bias)
  * } kg_transforms;
  * }</pre>
  *
@@ -40,9 +45,9 @@ import java.nio.ByteBuffer;
  * {@code globals.glsl} ({@code CameraBlockPos} + {@code CameraOffset}, a precision-split form that is more
  * accurate far from the origin), so the Transform node's world translation reads that instead. World here
  * means <em>absolute world</em>: {@code world = IViewMat * view + cameraWorldPos}, with {@code ViewMat}
- * carrying only the camera rotation. Updated once per frame at {@code RenderType.draw} HEAD (before any
- * pass — {@code writeToBuffer} is illegal inside a pass) via {@link #prepareUpload()}; bound inside the
- * pass via {@link #slice()}.</p>
+ * carrying only the camera rotation. Rewritten at the start of every KilaGraph draw (before its pass —
+ * {@code writeToBuffer} is illegal inside a pass) via {@link #prepareUpload()}; bound inside the pass via
+ * {@link #slice()}.</p>
  *
  * <p><b>Camera source:</b> the object&harr;view matrix always comes from {@code RenderSystem} (set
  * correctly by whatever is rendering). The camera rotation + projection come from the live game camera in
@@ -64,9 +69,9 @@ public final class KGTransformUniforms {
         @Override public GpuBufferSlice slice() { return KGTransformUniforms.slice(); }
     };
 
-    /** std140 size: six mat4 + ivec3 + vec3 (the camera-position split pair). */
+    /** std140 size: six mat4 + ivec3 + vec3 (the camera-position split pair) + vec2 (the depth remap). */
     private static final int UBO_SIZE = new Std140SizeCalculator()
-            .putMat4f().putMat4f().putMat4f().putMat4f().putMat4f().putMat4f().putIVec3().putVec3().get();
+            .putMat4f().putMat4f().putMat4f().putMat4f().putMat4f().putMat4f().putIVec3().putVec3().putVec2().get();
 
     @Nullable private static GpuBuffer buffer;
 
@@ -78,6 +83,7 @@ public final class KGTransformUniforms {
     private static final Matrix4f iProjMat = new Matrix4f();
     private static int camBlockX, camBlockY, camBlockZ;
     private static float camOffX, camOffY, camOffZ;
+    private static float depthZScale = 1f, depthZBias = 0f;
 
     private KGTransformUniforms() {}
 
@@ -98,6 +104,7 @@ public final class KGTransformUniforms {
                 + "    mat4 ProjMat;\n"
                 + "    ivec3 CameraBlockPos;\n"
                 + "    vec3 CameraOffset;\n"
+                + "    vec2 DepthZRemap;\n"
                 + "} " + UBO_INSTANCE + ";\n";
     }
 
@@ -108,7 +115,7 @@ public final class KGTransformUniforms {
 
     /**
      * Create (if needed) and refresh the buffer for the current frame from the live MC matrices + camera.
-     * Performs a {@code writeToBuffer} — call before {@code RenderType.draw} opens its pass.
+     * Performs a {@code writeToBuffer} — call before the draw's render pass opens.
      */
     public static void prepareUpload() {
         RenderSystem.assertOnRenderThread();
@@ -129,7 +136,7 @@ public final class KGTransformUniforms {
     private static void compute() {
         // Object<->view always comes from RenderSystem, which is set correctly by whatever is rendering
         // (the main pipeline OR an off-screen scene), so this is context-independent.
-        modelView.set(RenderSystem.getModelViewMatrix());
+        modelView.set(RenderSystem.getModelViewMatrixCopy());
         iModelView.set(modelView).invert();
 
         // The camera rotation + projection are NOT on RenderSystem in a usable CPU form. The main pipeline
@@ -140,7 +147,7 @@ public final class KGTransformUniforms {
             viewMat.set(SceneCameraContext.viewRotation());
             projMat.set(SceneCameraContext.projection());
         } else {
-            Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+            Camera camera = Minecraft.getInstance().gameRenderer.mainCamera();
             camera.getViewRotationMatrix(viewMat);
             // Recover ProjMat (no direct CPU getter): getViewRotationProjectionMatrix = ProjMat * ViewRotMatrix,
             // so ProjMat = that * inverse(ViewRotMatrix).
@@ -152,13 +159,17 @@ public final class KGTransformUniforms {
         // Camera position: consumed only by INJECTED fragments (previews never inject and keep reading
         // Minecraft's Globals form), so the main world camera is always the right source. Same split as MC:
         // CameraBlockPos = floor(camPos), CameraOffset = floor(camPos) - camPos (exact in double, tiny in float).
-        var camPos = Minecraft.getInstance().gameRenderer.getMainCamera().position();
+        var camPos = Minecraft.getInstance().gameRenderer.mainCamera().position();
         camBlockX = (int) Math.floor(camPos.x);
         camBlockY = (int) Math.floor(camPos.y);
         camBlockZ = (int) Math.floor(camPos.z);
         camOffX = (float) (camBlockX - camPos.x);
         camOffY = (float) (camBlockY - camPos.y);
         camOffZ = (float) (camBlockZ - camPos.z);
+        // Window depth -> clip z: identity when clip z is [0,1] (Vulkan, GL with clip control), else GL's [-1,1].
+        boolean zZeroToOne = RenderSystem.getDevice().getDeviceInfo().isZZeroToOne();
+        depthZScale = zZeroToOne ? 1f : 2f;
+        depthZBias = zZeroToOne ? 0f : -1f;
     }
 
     private static void upload() {
@@ -172,7 +183,8 @@ public final class KGTransformUniforms {
                     .putMat4f(modelView)
                     .putMat4f(projMat)
                     .putIVec3(camBlockX, camBlockY, camBlockZ)
-                    .putVec3(camOffX, camOffY, camOffZ);
+                    .putVec3(camOffX, camOffY, camOffZ)
+                    .putVec2(depthZScale, depthZBias);
             bb.rewind();
             RenderSystem.getDevice().createCommandEncoder().writeToBuffer(buffer.slice(), bb);
         } finally {

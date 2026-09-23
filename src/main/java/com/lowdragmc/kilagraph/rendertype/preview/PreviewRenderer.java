@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.preview;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
@@ -20,8 +21,8 @@ import java.util.List;
 public final class PreviewRenderer {
 
     private static final Logger LOGGER = LogUtils.getLogger();
-    /** Element ids we've already warned about lacking a writer (warn once, not every frame). */
-    private static final java.util.Set<Integer> WARNED_MISSING_WRITER = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    /** Element names we've already warned about lacking a writer (warn once, not every frame). */
+    private static final java.util.Set<String> WARNED_MISSING_WRITER = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private PreviewRenderer() {}
 
@@ -42,15 +43,15 @@ public final class PreviewRenderer {
     public static void emit(List<PreviewVertex> stream, PoseStack.Pose pose, VertexConsumer vc, VertexFormat format) {
         var writers = new ArrayList<PreviewVertexWriters.Writer>();
         for (VertexFormatElement element : format.getElements()) {
-            if (element == VertexFormatElement.POSITION) continue;
+            if (element.name().equals(DefaultVertexFormat.POSITION_SEMANTIC_NAME)) continue;
             var writer = PreviewVertexWriters.get(element);
             if (writer == null) {
                 // Unknown element (e.g. an Iris-extended attribute, or a mod's custom element). Skip it and
                 // rely on the buffer to fill it; warn once so a genuinely-missing writer is still diagnosable.
-                if (WARNED_MISSING_WRITER.add(element.id())) {
-                    LOGGER.warn("[KilaGraph] no preview writer for vertex element id {}; leaving it for the "
-                            + "buffer to fill (Iris-extended attribute?). Register one via PreviewVertexWriters.register "
-                            + "if it should be written explicitly.", element.id());
+                if (WARNED_MISSING_WRITER.add(element.name())) {
+                    LOGGER.warn("[KilaGraph] vertex attribute '{}' is not a built-in, so the preview cannot "
+                            + "write it (Minecraft's BufferBuilder only writes Position..LineWidth); it is left "
+                            + "to whatever fills it, if anything.", element.name());
                 }
                 continue;
             }

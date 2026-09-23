@@ -1,7 +1,12 @@
 package com.lowdragmc.kilagraph.rendertype.runtime;
 
+import com.lowdragmc.kilagraph.Kilagraph;
+import com.lowdragmc.kilagraph.rendertype.compiler.ColorTarget;
+import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.blaze3d.systems.RenderPassDescriptor;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
@@ -11,6 +16,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.lowdraglib2.math.HDRColor;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.resources.Identifier;
@@ -21,11 +27,12 @@ import org.joml.Vector3fc;
 import org.joml.Vector4fc;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 /**
  * A compiled, ready-to-render material: a Minecraft {@link RenderType} (sharing a cached pipeline)
  * plus its per-instance {@code KG_Material} uniform buffer and dynamic sampler bindings. Renderers get
- * {@link #renderType()} for {@code submitCustomGeometry}; {@code RenderTypeMixin} calls
+ * {@link #renderType()} for {@code submitCustomGeometry}; {@code PreparedRenderTypeMixin} calls
  * {@link #bindCustomUniforms} during draw to bind both the custom UBO and the per-instance textures that
  * vanilla's {@code RenderSetup} path doesn't update.
  *
@@ -40,7 +47,7 @@ import java.util.*;
  * this material's dynamic texture map.</p>
  *
  * <p>Instances register themselves in a static identity side-table keyed by {@link RenderType} so the
- * draw mixin can find the owning material without adding fields to the vanilla class.</p>
+ * prepare mixin can find the owning material without adding fields to the vanilla class.</p>
  */
 public final class RenderTypeGraphMaterial implements AutoCloseable {
 
@@ -114,6 +121,117 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
 
     public RenderType renderType() {
         return renderType;
+    }
+
+    // ---- instancing --------------------------------------------------------------------------
+
+    @Nullable private KGInstanceLayout instanceLayout;
+    /** One default instance, bound when an instanced graph is drawn the ordinary way (preview, submits). */
+    @Nullable private KGInstanceBuffer defaultInstance;
+
+    void setInstanceLayout(@Nullable KGInstanceLayout layout) {
+        this.instanceLayout = layout;
+    }
+
+    /** The graph's per-instance layout, or {@code null} when it reads no Instance Data. */
+    @Nullable
+    public KGInstanceLayout instanceLayout() {
+        return instanceLayout;
+    }
+
+    /** A buffer of per-instance values for {@link #drawInstanced}. The caller owns (closes) it. */
+    public KGInstanceBuffer createInstanceBuffer(int capacity) {
+        if (instanceLayout == null) throw new IllegalStateException("the graph reads no instance data");
+        return new KGInstanceBuffer(instanceLayout, capacity);
+    }
+
+    /**
+     * Draw {@code count} instances of {@code mesh} now, transformed by {@code pose} on top of the current
+     * model-view. Call on the render thread, outside a render pass (e.g. from a render-stage event).
+     * {@code instances} is required when the graph reads Instance Data, and must hold {@code count} values.
+     */
+    public void drawInstanced(KGMesh mesh, @Nullable KGInstanceBuffer instances, int count, Matrix4fc pose) {
+        RenderSystem.assertOnRenderThread();
+        if (count <= 0) return;
+        if (instanceLayout != null) {
+            if (instances == null || !instances.layout().attributes().equals(instanceLayout.attributes())) {
+                throw new IllegalArgumentException("an instance buffer created for this graph is required");
+            }
+            if (instances.capacity() < count) {
+                throw new IllegalArgumentException(count + " instances drawn from a buffer of " + instances.capacity());
+            }
+            instances.upload();
+        }
+        var modelView = RenderSystem.getModelViewStack();
+        modelView.pushMatrix();
+        try {
+            modelView.mul(pose);
+            PreparedRenderType prepared = renderType.prepare();
+            ((KGPreparedRenderType) (Object) prepared).kilagraph$setInstances(
+                    instanceLayout == null ? null : instances.slice(), count);
+            mesh.draw(prepared);
+        } finally {
+            modelView.popMatrix();
+        }
+    }
+
+    /** The default instance's buffer (uploaded by {@link #prepareUniforms}); {@code null} without instance data. */
+    @Nullable
+    public GpuBufferSlice defaultInstanceSlice() {
+        return defaultInstance == null ? null : defaultInstance.slice();
+    }
+
+    // ---- extra colour targets (MRT) -----------------------------------------------------------
+
+    private List<ColorTarget> colorTargets = List.of();
+    private final @Nullable GpuTextureView[] colorTargetViews = new GpuTextureView[ColorTarget.MAX_LOCATION + 1];
+    private boolean colorTargetSizeWarned;
+
+    void setColorTargets(List<ColorTarget> targets) {
+        this.colorTargets = List.copyOf(targets);
+    }
+
+    /** The graph's extra colour targets (Color Target blocks), sorted by location. */
+    public List<ColorTarget> colorTargets() {
+        return colorTargets;
+    }
+
+    /**
+     * Bind {@code view} as the colour target at {@code location} (1..7) for every draw of this material; null
+     * discards that output. Its format must match the Color Target block's; its size must match the main target
+     * at draw time, else it is skipped for that draw.
+     */
+    public void setColorTarget(int location, @Nullable GpuTextureView view) {
+        ColorTarget target = colorTargets.stream().filter(t -> t.location() == location).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("the graph writes no colour target " + location));
+        if (view != null && view.texture().getFormat() != GpuFormat.valueOf(target.format().gpuFormat)) {
+            throw new IllegalArgumentException("colour target " + location + " is " + target.format()
+                    + ", the texture is " + view.texture().getFormat());
+        }
+        colorTargetViews[location] = view;
+    }
+
+    /** The render pass for a draw into {@code color}: the bound colour targets, unused attachments elsewhere. */
+    public RenderPassDescriptor colorTargetPass(Supplier<String> label, GpuTextureView color, Optional<Vector4fc> clearColor,
+                                                @Nullable GpuTextureView depth, OptionalDouble clearDepth) {
+        int width = color.getWidth(0), height = color.getHeight(0);
+        RenderPassDescriptor pass = RenderPassDescriptor.create(label).withColorAttachment(color, clearColor);
+        int count = colorTargets.getLast().location() + 1;
+        for (int location = 1; location < count; location++) {
+            GpuTextureView view = colorTargetViews[location];
+            if (view != null && (view.isClosed() || view.getWidth(0) != width || view.getHeight(0) != height)) {
+                if (!colorTargetSizeWarned) {
+                    colorTargetSizeWarned = true;
+                    Kilagraph.LOGGER.warn("[KilaGraph] colour target {} of {} is closed or not {}x{}; skipped",
+                            location, contentHash, width, height);
+                }
+                view = null;
+            }
+            if (view != null) pass.withColorAttachment(view);
+            else pass.withUnusedColorAttachment();
+        }
+        if (depth != null) pass.withDepthAttachment(depth, clearDepth);
+        return pass.withRenderArea(new RenderPass.RenderArea(0, 0, width, height));
     }
 
     public String contentHash() {
@@ -330,13 +448,17 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     // ---- draw-time binding -------------------------------------------------------------------
 
     /**
-     * Called from the draw mixin at {@code RenderType.draw} HEAD, before the render pass opens:
+     * Called from the draw mixin at {@code drawFromBuffer} HEAD, before the render pass opens:
      * (re)upload the UBO if values changed and resolve the dynamic textures. Both must happen here, not
      * inside the pass — {@code writeToBuffer} and a lazy texture load ({@code getTexture} →
      * {@code registerAndLoad} → {@code writeToTexture}) are illegal once a render pass is active.
      */
     public void prepareUniforms() {
         uniforms.prepareUpload();
+        if (instanceLayout != null) {
+            if (defaultInstance == null) defaultInstance = new KGInstanceBuffer(instanceLayout, 1);
+            defaultInstance.upload();
+        }
         for (ShaderUniformBlock block : uniformBlocks) block.prepareUpload();
         // Injection-only blocks must upload too, or the injected program reads a stale/empty buffer.
         for (ShaderUniformBlock block : injectionOnlyBlocks) block.prepareUpload();
@@ -407,6 +529,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     public void close() {
         BY_RENDER_TYPE.remove(renderType);
         uniforms.close();
+        if (defaultInstance != null) defaultInstance.close();
         if (usesSceneColor || usesSceneDepth) SceneCaptureManager.INSTANCE.release();
         RenderTypeFactory.release(contentHash);
     }

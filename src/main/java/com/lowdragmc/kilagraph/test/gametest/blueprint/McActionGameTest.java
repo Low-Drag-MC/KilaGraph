@@ -21,7 +21,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
@@ -149,12 +149,12 @@ public final class McActionGameTest {
         ServerLevel level = helper.getLevel();
         BlockPos at = helper.absolutePos(new BlockPos(1, 2, 1));
 
-        var spawn = run(level, EntityActionNodes.SpawnEntity.class, "type", EntityType.PIG, "pos", at);
+        var spawn = run(level, EntityActionNodes.SpawnEntity.class, "type", EntityTypes.PIG, "pos", at);
         assertTrue(helper, "spawn reported success", spawn.ok());
         Entity pig = spawn.get("entity", Entity.class);
         assertTrue(helper, "and handed back the entity", pig != null);
         assertTrue(helper, "which is really in the world", pig.isAlive() && !pig.isRemoved());
-        assertEq(helper, "and is a pig", EntityType.PIG, pig.getType());
+        assertEq(helper, "and is a pig", EntityTypes.PIG, pig.getType());
 
         // Teleport, then confirm the entity actually moved rather than trusting ok.
         Vector3f to = new Vector3f(at.getX() + 4.5f, at.getY(), at.getZ() + 4.5f);
@@ -179,7 +179,7 @@ public final class McActionGameTest {
 
     public static void damageHealAndEffect(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        LivingEntity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        LivingEntity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
         float full = pig.getHealth();
 
         assertTrue(helper, "damage reported success",
@@ -205,7 +205,7 @@ public final class McActionGameTest {
                         "effect", Identifier.parse("kilagraph:no_such_effect")).ok());
 
         // Damage on a non-living entity is refused, not an error.
-        Entity arrow = helper.spawn(EntityType.ARROW, new BlockPos(1, 2, 1));
+        Entity arrow = helper.spawn(EntityTypes.ARROW, new BlockPos(1, 2, 1));
         assertFalse(helper, "an arrow cannot be damaged",
                 run(level, EntityActionNodes.DamageEntity.class, "entity", arrow, "amount", 5f).ok());
         helper.succeed();
@@ -342,7 +342,7 @@ public final class McActionGameTest {
                 level.getBlockState(origin).getBlock());
 
         // --- @s resolves to the entity, and not otherwise ---
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(6, 2, 1));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(6, 2, 1));
         var named = run(level, RunCommandNode.class, "entity", pig,
                 "command", "data merge entity @s {CustomName:'\"Commanded\"'}");
         assertTrue(helper, "a command ran as the entity", named.ok());

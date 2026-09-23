@@ -39,6 +39,7 @@ public class FragmentStageNode extends ContextNode implements IShaderNodeDescrip
                 FragmentAlphaBlock.class,
                 FragmentEmissionBlock.class,
                 FragmentAlphaDiscardBlock.class,
+                FragmentColorTargetBlock.class,
                 // LabPBR surface channels (M2) — only affect rendering under an Iris shaderpack.
                 FragmentNormalBlock.class,
                 FragmentSmoothnessBlock.class,

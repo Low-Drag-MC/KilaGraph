@@ -6,6 +6,7 @@ import com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureManager;
 import com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.opengl.GlBuffer;
 import com.mojang.blaze3d.opengl.GlSampler;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
@@ -18,7 +19,6 @@ import org.lwjgl.opengl.GL31;
 import org.lwjgl.opengl.GL33;
 import org.lwjgl.opengl.GL41;
 
-import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,12 +28,13 @@ import java.util.Map;
  * the active material's {@code KG_Material}/managed UBOs, bound onto that program directly by program id.
  *
  * <p><b>Timing.</b> Iris pairs our {@code RenderPipeline} with the shaderpack's {@code GlProgram} and binds
- * that program lazily inside {@code GlCommandEncoder.trySetup} — <em>after</em> our {@code RenderType.draw}
- * "before drawIndexed" hook (where {@code GL_CURRENT_PROGRAM} is still 0). So {@code RenderTypeMixin} only
- * records the {@link #currentMaterial} around the draw; {@link #applyToBoundProgram()} (a {@code trySetup}
- * {@code @RETURN} hook) writes the id and binds the UBOs onto the actually-bound program, and
- * {@link #clearBoundProgram()} resets the id afterwards so an unrelated draw on the same program isn't
- * flagged as ours.</p>
+ * that program lazily inside {@code GlCommandEncoder.trySetup} — <em>after</em> our
+ * {@code PreparedRenderType.drawFromBuffer} "before drawIndexed" hook (where {@code GL_CURRENT_PROGRAM} is
+ * still 0). So {@code PreparedRenderTypeMixin} only records the {@link #currentMaterial} around the draw;
+ * {@link #applyToBoundProgram()} (a {@code trySetup} {@code @RETURN} hook) writes the id and binds the UBOs
+ * onto the actually-bound program, and {@link #clearBoundProgram()} resets the id afterwards so an unrelated
+ * draw on the same program isn't flagged as ours.</p>
+
  *
  * <p>The material's {@code KG_Material} UBO is bound to the injected per-id block {@code KG_Material_<id>}
  * ({@link IrisSurfaceRegistry#materialBlockName}); managed UBOs ({@code KG_Globals}/{@code KG_Transforms})
@@ -62,12 +63,13 @@ public final class IrisSurfaceUniform {
     /** Sampler uniform location per "program:samplerName" (avoids a glGetUniformLocation every draw). */
     private static final Map<String, Integer> SAMPLER_LOCATION = new HashMap<>();
 
+    /** Draws that ran inside an injected pack program (diagnostics). */
+    private static long injectedDraws;
+
     /** Highest legal UBO binding point + 1, queried once; our high binding points sit just below it. */
     private static int maxUboBindings = -1;
     /** {@code GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS}, queried once; our sampler units sit just below it. */
     private static int maxCombinedTexUnits = -1;
-    /** Reflected {@code GlBuffer.handle} (protected) — read once, then per buffer. */
-    @Nullable private static Field handleField;
 
     private IrisSurfaceUniform() {}
 
@@ -77,13 +79,18 @@ public final class IrisSurfaceUniform {
      * {@code IrisShaderInjector.inject}): the old programs are deleted and GL is free to <em>reuse their
      * integer ids</em> for new, unrelated programs, so a stale cached location would make
      * {@code glProgramUniform1i}/block/sampler binding write into a program that isn't ours — corrupting the
-     * shaderpack's own rendering, not just wasting work. The device constants and the reflected
-     * {@code GlBuffer.handle} field are stable and deliberately kept.
+     * shaderpack's own rendering, not just wasting work. The queried device constants are stable and
+     * deliberately kept.
      */
     public static void invalidateCaches() {
         LOCATION.clear();
         BLOCK_INDEX.clear();
         SAMPLER_LOCATION.clear();
+    }
+
+    /** How many draws so far ran inside an injected shaderpack program. */
+    public static long injectedDraws() {
+        return injectedDraws;
     }
 
     /** Record the material of the draw we're about to issue (set before {@code drawIndexed}). */
@@ -102,9 +109,10 @@ public final class IrisSurfaceUniform {
         // Only an Iris-injected shaderpack program declares kg_surface_id. When Iris did NOT override our
         // pipeline (our own program is bound — GUI/editor preview, an unassigned pipeline, or a draw before
         // the inject reload), this is -1: skip everything. Our own program already binds its KG_Material UBO
-        // + samplers through the normal RenderType.draw path, and re-binding them here (to our high units)
-        // would clobber that correct binding — which showed up as a wrong/garbage albedo texture.
+        // + samplers through the normal draw path, and re-binding them here (to our high units) would clobber
+        // that correct binding — which showed up as a wrong/garbage albedo texture.
         if (location(program) < 0) return;
+        injectedDraws++;
         writeSurfaceId(program, currentSurfaceId);
         bindMaterialBlocks(program);
         bindMaterialSamplers(program);
@@ -247,18 +255,8 @@ public final class IrisSurfaceUniform {
         return Math.max(0, maxUboBindings - 8);
     }
 
-    /** The raw GL handle of a {@code GpuBuffer} (a {@code GlBuffer} on the GL backend), via cached reflection
-     *  of its {@code protected final int handle}. 0 on failure (binding then skipped). */
+    /** Raw GL buffer name; 0 on a non-GL backend (Iris doesn't run there). */
     private static int bufferHandle(GpuBuffer buffer) {
-        try {
-            if (handleField == null) {
-                Field f = Class.forName("com.mojang.blaze3d.opengl.GlBuffer").getDeclaredField("handle");
-                f.setAccessible(true);
-                handleField = f;
-            }
-            return handleField.getInt(buffer);
-        } catch (Throwable t) {
-            return 0;
-        }
+        return buffer instanceof GlBuffer glBuffer ? glBuffer.handle() : 0;
     }
 }

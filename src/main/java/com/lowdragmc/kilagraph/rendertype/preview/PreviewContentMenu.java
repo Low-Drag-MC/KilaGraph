@@ -55,7 +55,7 @@ public final class PreviewContentMenu {
     public static Set<String> formatKeys(VertexFormat format) {
         Set<String> keys = new LinkedHashSet<>();
         for (var element : format.getElements()) {
-            KGVertexElement desc = KGVertexElements.byMcId(element.id());
+            KGVertexElement desc = KGVertexElements.byAttribName(element.name());
             if (desc != null) keys.add(desc.key());
         }
         return keys;

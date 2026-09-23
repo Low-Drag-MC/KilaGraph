@@ -13,7 +13,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -169,7 +169,7 @@ public final class McPotionGameTest {
      * there is {@code false} — that is the branch a graph hits when it clears a buff it never applied.</p>
      */
     public static void effectsAreRemoved(GameTestHelper helper) {
-        LivingEntity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        LivingEntity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
 
         assertTrue(helper, "gave the pig speed",
                 run(EntityActionNodes.AddEffect.class,
@@ -200,7 +200,7 @@ public final class McPotionGameTest {
         assertEq(helper, "and removed nothing", 0, again.get("removed", Integer.class).intValue());
 
         // Not a living entity: refused rather than thrown, like every other living-only action.
-        Entity cart = helper.spawn(EntityType.MINECART, new BlockPos(3, 2, 1));
+        Entity cart = helper.spawn(EntityTypes.MINECART, new BlockPos(3, 2, 1));
         assertFalse(helper, "a minecart cannot lose effects",
                 run(EntityActionNodes.ClearEffects.class, "entity", cart).ok());
         assertFalse(helper, "nor have one removed",

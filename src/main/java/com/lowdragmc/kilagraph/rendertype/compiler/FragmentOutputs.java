@@ -2,6 +2,8 @@ package com.lowdragmc.kilagraph.rendertype.compiler;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.util.TreeMap;
+
 /**
  * Accumulates the fragment stage's semantic outputs as the fragment blocks compile. The compiler
  * assembles the final {@code fragColor} / discard logic from these.
@@ -15,6 +17,10 @@ public final class FragmentOutputs {
     @Nullable public ShaderExpr emission;
     /** Alpha discard cutoff (float). When set, {@code if (alpha < cutoff) discard;} is emitted. */
     @Nullable public ShaderExpr alphaDiscardCutoff;
+    /** Extra colour targets (MRT) by location, each a vec4. */
+    public final TreeMap<Integer, ColorTargetWrite> colorTargets = new TreeMap<>();
+
+    public record ColorTargetWrite(ColorTarget target, ShaderExpr value) {}
 
     // ---- PBR (LabPBR) channels — consumed only by the Iris injection path (buildInjectionSnippet);
     //      our own pipeline / editor preview ignore them. See the M2 spec. ----

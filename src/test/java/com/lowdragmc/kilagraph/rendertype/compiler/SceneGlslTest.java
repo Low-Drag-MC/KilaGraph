@@ -21,7 +21,8 @@ class SceneGlslTest {
         try (InputStream in = SceneGlslTest.class.getResourceAsStream(
                 "/assets/kilagraph/shaders/include/kg_scene.glsl")) {
             assertNotNull(in, "kg_scene.glsl must be on the test classpath (main resources)");
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            // Git may check the file out with CRLF; text blocks are always LF.
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
         }
     }
 
@@ -38,6 +39,8 @@ class SceneGlslTest {
                 "kg_camera_near constant must match kg_scene.glsl verbatim");
         assertTrue(include.contains(SceneGlsl.FN_CAMERA_FAR.strip()),
                 "kg_camera_far constant must match kg_scene.glsl verbatim");
+        assertTrue(include.contains(SceneGlsl.FN_ZBUFFER_SIGN.strip()),
+                "kg_zbuffer_sign constant must match kg_scene.glsl verbatim");
     }
 
     @Test

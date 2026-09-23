@@ -3,7 +3,6 @@ package com.lowdragmc.kilagraph.rendertype.gui;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphModel;
 import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
-import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContent;
 import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents;
 import com.lowdragmc.kilagraph.rendertype.preview.PreviewContentMenu;
@@ -21,8 +20,10 @@ import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.gui.IGraphTool;
 import com.lowdragmc.lowdraglib2.utils.virtuallevel.TrackedDummyWorld;
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.logging.LogUtils;
+import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.network.chat.Component;
@@ -52,6 +53,9 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
 
     @Nullable
     private final Label errorLabel;
+    /** The material being drawn; {@code null} until the first successful compile (a failed one keeps the last). */
+    @Getter
+    @Nullable
     private RenderTypeGraphMaterial material;
     private boolean lastCompileFailed = false;
     /** The graph change-version last compiled; skip recompiling while it's unchanged. */
@@ -139,16 +143,16 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
         // between the buffer's format and what we write.)
         RenderType renderType = mat.renderType();
         VertexFormat format = renderType.format();
-        var mode = modeOf(renderType.mode());
+        var mode = modeOf(renderType.primitiveTopology());
 
         ctx.submitStorage().submitCustomGeometry(ctx.poseStack(), renderType,
                 (pose, buffer) -> PreviewRenderer.render(content, pose, buffer, format, mode));
     }
 
-    /** Map the pipeline's primitive mode back to the graph's {@link RenderTypeGraph.Settings.VertexFormatMode}
-     * (the inverse of {@code RenderTypeFactory.vertexMode}), so the tessellator emits a matching stream. */
-    private static RenderTypeGraph.Settings.VertexFormatMode modeOf(VertexFormat.Mode mode) {
-        return switch (mode) {
+    /** Map the pipeline's primitive topology back to the graph's {@link RenderTypeGraph.Settings.VertexFormatMode}
+     * (the inverse of {@code RenderTypeFactory.primitiveTopology}), so the tessellator emits a matching stream. */
+    private static RenderTypeGraph.Settings.VertexFormatMode modeOf(PrimitiveTopology topology) {
+        return switch (topology) {
             case TRIANGLES -> RenderTypeGraph.Settings.VertexFormatMode.TRIANGLES;
             case TRIANGLE_STRIP, TRIANGLE_FAN -> RenderTypeGraph.Settings.VertexFormatMode.TRIANGLE_STRIP;
             case LINES -> RenderTypeGraph.Settings.VertexFormatMode.LINES;

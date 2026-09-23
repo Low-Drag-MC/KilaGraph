@@ -1,10 +1,13 @@
 package com.lowdragmc.kilagraph.mixin.iris;
 
 import com.mojang.blaze3d.opengl.GlProgram;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 
@@ -29,12 +32,17 @@ import java.util.Map;
  * validation loop a no-op for those draws. The second {@code getUniforms()} call (the real binding loop) is
  * left untouched via {@code ordinal = 0}, so uniforms/samplers still bind normally. Non-Iris draws keep full
  * validation. Only Iris-targeting; applied solely when Iris is present (gated by {@link IrisMixinPlugin}).</p>
+ *
+ * <p>Also pads {@code getVertexFormatBindings()} in {@code validateDraw}: under a pack Iris returns a
+ * one-element array for entity formats, but validation walks all 16 slots (AIOOBE on every entity draw).</p>
  */
 @Mixin(targets = "com.mojang.blaze3d.opengl.GlCommandEncoder")
 public class MixinGlCommandEncoder {
 
     /** {@code net.irisshaders.iris.pipeline.programs.IrisProgram}, resolved reflectively to keep Iris a soft dep. */
     private static final Class<?> kilagraph$IRIS_PROGRAM = kilagraph$resolveIrisProgram();
+
+    private static final int kilagraph$BINDING_SLOTS = 16;
 
     private static Class<?> kilagraph$resolveIrisProgram() {
         try {
@@ -55,5 +63,14 @@ public class MixinGlCommandEncoder {
             return Collections.emptyMap();
         }
         return program.getUniforms();
+    }
+
+    @Redirect(
+            method = "validateDraw",
+            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/pipeline/RenderPipeline;getVertexFormatBindings()[Lcom/mojang/blaze3d/vertex/VertexFormat;")
+    )
+    private VertexFormat[] kilagraph$padIrisVertexBindings(RenderPipeline pipeline) {
+        VertexFormat[] bindings = pipeline.getVertexFormatBindings();
+        return bindings.length >= kilagraph$BINDING_SLOTS ? bindings : Arrays.copyOf(bindings, kilagraph$BINDING_SLOTS);
     }
 }

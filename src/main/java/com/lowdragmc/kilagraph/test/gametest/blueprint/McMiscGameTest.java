@@ -20,7 +20,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.Nullable;
@@ -118,7 +118,7 @@ public final class McMiscGameTest {
      * set and a graph reading {@code out[0]} would otherwise get a different tag on a different launch.</p>
      */
     public static void entityTagsAreReadBackSorted(GameTestHelper helper) {
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
         assertEq(helper, "a fresh pig has no tags", 0,
                 probe(EntityDataNodes.Tags.class, "entity", pig).eval("count", Integer.class).intValue());
 
@@ -146,7 +146,7 @@ public final class McMiscGameTest {
      * A node that mismatched the lists, or read the wrong side of a trade, breaks one of those.</p>
      */
     public static void villagerTradesAreListed(GameTestHelper helper) {
-        Entity trader = helper.spawn(EntityType.WANDERING_TRADER, new BlockPos(2, 2, 2));
+        Entity trader = helper.spawn(EntityTypes.WANDERING_TRADER, new BlockPos(2, 2, 2));
 
         var trades = probe(EntityDataNodes.Trades.class, "entity", trader);
         assertTrue(helper, "a trader is a merchant", trades.eval("found", Boolean.class));
@@ -172,7 +172,7 @@ public final class McMiscGameTest {
         }
 
         // A pig is not a merchant, which is reported rather than thrown.
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(4, 2, 2));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(4, 2, 2));
         var notATrader = probe(EntityDataNodes.Trades.class, "entity", pig);
         assertFalse(helper, "a pig does not trade", notATrader.eval("found", Boolean.class));
         assertEq(helper, "and offers nothing", 0, notATrader.eval("count", Integer.class).intValue());

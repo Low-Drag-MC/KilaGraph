@@ -28,8 +28,8 @@ import java.util.Map;
  * {@code KG_SceneColor} capture the runtime binds at draw (see {@code SceneCaptureManager}).</p>
  *
  * @param declarationUnits global declarations (the {@code KG_Material} block, each sampler line, each managed
- *                         UBO block, the {@code KG_Gradient} struct) — one complete declaration per element so
- *                         identical ones dedup across snippets
+ *                         UBO block, the {@code KG_Gradient}/{@code KG_Curve} structs) — one complete
+ *                         declaration per element so identical ones dedup across snippets
  * @param functions        helper function definitions (procedural/gradient), deduped by the injector
  * @param body             the function body statements (hoisted temps)
  * @param surfaceArgs      the comma-joined arguments to the {@code kg_Surface(...)} constructor, in the

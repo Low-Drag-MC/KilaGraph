@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Routes KilaGraph-generated shader ids ({@code kilagraph:generated/...}) to
- * {@link DynamicShaderSourceRegistry}. {@code ShaderManager.getShader} is the source the GL device
+ * {@link DynamicShaderSourceRegistry}. {@code ShaderManager.getShader} is the source the device
  * uses for both lazy {@code setPipeline} compilation and explicit {@code precompilePipeline}, so this
  * single seam makes generated pipelines compile everywhere and survive resource reloads.
  */

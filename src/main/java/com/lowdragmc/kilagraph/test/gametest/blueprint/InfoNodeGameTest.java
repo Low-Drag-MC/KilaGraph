@@ -17,7 +17,7 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import org.joml.Vector3f;
 import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 import net.minecraft.core.Holder;
@@ -73,7 +73,7 @@ public final class InfoNodeGameTest {
 
     /** One context feeding several blocks: each reads a different property of the same target. */
     public static void oneTargetManyBlocks(GameTestHelper helper) {
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
 
         var g = newGraph();
         var ctx = addNode(g, EntityInfoNode.class);
@@ -176,7 +176,7 @@ public final class InfoNodeGameTest {
      * asserts it stays that way.</p>
      */
     public static void positionBlocksUseTheGraphVectorType(GameTestHelper helper) {
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
         for (Class<? extends BlockNode> cls : List.of(
                 EntityInfoBlocks.Position.class,
                 EntityInfoBlocks.EyePosition.class,

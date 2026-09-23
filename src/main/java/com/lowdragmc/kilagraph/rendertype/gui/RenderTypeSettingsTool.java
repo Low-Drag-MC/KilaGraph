@@ -5,7 +5,9 @@ import com.lowdragmc.kilagraph.rendertype.format.KGVertexElement;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexElements;
 import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
 import com.lowdragmc.lowdraglib2.configurator.ui.BooleanConfigurator;
+import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
+import com.lowdragmc.lowdraglib2.configurator.ui.NumberConfigurator;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.Style;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
@@ -39,6 +41,8 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
     private final Selector<RenderTypeGraph.Settings.BlendMode> blend;
     private final Selector<RenderTypeGraph.Settings.DepthTest> depthTest;
     private final Selector<RenderTypeGraph.Settings.OutputTarget> outputTarget;
+    private final Selector<RenderTypeGraph.Settings.ColorFormat> colorFormat;
+    private float depthOffsetFactor, depthOffsetUnits;
     private final Toggle depthWrite;
     private final Toggle cull;
     private final Toggle affectsOutline;
@@ -87,6 +91,13 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
         blend = enumSelector(RenderTypeGraph.Settings.BlendMode.class);
         depthTest = enumSelector(RenderTypeGraph.Settings.DepthTest.class);
         outputTarget = enumSelector(RenderTypeGraph.Settings.OutputTarget.class);
+        colorFormat = enumSelector(RenderTypeGraph.Settings.ColorFormat.class);
+        var depthOffsetGroup = new ConfiguratorGroup("rendertypegraph.settings.depth_offset", false);
+        depthOffsetGroup.addConfigurators(
+                depthOffsetField("rendertypegraph.settings.depth_offset.factor",
+                        () -> depthOffsetFactor, v -> depthOffsetFactor = v),
+                depthOffsetField("rendertypegraph.settings.depth_offset.units",
+                        () -> depthOffsetUnits, v -> depthOffsetUnits = v));
         depthWrite = toggle();
         cull = toggle();
         affectsOutline = toggle();
@@ -106,8 +117,10 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
                 row("rendertypegraph.settings.blend", blend),
                 row("rendertypegraph.settings.depth_test", depthTest),
                 row("rendertypegraph.settings.target", outputTarget),
+                row("rendertypegraph.settings.color_format", colorFormat),
                 row("rendertypegraph.settings.depth_write", depthWrite),
                 row("rendertypegraph.settings.cull", cull),
+                depthOffsetGroup,
                 row("rendertypegraph.settings.outline", affectsOutline),
                 row("rendertypegraph.settings.sort_upload", sortOnUpload)
         );
@@ -138,6 +151,9 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
         blend.setSelected(settings.blend(), false);
         depthTest.setSelected(settings.depthTest(), false);
         outputTarget.setSelected(settings.outputTarget(), false);
+        colorFormat.setSelected(settings.colorFormat(), false);
+        depthOffsetFactor = settings.depthOffsetFactor();
+        depthOffsetUnits = settings.depthOffsetUnits();
         depthWrite.setOn(settings.depthWrite(), false);
         cull.setOn(settings.cull(), false);
         affectsOutline.setOn(settings.affectsOutline(), false);
@@ -171,7 +187,10 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
                 cull.isOn(),
                 valueOr(outputTarget, defaults.outputTarget()),
                 affectsOutline.isOn(),
-                sortOnUpload.isOn()
+                sortOnUpload.isOn(),
+                valueOr(colorFormat, defaults.colorFormat()),
+                depthOffsetFactor,
+                depthOffsetUnits
         ));
         // Settings edits don't route through the model changeset, so re-run the editor's diagnostic hook
         // (validateVertexFormat) to refresh the footer — e.g. warn when removing an element a default uses.
@@ -194,6 +213,16 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
         Style.defaultPipeline(selector.getLayout(), l -> l.height(14).flex(1));
         selector.setOnValueChanged(value -> applyControlsToGraph());
         return selector;
+    }
+
+    private NumberConfigurator depthOffsetField(String name, java.util.function.Supplier<Float> getter,
+                                                java.util.function.Consumer<Float> setter) {
+        var field = new NumberConfigurator(name, getter::get, v -> {
+            setter.accept(v.floatValue());
+            applyControlsToGraph();
+        }, 0f, true);
+        field.setType(ConfigNumber.Type.FLOAT);
+        return field;
     }
 
     private Toggle toggle() {
@@ -238,6 +267,8 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
             group = "depth_test";
         } else if (enumClass == RenderTypeGraph.Settings.OutputTarget.class) {
             group = "output_target";
+        } else if (enumClass == RenderTypeGraph.Settings.ColorFormat.class) {
+            group = "color_format";
         } else {
             group = enumClass.getSimpleName().toLowerCase(Locale.ROOT);
         }

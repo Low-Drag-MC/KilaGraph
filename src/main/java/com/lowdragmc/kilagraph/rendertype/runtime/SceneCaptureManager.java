@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.runtime;
 
 import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
+import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -9,7 +10,6 @@ import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.textures.TextureFormat;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.Nullable;
@@ -20,7 +20,7 @@ import org.lwjgl.opengl.GL30;
  * Owns copies of the opaque scene's colour + depth, for the Scene Color / Scene Depth nodes. You cannot
  * sample the main render target while it is the active attachment (feedback loop), so {@link #capture()}
  * copies the main colour + depth into textures we own — taken at the opaque&rarr;translucent boundary
- * (see {@code LevelRendererMixin}) so translucent materials sample "the opaque scene behind them", exactly
+ * (see {@link SceneCaptureHandler}) so translucent materials sample "the opaque scene behind them", exactly
  * like Unity's opaque texture.
  *
  * <p><b>Gated.</b> Capture only runs while at least one live {@link RenderTypeGraphMaterial} needs it:
@@ -35,14 +35,14 @@ public final class SceneCaptureManager {
     public static final SceneCaptureManager INSTANCE = new SceneCaptureManager();
 
     // Usage = COPY_DST(1) | TEXTURE_BINDING(4): we only copy into these and sample them (never render to them).
-    private static final int CAPTURE_USAGE = 1 | 4;
+    private static final int CAPTURE_USAGE = GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING;
 
     private int users;
     // Colour and depth are sized independently: under an Iris shaderpack the colour is copied from Iris's
     // colortex0 (whose size follows Iris's render-quality scaling), while depth still copies MC's main
     // depth (window-sized) — Iris's depthtex0 wraps that same attachment, so it stays live under a pack.
     private int colorWidth, colorHeight, depthWidth, depthHeight;
-    @Nullable private TextureFormat colorFormat, depthFormat;
+    @Nullable private GpuFormat colorFormat, depthFormat;
     @Nullable private GpuTexture colorTexture, depthTexture;
     @Nullable private GpuTextureView colorView, depthView;
     @Nullable private GpuSampler sampler;
@@ -69,13 +69,13 @@ public final class SceneCaptureManager {
 
     /**
      * Copy the main render target's colour + depth into our owned textures. No-op if nobody needs it or the
-     * main target isn't ready. Called from {@code LevelRendererMixin} after opaque geometry, before translucent.
+     * main target isn't ready. Called by {@link SceneCaptureHandler} after opaque geometry, before translucent.
      */
     public void capture() {
         if (users <= 0) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc == null) return;
-        RenderTarget main = mc.getMainRenderTarget();
+        RenderTarget main = mc.gameRenderer.mainRenderTarget();
         if (main == null) return;
         GpuTexture mainColor = main.getColorTexture();
         GpuTexture mainDepth = main.getDepthTexture();
@@ -110,8 +110,10 @@ public final class SceneCaptureManager {
      */
     private boolean blitIrisColor(int srcTex, int w, int h) {
         if (srcTex == 0 || w <= 0 || h <= 0) return false;
+        // Raw GL below; Iris is GL-only, so anything else just takes the vanilla copy.
+        if (!(Minecraft.getInstance().gameRenderer.mainRenderTarget().getColorTexture() instanceof GlTexture)) return false;
         try {
-            ensureColor(w, h, TextureFormat.RGBA8);
+            ensureColor(w, h, GpuFormat.RGBA8_UNORM);
             int dstTex = ((GlTexture) colorTexture).glId();
             if (blitReadFbo == 0) blitReadFbo = GlStateManager.glGenFramebuffers();
             if (blitDrawFbo == 0) blitDrawFbo = GlStateManager.glGenFramebuffers();
@@ -161,7 +163,7 @@ public final class SceneCaptureManager {
         return sampler;
     }
 
-    private void ensureColor(int w, int h, TextureFormat cf) {
+    private void ensureColor(int w, int h, GpuFormat cf) {
         if (colorTexture != null && w == colorWidth && h == colorHeight && cf == colorFormat) return;
         if (colorView != null) { colorView.close(); colorView = null; }
         if (colorTexture != null) { colorTexture.close(); colorTexture = null; }
@@ -173,7 +175,7 @@ public final class SceneCaptureManager {
         colorView = device.createTextureView(colorTexture);
     }
 
-    private void ensureDepth(int w, int h, TextureFormat df) {
+    private void ensureDepth(int w, int h, GpuFormat df) {
         if (depthTexture != null && w == depthWidth && h == depthHeight && df == depthFormat) return;
         if (depthView != null) { depthView.close(); depthView = null; }
         if (depthTexture != null) { depthTexture.close(); depthTexture = null; }

@@ -25,7 +25,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -420,8 +420,8 @@ public final class McContainerGameTest {
      */
     public static void entityNbtRoundTripsWithoutTeleporting(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        var donor = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
-        var target = helper.spawn(EntityType.PIG, new BlockPos(4, 2, 4));
+        var donor = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
+        var target = helper.spawn(EntityTypes.PIG, new BlockPos(4, 2, 4));
         donor.setCustomName(Component.literal("Donor"));
         double targetX = target.getX();
         double targetZ = target.getZ();

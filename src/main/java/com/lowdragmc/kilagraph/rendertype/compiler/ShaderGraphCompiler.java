@@ -85,12 +85,18 @@ public class ShaderGraphCompiler {
     private final MaterialUniformLayout layout = new MaterialUniformLayout();
     /** Minecraft builtin UBOs the generated GLSL actually references — nothing else. A block a consumer
      *  binds unconditionally belongs on that consumer's pipeline, not here: {@code RenderTypeFactory} adds
-     *  {@code DynamicTransforms} itself because {@code RenderType.draw} always binds it. Putting it here
+     *  {@code DynamicTransforms} itself because the vanilla draw path always binds it. Putting it here
      *  instead made every consumer that drives its OWN draw (Photon's fullscreen post-effect passes bind
-     *  nothing of Minecraft's) declare a uniform it never fills, which 26.1 rejects at draw. */
+     *  nothing of Minecraft's) declare a uniform it never fills, which Minecraft rejects at draw. */
     private final Set<String> builtinUbos = new LinkedHashSet<>();
     /** name -> type of varyings already built in the vertex shader. */
     private final Map<String, GlslType> varyings = new java.util.LinkedHashMap<>();
+    /** Varyings declared {@code flat} regardless of type (per-instance data). */
+    private final Set<String> flatVaryings = new java.util.HashSet<>();
+    /** Per-instance attributes read through Instance Data nodes, by name (sorted, so the layout is stable). */
+    private final Map<String, InstanceAttribute> instanceAttributes = new java.util.TreeMap<>();
+    /** An Instance Data node was read while building the injection snippet — the graph can't be injected. */
+    private boolean instanceDataRead;
     /** Baked default values for EXPOSED variable uniforms: uniform field name -> std140 components. */
     private final Map<String, float[]> uniformDefaults = new LinkedHashMap<>();
     /** Baked default textures+params for Sampler2D samplers: sampler name -> {@link SamplerDefault}. */
@@ -300,7 +306,8 @@ public class ShaderGraphCompiler {
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
                 usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth,
                 out.alphaDiscardCutoff != null, new ArrayList<>(missingAttributes),
-                tangentBasisDegraded, injectionSnippet);
+                tangentBasisDegraded, injectionSnippet, new ArrayList<>(instanceAttributes.values()),
+                out.colorTargets.values().stream().map(FragmentOutputs.ColorTargetWrite::target).toList());
     }
 
     /**
@@ -345,7 +352,7 @@ public class ShaderGraphCompiler {
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
                 usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth,
                 false, new ArrayList<>(missingAttributes),
-                tangentBasisDegraded, null);
+                tangentBasisDegraded, null, List.of(), List.of());
     }
 
     /**
@@ -391,6 +398,10 @@ public class ShaderGraphCompiler {
         // Unsupported subset: a Minecraft engine include (Fog/Lighting/...) can't be satisfied inside the
         // shaderpack program; a stage error means the GLSL references unavailable data. (Scene Color/Depth
         // ARE supported: depth reads Iris's depthtex1, colour reads the KG_SceneColor capture bound at draw.)
+        if (!out.colorTargets.isEmpty()) {
+            Kilagraph.LOGGER.info("[KilaGraph][Iris] injection snippet rejected: the graph writes extra colour targets");
+            return null;
+        }
         if (!fragment.includes.isEmpty() || !stageErrors.isEmpty()) {
             // Name the culprit — pairs with IrisSurfaceRegistry's "no injection snippet -> passthrough" line
             // (which only knows the hash). An include here means some node used a #moj_import-backed
@@ -408,13 +419,19 @@ public class ShaderGraphCompiler {
         // part degrades to fragment-only (shading survives, displacement dropped) and rolls its
         // registrations back.
         VertexSnippetParts vparts = buildVertexSnippetParts();
+        if (instanceDataRead) {
+            Kilagraph.LOGGER.info("[KilaGraph][Iris] injection snippet rejected: the graph reads per-instance data");
+            return null;
+        }
 
         // The block declaration must mirror the buffer that will actually be bound — the MAIN compile's
         // full layout (see the fullLayout javadoc). Sampler declarations stay the snippet's own set (a
         // main-only sampler would just be inactive, and Sampler1/2 must never leak into the snippet).
         MaterialUniformLayout blockLayout = fullLayout != null ? fullLayout : layout;
         List<String> decls = new ArrayList<>();
-        if (blockLayout.hasGradientField() || fragment.usesGradient) decls.add(GradientGlsl.STRUCT);
+        // Either stage: these units also go into the pack's vertex source.
+        if (blockLayout.hasGradientField() || fragment.usesGradient || vertex.usesGradient) decls.add(GradientGlsl.STRUCT);
+        if (blockLayout.hasCurveField() || fragment.usesCurve || vertex.usesCurve) decls.add(CurveGlsl.STRUCT);
         if (!blockLayout.isEmpty()) decls.add(blockLayout.blockGlsl());
         for (String s : layout.samplers()) decls.add("uniform sampler2D " + s + ";");
         uniformBlocks.stream()
@@ -792,12 +809,14 @@ public class ShaderGraphCompiler {
                     + " * vec4(kg_pos, 1.0)).xyz", GlslType.VEC3);
         }
         useUniformBlock(KGEngineUniforms.BLOCK);      // ScreenSize
-        useUniformBlock(KGTransformUniforms.BLOCK);   // IProjMat (clip -> view)
+        useUniformBlock(KGTransformUniforms.BLOCK);   // IProjMat (clip -> view) + DepthZRemap
+        // gl_FragCoord.z is a window depth; DepthZRemap maps it to clip z.
+        String zRemap = KGTransformUniforms.accessor("DepthZRemap");
         addFunction("kg_recon_viewPos",
                 "vec3 kg_recon_viewPos() {\n"
               + "    vec2 kg_ndc = gl_FragCoord.xy / " + KGEngineUniforms.screenSizeAccessor() + " * 2.0 - 1.0;\n"
               + "    vec4 kg_vp = " + KGTransformUniforms.accessor("IProjMat")
-                    + " * vec4(kg_ndc, gl_FragCoord.z * 2.0 - 1.0, 1.0);\n"
+                    + " * vec4(kg_ndc, gl_FragCoord.z * " + zRemap + ".x + " + zRemap + ".y, 1.0);\n"
               + "    return kg_vp.xyz / kg_vp.w;\n}\n");
         return new ShaderExpr("kg_recon_viewPos()", GlslType.VEC3);
     }
@@ -1301,6 +1320,12 @@ public class ShaderGraphCompiler {
      */
     protected ShaderExpr varyingInput(String name, GlslType type,
                             java.util.function.Supplier<ShaderExpr> vshDefault, ShaderExpr previewDefault) {
+        return varyingInput(name, type, vshDefault, previewDefault, false);
+    }
+
+    private ShaderExpr varyingInput(String name, GlslType type, java.util.function.Supplier<ShaderExpr> vshDefault,
+                                    ShaderExpr previewDefault, boolean flat) {
+        if (flat) flatVaryings.add(name);
         if (preview) return previewDefault;
         if (current == vertex) return convert(vshDefault.get(), type);
         ensureVaryingWithDefault(name, type, vshDefault);
@@ -1319,6 +1344,32 @@ public class ShaderGraphCompiler {
         } finally {
             current = saved;
         }
+    }
+
+    /**
+     * A per-instance value (vertex binding 1, one step per instance), read directly in the vertex stage and
+     * through a flat varying in the fragment. The first read of a name fixes its type. Preview: zero (identity
+     * for {@code mat4}).
+     */
+    ShaderExpr instanceData(String name, InstanceAttribute.Type type) {
+        String id = name.replaceAll("[^A-Za-z0-9_]", "_");
+        if (id.isEmpty()) id = "Data";
+        ShaderExpr fallback = type == InstanceAttribute.Type.MAT4
+                ? new ShaderExpr("mat4(1.0)", GlslType.MAT4)
+                : new ShaderExpr(type.glslType.glsl() + "(0)", type.glslType);
+        if (injection) instanceDataRead = true;
+        if (preview) return fallback;
+        InstanceAttribute attribute = instanceAttributes.computeIfAbsent(id, k -> new InstanceAttribute(k, type));
+        if (attribute.type() != type) {
+            Kilagraph.LOGGER.warn("[KilaGraph] instance data '{}' read as {} and {}; using {}", id,
+                    attribute.type(), type, attribute.type());
+            return fallback;
+        }
+        ShaderExpr raw = type == InstanceAttribute.Type.MAT4
+                ? new ShaderExpr("mat4(" + attribute.attribName(0) + ", " + attribute.attribName(1) + ", "
+                        + attribute.attribName(2) + ", " + attribute.attribName(3) + ")", GlslType.MAT4)
+                : new ShaderExpr(attribute.attribName(0), type.glslType);
+        return varyingInput("kg_iv_" + id, type.glslType, () -> raw, fallback, true);
     }
 
     /** Register a KilaGraph-managed UBO (engine globals / transforms / a mod's own) so the GLSL declares it,
@@ -1422,6 +1473,7 @@ public class ShaderGraphCompiler {
      *  equivalent) — degrade to the all-white neutral: sampling white = no overlay tint. */
     ShaderExpr overlaySampler() {
         if (injection) return neutralWhiteSampler();
+        layout.addSampler("Sampler1"); // declare `uniform sampler2D Sampler1`
         usesOverlay = true;
         return new ShaderExpr("Sampler1", GlslType.SAMPLER2D);
     }
@@ -1430,6 +1482,7 @@ public class ShaderGraphCompiler {
      *  injection the pack owns lighting — degrade to the all-white neutral (fullbright). */
     ShaderExpr lightmapSampler() {
         if (injection) return neutralWhiteSampler();
+        layout.addSampler("Sampler2"); // declare `uniform sampler2D Sampler2`
         usesLightmap = true;
         return new ShaderExpr("Sampler2", GlslType.SAMPLER2D);
     }
@@ -1446,6 +1499,8 @@ public class ShaderGraphCompiler {
         return new ShaderExpr(NEUTRAL_WHITE_SAMPLER, GlslType.SAMPLER2D);
     }
 
+    /** The fragment output array of a graph with colour targets; element 0 is the main target. */
+    public static final String MRT_OUTPUTS = "kg_outputs";
     /** Sampler name for the captured opaque scene colour (bound at draw from {@code SceneCaptureManager}). */
     public static final String SCENE_COLOR_SAMPLER = "KG_SceneColor";
     /** Sampler name for the captured opaque scene depth (bound at draw from {@code SceneCaptureManager}). */
@@ -1541,7 +1596,9 @@ public class ShaderGraphCompiler {
         sceneDepthHelpers();
         ShaderExpr raw = sampleSceneDepthRaw(uv);
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
-        return new ShaderExpr("kg_eye_depth(" + raw.code() + ", " + iproj.code() + ")", GlslType.FLOAT);
+        ShaderExpr zRemap = transformField("DepthZRemap", GlslType.VEC2);
+        return new ShaderExpr("kg_eye_depth(" + raw.code() + ", " + iproj.code() + ", " + zRemap.code() + ")",
+                GlslType.FLOAT);
     }
 
     /** Linearised depth {@code 0}(near)..{@code 1}(far) (Unity's Scene Depth "Linear 01"), reconstructed via {@code IProjMat}. */
@@ -1549,7 +1606,9 @@ public class ShaderGraphCompiler {
         sceneDepthHelpers();
         ShaderExpr raw = sampleSceneDepthRaw(uv);
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
-        return new ShaderExpr("kg_linear01_depth(" + raw.code() + ", " + iproj.code() + ")", GlslType.FLOAT);
+        ShaderExpr zRemap = transformField("DepthZRemap", GlslType.VEC2);
+        return new ShaderExpr("kg_linear01_depth(" + raw.code() + ", " + iproj.code() + ", " + zRemap.code() + ")",
+                GlslType.FLOAT);
     }
 
     /** The default (unconnected-uv) screen-space UV for Scene Depth. Under injection the lookup targets
@@ -1585,32 +1644,55 @@ public class ShaderGraphCompiler {
         } else {
             addInclude("kilagraph:kg_scene.glsl");
         }
+        ShaderExpr proj = transformField("ProjMat", GlslType.MAT4);
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
-        return new ShaderExpr("kg_eye_depth(gl_FragCoord.z, " + iproj.code() + ")", GlslType.FLOAT);
+        ShaderExpr zRemap = transformField("DepthZRemap", GlslType.VEC2);
+        // Perspective: clip w is the eye depth, so 1/gl_FragCoord.w (exact, and the projection this draw
+        // actually used). Orthographic: w is 1, so reconstruct from depth instead.
+        return new ShaderExpr("(" + proj.code() + "[3][3] == 0.0 ? 1.0 / gl_FragCoord.w : kg_eye_depth(gl_FragCoord.z, "
+                + iproj.code() + ", " + zRemap.code() + "))", GlslType.FLOAT);
     }
 
     /** Camera near-plane distance (world units), reconstructed from {@code IProjMat}. */
     ShaderExpr cameraNear() {
         if (injection) {
             addFunction("kg_eye_from_ndcz", SceneGlsl.FN_EYE_FROM_NDCZ);
+            addFunction("kg_eye_depth", SceneGlsl.FN_EYE_DEPTH);
             addFunction("kg_camera_near", SceneGlsl.FN_CAMERA_NEAR);
         } else {
             addInclude("kilagraph:kg_scene.glsl");
         }
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
-        return new ShaderExpr("kg_camera_near(" + iproj.code() + ")", GlslType.FLOAT);
+        ShaderExpr zRemap = transformField("DepthZRemap", GlslType.VEC2);
+        return new ShaderExpr("kg_camera_near(" + iproj.code() + ", " + zRemap.code() + ")", GlslType.FLOAT);
     }
 
     /** Camera far-plane distance (world units), reconstructed from {@code IProjMat}. */
     ShaderExpr cameraFar() {
         if (injection) {
             addFunction("kg_eye_from_ndcz", SceneGlsl.FN_EYE_FROM_NDCZ);
+            addFunction("kg_eye_depth", SceneGlsl.FN_EYE_DEPTH);
             addFunction("kg_camera_far", SceneGlsl.FN_CAMERA_FAR);
         } else {
             addInclude("kilagraph:kg_scene.glsl");
         }
         ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
-        return new ShaderExpr("kg_camera_far(" + iproj.code() + ")", GlslType.FLOAT);
+        ShaderExpr zRemap = transformField("DepthZRemap", GlslType.VEC2);
+        return new ShaderExpr("kg_camera_far(" + iproj.code() + ", " + zRemap.code() + ")", GlslType.FLOAT);
+    }
+
+    /** {@code -1} for a reversed depth buffer, else {@code 1}; read off {@code IProjMat}. */
+    ShaderExpr zBufferSign() {
+        if (injection) {
+            addFunction("kg_eye_from_ndcz", SceneGlsl.FN_EYE_FROM_NDCZ);
+            addFunction("kg_eye_depth", SceneGlsl.FN_EYE_DEPTH);
+            addFunction("kg_zbuffer_sign", SceneGlsl.FN_ZBUFFER_SIGN);
+        } else {
+            addInclude("kilagraph:kg_scene.glsl");
+        }
+        ShaderExpr iproj = transformField("IProjMat", GlslType.MAT4);
+        ShaderExpr zRemap = transformField("DepthZRemap", GlslType.VEC2);
+        return new ShaderExpr("kg_zbuffer_sign(" + iproj.code() + ", " + zRemap.code() + ")", GlslType.FLOAT);
     }
 
     // ---- traversal ---------------------------------------------------------------------------
@@ -2041,7 +2123,29 @@ public class ShaderGraphCompiler {
     private static void appendFunctions(StringBuilder sb, StageScope scope) {
         if (scope.functions.isEmpty()) return;
         sb.append('\n');
-        for (String fn : scope.functions.values()) sb.append(fn).append('\n');
+        for (var fn : scope.functions.entrySet()) {
+            if (providedByInclude(scope, fn.getKey())) continue;
+            sb.append(fn.getValue()).append('\n');
+        }
+    }
+
+    /** Functions each Minecraft include defines — an inline copy (FogGlsl/LightGlsl) is dropped when the
+     *  stage imports the include too, or the driver sees a redefinition. */
+    private static final Map<String, Set<String>> INCLUDE_FUNCTIONS = Map.of(
+            "minecraft:fog.glsl", Set.of("linear_fog_value", "total_fog_value", "apply_fog",
+                    "fog_spherical_distance", "fog_cylindrical_distance"),
+            "minecraft:light.glsl", Set.of("minecraft_compute_light", "minecraft_mix_light_separate",
+                    "minecraft_mix_light"),
+            "minecraft:projection.glsl", Set.of("projection_from_position"),
+            "minecraft:sample_lightmap.glsl", Set.of("sample_lightmap"),
+            "minecraft:matrix.glsl", Set.of("mat2_rotate_z"));
+
+    private static boolean providedByInclude(StageScope scope, String function) {
+        for (String include : scope.includes) {
+            Set<String> provided = INCLUDE_FUNCTIONS.get(include);
+            if (provided != null && provided.contains(function)) return true;
+        }
+        return false;
     }
 
     /** Append each used KG-managed UBO's std140 declaration, sorted by name so the generated source (and
@@ -2135,6 +2239,12 @@ public class ShaderGraphCompiler {
         for (String inc : vertex.includes) sb.append("#moj_import <").append(inc).append(">\n");
         if (!vertex.includes.isEmpty()) sb.append('\n');
         sb.append(vertexInputsBlock());
+        for (InstanceAttribute attribute : instanceAttributes.values()) {
+            for (int column = 0; column < attribute.type().columns; column++) {
+                sb.append("in ").append(attribute.type().columnGlsl()).append(' ')
+                        .append(attribute.attribName(column)).append(";\n");
+            }
+        }
         appendStructDecls(sb, vertex);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append('\n').append(uniforms);
@@ -2142,7 +2252,7 @@ public class ShaderGraphCompiler {
         if (!varyings.isEmpty()) {
             sb.append('\n');
             for (var e : varyings.entrySet()) {
-                if (e.getValue().requiresFlat()) sb.append("flat ");
+                if (e.getValue().requiresFlat() || flatVaryings.contains(e.getKey())) sb.append("flat ");
                 sb.append("out ").append(e.getValue().glsl()).append(' ').append(e.getKey()).append(";\n");
             }
         }
@@ -2212,11 +2322,19 @@ public class ShaderGraphCompiler {
         appendUniformBlocks(sb, false);
         if (!varyings.isEmpty()) {
             for (var e : varyings.entrySet()) {
-                if (e.getValue().requiresFlat()) sb.append("flat ");
+                if (e.getValue().requiresFlat() || flatVaryings.contains(e.getKey())) sb.append("flat ");
                 sb.append("in ").append(e.getValue().glsl()).append(' ').append(e.getKey()).append(";\n");
             }
         }
-        sb.append("\nout vec4 fragColor;\n");
+        // MRT: one output array, since Minecraft's Vulkan backend renumbers output variables by declaration order.
+        String mainOutput = "fragColor";
+        if (out.colorTargets.isEmpty()) {
+            sb.append("\nout vec4 fragColor;\n");
+        } else {
+            mainOutput = MRT_OUTPUTS + "[0]";
+            int count = out.colorTargets.lastKey() + 1;
+            sb.append("\nlayout(location = 0) out vec4 ").append(MRT_OUTPUTS).append('[').append(count).append("];\n");
+        }
         appendFunctions(sb, fragment);
         sb.append("\nvoid main() {\n").append(fragment.body);
         String baseColor = out.baseColor != null ? out.baseColor.code() : "vec3(1.0)";
@@ -2229,7 +2347,11 @@ public class ShaderGraphCompiler {
         if (out.alphaDiscardCutoff != null) {
             sb.append("    if (kg_alpha < ").append(out.alphaDiscardCutoff.code()).append(") discard;\n");
         }
-        sb.append("    fragColor = vec4(kg_baseColor, kg_alpha);\n");
+        sb.append("    ").append(mainOutput).append(" = vec4(kg_baseColor, kg_alpha);\n");
+        for (var write : out.colorTargets.values()) {
+            sb.append("    ").append(MRT_OUTPUTS).append('[').append(write.target().location()).append("] = ")
+                    .append(convert(write.value(), GlslType.VEC4).code()).append(";\n");
+        }
         sb.append("}\n");
         return sb.toString();
     }

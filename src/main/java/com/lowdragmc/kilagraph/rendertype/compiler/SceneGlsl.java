@@ -7,9 +7,8 @@ package com.lowdragmc.kilagraph.rendertype.compiler;
  * mirror {@code assets/kilagraph/shaders/include/kg_scene.glsl} <b>verbatim</b> — {@code SceneGlslTest} pins
  * the two copies together so vanilla and shaderpack rendering can't silently diverge.
  *
- * <p>Register in dependency order ({@code kg_eye_from_ndcz} → {@code kg_eye_depth} →
- * {@code kg_linear01_depth}): the compiler's function map and the injector both preserve insertion order,
- * and GLSL needs a definition before its first use.</p>
+ * <p>Register {@code kg_eye_from_ndcz} and {@code kg_eye_depth} first (every other helper uses them): the
+ * compiler's function map and the injector both preserve insertion order.</p>
  */
 public final class SceneGlsl {
 
@@ -23,26 +22,30 @@ public final class SceneGlsl {
             """;
 
     public static final String FN_EYE_DEPTH = """
-            float kg_eye_depth(float rawDepth, mat4 iproj) {
-                return kg_eye_from_ndcz(rawDepth * 2.0 - 1.0, iproj);
-            }
-            """;
-
-    public static final String FN_LINEAR01_DEPTH = """
-            float kg_linear01_depth(float rawDepth, mat4 iproj) {
-                float eye = kg_eye_depth(rawDepth, iproj);
-                float nearD = kg_eye_from_ndcz(-1.0, iproj);
-                float farD  = kg_eye_from_ndcz( 1.0, iproj);
-                return (eye - nearD) / (farD - nearD);
+            float kg_eye_depth(float rawDepth, mat4 iproj, vec2 zRemap) {
+                return kg_eye_from_ndcz(rawDepth * zRemap.x + zRemap.y, iproj);
             }
             """;
 
     public static final String FN_CAMERA_NEAR = """
-            float kg_camera_near(mat4 iproj) { return kg_eye_from_ndcz(-1.0, iproj); }
+            float kg_camera_near(mat4 iproj, vec2 zRemap) { return min(kg_eye_depth(0.0, iproj, zRemap), kg_eye_depth(1.0, iproj, zRemap)); }
             """;
 
     public static final String FN_CAMERA_FAR = """
-            float kg_camera_far(mat4 iproj)  { return kg_eye_from_ndcz( 1.0, iproj); }
+            float kg_camera_far(mat4 iproj, vec2 zRemap)  { return max(kg_eye_depth(0.0, iproj, zRemap), kg_eye_depth(1.0, iproj, zRemap)); }
+            """;
+
+    public static final String FN_ZBUFFER_SIGN = """
+            float kg_zbuffer_sign(mat4 iproj, vec2 zRemap) { return kg_eye_depth(1.0, iproj, zRemap) < kg_eye_depth(0.0, iproj, zRemap) ? -1.0 : 1.0; }
+            """;
+
+    public static final String FN_LINEAR01_DEPTH = """
+            float kg_linear01_depth(float rawDepth, mat4 iproj, vec2 zRemap) {
+                float end0 = kg_eye_depth(0.0, iproj, zRemap);
+                float end1 = kg_eye_depth(1.0, iproj, zRemap);
+                float nearD = min(end0, end1);
+                return (kg_eye_depth(rawDepth, iproj, zRemap) - nearD) / (max(end0, end1) - nearD);
+            }
             """;
 
     /**

@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
  * <pre>{@code layout(std140) uniform KG_Globals { float Time; } kg_globals; }</pre>
  *
  * <p>Fields are accessed in GLSL as {@code kg_globals.Time}. The buffer is updated once per frame at
- * {@code RenderType.draw} HEAD (before any render pass — {@code writeToBuffer} is illegal inside a
+ * the start of a KilaGraph draw (before its render pass opens — {@code writeToBuffer} is illegal inside a
  * pass) via {@link #prepareUpload()}, and bound inside the pass via {@link #slice()}.</p>
  */
 public final class KGEngineUniforms {
@@ -122,7 +122,7 @@ public final class KGEngineUniforms {
 
     /**
      * Create (if needed) and refresh the buffer for the current frame. Performs a {@code writeToBuffer}
-     * — call before {@code RenderType.draw} opens its pass. Idempotent within a frame (skips the write
+     * — call before the draw's render pass opens. Idempotent within a frame (skips the write
      * when the time hasn't advanced), so many materials per frame upload at most once.
      */
     public static void prepareUpload() {

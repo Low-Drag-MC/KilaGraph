@@ -14,7 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import org.joml.Vector2f;
 
 import java.util.List;
@@ -23,6 +23,7 @@ import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
@@ -78,8 +79,8 @@ public final class EntityNodeGameTest {
 
     public static void inRadius(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        Entity a = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 1));
-        Entity b = helper.spawn(EntityType.PIG, new BlockPos(1, 2, 3));
+        Entity a = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 1));
+        Entity b = helper.spawn(EntityTypes.PIG, new BlockPos(1, 2, 3));
         BlockPos center = helper.absolutePos(new BlockPos(1, 2, 2));
 
         var g = newGraph();
@@ -96,7 +97,7 @@ public final class EntityNodeGameTest {
         // suite run, and "expected true" says nothing about whether the query came back short, came back
         // with the wrong centre, or the pigs were gone. Built only on the failing path.
         if (!out.contains(a) || !out.contains(b)) {
-            helper.fail("radius contains both pigs: centre=" + center.getCenter()
+            helper.fail("radius contains both pigs: centre=" + Vec3.atCenterOf(center)
                     + " | a=" + diag(level, a) + " | b=" + diag(level, b) + " | found=" + out);
         }
         helper.succeed();

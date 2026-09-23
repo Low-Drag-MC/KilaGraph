@@ -23,6 +23,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -53,7 +54,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputCo
  *
  * <p>Every assertion compares the block's output against the same Minecraft call made directly, on the
  * same live object. That is deliberate: asserting a pig's height is {@code 0.9} would be testing
- * Minecraft, while asserting the block reports whatever {@code EntityType.PIG.getHeight()} returns is
+ * Minecraft, while asserting the block reports whatever {@code EntityTypes.PIG.getHeight()} returns is
  * testing the block. The few literals are ones this test set itself.
  */
 public final class McInfoBlockGameTest {
@@ -132,7 +133,7 @@ public final class McInfoBlockGameTest {
     // ---- Entity ------------------------------------------------------------------------------
 
     public static void entityBlocks(GameTestHelper helper) {
-        Entity pig = helper.spawn(EntityType.PIG, new BlockPos(2, 2, 2));
+        Entity pig = helper.spawn(EntityTypes.PIG, new BlockPos(2, 2, 2));
         var probe = new Probe(EntityInfoNode.class, pig);
 
         assertVector(helper, "position", pig.position(),
@@ -193,7 +194,7 @@ public final class McInfoBlockGameTest {
      * getter is not on {@code Entity}.</p>
      */
     public static void healthOnANonLivingEntity(GameTestHelper helper) {
-        Entity arrow = helper.spawn(EntityType.ARROW, new BlockPos(2, 2, 2));
+        Entity arrow = helper.spawn(EntityTypes.ARROW, new BlockPos(2, 2, 2));
         var health = new Probe(EntityInfoNode.class, arrow).block(EntityInfoBlocks.Health.class);
         assertFalse(helper, "an arrow is not living", health.get("living", Boolean.class));
         assertEq(helper, "and reads zero health", 0f, health.get("value", Float.class), EPS);
