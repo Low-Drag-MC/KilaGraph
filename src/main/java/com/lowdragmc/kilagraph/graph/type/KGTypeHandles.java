@@ -15,6 +15,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
@@ -122,6 +123,15 @@ public final class KGTypeHandles {
      */
     public static final TypeHandle FLUID_CONTAINER;
     /**
+     * How something was hurt, as Minecraft's {@code DamageSource}: the damage type, who is responsible,
+     * what physically did it and where from.
+     *
+     * <p>Wire-only, like the other live-object handles — a source is built by
+     * {@code mc_make_damage_source} or handed in by whatever reported the damage, never authored as a
+     * literal. Its type lives in a datapack registry, so there is no value to default one to.</p>
+     */
+    public static final TypeHandle DAMAGE_SOURCE;
+    /**
      * NBT compound tag. LDLib2 has a {@code Tag} accessor and a {@code TagAccessor} widget, so unlike
      * LEVEL/ENTITY this one is a real editable value — it just needed a default before the editor
      * could build a constant for it.
@@ -215,6 +225,7 @@ public final class KGTypeHandles {
                 IItemHandler.class, "Container");
         FLUID_CONTAINER = TypeHandleHelpers.fromType(
                 IFluidHandler.class, "FluidContainer");
+        DAMAGE_SOURCE = TypeHandleHelpers.fromType(DamageSource.class, "DamageSource");
         NBT_COMPOUND = TypeHandleHelpers.fromType(CompoundTag.class, "CompoundTag");
         // Without this the NBT editor cannot open: Constant.init seeds the value from
         // getDefaultValue(), and TagAccessor has nothing to edit when that is null.

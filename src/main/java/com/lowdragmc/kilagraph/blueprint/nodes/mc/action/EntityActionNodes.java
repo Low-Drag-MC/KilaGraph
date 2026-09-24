@@ -15,6 +15,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -211,6 +212,43 @@ public final class EntityActionNodes {
                 return;
             }
             McActions.done(ctx, living.hurt(e.level().damageSources().generic(), amount));
+        }
+    }
+
+    /**
+     * Damages an entity with a given source.
+     *
+     * <p>What {@code mc_damage_entity} cannot say: who did it and how. The source's entity gets the death
+     * message, the kill credit and the victim's aggro, and its damage type decides what armour and
+     * enchantments make of the hit. Build one with {@code mc_make_damage_source}. {@code ok} is false
+     * under the same conditions as {@code mc_damage_entity}, and when there is no source.</p>
+     */
+    @NodeAttribute(name = "mc_damage_entity_with_source", group = GROUP, graphTypes = BlueprintGraph.class)
+    public static class DamageEntityWithSource extends ActionNode {
+        @Override
+        protected Component getNodeTooltip() {
+            return Component.translatable("kg.node.mc_damage_entity_with_source.tooltip");
+        }
+
+        @ExecInputPort public ExecutionFlow trigger;
+        @ExecOutputPort public ExecutionFlow next;
+
+        @InputPort public Entity entity;
+        @InputPort public DamageSource source;
+        @InputPort public float amount = 1f;
+        @OutputPort public boolean ok;
+
+        @Override
+        public void execute(ExecContext ctx) {
+            Entity e = ctx.getInput("entity", Entity.class, null);
+            DamageSource source = ctx.getInput("source", DamageSource.class, null);
+            float amount = ctx.getFloat("amount", 1f);
+            if (!(e instanceof LivingEntity living) || source == null || e.level().isClientSide || e.isRemoved()
+                    || amount <= 0) {
+                McActions.done(ctx, false);
+                return;
+            }
+            McActions.done(ctx, living.hurt(source, amount));
         }
     }
 
