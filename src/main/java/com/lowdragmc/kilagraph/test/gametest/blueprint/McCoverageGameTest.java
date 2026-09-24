@@ -174,13 +174,16 @@ public final class McCoverageGameTest {
         Entity boat = helper.spawn(EntityType.BOAT, new BlockPos(2, 2, 1));
         Entity near = helper.spawn(EntityType.PIG, new BlockPos(3, 2, 1));
         Entity far = helper.spawn(EntityType.PIG, new BlockPos(6, 2, 1));
+        // ⚠️ GameTests run millions of blocks out, where a float is a whole block wide: the centre is
+        // the asker's position rounded, so distances are measured from it rather than assumed
         var at = new org.joml.Vector3f((float) asker.getX(), (float) asker.getY(), (float) asker.getZ());
 
         var living = probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
                 "center", at, "radius", 8.0, "exclude", asker, "livingOnly", true);
         assertTrue(helper, "something living is within eight blocks", living.eval("found", Boolean.class));
         assertEq(helper, "the near pig, not the asker and not the boat", near, living.eval("out", Object.class));
-        assertEq(helper, "two blocks away", 2f, living.eval("distance", Double.class).floatValue(), 0.01f);
+        assertEq(helper, "about two blocks away", (float) Math.sqrt(near.distanceToSqr(at.x, at.y, at.z)),
+                living.eval("distance", Double.class).floatValue(), 0.01f);
 
         var anything = probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
                 "center", at, "radius", 8.0, "exclude", asker, "livingOnly", false);
@@ -190,14 +193,20 @@ public final class McCoverageGameTest {
                 "center", at, "radius", 8.0, "livingOnly", true);
         assertEq(helper, "with nothing excluded the asker finds itself", asker, unexcluded.eval("out", Object.class));
 
-        // a sphere: the far pig sits inside the 4.5-block box but outside the 4.5-block sphere once the
-        // near one is gone
+        // a sphere: from three blocks up, the far pig (about five along) sits inside the search box but
+        // outside the sphere once the near one is gone — the radius is picked halfway between the two
         near.discard();
+        var above = new org.joml.Vector3f(at.x, at.y + 3f, at.z);
+        double reach = Math.sqrt(far.distanceToSqr(above.x, above.y, above.z));
+        double boxReach = Math.max(Math.abs(far.getX() - above.x),
+                Math.max(Math.abs(far.getY() - above.y), Math.abs(far.getZ() - above.z)));
+        double radius = (reach + boxReach) / 2;
         var sphere = probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
-                "center", new org.joml.Vector3f(at.x, at.y + 3f, at.z), "radius", 5.5, "exclude", asker, "livingOnly", true);
-        assertFalse(helper, "five along and three up is 5.83 away: outside a 5.5 sphere though inside its box",
+                "center", above, "radius", radius, "exclude", asker, "livingOnly", true);
+        assertFalse(helper, "five along and three up is about 5.83 away: outside the sphere though inside its box",
                 sphere.eval("found", Boolean.class));
-        assertEq(helper, "and the distance reads the radius", 5.5f, sphere.eval("distance", Double.class).floatValue(), 0.01f);
+        assertEq(helper, "and the distance reads the radius", (float) radius,
+                sphere.eval("distance", Double.class).floatValue(), 0.01f);
         assertEq(helper, "the far pig is still there for a wider search", far,
                 probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
                         "center", at, "radius", 8.0, "exclude", asker, "livingOnly", true).eval("out", Object.class));
