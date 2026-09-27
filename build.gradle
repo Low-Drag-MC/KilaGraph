@@ -251,6 +251,3 @@ idea {
         downloadJavadoc = true
     }
 }
-
-// TEMP(port-26.3): show every compile error
-tasks.withType(JavaCompile).configureEach { options.compilerArgs += ['-Xmaxerrs', '100000', '-XDshould-stop.ifError=FLOW'] }
