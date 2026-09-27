@@ -158,7 +158,7 @@ public final class RenderTypeGraphTypes {
         @Override public String getSerializedName() { return name; }
     }
 
-    /** Texture filtering (maps to {@code com.mojang.blaze3d.textures.FilterMode}). */
+    /** Texture filtering (maps to {@code com.mojang.renderpearl.api.textures.FilterMode}). */
     public enum SamplerFilter implements StringRepresentable {
         NEAREST("nearest"), LINEAR("linear");
         private final String name;
@@ -166,7 +166,7 @@ public final class RenderTypeGraphTypes {
         @Override public String getSerializedName() { return name; }
     }
 
-    /** Texture address/wrap mode (maps to {@code com.mojang.blaze3d.textures.AddressMode}). */
+    /** Texture address/wrap mode (maps to {@code com.mojang.renderpearl.api.textures.AddressMode}). */
     public enum SamplerAddress implements StringRepresentable {
         REPEAT("repeat"), CLAMP("clamp");
         private final String name;

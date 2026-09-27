@@ -175,9 +175,9 @@ public final class EntityActionNodes {
                 return;
             }
             e.setDeltaMovement(McConvert.toVec3(v));
-            // 26.1 dropped hasImpulse; hurtMarked is the flag that still forces the server to
-            // send the new motion to the client, which is the whole point of setting it here.
-            e.hurtMarked = true;
+            // syncVelocity (26.3's name for hurtMarked) is the flag that forces the server to send the
+            // new motion to the client, which is the whole point of setting it here.
+            e.syncVelocity = true;
             McActions.done(ctx, true);
         }
     }

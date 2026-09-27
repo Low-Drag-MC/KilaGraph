@@ -1,7 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.runtime;
 
 import com.lowdragmc.kilagraph.Kilagraph;
-import com.mojang.blaze3d.shaders.ShaderType;
+import com.mojang.renderpearl.api.pipeline.ShaderType;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 

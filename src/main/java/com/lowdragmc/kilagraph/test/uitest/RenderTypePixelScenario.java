@@ -83,11 +83,11 @@ import com.lowdragmc.lowdraglib2.uitest.UIScenario;
 import com.lowdragmc.lowdraglib2.uitest.capture.FrameCapture;
 import com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.Bare;
 import com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.Canvas;
-import com.mojang.blaze3d.GpuFormat;
+import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
@@ -326,7 +326,7 @@ public class RenderTypePixelScenario implements UIScenario {
                 var view = textures.getTexture(checker).getTextureView();
                 ctx.check("setTextureView binds a raw view",
                         material.setTextureView(sampler, view, RenderSystem.getSamplerCache().getClampToEdge(
-                                com.mojang.blaze3d.textures.FilterMode.NEAREST)));
+                                com.mojang.renderpearl.api.textures.FilterMode.NEAREST)));
                 try (NativeImage img = drawImage(ctx, material, new Matrix4f(), vc -> quad(vc, -1, -1, 1, 1, 0.5f, -1))) {
                     expect(ctx, "the raw view wins over the Identifier binding",
                             rgba(img, Canvas.SIZE / 4, Canvas.SIZE * 3 / 4), 1, 0, 0);
@@ -486,7 +486,7 @@ public class RenderTypePixelScenario implements UIScenario {
 
         try (RenderTypeGraphMaterial read = material(ctx, reader)) {
             ctx.check("the float texture binds", read.setTextureView(read.managedSamplerNames().iterator().next(),
-                    view, RenderSystem.getSamplerCache().getClampToEdge(com.mojang.blaze3d.textures.FilterMode.NEAREST)));
+                    view, RenderSystem.getSamplerCache().getClampToEdge(com.mojang.renderpearl.api.textures.FilterMode.NEAREST)));
             return draw(ctx, read, C, C);
         }
     }

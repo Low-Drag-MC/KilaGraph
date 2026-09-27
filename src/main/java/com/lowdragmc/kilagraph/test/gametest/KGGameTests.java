@@ -300,19 +300,7 @@ public final class KGGameTests {
      */
     public static TestData<Holder<TestEnvironmentDefinition<?>>> defaultTestData(
             Holder<TestEnvironmentDefinition<?>> environment, String structurePath, int maxTicks) {
-        return new TestData<>(
-                environment,
-                structureId(structurePath),
-                maxTicks,
-                0,
-                true,
-                Rotation.NONE,
-                false,
-                1,
-                1,
-                false,
-                0
-        );
+        return new TestData<>(environment, structureId(structurePath), maxTicks, 0, true, Rotation.NONE);
     }
 
     /**

@@ -1,6 +1,5 @@
 package com.lowdragmc.kilagraph.mixin.iris;
 
-import com.lowdragmc.lowdraglib2.Platform;
 import com.mojang.logging.LogUtils;
 import net.neoforged.fml.loading.LoadingModList;
 import org.objectweb.asm.tree.ClassNode;
@@ -27,6 +26,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public class IrisMixinPlugin implements IMixinConfigPlugin {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+
+    /**
+     * Whether the Iris integration has been ported to this Minecraft version. It was built on 26.2's Iris and
+     * GL backend; 26.3 replaced that backend (renderpearl) and no NeoForge Iris 26.3 exists yet to port and
+     * test it against, so it stays off: no mixin applies and {@code IrisCompat.ENABLED} is false.
+     */
+    public static final boolean INTEGRATION_PORTED = false;
 
     /** Simple names of our mixins whose class transform completed ({@code postApply} fired). Static because
      *  the mixin service instantiates the plugin, not us. */
@@ -64,12 +70,10 @@ public class IrisMixinPlugin implements IMixinConfigPlugin {
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         // Kill-switch: read the property directly (this runs at mixin-bootstrap; must not load IrisCompat,
         // which reads the same property for the runtime paths).
-        if (!irisLoaded || Boolean.getBoolean("kilagraph.iris.disabled")) return false;
-        // MixinGlCommandEncoder only works around dev-only Iris crashes (GL draw validation) — skip it outside dev.
-        // NB: mixinClassName is OUR mixin (the 2nd arg); targetClassName is the Iris class being transformed.
-        boolean apply = !mixinClassName.endsWith("MixinGlCommandEncoder") || Platform.isDevEnv();
-        LOGGER.debug("[KilaGraph][Iris] shouldApplyMixin {} -> {} (apply={})", mixinClassName, targetClassName, apply);
-        return apply;
+        if (!irisLoaded || !INTEGRATION_PORTED || Boolean.getBoolean("kilagraph.iris.disabled")) return false;
+        // NB: mixinClassName is OUR mixin (the 2nd arg); targetClassName is the class being transformed.
+        LOGGER.debug("[KilaGraph][Iris] shouldApplyMixin {} -> {}", mixinClassName, targetClassName);
+        return true;
     }
 
     /** Whether the mixin with this simple class name (e.g. {@code "MixinShaderCreator"}) applied to its

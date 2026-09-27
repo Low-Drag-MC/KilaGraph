@@ -2,7 +2,7 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'idea'
-    id 'net.neoforged.moddev' version '2.0.141'
+    id 'net.neoforged.moddev' version '2.0.147'
     id 'io.freefair.lombok' version '9.2.0'
 }
 
@@ -161,14 +161,15 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 dependencies {
     implementation("com.lowdragmc.ldlib2:ldlib2-neoforge-${minecraft_version_vague}:${ldlib2_version}")
 
-    // Iris + Sodium: OpenGL-only, so left off a Vulkan run
+    // Sodium: OpenGL-only, so left off a Vulkan run
     compileOnly("net.caffeinemc:sodium-neoforge:${sodium_version}")
+    // Iris has no NeoForge 26.3 build yet, so the Iris integration is dormant: it compiles against the Fabric
+    // build (MC 26.x is unobfuscated, so the classes and signatures match) and Iris stays off the run classpath.
     compileOnly("maven.modrinth:iris:${iris_version}")
     if (graphicsBackendIsVulkan) {
-        logger.lifecycle("KilaGraph: Vulkan run, Iris/Sodium left off the classpath")
+        logger.lifecycle("KilaGraph: Vulkan run, Sodium left off the classpath")
     } else {
         localRuntime("net.caffeinemc:sodium-neoforge:${sodium_version}")
-        localRuntime("maven.modrinth:iris:${iris_version}")
     }
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
@@ -250,3 +251,6 @@ idea {
         downloadJavadoc = true
     }
 }
+
+// TEMP(port-26.3): show every compile error
+tasks.withType(JavaCompile).configureEach { options.compilerArgs += ['-Xmaxerrs', '100000', '-XDshould-stop.ifError=FLOW'] }

@@ -16,7 +16,7 @@ import com.lowdragmc.lowdraglib2.uitest.ScenarioBuilder;
 import com.lowdragmc.lowdraglib2.uitest.ScenarioOptions;
 import com.lowdragmc.lowdraglib2.uitest.TestContext;
 import com.lowdragmc.lowdraglib2.uitest.UIScenario;
-import com.mojang.blaze3d.PrimitiveTopology;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 
 /** The preview panel compiles the default graph into a live pipeline and draws it without a backend error,
  *  then again after an edit. Run it on both backends ({@code -PgraphicsBackend=vulkan}, headless). */

@@ -1,8 +1,8 @@
 package com.lowdragmc.kilagraph.rendertype.runtime;
 
 import com.lowdragmc.kilagraph.rendertype.compiler.InstanceAttribute;
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashMap;

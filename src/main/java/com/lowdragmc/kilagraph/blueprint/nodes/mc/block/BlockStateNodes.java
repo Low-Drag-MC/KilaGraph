@@ -7,6 +7,7 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.network.chat.Component;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Mirror;
@@ -97,7 +98,8 @@ public final class BlockStateNodes {
             ctx.setOutput("solid", s.isSolid());
             ctx.setOutput("liquid", s.liquid());
             ctx.setOutput("canOcclude", s.canOcclude());
-            ctx.setOutput("blocksMotion", s.blocksMotion());
+            // 26.3 made "blocks motion" the data-driven blocks_motion tag.
+            ctx.setOutput("blocksMotion", s.is(BlockTags.BLOCKS_MOTION));
             ctx.setOutput("hasBlockEntity", s.hasBlockEntity());
             ctx.setOutput("randomlyTicking", s.isRandomlyTicking());
             ctx.setOutput("lightEmission", s.getLightEmission());

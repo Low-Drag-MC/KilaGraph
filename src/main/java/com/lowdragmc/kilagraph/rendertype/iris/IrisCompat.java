@@ -1,9 +1,9 @@
 package com.lowdragmc.kilagraph.rendertype.iris;
 
 import com.lowdragmc.kilagraph.mixin.iris.IrisMixinPlugin;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.mojang.logging.LogUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -25,11 +25,13 @@ public final class IrisCompat {
     /** Whether Iris is on the classpath. Checked without initializing the class (no side effects). */
     public static final boolean LOADED = detect();
 
-    /** Master kill-switch: Iris present <em>and</em> the integration not disabled via
+    /** Master kill-switch: Iris present, the integration ported to this Minecraft version
+     *  ({@link IrisMixinPlugin#INTEGRATION_PORTED}) <em>and</em> not disabled via
      *  {@code -Dkilagraph.iris.disabled=true}. Read once at class init (toggling requires a restart);
-     *  {@code IrisMixinPlugin} reads the same property independently at mixin-bootstrap, so with the switch
+     *  {@code IrisMixinPlugin} reads the same gates independently at mixin-bootstrap, so with the switch
      *  off neither the mixins nor any runtime path runs — KilaGraph behaves as if Iris were absent. */
-    public static final boolean ENABLED = LOADED && !Boolean.getBoolean("kilagraph.iris.disabled");
+    public static final boolean ENABLED = LOADED && IrisMixinPlugin.INTEGRATION_PORTED
+            && !Boolean.getBoolean("kilagraph.iris.disabled");
 
     /** Pipelines already handed to {@code IrisApi.assignPipeline}. Iris throws if a pipeline is assigned
      *  twice, and one cached pipeline (per content hash) is shared by many materials (preview + in-world),
@@ -63,6 +65,13 @@ public final class IrisCompat {
     private static int failedReloadAttempts;
     /** The Iris pipeline instance we last saw (weak — never pin a destroyed pipeline), to detect swaps. */
     private static WeakReference<Object> lastPipeline = new WeakReference<>(null);
+
+    static {
+        if (LOADED && !IrisMixinPlugin.INTEGRATION_PORTED) {
+            LOGGER.warn("[KilaGraph][Iris] Iris is installed, but the KilaGraph integration is not ported to this "
+                    + "Minecraft version yet: graph materials render with their own shader, unlit by the shaderpack.");
+        }
+    }
 
     private IrisCompat() {}
 

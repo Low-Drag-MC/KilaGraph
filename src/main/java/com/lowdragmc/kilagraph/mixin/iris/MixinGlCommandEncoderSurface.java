@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * whatever program is current, so it is harmless for non-Iris draws (it no-ops unless our geometry is the
  * one being drawn — see {@link IrisSurfaceUniform}).</p>
  */
-@Mixin(targets = "com.mojang.blaze3d.opengl.GlCommandEncoder", remap = false)
+@Mixin(targets = "com.mojang.renderpearl.backend.opengl.GlCommandEncoder", remap = false)
 public class MixinGlCommandEncoderSurface {
 
     @Inject(method = "trySetup", at = @At("RETURN"), remap = false)

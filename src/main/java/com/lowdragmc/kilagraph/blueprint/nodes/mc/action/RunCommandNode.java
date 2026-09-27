@@ -99,9 +99,12 @@ public class RunCommandNode extends ActionNode {
         // The result callback is the only way to learn what the command returned: 1.21 runs commands
         // through an execution queue and performPrefixedCommand discards the result on its own.
         var outcome = new Outcome();
+        // 26.3 names a source either by a constant or by its entity, never both: run as the executor (named
+        // after it, as `execute as` does) when there is one, else as "KilaGraph".
         CommandSourceStack source = new CommandSourceStack(
-                collector, origin, rotation, world, PERMISSION_SET,
-                "KilaGraph", Component.literal("KilaGraph"), server, executor)
+                collector, origin, rotation, world, PERMISSION_SET, Component.literal("KilaGraph"), server);
+        if (executor != null) source = source.withEntity(executor);
+        source = source
                 .withCallback((success, value) -> {
                     outcome.success = success;
                     outcome.result = value;

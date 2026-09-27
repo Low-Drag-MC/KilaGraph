@@ -1,7 +1,7 @@
 package com.lowdragmc.kilagraph.mixin.client;
 
 import com.lowdragmc.kilagraph.rendertype.runtime.DynamicShaderSourceRegistry;
-import com.mojang.blaze3d.shaders.ShaderType;
+import com.mojang.renderpearl.api.pipeline.ShaderType;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;

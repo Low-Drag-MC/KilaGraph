@@ -3,7 +3,7 @@ package com.lowdragmc.kilagraph.rendertype.preview;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormatElement;
+import com.mojang.renderpearl.api.vertex.VertexFormatElement;
 
 import java.util.HashMap;
 import java.util.Map;

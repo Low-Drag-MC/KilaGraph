@@ -1,6 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.runtime;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 import org.jetbrains.annotations.Nullable;
 
