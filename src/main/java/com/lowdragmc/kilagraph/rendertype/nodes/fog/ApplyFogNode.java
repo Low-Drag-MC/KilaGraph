@@ -46,7 +46,7 @@ public class ApplyFogNode extends ShaderNode {
             return;
         }
         // Inline mirrors of fog.glsl's functions (FogGlsl) + the KG_Fog slice-view for the parameter
-        // defaults — no #moj_import anywhere in the fragment path (unified-UBO policy).
+        // defaults — no #include anywhere in the fragment path (unified-UBO policy).
         ctx.function("linear_fog_value", com.lowdragmc.kilagraph.rendertype.compiler.FogGlsl.FN_LINEAR_FOG_VALUE);
         ctx.function("total_fog_value", com.lowdragmc.kilagraph.rendertype.compiler.FogGlsl.FN_TOTAL_FOG_VALUE);
         ctx.function("apply_fog", com.lowdragmc.kilagraph.rendertype.compiler.FogGlsl.FN_APPLY_FOG);

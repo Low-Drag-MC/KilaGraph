@@ -12,7 +12,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
 /**
- * The GLSL built-in {@code gl_InstanceID} — the index of the current instance within an instanced draw
+ * The GLSL built-in {@code gl_InstanceIndex} — the index of the current instance within an instanced draw
  * (an {@code int}; {@code 0} for non-instanced draws). Stage-agnostic (default
  * {@link com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity#ANY}): the built-in itself only exists in
  * the vsh, so the vertex stage reads it directly while the fragment stage reads it through an auto-forwarded
@@ -35,9 +35,11 @@ public class InstanceIdNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        // vsh: gl_InstanceID directly. fsh: a `flat in int kg_instanceId` fed by the vsh. preview: constant 0.
+        // vsh: gl_InstanceIndex directly (every stage is compiled as Vulkan GLSL, which has no gl_InstanceID; our
+        // draws start at instance 0, so it is the instance id on both backends). fsh: a `flat in int kg_instanceId`
+        // fed by the vsh. preview: constant 0.
         ctx.output("out", ctx.varyingInput("kg_instanceId", GlslType.INT,
-                () -> new ShaderExpr("gl_InstanceID", GlslType.INT),
+                () -> new ShaderExpr("gl_InstanceIndex", GlslType.INT),
                 new ShaderExpr("0", GlslType.INT)));
     }
 
@@ -45,7 +47,7 @@ public class InstanceIdNode extends ShaderNode {
     public String glslExample() {
         return """
                 // vertex shader
-                out = gl_InstanceID;
+                out = gl_InstanceIndex;
 
                 // fragment shader (auto-forwarded)
                 flat in int kg_instanceId;""";

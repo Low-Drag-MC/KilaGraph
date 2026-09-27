@@ -32,7 +32,7 @@ public class GlobalsUboNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        // KG_McGlobals is a slice-view of Minecraft's own Globals buffer (identical values, no #moj_import)
+        // KG_McGlobals is a slice-view of Minecraft's own Globals buffer (identical values, no #include)
         // — keeps graphs reading these fields injectable under an Iris shaderpack.
         ctx.useUniformBlock(com.lowdragmc.kilagraph.rendertype.runtime.KGMcGlobalsUniforms.BLOCK);
         String g = com.lowdragmc.kilagraph.rendertype.runtime.KGMcGlobalsUniforms.UBO_INSTANCE;

@@ -1,3 +1,6 @@
+#ifndef KILAGRAPH_KG_SCENE_GLSL
+#define KILAGRAPH_KG_SCENE_GLSL
+
 // KilaGraph scene-depth helpers. Reconstruct linear depth from a raw hardware depth sample and the
 // inverse projection matrix (KG_Transforms.IProjMat, clip->view). Using the actual inverse projection
 // makes this robust to the projection convention (reversed-Z etc.) - we never hardcode near/far.
@@ -28,3 +31,5 @@ float kg_linear01_depth(float rawDepth, mat4 iproj, vec2 zRemap) {
     float nearD = min(end0, end1);
     return (kg_eye_depth(rawDepth, iproj, zRemap) - nearD) / (max(end0, end1) - nearD);
 }
+
+#endif

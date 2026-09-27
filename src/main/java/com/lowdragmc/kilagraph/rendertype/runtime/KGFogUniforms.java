@@ -8,10 +8,10 @@ import org.jetbrains.annotations.Nullable;
  * A KilaGraph-named <b>view</b> of Minecraft's own {@code Fog} uniform buffer: {@link #slice()} returns
  * {@code RenderSystem.getShaderFog()} — the very slice the vanilla renderer uploads each frame — bound
  * under the block name {@code KG_Fog}. No CPU mirroring, no second upload; the values are identical to
- * the {@code #moj_import <minecraft:fog.glsl>} block by construction.
+ * the {@code #include <minecraft:fog.glsl>} block by construction.
  *
  * <p>Why a rename instead of the include: an injected Iris shaderpack program can't resolve
- * {@code #moj_import} (a Minecraft include in the fragment stage rejects the whole graph from injection),
+ * {@code #include} (a Minecraft include in the fragment stage rejects the whole graph from injection),
  * and the pack's own GLSL owns Minecraft's block names. Declaring the same std140 layout under our own
  * name and binding Minecraft's slice to it works on both the vanilla pipeline (the generic
  * {@link ShaderUniformBlock} bind path) and the injected program ({@code IrisSurfaceUniform} binds

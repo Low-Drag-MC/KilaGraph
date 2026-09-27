@@ -59,7 +59,7 @@ public final class KGEngineUniforms {
 
     /** GLSL accessor for the normalised day fraction — same value as Minecraft's {@code Globals.GameTime}
      *  ({@code (gameTime % 24000 + partialTick) / 24000}), carried in OUR block so the Game Time node stays
-     *  injectable under an Iris shaderpack (a {@code #moj_import} include would reject the whole graph). */
+     *  injectable under an Iris shaderpack (a {@code #include} include would reject the whole graph). */
     public static String gameTimeAccessor() {
         return UBO_INSTANCE + ".GameTime";
     }

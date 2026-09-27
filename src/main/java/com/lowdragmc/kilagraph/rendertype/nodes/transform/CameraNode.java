@@ -48,7 +48,7 @@ public class CameraNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         // All camera data from KilaGraph's own KG_Transforms block (same values as Minecraft's
-        // Globals/Projection, no #moj_import) — keeps camera-reading graphs injectable under a shaderpack.
+        // Globals/Projection, no #include) — keeps camera-reading graphs injectable under a shaderpack.
         // Absolute world camera position, MC's exact precision-split form: camPos = block - offset.
         ctx.output("Position", new ShaderExpr("(vec3("
                 + ctx.transformField("CameraBlockPos", GlslType.VEC3).code() + ") - "

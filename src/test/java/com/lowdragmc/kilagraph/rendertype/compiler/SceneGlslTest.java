@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Pins {@link SceneGlsl}'s Java constants to {@code kg_scene.glsl}: the same helpers exist in two forms —
- * the {@code #moj_import} include used by the normal pipeline and {@code addFunction} constants used in
+ * the {@code #include} include used by the normal pipeline and {@code addFunction} constants used in
  * Iris-injection mode (an injected shaderpack program can't resolve includes). If someone edits the include
  * without updating the constants (or vice versa), vanilla and shaderpack rendering would silently diverge.
  */

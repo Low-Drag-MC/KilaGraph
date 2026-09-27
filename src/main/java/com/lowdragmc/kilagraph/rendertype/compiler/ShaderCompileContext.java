@@ -75,7 +75,7 @@ public final class ShaderCompileContext {
     /** Whether this is an Iris-injection compile (compiling the fragment into a {@code kg_surface} function
      *  for a shaderpack program). Nodes needing Minecraft engine state the pack program can't provide — fog
      *  especially (the shaderpack applies its own in composite) — should pass through here so the graph stays
-     *  injectable rather than pulling an unsupported {@code #moj_import} that rejects it. */
+     *  injectable rather than pulling an unsupported {@code #include} that rejects it. */
     public boolean isInjection() {
         return compiler.isInjection();
     }
@@ -129,7 +129,7 @@ public final class ShaderCompileContext {
 
     // ---- emission helpers --------------------------------------------------------------------
 
-    /** Register a {@code #moj_import <path>} include in the current stage. */
+    /** Register a {@code #include <path>} include in the current stage. */
     public void include(String path) {
         compiler.addInclude(path);
     }

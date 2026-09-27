@@ -26,7 +26,7 @@ public class ProjectionUboNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         // KG_Transforms carries the same forward projection (recovered CPU-side each frame) — identical
-        // value, no #moj_import, so the graph stays injectable under an Iris shaderpack.
+        // value, no #include, so the graph stays injectable under an Iris shaderpack.
         ctx.output("ProjMat", ctx.transformField("ProjMat", GlslType.MAT4));
     }
 }

@@ -32,7 +32,7 @@ public class FogUboNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        // KG_Fog is a slice-view of Minecraft's own Fog buffer (identical values, no #moj_import) — keeps
+        // KG_Fog is a slice-view of Minecraft's own Fog buffer (identical values, no #include) — keeps
         // graphs reading fog parameters injectable under an Iris shaderpack. The values are VANILLA fog
         // parameters; a shaderpack still applies its own fog in composite regardless.
         ctx.output("FogColor", ctx.fogField("FogColor", GlslType.VEC4));

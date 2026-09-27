@@ -600,12 +600,12 @@ public final class ShaderCompilerGameTest {
         helper.succeed();
     }
 
-    /** The ID nodes are now stage-agnostic ({@code ANY}): the vsh reads {@code gl_VertexID}/{@code gl_InstanceID}
+    /** The ID nodes are now stage-agnostic ({@code ANY}): the vsh reads {@code gl_VertexIndex}/{@code gl_InstanceIndex}
      *  directly, and the fragment stage receives them through an auto-forwarded {@code flat int} varying (int
      *  varyings must be {@code flat}). */
     public static void idNodesWorkInBothStages(GameTestHelper helper) {
         // Fragment stage: Vertex ID → fragment emission. No longer a stage error — it's forwarded as a flat
-        // int varying, so the fsh declares `flat in int kg_vertexId` and the vsh writes it from gl_VertexID.
+        // int varying, so the fsh declares `flat in int kg_vertexId` and the vsh writes it from gl_VertexIndex.
         RenderTypeGraph frag = new RenderTypeGraph();
         NodeModel fragEmission = addBlock(frag, frag.getFragmentStageModel(), FragmentEmissionBlock.class);
         NodeModel vId = addNode(frag, VertexIdNode.class);
@@ -613,10 +613,10 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph fragCompiled = compile(frag);
         assertFalse(helper, "vertex id in the fragment stage is no longer a stage error", fragCompiled.hasStageErrors());
         assertTrue(helper, "fsh declares a flat int varying", fragCompiled.fragmentSource().contains("flat in int kg_vertexId"));
-        assertTrue(helper, "vsh forwards gl_VertexID into the varying", fragCompiled.vertexSource().contains("kg_vertexId = gl_VertexID"));
+        assertTrue(helper, "vsh forwards gl_VertexIndex into the varying", fragCompiled.vertexSource().contains("kg_vertexId = gl_VertexIndex"));
 
         // Vertex stage: Instance ID → vertex varying block → consumed in fragment. The vsh reads the built-in
-        // directly (no kg_instanceId forwarding varying is created), so gl_InstanceID appears in the vsh.
+        // directly (no kg_instanceId forwarding varying is created), so gl_InstanceIndex appears in the vsh.
         RenderTypeGraph vert = new RenderTypeGraph();
         NodeModel varying = addBlock(vert, vert.getVertexStageModel(), VaryingCustomFloatBlock.class);
         NodeModel instanceId = addNode(vert, InstanceIdNode.class);
@@ -625,7 +625,7 @@ public final class ShaderCompilerGameTest {
         wire(vert, vertEmission.getInputsById().get("color"), varying.getOutputsById().get("value"));
         CompiledShaderGraph vertCompiled = compile(vert);
         assertFalse(helper, "instance id in the vertex stage is not a stage error", vertCompiled.hasStageErrors());
-        assertTrue(helper, "vsh references gl_InstanceID directly", vertCompiled.vertexSource().contains("gl_InstanceID"));
+        assertTrue(helper, "vsh references gl_InstanceIndex directly", vertCompiled.vertexSource().contains("gl_InstanceIndex"));
         assertFalse(helper, "no forwarding varying created for a vertex-only read", vertCompiled.fragmentSource().contains("kg_instanceId"));
         helper.succeed();
     }
@@ -1151,7 +1151,7 @@ public final class ShaderCompilerGameTest {
     /**
      * The unified-UBO policy end-to-end: every formerly-rejecting node family (Fog UBO/values, Lighting,
      * MC Globals, Camera, Projection, Transform, Game Time) now compiles an injection snippet — nodes read
-     * KilaGraph blocks (slice-views of Minecraft's buffers), never a fragment {@code #moj_import}. Also
+     * KilaGraph blocks (slice-views of Minecraft's buffers), never a fragment {@code #include}. Also
      * pins the vanilla fragment GLSL to be include-free for these graphs (single-source unification), and
      * the Overlay/LightMap neutral degrade.
      */
@@ -1248,7 +1248,7 @@ public final class ShaderCompilerGameTest {
             for (String include : new String[]{"minecraft:fog.glsl", "minecraft:light.glsl",
                     "minecraft:globals.glsl", "minecraft:projection.glsl"}) {
                 assertFalse(helper, c.name() + " vanilla fsh does not import " + include,
-                        fsh.contains("#moj_import <" + include + ">"));
+                        fsh.contains("#include <" + include + ">"));
             }
         }
 
@@ -1973,7 +1973,7 @@ public final class ShaderCompilerGameTest {
         CompiledShaderGraph compiled = compile(new RenderTypeGraph());
         String vsh = compiled.vertexSource();
         assertTrue(helper, "vsh applies minecraft_mix_light by default", vsh.contains("minecraft_mix_light("));
-        assertTrue(helper, "vsh imports light.glsl", vsh.contains("#moj_import <minecraft:light.glsl>"));
+        assertTrue(helper, "vsh imports light.glsl", vsh.contains("#include <minecraft:light.glsl>"));
         helper.succeed();
     }
 
@@ -2849,7 +2849,7 @@ public final class ShaderCompilerGameTest {
         assertTrue(helper, "samples the captured scene depth", fsh.contains("texture(KG_SceneDepth"));
         assertTrue(helper, "screen position derives uv from gl_FragCoord", fsh.contains("gl_FragCoord"));
         assertTrue(helper, "linear01 imports the scene depth helper",
-                fsh.contains("#moj_import <kilagraph:kg_scene.glsl>"));
+                fsh.contains("#include <kilagraph:kg_scene.glsl>"));
         assertTrue(helper, "linear01 reconstructs via IProjMat",
                 fsh.contains("kg_linear01_depth(") && fsh.contains("IProjMat"));
         assertTrue(helper, "flags scene colour use", compiled.usesSceneColor());

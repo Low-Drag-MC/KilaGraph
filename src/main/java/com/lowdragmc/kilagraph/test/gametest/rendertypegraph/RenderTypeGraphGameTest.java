@@ -620,7 +620,7 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "vsh outputs uv0 varying", vsh.contains("out vec2 uv0;"));
         assertTrue(helper, "vsh outputs spherical distance varying", vsh.contains("out float sphericalVertexDistance;"));
         assertTrue(helper, "vsh assigns uv0 from UV0", vsh.contains("uv0 = UV0;"));
-        assertTrue(helper, "vsh imports projection", vsh.contains("#moj_import <minecraft:projection.glsl>"));
+        assertTrue(helper, "vsh imports projection", vsh.contains("#include <minecraft:projection.glsl>"));
 
         // Fragment shader
         assertTrue(helper, "fsh declares version", fsh.startsWith("#version 330"));
@@ -631,11 +631,11 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "fsh declares the texture-constant sampler uniform", fsh.contains("uniform sampler2D kg_tex"));
         assertTrue(helper, "fsh applies fog", fsh.contains("apply_fog("));
         // Unified-UBO policy: the fog functions are inlined (FogGlsl) and the parameters come from the
-        // KG_Fog slice-view of Minecraft's Fog buffer — no fog #moj_import in the fragment anymore.
+        // KG_Fog slice-view of Minecraft's Fog buffer — no fog #include in the fragment anymore.
         assertTrue(helper, "fsh inlines the fog functions", fsh.contains("vec4 apply_fog("));
         assertTrue(helper, "fsh reads the KG_Fog slice-view", fsh.contains("kg_fog."));
-        assertFalse(helper, "fsh no longer imports fog", fsh.contains("#moj_import <minecraft:fog.glsl>"));
-        assertTrue(helper, "fsh imports dynamictransforms", fsh.contains("#moj_import <minecraft:dynamictransforms.glsl>"));
+        assertFalse(helper, "fsh no longer imports fog", fsh.contains("#include <minecraft:fog.glsl>"));
+        assertTrue(helper, "fsh imports dynamictransforms", fsh.contains("#include <minecraft:dynamictransforms.glsl>"));
         assertTrue(helper, "fsh writes fragColor", fsh.contains("fragColor = vec4("));
 
         // Pipeline metadata

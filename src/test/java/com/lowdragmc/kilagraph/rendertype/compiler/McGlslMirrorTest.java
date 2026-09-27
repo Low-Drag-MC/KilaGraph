@@ -94,8 +94,8 @@ class McGlslMirrorTest {
         String globals = mcInclude("globals.glsl");
         String kg = com.lowdragmc.kilagraph.rendertype.runtime.KGMcGlobalsUniforms.declareGlsl();
         int last = -1;
-        for (String field : new String[]{"ivec3 CameraBlockPos;", "vec3 CameraOffset;", "vec2 ScreenSize;",
-                "float GlintAlpha;", "float GameTime;", "int MenuBlurRadius;", "int UseRgss;"}) {
+        for (String field : new String[]{"ivec3 CameraBlockPos;", "float GlintAlpha;", "vec3 CameraOffset;",
+                "float GameTime;", "vec2 ScreenSize;", "int MenuBlurRadius;", "int UseRgss;"}) {
             assertTrue(globals.contains(field), "globals.glsl lost field: " + field);
             int at = kg.indexOf(field);
             assertTrue(at > last, "KG_McGlobals field order diverged at: " + field);

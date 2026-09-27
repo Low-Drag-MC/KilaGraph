@@ -2,7 +2,7 @@ package com.lowdragmc.kilagraph.rendertype.compiler;
 
 /**
  * The {@code kg_scene.glsl} depth helpers as {@code addFunction}-registrable Java constants, for
- * <b>Iris-injection mode</b>: an injected shaderpack program can't resolve {@code #moj_import} includes, so
+ * <b>Iris-injection mode</b>: an injected shaderpack program can't resolve {@code #include} includes, so
  * the same helpers are emitted inline instead (deduped by name across surfaces by the injector). The bodies
  * mirror {@code assets/kilagraph/shaders/include/kg_scene.glsl} <b>verbatim</b> — {@code SceneGlslTest} pins
  * the two copies together so vanilla and shaderpack rendering can't silently diverge.

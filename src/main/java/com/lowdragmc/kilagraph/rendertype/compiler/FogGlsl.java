@@ -3,7 +3,7 @@ package com.lowdragmc.kilagraph.rendertype.compiler;
 /**
  * Minecraft's {@code fog.glsl} <b>functions</b> as {@code addFunction}-registrable constants (the
  * {@code Fog} UBO itself is exposed as the {@code KG_Fog} slice-view block — see
- * {@code KGFogUniforms}). Emitting the functions inline instead of {@code #moj_import}-ing the include
+ * {@code KGFogUniforms}). Emitting the functions inline instead of {@code #include}-ing the include
  * keeps fog-using graphs injectable under an Iris shaderpack (a Minecraft include in the fragment stage
  * rejects the whole graph). Bodies mirror the include <b>verbatim</b> — {@code FogGlslTest} pins the two
  * copies together. Register in dependency order ({@code linear_fog_value} first).

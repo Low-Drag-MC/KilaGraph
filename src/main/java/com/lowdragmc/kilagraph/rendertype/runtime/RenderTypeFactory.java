@@ -265,8 +265,8 @@ public final class RenderTypeFactory {
 
     private static RenderPipeline buildPipeline(CompiledShaderGraph compiled) {
         Identifier shaderId = DynamicShaderSourceRegistry.shaderId(compiled.contentHash());
-        // Resolve #moj_import the same way ShaderManager does for asset shaders — the GL device
-        // compiles whatever the registry returns, and the driver can't understand #moj_import.
+        // Resolve #include the same way ShaderManager does for asset shaders — the GL device
+        // compiles whatever the registry returns, and the driver can't understand #include.
         String vsh = GlslImportProcessor.process(compiled.vertexSource());
         String fsh = GlslImportProcessor.process(compiled.fragmentSource());
         DynamicShaderSourceRegistry.register(shaderId, vsh, fsh);

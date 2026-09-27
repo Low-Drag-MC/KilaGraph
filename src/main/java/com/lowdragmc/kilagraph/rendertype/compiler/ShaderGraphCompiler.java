@@ -51,7 +51,9 @@ import java.util.function.UnaryOperator;
  */
 public class ShaderGraphCompiler {
 
-    private static final String GLSL_VERSION = "#version 330";
+    /** Every stage is compiled to SPIR-V (shaderc) on both backends; explicit varying locations on GLSL 330 need
+     *  separate shader objects, as in Minecraft's own shaders. */
+    private static final String GLSL_PRELUDE = "#version 330\n#extension GL_ARB_separate_shader_objects : require\n";
 
     /** Per-stage emission state. */
     private static final class StageScope {
@@ -363,7 +365,7 @@ public class ShaderGraphCompiler {
      * samplers, and KilaGraph-managed UBOs — all bound onto the shaderpack program at draw.
      *
      * <p>Returns {@code null} when the graph is not injection-compatible: its fragment needs a Minecraft
-     * engine include ({@code #moj_import}, i.e. Fog/Lighting/Projection) or the captured scene
+     * engine include ({@code #include}, i.e. Fog/Lighting/Projection) or the captured scene
      * ({@code KG_SceneColor/Depth}), or a stage-affinity error was found. Such a material falls back to the
      * M0 passthrough under Iris. Call on a fresh compiler instance (it mutates stage scope state).</p>
      */
@@ -404,7 +406,7 @@ public class ShaderGraphCompiler {
         }
         if (!fragment.includes.isEmpty() || !stageErrors.isEmpty()) {
             // Name the culprit — pairs with IrisSurfaceRegistry's "no injection snippet -> passthrough" line
-            // (which only knows the hash). An include here means some node used a #moj_import-backed
+            // (which only knows the hash). An include here means some node used a #include-backed
             // Minecraft uniform in the fragment; the include id tells WHICH node family to make injectable.
             Kilagraph.LOGGER.info("[KilaGraph][Iris] injection snippet rejected: fragment includes={}, stageErrors={}",
                     fragment.includes, stageErrors.values());
@@ -896,7 +898,7 @@ public class ShaderGraphCompiler {
 
     /** A vanilla fog parameter (e.g. {@code FogColor}, {@code FogEnvironmentalStart}) from the
      *  {@code KG_Fog} slice-view of Minecraft's own Fog buffer (see {@code KGFogUniforms} — identical
-     *  values, no {@code #moj_import}, so fog-reading graphs stay injectable under a shaderpack). */
+     *  values, no {@code #include}, so fog-reading graphs stay injectable under a shaderpack). */
     ShaderExpr fogField(String name, GlslType type) {
         useUniformBlock(KGFogUniforms.BLOCK);
         return new ShaderExpr(KGFogUniforms.accessor(name), type);
@@ -1397,7 +1399,7 @@ public class ShaderGraphCompiler {
 
     /** Minecraft's builtin {@code Globals.GameTime} (day fraction). Bound by {@code bindDefaultUniforms}. */
     ShaderExpr mcGameTime() {
-        // Always KG_Globals (same day-fraction value as Minecraft's Globals.GameTime): a #moj_import include
+        // Always KG_Globals (same day-fraction value as Minecraft's Globals.GameTime): a #include include
         // would reject the whole graph under a shaderpack, and one unconditional source keeps every compile
         // mode identical (the unified-UBO policy — nodes never read Minecraft blocks in the fragment path).
         useUniformBlock(KGEngineUniforms.BLOCK);
@@ -1501,6 +1503,10 @@ public class ShaderGraphCompiler {
 
     /** The fragment output array of a graph with colour targets; element 0 is the main target. */
     public static final String MRT_OUTPUTS = "kg_outputs";
+    /** Shader define of the pipeline variant that writes the extra colour targets (see {@link #MRT_OUTPUTS}). */
+    public static final String COLOR_TARGETS_DEFINE = "KG_COLOR_TARGETS";
+    /** Shader define of a premultiplied-alpha material's OIT pipelines: the accumulation wants straight alpha. */
+    public static final String PREMULTIPLIED_ALPHA_DEFINE = "KG_PREMULTIPLIED_ALPHA";
     /** Sampler name for the captured opaque scene colour (bound at draw from {@code SceneCaptureManager}). */
     public static final String SCENE_COLOR_SAMPLER = "KG_SceneColor";
     /** Sampler name for the captured opaque scene depth (bound at draw from {@code SceneCaptureManager}). */
@@ -1579,7 +1585,7 @@ public class ShaderGraphCompiler {
 
     /** Register the shared depth-linearisation helpers: the {@code kg_scene.glsl} include normally; under
      *  injection the same bodies inline via {@code addFunction} (an injected pack program can't resolve
-     *  {@code #moj_import}, and a non-empty include set rejects the snippet). Identical GLSL either way —
+     *  {@code #include}, and a non-empty include set rejects the snippet). Identical GLSL either way —
      *  {@code SceneGlslTest} pins the two copies together. */
     private void sceneDepthHelpers() {
         if (injection) {
@@ -2233,15 +2239,63 @@ public class ShaderGraphCompiler {
 
     // ---- assembly ----------------------------------------------------------------------------
 
+    /**
+     * Hands out consecutive shader interface locations. Every stage is compiled to SPIR-V with no automatic
+     * location mapping, so each vertex input, varying and fragment output carries an explicit
+     * {@code layout(location = N)}; one {@code mat4} takes four.
+     */
+    public static final class Locations {
+        private int next;
+
+        /** Reserve {@code count} consecutive locations and return the first. */
+        public int take(int count) {
+            int first = next;
+            next += count;
+            return first;
+        }
+
+        /** The first location not handed out yet. */
+        public int next() {
+            return next;
+        }
+    }
+
+    /** The {@code layout(location = N)} qualifier, with a trailing space. */
+    protected static String location(int location) {
+        return "layout(location = " + location + ") ";
+    }
+
+    /** Interface locations a varying of {@code type} takes (a {@code mat4} is four {@code vec4}s). */
+    private static int locationCount(GlslType type) {
+        return type == GlslType.MAT4 ? 4 : 1;
+    }
+
+    private static void appendIncludes(StringBuilder sb, StageScope scope) {
+        for (String inc : scope.includes) sb.append("#include <").append(inc).append(">\n");
+        if (!scope.includes.isEmpty()) sb.append('\n');
+    }
+
+    /** The vsh {@code out} / fsh {@code in} declarations, numbered in declaration order so both stages agree. */
+    private void appendVaryings(StringBuilder sb, String direction) {
+        if (varyings.isEmpty()) return;
+        sb.append('\n');
+        Locations locations = new Locations();
+        for (var e : varyings.entrySet()) {
+            sb.append(location(locations.take(locationCount(e.getValue()))));
+            if (e.getValue().requiresFlat() || flatVaryings.contains(e.getKey())) sb.append("flat ");
+            sb.append(direction).append(e.getValue().glsl()).append(' ').append(e.getKey()).append(";\n");
+        }
+    }
+
     private String assembleVertex() {
         StringBuilder sb = new StringBuilder();
-        sb.append(GLSL_VERSION).append("\n\n");
-        for (String inc : vertex.includes) sb.append("#moj_import <").append(inc).append(">\n");
-        if (!vertex.includes.isEmpty()) sb.append('\n');
-        sb.append(vertexInputsBlock());
+        sb.append(GLSL_PRELUDE).append('\n');
+        appendIncludes(sb, vertex);
+        Locations inputs = new Locations();
+        sb.append(vertexInputsBlock(inputs));
         for (InstanceAttribute attribute : instanceAttributes.values()) {
             for (int column = 0; column < attribute.type().columns; column++) {
-                sb.append("in ").append(attribute.type().columnGlsl()).append(' ')
+                sb.append(location(inputs.take(1))).append("in ").append(attribute.type().columnGlsl()).append(' ')
                         .append(attribute.attribName(column)).append(";\n");
             }
         }
@@ -2249,13 +2303,7 @@ public class ShaderGraphCompiler {
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append('\n').append(uniforms);
         appendUniformBlocks(sb, true);
-        if (!varyings.isEmpty()) {
-            sb.append('\n');
-            for (var e : varyings.entrySet()) {
-                if (e.getValue().requiresFlat() || flatVaryings.contains(e.getKey())) sb.append("flat ");
-                sb.append("out ").append(e.getValue().glsl()).append(' ').append(e.getKey()).append(";\n");
-            }
-        }
+        appendVaryings(sb, "out ");
         appendFunctions(sb, vertex);
         sb.append("\nvoid main() {\n");
         sb.append(vertexPrologue());
@@ -2264,12 +2312,16 @@ public class ShaderGraphCompiler {
     }
 
     /**
-     * The vertex-stage input declarations, emitted after the includes/builtin uniforms. Default: one
-     * {@code in <type> <name>;} per element of the graph's composed vertex format. A subclass whose inputs
-     * come from an include (declaring the attribute layouts itself) overrides this to emit its import instead.
+     * The vertex-stage input declarations, emitted after the includes. Default: one
+     * {@code layout(location = N) in <type> <name>;} per element of the graph's composed vertex format, taking
+     * its location from {@code locations}. The pipeline pairs a vertex-format element with the input of the same
+     * name, so any distinct locations work — but every location this block's inputs use must be taken from
+     * {@code locations}, since the instance-data inputs are numbered after them. A subclass whose inputs come
+     * from an include (declaring the attribute layouts itself) overrides this to emit its include and take the
+     * locations that include uses.
      */
-    protected String vertexInputsBlock() {
-        return vertexAttributes(graph.getSettings().vertexFormatElements());
+    protected String vertexInputsBlock(Locations locations) {
+        return vertexAttributes(graph.getSettings().vertexFormatElements(), locations);
     }
 
     /**
@@ -2282,10 +2334,15 @@ public class ShaderGraphCompiler {
     }
 
     private String assemblePreviewVertex() {
-        return GLSL_VERSION + "\n\n"
-                + "#moj_import <minecraft:dynamictransforms.glsl>\n"
-                + "#moj_import <minecraft:projection.glsl>\n\n"
-                + "in vec3 Position;\nin vec2 UV0;\nin vec3 Normal;\n\nout vec2 vUv;\nout vec3 vPos;\nout vec3 vNormal;\n\n"
+        return GLSL_PRELUDE + "\n"
+                + "#include <minecraft:dynamictransforms.glsl>\n"
+                + "#include <minecraft:projection.glsl>\n\n"
+                + "layout(location = 0) in vec3 Position;\n"
+                + "layout(location = 1) in vec2 UV0;\n"
+                + "layout(location = 2) in vec3 Normal;\n\n"
+                + "layout(location = 0) out vec2 vUv;\n"
+                + "layout(location = 1) out vec3 vPos;\n"
+                + "layout(location = 2) out vec3 vNormal;\n\n"
                 + "void main() {\n"
                 + "    vUv = UV0;\n"
                 + "    vPos = Position;\n"
@@ -2296,14 +2353,14 @@ public class ShaderGraphCompiler {
 
     private String assemblePreviewFragment(ShaderExpr color) {
         StringBuilder sb = new StringBuilder();
-        sb.append(GLSL_VERSION).append("\n\n");
-        for (String inc : fragment.includes) sb.append("#moj_import <").append(inc).append(">\n");
-        if (!fragment.includes.isEmpty()) sb.append('\n');
+        sb.append(GLSL_PRELUDE).append('\n');
+        appendIncludes(sb, fragment);
         appendStructDecls(sb, fragment);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
         appendUniformBlocks(sb, false);
-        sb.append("\nin vec2 vUv;\nin vec3 vPos;\nin vec3 vNormal;\n\nout vec4 fragColor;\n");
+        sb.append("\nlayout(location = 0) in vec2 vUv;\nlayout(location = 1) in vec3 vPos;\nlayout(location = 2) in vec3 vNormal;\n")
+                .append("\nlayout(location = 0) out vec4 fragColor;\n");
         appendFunctions(sb, fragment);
         sb.append("\nvoid main() {\n").append(fragment.body);
         sb.append("    fragColor = ").append(color.code()).append(";\n");
@@ -2311,30 +2368,39 @@ public class ShaderGraphCompiler {
         return sb.toString();
     }
 
+    /**
+     * The fragment shader. One source serves every pipeline built from it; the pipeline's defines pick the variant:
+     * <ul>
+     *   <li>{@code OIT} + {@code OIT_DEPTH_BOUNDS}/{@code OIT_TRANSMITTANCE} ({@code OIT_ALPHA_ONLY}): the surface's
+     *       alpha feeds Minecraft's order-independent transparency, which declares these phases' outputs itself;</li>
+     *   <li>{@code OIT_ACCUMULATE}: the colour is weighted by the transmittance in front of it;</li>
+     *   <li>{@link #COLOR_TARGETS_DEFINE}: the extra colour targets are written too — only in a pass that has them,
+     *       since a Minecraft pass has a single colour attachment.</li>
+     * </ul>
+     */
     private String assembleFragment(FragmentOutputs out) {
         StringBuilder sb = new StringBuilder();
-        sb.append(GLSL_VERSION).append("\n\n");
-        for (String inc : fragment.includes) sb.append("#moj_import <").append(inc).append(">\n");
-        if (!fragment.includes.isEmpty()) sb.append('\n');
+        sb.append(GLSL_PRELUDE).append('\n');
+        appendIncludes(sb, fragment);
+        sb.append("#ifdef OIT\n#include <minecraft:oit.glsl>\n#endif\n");
         appendStructDecls(sb, fragment);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
         appendUniformBlocks(sb, false);
-        if (!varyings.isEmpty()) {
-            for (var e : varyings.entrySet()) {
-                if (e.getValue().requiresFlat() || flatVaryings.contains(e.getKey())) sb.append("flat ");
-                sb.append("in ").append(e.getValue().glsl()).append(' ').append(e.getKey()).append(";\n");
-            }
-        }
-        // MRT: one output array, since Minecraft's Vulkan backend renumbers output variables by declaration order.
-        String mainOutput = "fragColor";
+        appendVaryings(sb, "in ");
+        sb.append("\n#ifndef OIT_ALPHA_ONLY\n");
         if (out.colorTargets.isEmpty()) {
-            sb.append("\nout vec4 fragColor;\n");
+            sb.append("layout(location = 0) out vec4 fragColor;\n");
         } else {
-            mainOutput = MRT_OUTPUTS + "[0]";
             int count = out.colorTargets.lastKey() + 1;
-            sb.append("\nlayout(location = 0) out vec4 ").append(MRT_OUTPUTS).append('[').append(count).append("];\n");
+            sb.append("#ifdef ").append(COLOR_TARGETS_DEFINE).append('\n')
+                    .append("layout(location = 0) out vec4 ").append(MRT_OUTPUTS).append('[').append(count).append("];\n")
+                    .append("#define fragColor ").append(MRT_OUTPUTS).append("[0]\n")
+                    .append("#else\n")
+                    .append("layout(location = 0) out vec4 fragColor;\n")
+                    .append("#endif\n");
         }
+        sb.append("#endif\n");
         appendFunctions(sb, fragment);
         sb.append("\nvoid main() {\n").append(fragment.body);
         String baseColor = out.baseColor != null ? out.baseColor.code() : "vec3(1.0)";
@@ -2347,29 +2413,48 @@ public class ShaderGraphCompiler {
         if (out.alphaDiscardCutoff != null) {
             sb.append("    if (kg_alpha < ").append(out.alphaDiscardCutoff.code()).append(") discard;\n");
         }
-        sb.append("    ").append(mainOutput).append(" = vec4(kg_baseColor, kg_alpha);\n");
-        for (var write : out.colorTargets.values()) {
-            sb.append("    ").append(MRT_OUTPUTS).append('[').append(write.target().location()).append("] = ")
-                    .append(convert(write.value(), GlslType.VEC4).code()).append(";\n");
+        sb.append("    vec4 kg_color = vec4(kg_baseColor, kg_alpha);\n");
+        // An additive surface never counts as opaque in the depth bounds, as in vanilla's additive OIT shaders.
+        sb.append("#ifdef OIT_ADDITIVE\n    kg_color.a = min(0.99, kg_color.a);\n#endif\n");
+        sb.append("#ifdef OIT_ALPHA_ONLY\n");
+        sb.append("    executeAlphaOnlyPhase(gl_FragCoord.z, kg_color.a);\n");
+        sb.append("#else\n");
+        sb.append("#ifdef OIT_ACCUMULATE\n");
+        // The accumulation premultiplies by alpha itself.
+        sb.append("#ifdef ").append(PREMULTIPLIED_ALPHA_DEFINE).append('\n')
+                .append("    kg_color.rgb /= max(kg_color.a, 0.0001);\n")
+                .append("#endif\n");
+        sb.append("    kg_color = sampleColorForAccumulation(kg_color);\n");
+        sb.append("#endif\n");
+        sb.append("    fragColor = kg_color;\n");
+        if (!out.colorTargets.isEmpty()) {
+            sb.append("#ifdef ").append(COLOR_TARGETS_DEFINE).append('\n');
+            for (var write : out.colorTargets.values()) {
+                sb.append("    ").append(MRT_OUTPUTS).append('[').append(write.target().location()).append("] = ")
+                        .append(convert(write.value(), GlslType.VEC4).code()).append(";\n");
+            }
+            sb.append("#endif\n");
         }
+        sb.append("#endif\n");
         sb.append("}\n");
         return sb.toString();
     }
 
     /**
      * The {@code in} vertex attribute declarations for the graph's composed vertex format. Each declared
-     * element contributes one {@code in <glslType> <attribName>;} line; the {@code attribName} is exactly
-     * the name {@link com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat} binds the element under, so
-     * the shader's inputs line up with the pipeline layout. Unknown keys are skipped.
+     * element contributes one {@code layout(location = N) in <glslType> <attribName>;} line; the
+     * {@code attribName} is exactly the name {@link com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat}
+     * binds the element under, which is how the pipeline pairs them. Unknown keys are skipped.
      */
-    private static String vertexAttributes(java.util.List<String> elementKeys) {
+    private static String vertexAttributes(java.util.List<String> elementKeys, Locations locations) {
         StringBuilder sb = new StringBuilder();
         var seen = new java.util.HashSet<String>();
         for (String key : elementKeys) {
             var e = com.lowdragmc.kilagraph.rendertype.format.KGVertexElements.get(key);
             if (e == null) continue;
             if (!seen.add(e.attribName())) continue; // never declare the same `in` twice
-            sb.append("in ").append(e.glslType()).append(' ').append(e.attribName()).append(";\n");
+            sb.append(location(locations.take(1))).append("in ").append(e.glslType()).append(' ')
+                    .append(e.attribName()).append(";\n");
         }
         return sb.toString();
     }

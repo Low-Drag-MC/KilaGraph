@@ -36,10 +36,10 @@ public final class KGMcGlobalsUniforms {
     public static String declareGlsl() {
         return "layout(std140) uniform " + UBO_NAME + " {\n"
                 + "    ivec3 CameraBlockPos;\n"
-                + "    vec3 CameraOffset;\n"
-                + "    vec2 ScreenSize;\n"
                 + "    float GlintAlpha;\n"
+                + "    vec3 CameraOffset;\n"
                 + "    float GameTime;\n"
+                + "    vec2 ScreenSize;\n"
                 + "    int MenuBlurRadius;\n"
                 + "    int UseRgss;\n"
                 + "} " + UBO_INSTANCE + ";\n";

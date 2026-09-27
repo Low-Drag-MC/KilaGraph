@@ -29,7 +29,7 @@ public class DynamicTransformsUboNode extends ShaderNode {
     @Override
     public void compile(ShaderCompileContext ctx) {
         // Under an Iris shaderpack we run inside the pack's gbuffers program, which doesn't declare Mojang's
-        // DynamicTransforms UBO (and we can't #moj_import it there). Degrade to neutral values so the graph
+        // DynamicTransforms UBO (and we can't #include it there). Degrade to neutral values so the graph
         // stays injection-compatible: identity matrices, no colour modulation, no model offset. (Per-draw
         // ColorModulator/ModelOffset are lost under shaderpacks for now — base surface shading is preserved.)
         if (ctx.isInjection()) {

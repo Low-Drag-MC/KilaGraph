@@ -12,7 +12,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
 /**
- * The GLSL built-in {@code gl_VertexID} — the index of the current vertex within the draw call (an
+ * The GLSL built-in {@code gl_VertexIndex} — the index of the current vertex within the draw call (an
  * {@code int}). Stage-agnostic (default {@link com.lowdragmc.kilagraph.rendertype.compiler.StageAffinity#ANY}):
  * the built-in itself only exists in the vsh, so the vertex stage reads it directly while the fragment stage
  * reads it through an auto-forwarded {@code flat int} varying ({@code kg_vertexId}).
@@ -34,9 +34,9 @@ public class VertexIdNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        // vsh: gl_VertexID directly. fsh: a `flat in int kg_vertexId` fed by the vsh. preview: constant 0.
+        // vsh: gl_VertexIndex directly. fsh: a `flat in int kg_vertexId` fed by the vsh. preview: constant 0.
         ctx.output("out", ctx.varyingInput("kg_vertexId", GlslType.INT,
-                () -> new ShaderExpr("gl_VertexID", GlslType.INT),
+                () -> new ShaderExpr("gl_VertexIndex", GlslType.INT),
                 new ShaderExpr("0", GlslType.INT)));
     }
 
@@ -44,7 +44,7 @@ public class VertexIdNode extends ShaderNode {
     public String glslExample() {
         return """
                 // vertex shader
-                out = gl_VertexID;
+                out = gl_VertexIndex;
 
                 // fragment shader (auto-forwarded)
                 flat in int kg_vertexId;""";

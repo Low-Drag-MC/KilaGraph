@@ -21,7 +21,7 @@ import java.util.Map;
  * {@code IrisSurfaceRegistry} can namespace per-id collision-prone identifiers and the injector can dedup
  * shared declarations/helpers across snippets. All strings are raw (not yet id-namespaced).</p>
  *
- * <p>A graph whose fragment output needs a Minecraft engine include ({@code #moj_import}, i.e.
+ * <p>A graph whose fragment output needs a Minecraft engine include ({@code #include}, i.e.
  * Fog/vanilla-Lighting) is <b>not</b> injection-compatible; {@link ShaderGraphCompiler#buildInjectionSnippet()}
  * returns {@code null} for those and the material falls back to the M0 passthrough under Iris. Scene
  * Color/Depth <em>are</em> injectable: depth reads Iris's own {@code depthtex1} and colour reads the

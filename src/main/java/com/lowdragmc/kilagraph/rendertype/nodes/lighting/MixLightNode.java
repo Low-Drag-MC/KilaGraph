@@ -42,7 +42,7 @@ public class MixLightNode extends ShaderNode {
 
     @Override
     public void compile(ShaderCompileContext ctx) {
-        // KG_Lighting slice-view + inline mirrors of light.glsl's functions (LightGlsl) — no #moj_import,
+        // KG_Lighting slice-view + inline mirrors of light.glsl's functions (LightGlsl) — no #include,
         // so a graph pulling this stays injectable under an Iris shaderpack (unified-UBO policy).
         ctx.useUniformBlock(com.lowdragmc.kilagraph.rendertype.runtime.KGLightingUniforms.BLOCK);
         ctx.function("minecraft_compute_light", com.lowdragmc.kilagraph.rendertype.compiler.LightGlsl.FN_COMPUTE_LIGHT);

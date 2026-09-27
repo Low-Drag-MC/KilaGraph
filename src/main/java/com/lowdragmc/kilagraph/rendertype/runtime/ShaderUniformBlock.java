@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A KilaGraph-managed uniform block (UBO) that the engine declares in the generated GLSL, binds on the
  * pipeline, and uploads itself each frame — as opposed to per-material {@code KG_Material} values supplied
- * by the renderer, or Minecraft's own builtin UBOs (declared via {@code #moj_import} includes).
+ * by the renderer, or Minecraft's own builtin UBOs (declared via {@code #include} includes).
  *
  * <p>A shader node opts a graph into a block by registering it with the compiler
  * ({@code ShaderCompileContext.useUniformBlock(block)}); the compiler then emits {@link #declareGlsl()}

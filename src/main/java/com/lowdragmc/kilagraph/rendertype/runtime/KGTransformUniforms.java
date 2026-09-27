@@ -90,7 +90,7 @@ public final class KGTransformUniforms {
     /** GLSL declaration of the transforms block (must match the buffer layout exactly).
      *  The forward {@code ModelViewMat}/{@code ProjMat} and the camera-position pair duplicate values
      *  Minecraft's own UBOs carry — they exist so the Transform node works <em>under an Iris shaderpack</em>,
-     *  where a {@code #moj_import}-backed Minecraft uniform would reject the whole graph from injection.
+     *  where a {@code #include}-backed Minecraft uniform would reject the whole graph from injection.
      *  The vanilla pipeline keeps reading Minecraft's blocks (identical values). The camera position uses
      *  Minecraft's exact precision-split form: {@code camPos = vec3(CameraBlockPos) - CameraOffset}, so
      *  world-position math stays precise arbitrarily far from the origin. */
