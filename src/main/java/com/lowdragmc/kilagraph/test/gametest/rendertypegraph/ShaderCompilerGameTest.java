@@ -139,7 +139,8 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * varying boundary, fragment semantic blocks, sampler handling, and constant fallback.
  *
  * <p>GPU-validity (driver compilation) is not asserted here — that is verified at runtime via
- * {@code GpuDevice.precompilePipeline} (requires a client). These tests pin the generated source.</p>
+ * compiling it on the GPU (requires a client: the {@code kg_rt_node_sweep} scenario does). These tests pin the
+ * generated source.</p>
  */
 public final class ShaderCompilerGameTest {
     private static final String DEDUP = "rendertype_compile_dedup";

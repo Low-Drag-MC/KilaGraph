@@ -18,8 +18,15 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.CubeListBuilder;
+import net.minecraft.client.model.geom.builders.LayerDefinition;
+import net.minecraft.client.model.geom.builders.MeshDefinition;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent;
@@ -43,7 +50,7 @@ import static com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.vec3;
  * KilaGraph quads drawn into a real world frame (via {@link SubmitCustomGeometryEvent}), so through the level
  * renderer's own passes, against a wall of known colour — with classic transparency, and with improved
  * (order-independent) transparency, where blended custom geometry draws in the OIT phases or, for a blend they
- * can't express, in the solid phase.
+ * can't express, in the solid phase — as does that blend through a model and a block submit.
  */
 @LDLRegisterClient(name = "kg_rt_world", group = "kilagraph", registry = UIScenario.REGISTRY,
         environment = RegistrationEnvironment.DEV_ONLY)
@@ -58,6 +65,9 @@ public class RenderTypeWorldScenario implements UIScenario {
     /** Quad positions on that plane, in blocks right of / above the view centre. */
     private static final double[] COLUMNS = {-3.2, -1.6, 0, 1.6, 3.2};
     private static final double ROW = 1.0;
+    /** A row below: a model part and a block model, each of the multiply material, at columns 1 and 3. */
+    private static final double LOW_ROW = -0.8;
+    private static final int MODEL_COLUMN = 1, BLOCK_COLUMN = 3;
     private static final int FULL_BRIGHT = 0x00F000F0;
     private static final float TOL = 5f / 255f;
     /** The blended quads' colour, (0.5, 0.25, 0). */
@@ -130,8 +140,13 @@ public class RenderTypeWorldScenario implements UIScenario {
         scene.additive = scene.add(ctx, blended(BlendMode.ADDITIVE, 1), 2);
         scene.multiply = scene.add(ctx, blended(BlendMode.MULTIPLY, 1), 3);
         scene.sceneColor = scene.add(ctx, sceneColor(), 4);
-        ctx.check("a multiply draws in the solid phase under improved transparency",
-                scene.multiply.drawsSolidUnderImprovedTransparency());
+        ctx.check("a multiply draws in the solid phase", scene.multiply.drawsInSolidPhase());
+        // Culled, so of the model's and the block's faces only those toward the camera multiply the wall.
+        Bare culled = blended(BlendMode.MULTIPLY, 1)
+                .settings(s -> settings(s, s.blend(), s.depthTest(), s.depthWrite(), true));
+        scene.multiplyCulled = RenderTypeFactory.createMaterial(culled.graph());
+        ctx.require("the culled multiply compiles", scene.multiplyCulled != null);
+        scene.materials.add(scene.multiplyCulled);
     }
 
     private static Scene scene(TestContext ctx) {
@@ -156,6 +171,8 @@ public class RenderTypeWorldScenario implements UIScenario {
         Scene scene = scene(ctx);
         try (NativeImage frame = FrameCapture.grab(Minecraft.getInstance().gameRenderer.mainRenderTarget())) {
             for (int i = 0; i < COLUMNS.length; i++) scene.wall[i] = scene.sample(frame, COLUMNS[i], ROW);
+            scene.wallAtModel = scene.sample(frame, COLUMNS[MODEL_COLUMN], LOW_ROW);
+            scene.wallAtBlock = scene.sample(frame, COLUMNS[BLOCK_COLUMN], LOW_ROW);
         }
     }
 
@@ -172,6 +189,11 @@ public class RenderTypeWorldScenario implements UIScenario {
                     C[0] * w[3][0], C[1] * w[3][1], C[2] * w[3][2]);
             expect(ctx, mode + ": Scene Color shows the wall behind it", scene.sample(frame, COLUMNS[4], ROW),
                     w[4][0], w[4][1], w[4][2]);
+            float[] m = scene.wallAtModel, k = scene.wallAtBlock;
+            expect(ctx, mode + ": a multiply model part over the wall",
+                    scene.sample(frame, COLUMNS[MODEL_COLUMN], LOW_ROW), C[0] * m[0], C[1] * m[1], C[2] * m[2]);
+            expect(ctx, mode + ": a multiply block model over the wall",
+                    scene.sample(frame, COLUMNS[BLOCK_COLUMN], LOW_ROW), C[0] * k[0], C[1] * k[1], C[2] * k[2]);
         }
     }
 
@@ -185,6 +207,21 @@ public class RenderTypeWorldScenario implements UIScenario {
     }
 
     // ---- graphs ----------------------------------------------------------------------------------
+
+    /** A 1×1 block square, 1/16 deep, facing −Z (the camera). */
+    private static ModelPart cube() {
+        var mesh = new MeshDefinition();
+        mesh.getRoot().addOrReplaceChild("cube", CubeListBuilder.create().addBox(-8, -8, 0, 16, 16, 1), PartPose.ZERO);
+        return LayerDefinition.create(mesh, 16, 16).bakeRoot();
+    }
+
+    @SuppressWarnings("deprecation") // the plain collectParts, for a block model without a level
+    private static List<BlockStateModelPart> stone() {
+        List<BlockStateModelPart> parts = new ArrayList<>();
+        Minecraft.getInstance().getModelManager().getBlockStateModelSet().get(Blocks.STONE.defaultBlockState())
+                .collectParts(RandomSource.create(0), parts);
+        return parts;
+    }
 
     private static Bare solid(float r, float g, float b, BlendMode blend) {
         Bare graph = bare().settings(s -> settings(s, blend, s.depthTest(), blend == BlendMode.OPAQUE, false));
@@ -214,21 +251,41 @@ public class RenderTypeWorldScenario implements UIScenario {
         if (scene == null || !scene.visible) return;
         Vec3 camera = event.getLevelRenderState().cameraRenderState.pos;
         var collector = event.getSubmitNodeCollector();
-        for (int i = 0; i < scene.materials.size(); i++) {
+        for (int i = 0; i < scene.quads.size(); i++) {
             Vec3 center = scene.at(COLUMNS[scene.columns.get(i)], ROW).subtract(camera);
-            collector.submitCustomGeometry(event.getPoseStack(), scene.materials.get(i).renderType(),
+            collector.submitCustomGeometry(event.getPoseStack(), scene.quads.get(i).renderType(),
                     (pose, vc) -> scene.emit(pose, vc, center));
         }
+        PoseStack poseStack = event.getPoseStack();
+        Vec3 model = scene.at(COLUMNS[MODEL_COLUMN], LOW_ROW).subtract(camera);
+        poseStack.pushPose();
+        poseStack.translate(model.x, model.y, model.z);
+        collector.submitModelPart(scene.cube, poseStack, scene.multiplyCulled.renderType(), FULL_BRIGHT,
+                OverlayTexture.NO_OVERLAY, null);
+        poseStack.popPose();
+        // The block spans (0, 0, 0)..(1, 1, 1): its north face goes on the plane, centred.
+        Vec3 block = scene.at(COLUMNS[BLOCK_COLUMN], LOW_ROW).subtract(camera);
+        poseStack.pushPose();
+        poseStack.translate(block.x - 0.5, block.y - 0.5, block.z);
+        collector.submitBlockModel(poseStack, scene.multiplyCulled.renderType(), scene.stone, new int[0], FULL_BRIGHT,
+                OverlayTexture.NO_OVERLAY, 0);
+        poseStack.popPose();
     }
 
     private static final class Scene {
+        /** Every material, closed at teardown. */
         final List<RenderTypeGraphMaterial> materials = new ArrayList<>();
+        /** The quads, one per column. */
+        final List<RenderTypeGraphMaterial> quads = new ArrayList<>();
         final List<Integer> columns = new ArrayList<>();
+        final ModelPart cube = cube();
+        final List<BlockStateModelPart> stone = stone();
         /** The quad plane in world space. */
         final Vec3 center, right, up, toCamera;
-        RenderTypeGraphMaterial opaque, translucent, additive, multiply, sceneColor;
-        /** The wall at each column while the quads are hidden. */
+        RenderTypeGraphMaterial opaque, translucent, additive, multiply, sceneColor, multiplyCulled;
+        /** The wall at each column, and behind the model and the block, while the scene is hidden. */
         final float[][] wall = new float[COLUMNS.length][];
+        float[] wallAtModel, wallAtBlock;
         volatile boolean visible;
 
         Scene(Camera camera) {
@@ -245,6 +302,7 @@ public class RenderTypeWorldScenario implements UIScenario {
             RenderTypeGraphMaterial material = RenderTypeFactory.createMaterial(graph.graph());
             ctx.require("the graph compiles", material != null);
             materials.add(material);
+            quads.add(material);
             columns.add(column);
             return material;
         }

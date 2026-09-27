@@ -10,6 +10,7 @@ import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import net.minecraft.client.renderer.StagedVertexBuffer;
+import net.minecraft.client.renderer.oit.OitStage;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
@@ -31,12 +32,17 @@ import java.util.WeakHashMap;
 @Mixin(PreparedRenderType.class)
 public abstract class PreparedRenderTypeMixin implements KGPreparedRenderType {
 
-    /** Pipelines already reported as not compiling, so each is logged once. */
+    /** Pipelines already reported as not drawable, so each is logged once. */
     @Unique
     private static final Set<RenderPipeline> kilagraph$REPORTED = Collections.newSetFromMap(new WeakHashMap<>());
+    /** Closed materials already reported as drawn, so each is logged once. */
+    @Unique
+    private static final Set<RenderTypeGraphMaterial> kilagraph$REPORTED_CLOSED = Collections.newSetFromMap(new WeakHashMap<>());
 
     @Unique
     private @Nullable RenderTypeGraphMaterial kilagraph$material;
+    @Unique
+    private @Nullable RenderTypeGraphMaterial.Bindings kilagraph$bindings;
     @Unique
     private @Nullable GpuBufferSlice kilagraph$instances;
     @Unique
@@ -53,20 +59,53 @@ public abstract class PreparedRenderTypeMixin implements KGPreparedRenderType {
     }
 
     @Override
+    public @Nullable RenderTypeGraphMaterial.Bindings kilagraph$bindings() {
+        return this.kilagraph$bindings;
+    }
+
+    @Override
+    public void kilagraph$setBindings(RenderTypeGraphMaterial.Bindings bindings) {
+        this.kilagraph$bindings = bindings;
+    }
+
+    @Override
     public void kilagraph$setInstances(@Nullable GpuBufferSlice instances, int count) {
         this.kilagraph$instances = instances;
         this.kilagraph$instanceCount = count;
     }
 
+    /** A material that draws in the solid phase has no OIT pipelines; should a submit route it to an OIT phase anyway
+     *  (a mod handing it to any phase through {@code submitSpecial}), skip the draw rather than fail the frame. */
+    @Inject(method = "drawFromBufferOit", at = @At("HEAD"), cancellable = true)
+    private void kilagraph$skipWithoutOit(StagedVertexBuffer.ExecuteInfo info, OitStage stage, RenderPass renderPass,
+                                          CallbackInfo ci) {
+        var material = kilagraph$material;
+        if (material == null || ((PreparedRenderType) (Object) this).oitPipelineSet() != null) return;
+        if (kilagraph$REPORTED.add(((PreparedRenderType) (Object) this).pipeline())) {
+            Kilagraph.LOGGER.warn("[KilaGraph] {} was submitted to an order-independent transparency phase, which its "
+                    + "blend can't draw in; skipped", material.contentHash());
+        }
+        ci.cancel();
+    }
+
     /** Skip a draw whose pipeline doesn't compile — Minecraft would fail the frame. The main pipeline compiled when
      *  the material was built; an OIT phase's compiles at its first draw, a pipeline after a shader reload at its
-     *  next. Also skips an Iris shadow pass we have no mapping for (it would corrupt the shadow map). */
+     *  next. Also skips the draws of a closed material (its buffers are gone, its pipelines may be), and an Iris
+     *  shadow pass we have no mapping for (it would corrupt the shadow map). */
     @Inject(method = "draw", at = @At("HEAD"), cancellable = true)
     private void kilagraph$skipBroken(StagedVertexBuffer.ExecuteInfo info, RenderPass renderPass, RenderPipeline pipeline,
                                       CallbackInfo ci) {
         var material = kilagraph$material;
         if (material == null) return;
         if (IrisCompat.shouldSkipShadowDraw()) {
+            ci.cancel();
+            return;
+        }
+        if (material.isClosed() || kilagraph$bindings == null) { // (no bindings: it closed before the prepare)
+            if (kilagraph$REPORTED_CLOSED.add(material)) {
+                Kilagraph.LOGGER.warn("[KilaGraph] a render type of a closed material ({}) was drawn; skipped",
+                        material.contentHash());
+            }
             ci.cancel();
             return;
         }
@@ -86,12 +125,10 @@ public abstract class PreparedRenderTypeMixin implements KGPreparedRenderType {
     private void kilagraph$bindMaterialUniforms(StagedVertexBuffer.ExecuteInfo info, RenderPass renderPass,
                                                 RenderPipeline pipeline, CallbackInfo ci) {
         var material = kilagraph$material;
-        if (material == null) return;
-        material.bindCustomUniforms(renderPass);
-        if (material.instanceLayout() != null) {
-            renderPass.setVertexBuffer(1, kilagraph$instances != null ? kilagraph$instances : material.defaultInstanceSlice());
-        }
-        // Iris: record the active material so the trySetup hook can flag this draw (kg_surface_id) AND bind
+        var bindings = kilagraph$bindings;
+        if (material == null || bindings == null) return;
+        material.bindCustomUniforms(renderPass, bindings, kilagraph$instances);
+        // Iris: record the active material so the program-bind hook can flag this draw (kg_surface_id) AND bind
         // the material's KG_Material/managed UBOs onto the shaderpack's shared gbuffers program once it is
         // actually bound (the program isn't bound at this hook). Reset after. id 0 = passthrough (graph not
         // injection-compatible) — left unflagged so it shows the pack's own albedo.

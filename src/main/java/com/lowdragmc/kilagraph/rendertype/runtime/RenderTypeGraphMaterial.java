@@ -33,10 +33,11 @@ import java.util.function.Supplier;
 /**
  * A compiled, ready-to-render material: a Minecraft {@link RenderType} (sharing cached pipelines)
  * plus its per-instance {@code KG_Material} uniform buffer and dynamic sampler bindings. Renderers get
- * {@link #renderType()} for {@code submitCustomGeometry}. Values are uploaded when the render type is prepared
- * and again once the frame's geometry is built ({@link #flushPrepared}), all before the render passes open;
- * {@code PreparedRenderTypeMixin} calls {@link #bindCustomUniforms} inside the pass to bind both the custom UBO
- * and the per-instance textures that vanilla's {@code RenderSetup} path doesn't update.
+ * {@link #renderType()} for {@code submitCustomGeometry}. Like Minecraft's own per-draw transforms, a draw binds the
+ * values its render type was prepared with ({@link Bindings}): they are uploaded and taken when it is prepared, and
+ * taken again once the frame's geometry is built ({@link #flushPrepared}) — all before the render passes open.
+ * {@code PreparedRenderTypeMixin} binds them inside the pass: the custom UBOs and the per-instance textures that
+ * vanilla's {@code RenderSetup} path doesn't update.
  *
  * <p><b>Setting values.</b> EXPOSED graph variables are addressed by their <em>display name</em> (not
  * the mangled {@code kg_*} GLSL identifier): {@link #setUniform(String, float)} and its typed overloads
@@ -48,15 +49,13 @@ import java.util.function.Supplier;
  * <p>Overlay ({@code Sampler1}) / lightmap ({@code Sampler2}) stay owned by vanilla and are not part of
  * this material's dynamic texture map.</p>
  *
- * <p>Instances register themselves in a static identity side-table keyed by {@link RenderType} so the
- * prepare mixin can find the owning material without adding fields to the vanilla class.</p>
+ * <p>The render type carries its material ({@link #of}) — still once the material has closed, so a render type
+ * submitted after that is recognised, and its draws skipped rather than run without the material's buffers.</p>
  */
 public final class RenderTypeGraphMaterial implements AutoCloseable {
 
-    private static final Map<RenderType, RenderTypeGraphMaterial> BY_RENDER_TYPE =
-            Collections.synchronizedMap(new IdentityHashMap<>());
-    /** Materials prepared since the last {@link #flushPrepared}. Render thread. */
-    private static final Set<RenderTypeGraphMaterial> PREPARED = Collections.newSetFromMap(new IdentityHashMap<>());
+    /** Render types prepared since the last {@link #flushPrepared}, which takes their values again. Render thread. */
+    private static final List<KGPreparedRenderType> PREPARED = new ArrayList<>();
 
     private final RenderType renderType;
     private final MaterialUniformBuffer uniforms;
@@ -77,8 +76,9 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     /** Samplers only the Iris-injection snippet bakes (e.g. the {@code kg_NeutralWhite} degrade) — resolved
      *  alongside {@link #textures} and offered to the Iris binder, but never bound on the vanilla pass. */
     private final Map<String, SamplerDefault> injectionOnlyTextures;
-    /** Sampler uniform name -> resolved view+sampler, refreshed in {@link #prepareUniforms} (pre-pass). */
-    private final Map<String, ResolvedSampler> resolvedTextures = new HashMap<>();
+    /** Sampler uniform name -> resolved view+sampler (external views applied), replaced — never changed — by
+     *  {@link #prepareUniforms} (pre-pass), so a draw's {@link Bindings} can hold on to it. */
+    private Map<String, ResolvedSampler> resolvedTextures = Map.of();
     /** Resolved injection-only samplers (see {@link #injectionOnlyTextures}). */
     private final Map<String, ResolvedSampler> resolvedInjectionTextures = new HashMap<>();
     /** Sampler uniform name -> externally-supplied raw view+sampler (e.g. another mod's live {@code GpuTexture}),
@@ -92,8 +92,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
      *  this material draws (see {@code IrisShaderInjector}). 0 = no Iris injection. Set by the factory when a
      *  shaderpack-compatible variant is active. */
     private int irisSurfaceId = 0;
-    /** Blended, but in a way order-independent transparency can't express (see {@link RenderTypeFactory}). */
-    private final boolean solidUnderImprovedTransparency;
+    /** Blended, but in a way order-independent transparency can't express (see {@link #drawsInSolidPhase}). */
+    private final boolean drawsInSolidPhase;
     private boolean closed;
 
     private record ResolvedSampler(GpuTextureView view, GpuSampler sampler) {}
@@ -106,7 +106,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
                                    Map<String, SamplerDefault> textures,
                                    Map<String, SamplerDefault> injectionOnlyTextures,
                                    boolean usesSceneColor, boolean usesSceneDepth,
-                                   boolean solidUnderImprovedTransparency) {
+                                   boolean drawsInSolidPhase) {
         this.renderType = renderType;
         this.uniforms = new MaterialUniformBuffer(layout);
         this.uniformBlocks = List.copyOf(uniformBlocks);
@@ -118,43 +118,101 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         this.injectionOnlyTextures = new HashMap<>(injectionOnlyTextures);
         this.usesSceneColor = usesSceneColor;
         this.usesSceneDepth = usesSceneDepth;
-        this.solidUnderImprovedTransparency = solidUnderImprovedTransparency;
-        BY_RENDER_TYPE.put(renderType, this);
+        this.drawsInSolidPhase = drawsInSolidPhase;
+        ((KGRenderType) renderType).kilagraph$setMaterial(this);
     }
 
-    /** Lookup the material owning a render type, or {@code null} if it isn't a KilaGraph material. */
+    /** The material owning a render type — closed or not (see {@link #isClosed}) — or {@code null} if it isn't a
+     *  KilaGraph render type. */
     @Nullable
     public static RenderTypeGraphMaterial of(RenderType renderType) {
-        return BY_RENDER_TYPE.get(renderType);
+        return ((KGRenderType) renderType).kilagraph$material();
     }
 
     public RenderType renderType() {
         return renderType;
     }
 
+    /** Whether {@link #close} was called: the material's draws are skipped from then on. */
+    public boolean isClosed() {
+        return closed;
+    }
+
     /**
-     * Whether, with improved transparency on, the material's custom geometry draws in the solid phase: it blends,
-     * but in a way order-independent transparency can't express (multiply, min, invert… depend on what is behind),
-     * so it blends over the opaque scene instead, unsorted against other translucent geometry.
+     * Whether the material draws in the solid phase although it blends: order-independent transparency can't
+     * express its blend (multiply, min, invert… depend on what is behind), so — as vanilla does for its own such
+     * render types, e.g. glint — it draws there with either transparency setting, blending over the opaque scene,
+     * unsorted against translucent geometry. Its render type forces the solid model phase, and every submit of it
+     * lands in the solid phase (see {@code SubmitNodeCollectionMixin}).
      */
-    public boolean drawsSolidUnderImprovedTransparency() {
-        return solidUnderImprovedTransparency;
+    public boolean drawsInSolidPhase() {
+        return drawsInSolidPhase;
     }
 
-    /** Called when one of this material's render types is prepared: uploads now, and again at {@link #flushPrepared}. */
-    public void onPrepared() {
+    /** Called when one of this material's render types is prepared: uploads the values and hands the draw those it
+     *  binds, taken again at {@link #flushPrepared}. */
+    public void onPrepared(KGPreparedRenderType prepared) {
+        if (closed) return;
         prepareUniforms();
-        PREPARED.add(this);
+        prepared.kilagraph$setBindings(capture(null));
+        PREPARED.add(prepared);
     }
 
     /**
-     * Upload every material prepared since the last call. Minecraft prepares a render type before it runs the
-     * geometry callback that fills it, so values set there are uploaded here — when the frame's geometry is built
-     * and before its passes open. Render thread.
+     * Take the values of the render types prepared since the last call again. Minecraft prepares a render type before
+     * it runs the geometry callback that fills it, so values set there are taken here — when the frame's geometry is
+     * built and before its passes open. The transforms stay those of the prepare. Render thread.
      */
     public static void flushPrepared() {
-        for (RenderTypeGraphMaterial material : PREPARED) material.prepareUniforms();
+        Set<RenderTypeGraphMaterial> uploaded = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (KGPreparedRenderType prepared : PREPARED) {
+            RenderTypeGraphMaterial material = prepared.kilagraph$material();
+            Bindings bindings = prepared.kilagraph$bindings();
+            if (material == null || bindings == null || material.closed) continue;
+            if (uploaded.add(material)) material.prepareValues();
+            prepared.kilagraph$setBindings(material.capture(bindings));
+        }
         PREPARED.clear();
+    }
+
+    /** The frame has rendered: forget its prepared render types — those drawn in a pass of their own are never
+     *  flushed. Render thread. */
+    static void endFrame() {
+        PREPARED.clear();
+    }
+
+    /**
+     * What one prepared draw of a material binds: its values when the draw was prepared — the {@code KG_Material}
+     * values, textures and the KilaGraph blocks that change between draws (the transforms). Later changes don't reach
+     * it; the buffers it holds keep their contents until the frame ends ({@link KGUploadBuffer#capture}).
+     */
+    public static final class Bindings {
+        @Nullable private final GpuBufferSlice material;
+        /** Per {@link #uniformBlocks} entry; {@code null}: the block's current slice, bound at the draw. */
+        private final GpuBufferSlice[] blocks;
+        private final Map<String, ResolvedSampler> textures;
+        @Nullable private final GpuBufferSlice defaultInstance;
+
+        private Bindings(@Nullable GpuBufferSlice material, GpuBufferSlice[] blocks,
+                         Map<String, ResolvedSampler> textures, @Nullable GpuBufferSlice defaultInstance) {
+            this.material = material;
+            this.blocks = blocks;
+            this.textures = textures;
+            this.defaultInstance = defaultInstance;
+        }
+    }
+
+    /** The bindings of a draw prepared now; given {@code prepared}'s, keeping its blocks (the prepare's transforms). */
+    private Bindings capture(@Nullable Bindings prepared) {
+        GpuBufferSlice[] blocks;
+        if (prepared != null) {
+            blocks = prepared.blocks;
+        } else {
+            blocks = new GpuBufferSlice[uniformBlocks.size()];
+            for (int i = 0; i < blocks.length; i++) blocks[i] = uniformBlocks.get(i).capture();
+        }
+        return new Bindings(uniforms.capture(), blocks, resolvedTextures,
+                defaultInstance == null ? null : defaultInstance.capture());
     }
 
     // ---- instancing --------------------------------------------------------------------------
@@ -182,13 +240,15 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     /**
      * Prepare a draw of {@code count} instances of {@code mesh}, transformed by {@code pose} on top of the current
      * model-view, to {@link InstancedDraw#execute} in a render pass later in the frame. Call on the render thread
-     * before that pass opens: the values, instances and transforms are uploaded here, since a pass allows no
-     * uploads. {@code instances} is required when the graph reads Instance Data, and must hold {@code count}
-     * values. Returns {@code null} when there is nothing to draw, or the pipeline doesn't compile (logged).
+     * before that pass opens: the values, instances and transforms are uploaded and taken here — the draw keeps
+     * them whatever is set or prepared afterwards. {@code instances} is required when the graph reads Instance Data,
+     * and must hold {@code count} values. Returns {@code null} when there is nothing to draw ({@code count} &le; 0);
+     * a draw whose pipeline doesn't compile is skipped (logged).
      */
     @Nullable
     public InstancedDraw prepareInstanced(KGMesh mesh, @Nullable KGInstanceBuffer instances, int count, Matrix4fc pose) {
         RenderSystem.assertOnRenderThread();
+        if (closed) throw new IllegalStateException("the material is closed");
         if (KGUploadBuffer.inRenderPass()) {
             throw new IllegalStateException("prepare an instanced draw before its render pass opens");
         }
@@ -202,7 +262,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
                 throw new IllegalArgumentException(count + " instances drawn from a buffer of " + instances.capacity());
             }
             instances.upload();
-            instanceSlice = instances.slice();
+            instanceSlice = instances.capture();
         }
         mesh.prepareIndices();
         PreparedRenderType main;
@@ -210,11 +270,14 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         modelView.pushMatrix();
         try {
             modelView.mul(pose);
-            main = renderType.prepare(); // uploads this material (RenderTypeMixin)
+            main = renderType.prepare(); // uploads this material and takes its values (RenderTypeMixin)
         } finally {
             modelView.popMatrix();
         }
-        ((KGPreparedRenderType) (Object) main).kilagraph$setInstances(instanceSlice, count);
+        var prepared = (KGPreparedRenderType) (Object) main;
+        // Its values are those of now, not of the frame's geometry: keep it out of flushPrepared.
+        if (!PREPARED.isEmpty() && PREPARED.getLast() == prepared) PREPARED.removeLast();
+        prepared.kilagraph$setInstances(instanceSlice, count);
         PreparedRenderType withTargets = null;
         if (colorTargetsPipeline != null) {
             if (KGPipelines.ensureCompiled(colorTargetsPipeline)) {
@@ -222,6 +285,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
                         main.dynamicTransforms(), main.scissorState(), main.textures());
                 var tagged = (KGPreparedRenderType) (Object) withTargets;
                 tagged.kilagraph$setMaterial(this);
+                tagged.kilagraph$setBindings(Objects.requireNonNull(prepared.kilagraph$bindings()));
                 tagged.kilagraph$setInstances(instanceSlice, count);
             } else if (!colorTargetsFailedWarned) {
                 colorTargetsFailedWarned = true;
@@ -293,7 +357,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         }
     }
 
-    /** The default instance's buffer (uploaded by {@link #prepareUniforms}); {@code null} without instance data. */
+    /** The default instance's buffer (uploaded by {@link #prepareUniforms}), bound when a draw brings no instances;
+     *  {@code null} without instance data. */
     @Nullable
     public GpuBufferSlice defaultInstanceSlice() {
         return defaultInstance == null ? null : defaultInstance.slice();
@@ -412,8 +477,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
      *  includes the injection-only samplers (e.g. {@code kg_NeutralWhite}). */
     public void bindIrisSamplers(IrisSamplerBinder binder) {
         for (Map.Entry<String, ResolvedSampler> e : resolvedTextures.entrySet()) {
-            ResolvedSampler r = externalViews.getOrDefault(e.getKey(), e.getValue());
-            binder.bind(e.getKey(), r.view(), r.sampler());
+            binder.bind(e.getKey(), e.getValue().view(), e.getValue().sampler());
         }
         for (Map.Entry<String, ResolvedSampler> e : resolvedInjectionTextures.entrySet()) {
             binder.bind(e.getKey(), e.getValue().view(), e.getValue().sampler());
@@ -581,29 +645,41 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
      * (Re)upload the UBOs if values changed and resolve the dynamic textures, before the render pass opens. Both
      * belong outside the pass: a buffer write and a lazy texture load ({@code getTexture} → {@code registerAndLoad}
      * → {@code writeToTexture}) are illegal inside one (see {@link KGUploadBuffer} for the buffers' fallback).
-     * Called when the render type is prepared and at {@link #flushPrepared}; a renderer drawing through
-     * {@link #bindCustomUniforms} in its own pass calls it before opening that pass.
+     * Called when the render type is prepared; a renderer drawing through {@link #bindCustomUniforms} in its own pass
+     * calls it before opening that pass.
      */
     public void prepareUniforms() {
         if (closed) return;
+        prepareValues();
+        for (ShaderUniformBlock block : uniformBlocks) block.prepareUpload();
+        // Injection-only blocks must upload too, or the injected program reads a stale/empty buffer.
+        for (ShaderUniformBlock block : injectionOnlyBlocks) block.prepareUpload();
+    }
+
+    /** The material's own part of {@link #prepareUniforms}: its values, default instance and textures. */
+    private void prepareValues() {
         uniforms.prepareUpload();
         if (instanceLayout != null) {
             if (defaultInstance == null) defaultInstance = new KGInstanceBuffer(instanceLayout, 1);
             defaultInstance.upload();
         }
-        for (ShaderUniformBlock block : uniformBlocks) block.prepareUpload();
-        // Injection-only blocks must upload too, or the injected program reads a stale/empty buffer.
-        for (ShaderUniformBlock block : injectionOnlyBlocks) block.prepareUpload();
         // Resolve (loading if needed) each bound texture now, and build its GpuSampler from the params —
-        // the actual bindTexture in the pass then only reads the already-uploaded view/sampler.
+        // binding them in the pass then only reads the already-uploaded view/sampler. An external raw view (e.g.
+        // SlideShow's live slide texture) wins over the Identifier binding.
         if (!textures.isEmpty()) {
             var textureManager = Minecraft.getInstance().getTextureManager();
-            resolvedTextures.clear();
+            Map<String, ResolvedSampler> resolved = new HashMap<>(textures.size());
             for (Map.Entry<String, SamplerDefault> e : textures.entrySet()) {
+                ResolvedSampler external = externalViews.get(e.getKey());
+                if (external != null) {
+                    resolved.put(e.getKey(), external);
+                    continue;
+                }
                 SamplerDefault def = e.getValue();
                 AbstractTexture tex = textureManager.getTexture(def.texture());
-                resolvedTextures.put(e.getKey(), new ResolvedSampler(tex.getTextureView(), RenderTypeFactory.gpuSampler(def)));
+                resolved.put(e.getKey(), new ResolvedSampler(tex.getTextureView(), RenderTypeFactory.gpuSampler(def)));
             }
+            resolvedTextures = resolved;
         }
         if (!injectionOnlyTextures.isEmpty()) {
             var textureManager = Minecraft.getInstance().getTextureManager();
@@ -616,23 +692,30 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         }
     }
 
-    /** Called from the draw mixin inside the active pass: bind the custom UBO + engine UBO + textures. */
+    /** Bind the material's current values in {@code renderPass} — for a renderer drawing in a pass of its own, after
+     *  {@link #prepareUniforms}. (An instanced graph's instances are the renderer's to bind.) */
     public void bindCustomUniforms(RenderPass renderPass) {
-        if (!uniforms.isEmpty()) {
-            GpuBufferSlice slice = uniforms.slice();
-            if (slice != null) renderPass.setUniform(MaterialUniformLayout.UBO_NAME, slice);
+        bind(renderPass, uniforms.slice(), null, resolvedTextures);
+    }
+
+    /** Called from the draw mixin inside the pass: bind what the draw was prepared with, and its instances
+     *  ({@code null}: the default instance). */
+    public void bindCustomUniforms(RenderPass renderPass, Bindings bindings, @Nullable GpuBufferSlice instances) {
+        bind(renderPass, bindings.material, bindings.blocks, bindings.textures);
+        if (instanceLayout != null) renderPass.setVertexBuffer(1, instances != null ? instances : bindings.defaultInstance);
+    }
+
+    private void bind(RenderPass renderPass, @Nullable GpuBufferSlice material, @Nullable GpuBufferSlice[] blocks,
+                      Map<String, ResolvedSampler> textures) {
+        if (material != null) renderPass.setUniform(MaterialUniformLayout.UBO_NAME, material);
+        for (int i = 0; i < uniformBlocks.size(); i++) {
+            ShaderUniformBlock block = uniformBlocks.get(i);
+            GpuBufferSlice slice = blocks != null && blocks[i] != null ? blocks[i] : block.slice();
+            if (slice != null) renderPass.setUniform(block.uboName(), slice);
         }
-        for (ShaderUniformBlock block : uniformBlocks) {
-            GpuBufferSlice s = block.slice();
-            if (s != null) renderPass.setUniform(block.uboName(), s);
-        }
-        // Dynamic samplers: (re)bind the textures resolved in prepareUniforms, so setTexture takes effect
-        // without rebuilding the RenderType. Binding is a pure pass command (no GPU upload).
-        for (Map.Entry<String, ResolvedSampler> e : resolvedTextures.entrySet()) {
-            // An external raw view (e.g. SlideShow's live slide texture) wins over the Identifier binding.
-            ResolvedSampler r = externalViews.getOrDefault(e.getKey(), e.getValue());
-            renderPass.setUniform(e.getKey(), r.view(), r.sampler());
-        }
+        // Dynamic samplers: the textures resolved before the pass, so setTexture takes effect without rebuilding
+        // the RenderType. Binding is a pure pass command (no GPU upload).
+        textures.forEach((name, r) -> renderPass.setUniform(name, r.view(), r.sampler()));
         // Captured scene colour/depth: bound from the live SceneCaptureManager (not TextureManager). Before
         // the first capture the view is null — bind the missing-texture as a placeholder so the encoder's
         // "every declared sampler must be bound" check passes.
@@ -659,9 +742,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     @Override
     public void close() {
         if (closed) return;
-        closed = true;
-        BY_RENDER_TYPE.remove(renderType);
-        PREPARED.remove(this);
+        closed = true; // its prepared draws are skipped, and flushPrepared passes them by
         uniforms.close();
         if (defaultInstance != null) defaultInstance.close();
         if (usesSceneColor || usesSceneDepth) SceneCaptureManager.INSTANCE.release();

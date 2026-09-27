@@ -62,9 +62,9 @@ import java.util.function.Consumer;
  *   <li>the <b>main</b> pipeline, drawn in Minecraft's passes, which have a single colour attachment;</li>
  *   <li>a <b>colour-targets</b> pipeline when the graph writes extra colour targets, for a pass that has them;</li>
  *   <li>an {@link OitPipelineSet} for a blended material Minecraft's order-independent transparency can
- *       express. With improved transparency on, every blended custom geometry draws in the OIT phases; a blend
- *       those can't express (multiply, min, invert…) draws in the solid phase instead (see
- *       {@link RenderTypeGraphMaterial#drawsSolidUnderImprovedTransparency}).</li>
+ *       express, drawn in the OIT phases when improved transparency is on. A blend those can't express
+ *       (multiply, min, invert…) draws in the solid phase instead, with either transparency setting — as
+ *       vanilla's own such render types do (see {@link RenderTypeGraphMaterial#drawsInSolidPhase}).</li>
  * </ul>
  *
  * <p><b>Resource management.</b> Generated pipelines/sources are reference-counted by content hash:
@@ -102,10 +102,10 @@ public final class RenderTypeFactory {
     /** Hashes that failed to compile on the GPU. Content hash is deterministic, so a failed hash
      *  stays failed — skip re-compiling it every frame (and dump its GLSL only once). */
     private static final Set<String> FAILED = ConcurrentHashMap.newKeySet();
-    /** Graph hashes already warned about Scene Color/Depth on an opaque material (self-sampling feedback). */
-    private static final Set<String> SCENE_ON_OPAQUE_WARNED = ConcurrentHashMap.newKeySet();
-    /** Graph hashes already told about drawing in the solid phase under improved transparency. */
-    private static final Set<String> SOLID_UNDER_OIT_WARNED = ConcurrentHashMap.newKeySet();
+    /** Graph hashes already warned about Scene Color/Depth drawn before the capture (self-sampling feedback). */
+    private static final Set<String> SCENE_BEFORE_CAPTURE_WARNED = ConcurrentHashMap.newKeySet();
+    /** Blend modes already told about drawing in the solid phase. */
+    private static final Set<RenderTypeGraph.Settings.BlendMode> SOLID_PHASE_LOGGED = ConcurrentHashMap.newKeySet();
     /** Graph hashes already warned about a vertex format the Iris integration can't route (warn once each). */
     private static final Set<String> IRIS_FORMAT_WARNED = ConcurrentHashMap.newKeySet();
     /** Numbers each material's render type, so two materials of one graph never prepare to equal
@@ -158,10 +158,14 @@ public final class RenderTypeFactory {
         OitPipelineSet oit = pipelines.oit();
         if (oit != null && Minecraft.getInstance().gameRenderer.useImprovedTransparency() && !compileAll(oit)) {
             LOGGER.warn("[KilaGraph] graph {}: its order-independent transparency pipelines don't compile, "
-                    + "so with improved transparency it draws in the solid phase", hash);
+                    + "so it draws in the solid phase", hash);
             oit = null;
         }
-        boolean translucent = compiled.settings().blend() != RenderTypeGraph.Settings.BlendMode.OPAQUE;
+        RenderTypeGraph.Settings.BlendMode blend = compiled.settings().blend();
+        boolean translucent = blend != RenderTypeGraph.Settings.BlendMode.OPAQUE;
+        // A blend order-independent transparency can't express draws in the solid phase whatever the transparency
+        // setting — as vanilla's own do (its glint, banner patterns) — blending over the opaque scene there.
+        boolean solidPhase = translucent && oit == null;
 
         // A pack's entity program reads Sampler0/1/2 like a vanilla entity type does; unbound, it reads stale textures.
         boolean irisRouted = IrisCompat.ENABLED
@@ -195,26 +199,27 @@ public final class RenderTypeFactory {
         if (useLightmap) setup.useLightmap();
         if (useOverlay) setup.useOverlay();
         if (compiled.settings().sortOnUpload()) setup.sortOnUpload();
+        // Vanilla routes model submits by this; SubmitNodeCollectionMixin applies it to the other submits.
+        if (solidPhase) setup.withForcedSolidModelPhase();
 
         REFCOUNTS.merge(hash, 1, Integer::sum);
         // The graph samples the captured opaque scene — start (and refcount) the capture while this material lives.
         if (compiled.usesSceneColor() || compiled.usesSceneDepth()) {
             SceneCaptureManager.INSTANCE.acquire();
-            // Scene Color/Depth sample the capture taken AFTER opaque geometry. An opaque material draws
-            // BEFORE that point, so at its own screen position the capture contains... itself (last frame):
-            // a self-sampling feedback loop that renders black with view-dependent fringes (identical in
-            // vanilla and under shaderpacks; same constraint as Unity's Scene Color). Warn once per graph.
-            if (!translucent && SCENE_ON_OPAQUE_WARNED.add(hash)) {
-                Kilagraph.LOGGER.warn("[KilaGraph] graph {} uses Scene Color/Depth on an OPAQUE material: "
-                        + "it draws before the scene capture and will sample ITSELF (black feedback). "
-                        + "Use a translucent BlendMode and draw it in the translucent phase.", hash);
+            // Scene Color/Depth sample the capture taken AFTER the solid phase. A material drawn IN it (opaque, or
+            // a blend with no order-independent form) draws BEFORE that point, so at its own screen position the
+            // capture contains... itself (last frame): a self-sampling feedback loop that renders black with
+            // view-dependent fringes (identical in vanilla and under shaderpacks; same constraint as Unity's Scene
+            // Color). Warn once per graph.
+            if ((!translucent || solidPhase) && SCENE_BEFORE_CAPTURE_WARNED.add(hash)) {
+                Kilagraph.LOGGER.warn("[KilaGraph] graph {} uses Scene Color/Depth but draws in the solid phase "
+                        + "(blend mode {}): before the scene capture, so it will sample ITSELF (black feedback). "
+                        + "Use a translucent BlendMode.", hash, blend);
             }
         }
-        boolean solidUnderOit = translucent && oit == null;
-        if (solidUnderOit && Minecraft.getInstance().gameRenderer.useImprovedTransparency()
-                && SOLID_UNDER_OIT_WARNED.add(hash)) {
-            LOGGER.info("[KilaGraph] graph {}: blend mode {} has no order-independent form, so with improved "
-                    + "transparency it blends over the opaque scene in the solid phase", hash, compiled.settings().blend());
+        if (solidPhase && SOLID_PHASE_LOGGED.add(blend)) {
+            LOGGER.info("[KilaGraph] blend mode {} has no order-independent form: its materials draw in the solid "
+                    + "phase, blending over the opaque scene", blend);
         }
         String name = Kilagraph.MODID + ":graph/" + hash + "/" + MATERIAL_SERIAL.incrementAndGet();
         RenderType renderType = RenderType.create(name, setup.createRenderSetup());
@@ -241,7 +246,7 @@ public final class RenderTypeFactory {
         RenderTypeGraphMaterial material = new RenderTypeGraphMaterial(
                 renderType, compiled.layout(), compiled.uniformBlocks(), injectionOnly, hash,
                 compiled.uniformFields(), compiled.variableSamplers(), buildMaterialTextures(compiled),
-                injectionOnlyTextures, compiled.usesSceneColor(), compiled.usesSceneDepth(), solidUnderOit);
+                injectionOnlyTextures, compiled.usesSceneColor(), compiled.usesSceneDepth(), solidPhase);
         material.setInstanceLayout(KGInstanceLayout.of(compiled.instanceAttributes()));
         material.setColorTargets(compiled.colorTargets(), pipelines.colorTargets());
         // Bake EXPOSED-variable defaults into the material UBO; callers may override later via setUniform.

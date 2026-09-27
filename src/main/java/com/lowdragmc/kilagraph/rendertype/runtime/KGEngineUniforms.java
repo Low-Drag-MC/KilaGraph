@@ -21,9 +21,9 @@ import java.nio.ByteBuffer;
  * GLSL declaration ({@link #declareGlsl()}) and the buffer stay in lockstep. Currently:</p>
  * <pre>{@code layout(std140) uniform KG_Globals { float Time; } kg_globals; }</pre>
  *
- * <p>Fields are accessed in GLSL as {@code kg_globals.Time}. The buffer is updated once per frame at
- * the start of a KilaGraph draw (before its render pass opens — {@code writeToBuffer} is illegal inside a
- * pass) via {@link #prepareUpload()}, and bound inside the pass via {@link #slice()}.</p>
+ * <p>Fields are accessed in GLSL as {@code kg_globals.Time}. The buffer is refreshed when a KilaGraph render type
+ * is prepared and the values changed ({@link #prepareUpload()}); each draw binds it as it was then
+ * ({@code capture}).</p>
  */
 public final class KGEngineUniforms {
 
@@ -36,6 +36,7 @@ public final class KGEngineUniforms {
         @Override public String declareGlsl() { return KGEngineUniforms.declareGlsl(); }
         @Override public void prepareUpload() { KGEngineUniforms.prepareUpload(); }
         @Override public GpuBufferSlice slice() { return KGEngineUniforms.slice(); }
+        @Override public GpuBufferSlice capture() { return BUFFER.capture(); }
     };
 
     /** std140 size: float (Time) + vec2 (ScreenSize) + float (GameTime). Grows as engine fields are added. */

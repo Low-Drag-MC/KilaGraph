@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.mixin.client;
 
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.commands.RenderPass;
@@ -27,19 +28,35 @@ import java.util.OptionalDouble;
  *       the translucent draws (the caller's own close is then a no-op), captured, and continued in a pass on the
  *       same targets, closed when they are done.</li>
  * </ul>
- * Nothing changes while no material samples the scene.
+ * Nothing changes while no material samples the scene. Should a capture fail, the frame goes on without it
+ * (logged once).
  */
 @Mixin(LevelRenderer.class)
 public class LevelRendererMixin {
 
     @Unique
+    private static boolean kilagraph$captureFailed;
+
+    @Unique
     private @Nullable RenderPass kilagraph$translucentPass;
+
+    @Unique
+    private static void kilagraph$capture() {
+        try {
+            SceneCaptureManager.INSTANCE.capture();
+        } catch (RuntimeException e) {
+            if (!kilagraph$captureFailed) {
+                kilagraph$captureFailed = true;
+                Kilagraph.LOGGER.error("[KilaGraph] scene capture failed (logged once)", e);
+            }
+        }
+    }
 
     @ModifyVariable(method = "executeClassicTransparency", at = @At("HEAD"), argsOnly = true)
     private RenderPass kilagraph$captureBeforeTranslucent(RenderPass renderPass) {
         if (!SceneCaptureManager.INSTANCE.isNeeded()) return renderPass;
         renderPass.close();
-        SceneCaptureManager.INSTANCE.capture();
+        kilagraph$capture(); // doesn't throw: the translucent draws still need their pass
         var main = Minecraft.getInstance().gameRenderer.mainRenderTarget();
         RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
                 () -> "Main (after scene capture)", main.getColorTextureView(), Optional.empty(),
@@ -62,6 +79,6 @@ public class LevelRendererMixin {
     @Inject(method = "executeOit", at = @At("HEAD"))
     private void kilagraph$captureBeforeOit(ChunkSectionsToRender chunkSectionsToRender,
                                             FeatureRenderDispatcher.PreparedFrame featureFrame, CallbackInfo ci) {
-        SceneCaptureManager.INSTANCE.capture();
+        kilagraph$capture();
     }
 }

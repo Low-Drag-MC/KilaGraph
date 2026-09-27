@@ -72,6 +72,14 @@ public final class MaterialUniformBuffer implements AutoCloseable {
         return buffer.slice();
     }
 
+    /** {@link #slice()} for a draw prepared now: these values stay in it until the frame ends
+     *  ({@link KGUploadBuffer#capture}). */
+    @Nullable
+    public GpuBufferSlice capture() {
+        if (layout.isEmpty() || closed) return null;
+        return buffer.capture();
+    }
+
     private void upload() {
         ByteBuffer bb = MemoryUtil.memAlloc(byteSize);
         try {

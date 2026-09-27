@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.rendertype.runtime;
 
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.mixin.client.PipelineCacheAccessor;
 import com.lowdragmc.kilagraph.mixin.client.RenderSystemAccessor;
 import com.mojang.blaze3d.pipeline.PipelineCache;
@@ -44,16 +45,29 @@ public final class KGPipelines {
             failedIn = cache;
         }
         if (FAILED.contains(pipeline)) return false;
-        CompiledRenderPipeline compiled = RenderSystem.getDevice()
-                .compilePipeline(pipeline, accessor.kilagraph$getShaderSource(), Util.backgroundExecutor())
-                .join()
-                .finishCompile();
+        CompiledRenderPipeline compiled;
+        try {
+            compiled = RenderSystem.getDevice()
+                    .compilePipeline(pipeline, accessor.kilagraph$getShaderSource(), Util.backgroundExecutor())
+                    .join()
+                    .finishCompile();
+        } catch (RuntimeException e) {
+            // A backend can throw instead of returning no pipeline; either way this one doesn't compile.
+            Kilagraph.LOGGER.error("[KilaGraph] compiling {} threw", pipeline.getLocation(), e);
+            compiled = null;
+        }
         if (compiled == null) {
             FAILED.add(pipeline);
             return false;
         }
         cache.insert(pipeline, compiled);
         return true;
+    }
+
+    /** Whether {@code pipeline} is compiled in the current cache (a shader reload empties it). */
+    public static boolean isCompiled(RenderPipeline pipeline) {
+        PipelineCache cache = RenderSystemAccessor.kilagraph$getCurrentPipelineCache();
+        return cache != null && ((PipelineCacheAccessor) cache).kilagraph$getCache().containsKey(pipeline);
     }
 
     /** Whether {@code pipeline} failed to compile against the current sources. */

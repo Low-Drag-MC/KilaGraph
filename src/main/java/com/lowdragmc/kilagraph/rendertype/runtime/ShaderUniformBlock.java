@@ -11,10 +11,10 @@ import org.jetbrains.annotations.Nullable;
  * <p>A shader node opts a graph into a block by registering it with the compiler
  * ({@code ShaderCompileContext.useUniformBlock(block)}); the compiler then emits {@link #declareGlsl()}
  * into the source, the pipeline declares {@link #uboName()}, and the material drives {@link #prepareUpload()}
- * (when it is prepared, before the frame's passes open) + {@link #slice()} (bound inside the pass). This is the
- * single extension point for new engine UBOs — implement it, hand a node your instance, and nothing in the
- * compiler / factory / material needs to change. {@link KGEngineUniforms}/{@link KGTransformUniforms} are the
- * built-in implementations.</p>
+ * + {@link #capture()} (when it is prepared, before the frame's passes open) and binds that — or {@link #slice()}
+ * — inside the pass. This is the single extension point for new engine UBOs — implement it, hand a node your
+ * instance, and nothing in the compiler / factory / material needs to change. {@link KGEngineUniforms}/
+ * {@link KGTransformUniforms} are the built-in implementations.</p>
  *
  * <p>Implementations are typically singletons (one shared GPU buffer per block); the same instance may be
  * registered by many nodes/graphs in a frame, so {@link #prepareUpload()} must be idempotent per frame.</p>
@@ -34,4 +34,15 @@ public interface ShaderUniformBlock {
     /** The buffer slice to bind for {@link #uboName()} — pure (safe inside a render pass), or null if absent. */
     @Nullable
     GpuBufferSlice slice();
+
+    /**
+     * The slice a draw prepared now binds, right after {@link #prepareUpload()}: for values that differ between the
+     * draws of a frame (the transforms), these values, kept until the frame ends — see
+     * {@link KGUploadBuffer#capture}. By default {@code null}: the draw binds {@link #slice()} when it runs, as a view
+     * of one of Minecraft's own blocks should — those are set for the pass.
+     */
+    @Nullable
+    default GpuBufferSlice capture() {
+        return null;
+    }
 }

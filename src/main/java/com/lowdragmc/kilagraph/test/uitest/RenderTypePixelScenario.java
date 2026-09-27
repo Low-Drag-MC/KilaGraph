@@ -1,24 +1,23 @@
 package com.lowdragmc.kilagraph.test.uitest;
 
-import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph.Settings.BlendMode;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph.Settings.DepthTest;
+import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
+import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.GeometrySpaces;
+import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.CombineNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentAlphaDiscardBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.fragment.FragmentColorTargetBlock;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.PositionNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceDataNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceIdNode;
-import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4TransformNode;
-import com.lowdragmc.kilagraph.rendertype.runtime.KGInstanceBuffer;
-import com.lowdragmc.kilagraph.rendertype.runtime.KGMesh;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.UVNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.VertexColorNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.basic.Vec3Node;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceDataNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.InstanceIdNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.logic.BranchNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.logic.CompareNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.advanced.AbsNode;
@@ -39,6 +38,7 @@ import com.lowdragmc.kilagraph.rendertype.nodes.math.basic.SubtractNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.interpolation.InverseLerpNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.interpolation.LerpNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.interpolation.SmoothstepNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.math.matrix.Mat4TransformNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.range.ClampNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.range.FractNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.math.range.MaxNode;
@@ -69,9 +69,17 @@ import com.lowdragmc.kilagraph.rendertype.nodes.scene.ScreenPositionNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.transform.CameraNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.transform.KGTransformsUboNode;
+import com.lowdragmc.kilagraph.rendertype.runtime.DynamicShaderSourceRegistry;
+import com.lowdragmc.kilagraph.rendertype.runtime.KGInstanceBuffer;
+import com.lowdragmc.kilagraph.rendertype.runtime.KGMesh;
+import com.lowdragmc.kilagraph.rendertype.runtime.KGPipelines;
+import com.lowdragmc.kilagraph.rendertype.runtime.KGUploadBuffer;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeFactory;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
 import com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureManager;
+import com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.Bare;
+import com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.Canvas;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
@@ -81,26 +89,37 @@ import com.lowdragmc.lowdraglib2.uitest.ScenarioOptions;
 import com.lowdragmc.lowdraglib2.uitest.TestContext;
 import com.lowdragmc.lowdraglib2.uitest.UIScenario;
 import com.lowdragmc.lowdraglib2.uitest.capture.FrameCapture;
-import com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.Bare;
-import com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.Canvas;
-import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.pipeline.ShaderType;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.RenderBuffers;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.CubeListBuilder;
+import net.minecraft.client.model.geom.builders.LayerDefinition;
+import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.SubmitNodeCollection;
 import net.minecraft.client.renderer.SubmitNodeStorage;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.oit.OitRenderPassProvider;
 import net.minecraft.client.renderer.oit.OitStage;
-import com.mojang.renderpearl.api.commands.RenderPass;
-import com.mojang.renderpearl.api.textures.FilterMode;
-import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.shapes.Shapes;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -110,7 +129,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
-import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addBlock;
@@ -157,10 +176,14 @@ public class RenderTypePixelScenario implements UIScenario {
                 .step("two materials of one graph are not batched together", RenderTypePixelScenario::noCrossMaterialBatching)
                 .step("a value set during the submit reaches that draw", RenderTypePixelScenario::uniformSetDuringSubmit)
                 .step("a render type prepared inside an open pass still draws its values", RenderTypePixelScenario::preparedInsidePass)
+                .step("a draw binds the values its render type was prepared with", RenderTypePixelScenario::preparedValuesPerDraw)
                 .step("textures sample the right texels, and can be swapped per material", RenderTypePixelScenario::textureSampling)
                 .step("uv runs left-to-right and bottom-to-top", RenderTypePixelScenario::uvDirection)
                 .step("blend modes combine with what is already there", RenderTypePixelScenario::blending)
                 .step("order-independent transparency composites like blending", RenderTypePixelScenario::orderIndependentTransparency)
+                .step("a blend OIT can't express goes to the solid phase from every submit", RenderTypePixelScenario::submitPhases)
+                .step("closing the last material of a graph frees its pipelines", RenderTypePixelScenario::pipelinesFreed)
+                .step("a closed material's render type draws nothing", RenderTypePixelScenario::closedMaterial)
                 .step("the depth test keeps what is nearer (reversed-Z)", RenderTypePixelScenario::depthTest)
                 .step("a depth offset pulls a coplanar surface forward", RenderTypePixelScenario::depthOffset)
                 .step("a float colour target keeps values above 1", RenderTypePixelScenario::floatColorTarget)
@@ -172,6 +195,7 @@ public class RenderTypePixelScenario implements UIScenario {
                 .step("custom vertex layouts deliver their attributes", RenderTypePixelScenario::vertexLayouts)
                 .step("an instanced draw places and colours each instance", RenderTypePixelScenario::instancedData)
                 .step("instance transforms and the instance id", RenderTypePixelScenario::instanceTransformAndId)
+                .step("prepared instanced draws keep their transforms and instances", RenderTypePixelScenario::preparedInstancedDraws)
                 .step("Scene Color samples the captured frame", RenderTypePixelScenario::sceneColor)
                 .teardown("free the canvas", ctx -> {
                     Canvas canvas = ctx.get(CANVAS, null);
@@ -320,6 +344,34 @@ public class RenderTypePixelScenario implements UIScenario {
                 try (NativeImage img = canvas.read()) {
                     expect(ctx, "the tint set before the draw", rgba(img, C, C), tint[0], tint[1], tint[2]);
                 }
+            }
+            ctx.check("the buffer the new value replaced waits for the frame to end", KGUploadBuffer.retiredCount() > 0);
+            KGUploadBuffer.endFrame();
+            ctx.check("and is closed then", KGUploadBuffer.retiredCount() == 0);
+        }
+    }
+
+    /** Prepared twice before one pass, with the value changed in between, each draw shows the value it was prepared
+     *  with — as Minecraft's per-draw transforms do. */
+    private static void preparedValuesPerDraw(TestContext ctx) {
+        try (RenderTypeGraphMaterial material = material(ctx, exposedTint())) {
+            Canvas canvas = canvas(ctx);
+            canvas.clear(CLEAR);
+            material.setUniform("Tint", new Vector3f(1, 0, 0));
+            canvas.withCamera(new Matrix4f(), () -> Canvas.withPrepared(material.renderType(),
+                    vc -> quad(vc, -1, -1, 0, 1, 0.5f, -1), (left, leftInfo) -> {
+                        material.setUniform("Tint", new Vector3f(0, 0, 1));
+                        Canvas.withPrepared(material.renderType(), vc -> quad(vc, 0, -1, 1, 1, 0.5f, -1),
+                                (right, rightInfo) -> {
+                                    try (RenderPass pass = canvas.openPass()) {
+                                        left.drawFromBuffer(leftInfo, pass);
+                                        right.drawFromBuffer(rightInfo, pass);
+                                    }
+                                });
+                    }));
+            try (NativeImage img = canvas.read()) {
+                expect(ctx, "the first draw keeps the value it was prepared with", rgba(img, C / 2, C), 1, 0, 0);
+                expect(ctx, "the second has the new one", rgba(img, C + C / 2, C), 0, 0, 1);
             }
         }
     }
@@ -549,9 +601,124 @@ public class RenderTypePixelScenario implements UIScenario {
         oit(ctx, BlendMode.ADDITIVE, c[0] + d[0], c[1] + d[1], c[2] + d[2]);
         try (RenderTypeGraphMaterial multiply = material(ctx, halfTransparent(BlendMode.MULTIPLY));
              RenderTypeGraphMaterial translucent = material(ctx, halfTransparent(BlendMode.TRANSLUCENT))) {
-            ctx.check("a multiply draws in the solid phase", multiply.drawsSolidUnderImprovedTransparency());
-            ctx.check("a translucent draws in the OIT phases", !translucent.drawsSolidUnderImprovedTransparency());
+            ctx.check("a multiply draws in the solid phase", multiply.drawsInSolidPhase());
+            ctx.check("a translucent draws in the OIT phases", !translucent.drawsInSolidPhase());
         }
+    }
+
+    /** One way a render type is submitted. */
+    private record Submitter(String name, BiConsumer<SubmitNodeStorage, RenderType> submit) {}
+
+    /**
+     * Where each submit a render type goes through lands, with classic and with improved transparency: a blend
+     * order-independent transparency can't express in the solid phase either way (as vanilla's glint does), an
+     * expressible one in the translucent phases (the OIT one when improved). No draw — the phases are inspected.
+     */
+    @SuppressWarnings("deprecation") // the plain collectParts, for a block model without a level
+    private static void submitPhases(TestContext ctx) {
+        var mesh = new MeshDefinition();
+        mesh.getRoot().addOrReplaceChild("cube", CubeListBuilder.create().addBox(-8, -8, 0, 16, 16, 1), PartPose.ZERO);
+        ModelPart cube = LayerDefinition.create(mesh, 16, 16).bakeRoot();
+        List<BlockStateModelPart> stone = new ArrayList<>();
+        Minecraft.getInstance().getModelManager().getBlockStateModelSet().get(Blocks.STONE.defaultBlockState())
+                .collectParts(RandomSource.create(0), stone);
+        List<Submitter> submitters = List.of(
+                new Submitter("custom geometry", (storage, type) -> storage.submitCustomGeometry(new PoseStack(), type,
+                        (pose, vc) -> quad(vc, -1, -1, 1, 1, 0.5f, -1))),
+                new Submitter("model part", (storage, type) -> storage.submitModelPart(cube, new PoseStack(), type,
+                        0x00F000F0, OverlayTexture.NO_OVERLAY, null)),
+                new Submitter("block model", (storage, type) -> storage.submitBlockModel(new PoseStack(), type, stone,
+                        new int[0], 0x00F000F0, OverlayTexture.NO_OVERLAY, 0)),
+                new Submitter("shape outline", (storage, type) -> storage.submitShapeOutline(new PoseStack(),
+                        Shapes.block(), type, 0x80FFFFFF, 1, false)));
+        try (RenderTypeGraphMaterial multiply = material(ctx, halfTransparent(BlendMode.MULTIPLY));
+             RenderTypeGraphMaterial translucent = material(ctx, halfTransparent(BlendMode.TRANSLUCENT))) {
+            for (boolean improved : new boolean[]{false, true}) {
+                for (Submitter submitter : submitters) {
+                    String where = (improved ? "improved" : "classic") + ", " + submitter.name();
+                    ctx.check(where + ": multiply in the solid phase",
+                            landsInSolid(submitter, multiply, improved), "solid", "translucent");
+                    ctx.check(where + ": translucent in a translucent phase",
+                            !landsInSolid(submitter, translucent, improved), "translucent", "solid");
+                }
+            }
+        }
+    }
+
+    /** Whether {@code material}'s submit lands in the solid phase — else, as checked, in a translucent one. */
+    private static boolean landsInSolid(Submitter submitter, RenderTypeGraphMaterial material, boolean improved) {
+        var storage = new SubmitNodeStorage();
+        storage.setUseImprovedTransparency(improved);
+        submitter.submit().accept(storage, material.renderType());
+        SubmitNodeCollection collection = storage.order(0);
+        boolean translucent = !collection.translucentCustomGeometry.isEmpty() || !collection.translucentModels.isEmpty()
+                || !collection.translucentBlocksAndItems.isEmpty() || !collection.shapeOutlines.isEmpty()
+                || !collection.oitTranslucent.isEmpty();
+        return !collection.solid.isEmpty() && !translucent;
+    }
+
+    /** A graph's pipelines — the OIT ones and the colour-target one too — stay compiled while a material of it lives,
+     *  and are closed, their GLSL dropped, when the last one closes. */
+    private static void pipelinesFreed(TestContext ctx) {
+        Bare b = halfTransparent(BlendMode.TRANSLUCENT);
+        colorTarget(b, 1, "RGBA8", new Vector4f(0, 1, 0, 1));
+        CompiledShaderGraph compiled = new ShaderGraphCompiler(b.graph()).compile();
+        RenderTypeGraphMaterial first = RenderTypeFactory.createMaterial(compiled);
+        RenderTypeGraphMaterial second = RenderTypeFactory.createMaterial(compiled);
+        ctx.require("the graph compiles", first != null && second != null);
+        var generated = RenderTypeFactory.getOrBuildPipelines(compiled);
+        ctx.require("it has OIT and colour-target pipelines", generated.oit() != null && generated.colorTargets() != null);
+        boolean allCompiled = true;
+        for (var pipeline : generated.all()) allCompiled &= KGPipelines.ensureCompiled(pipeline);
+        ctx.check("all of them compile", allCompiled);
+        var shader = DynamicShaderSourceRegistry.shaderId(compiled.contentHash());
+        first.close();
+        ctx.check("a second material keeps them", generated.all().stream().allMatch(KGPipelines::isCompiled)
+                && DynamicShaderSourceRegistry.get(shader, ShaderType.VERTEX) != null);
+        second.close();
+        ctx.check("the last one closes them", generated.all().stream().noneMatch(KGPipelines::isCompiled));
+        ctx.check("and drops their GLSL", DynamicShaderSourceRegistry.get(shader, ShaderType.VERTEX) == null
+                && DynamicShaderSourceRegistry.get(shader, ShaderType.FRAGMENT) == null);
+        // Built again, the graph has a live material; closing a closed one again must not release its reference.
+        RenderTypeGraphMaterial third = RenderTypeFactory.createMaterial(compiled);
+        ctx.require("the graph compiles again", third != null);
+        second.close();
+        ctx.check("closing twice doesn't release another material's reference",
+                KGPipelines.isCompiled(third.renderType().pipeline())
+                        && DynamicShaderSourceRegistry.get(shader, ShaderType.VERTEX) != null);
+        third.close();
+    }
+
+    /** A render type of a closed material — prepared before the close, or submitted after it — draws nothing and
+     *  compiles nothing, and the material refuses an instanced draw. */
+    private static void closedMaterial(TestContext ctx) {
+        RenderTypeGraphMaterial material = material(ctx, exposedTint());
+        expect(ctx, "the material draws", draw(ctx, material, C, C), 1, 0, 0);
+        Canvas canvas = canvas(ctx);
+        canvas.clear(CLEAR);
+        canvas.withCamera(new Matrix4f(), () -> Canvas.withPrepared(material.renderType(),
+                vc -> quad(vc, -1, -1, 1, 1, 0.5f, -1), (prepared, info) -> {
+                    material.close();
+                    try (RenderPass pass = canvas.openPass()) {
+                        prepared.drawFromBuffer(info, pass);
+                    }
+                }));
+        try (NativeImage img = canvas.read()) {
+            expect(ctx, "a draw prepared before the close is skipped", rgba(img, C, C), 0.2f, 0.2f, 0.2f);
+        }
+        try (NativeImage img = dispatch(ctx, storage -> storage.submitCustomGeometry(new PoseStack(),
+                material.renderType(), (p, vc) -> quad(vc, -1, -1, 1, 1, 0.5f, -1)))) {
+            expect(ctx, "a render type submitted after the close draws nothing", rgba(img, C, C), 0.2f, 0.2f, 0.2f);
+        }
+        ctx.check("the render type still knows its material", RenderTypeGraphMaterial.of(material.renderType()) == material);
+        ctx.check("and nothing compiled its freed pipeline again", !KGPipelines.isCompiled(material.renderType().pipeline()));
+        boolean refused = false;
+        try (KGMesh mesh = KGMesh.build(material, vc -> quad(vc, -1, -1, 1, 1, 0.5f, -1))) {
+            material.prepareInstanced(mesh, null, 1, new Matrix4f());
+        } catch (IllegalStateException e) {
+            refused = true;
+        }
+        ctx.check("an instanced draw of a closed material is refused", refused);
     }
 
     /** (0.5, 0.25, 0) at alpha 0.5 with {@code mode}. */
@@ -754,7 +921,7 @@ public class RenderTypePixelScenario implements UIScenario {
     /** Vertex colour through each preset layout — a wrong offset or stride shows up as the wrong colour. */
     private static void vertexLayouts(TestContext ctx) {
         int argb = 0xFF3399E6; // (0.2, 0.6, 0.9)
-        var layouts = new LinkedHashMap<String, java.util.List<String>>();
+        var layouts = new LinkedHashMap<String, List<String>>();
         layouts.put("Entity", VertexFormatPresets.ENTITY);
         layouts.put("Block", VertexFormatPresets.BLOCK);
         layouts.put("Position Color Tex", VertexFormatPresets.POSITION_COLOR_TEX);
@@ -857,6 +1024,68 @@ public class RenderTypePixelScenario implements UIScenario {
         }
     }
 
+    /**
+     * Instanced draws prepared one after another and then run in one pass each keep what they were prepared with: the
+     * transforms of their pose ({@code KG_Transforms}) and the instances uploaded for them. So do a frame's draws when
+     * one is prepared between the frame's geometry and its passes.
+     */
+    private static void preparedInstancedDraws(TestContext ctx) {
+        // The object-space origin as the draw's KG_Transforms sees it: minus the translation of its pose.
+        Bare t = bare();
+        NodeModel transforms = addNode(t.graph(), KGTransformsUboNode.class);
+        NodeModel origin = addNode(t.graph(), Mat4TransformNode.class);
+        wire(t.graph(), origin.getInputsById().get("m"), transforms.getOutputsById().get("IModelViewMat"));
+        wire(t.graph(), origin.getInputsById().get("v"), vec3(t, 0, 0, 0).getOutputsById().get("out"));
+        wire(t.graph(), t.color(), origin.getOutputsById().get("out"));
+        Bare i = bare();
+        wire(i.graph(), i.color(), instanceData(i, "Tint", "VEC3").getOutputsById().get("out"));
+        float[][] poses = {{-0.5f, -0.25f}, {-0.25f, -0.75f}};
+        var mc = Minecraft.getInstance();
+        Canvas canvas = canvas(ctx);
+        try (RenderTypeGraphMaterial byPose = material(ctx, t);
+             RenderTypeGraphMaterial byInstance = material(ctx, i);
+             KGMesh poseMesh = KGMesh.build(byPose, vc -> quad(vc, -0.2f, -0.2f, 0.2f, 0.2f, 0.5f, -1));
+             KGMesh instanceMesh = KGMesh.build(byInstance, vc -> quad(vc, -0.2f, -0.2f, 0.2f, 0.2f, 0.5f, -1));
+             KGInstanceBuffer tint = byInstance.createInstanceBuffer(1);
+             var buffers = new RenderBuffers(1);
+             var dispatcher = new FeatureRenderDispatcher(buffers, mc.getModelManager(), mc.getAtlasManager(),
+                     mc.font, mc.gameRenderer.gameRenderState())) {
+            canvas.clear(CLEAR);
+            canvas.withCamera(new Matrix4f(), () -> {
+                // A frame whose geometry is built (identity model-view: the origin is black) ...
+                var storage = new SubmitNodeStorage();
+                storage.submitCustomGeometry(new PoseStack(), byPose.renderType(),
+                        (pose, vc) -> quad(vc, 0.3f, -0.2f, 0.7f, 0.2f, 0.5f, -1));
+                try (var frame = dispatcher.prepareFrame(storage)) {
+                    // ... then instanced draws prepared before its passes, each with its own pose or instances.
+                    List<RenderTypeGraphMaterial.InstancedDraw> draws = new ArrayList<>();
+                    for (float[] p : poses) {
+                        draws.add(byPose.prepareInstanced(poseMesh, null, 1, new Matrix4f().translation(p[0], p[1], 0)));
+                    }
+                    tint.set(0, "Tint", 1, 0, 0);
+                    draws.add(byInstance.prepareInstanced(instanceMesh, tint, 1, new Matrix4f().translation(0.5f, 0.6f, 0)));
+                    tint.set(0, "Tint", 0, 0, 1);
+                    draws.add(byInstance.prepareInstanced(instanceMesh, tint, 1, new Matrix4f().translation(0.5f, -0.6f, 0)));
+                    try (RenderPass pass = canvas.openPass()) {
+                        frame.executeSolid(pass);
+                        frame.executeTranslucent(pass);
+                        for (var draw : draws) draw.execute(pass);
+                    }
+                }
+                buffers.endFrame();
+            });
+            try (NativeImage img = canvas.read()) {
+                for (float[] p : poses) {
+                    expect(ctx, "the transforms of the pose at (" + p[0] + ", " + p[1] + ")", pixel(img, p[0], p[1]),
+                            -p[0], -p[1], 0);
+                }
+                expect(ctx, "the instances uploaded for the first draw", pixel(img, 0.5f, 0.6f), 1, 0, 0);
+                expect(ctx, "and for the second", pixel(img, 0.5f, -0.6f), 0, 0, 1);
+                expect(ctx, "the frame's draw keeps its own transforms", pixel(img, 0.5f, 0), 0, 0, 0);
+            }
+        }
+    }
+
     private static NodeModel instanceData(Bare b, String name, String type) {
         NodeModel node = addNode(b.graph(), InstanceDataNode.class);
         setOption(node, InstanceDataNode.OPTION_NAME, name);
@@ -890,6 +1119,9 @@ public class RenderTypePixelScenario implements UIScenario {
         } finally {
             material.close();
         }
+        ctx.check("closing the last material that samples the scene frees the capture",
+                !SceneCaptureManager.INSTANCE.isNeeded() && SceneCaptureManager.INSTANCE.colorView() == null
+                        && SceneCaptureManager.INSTANCE.depthView() == null);
     }
 
     // ---- building blocks ---------------------------------------------------------------------------

@@ -10,9 +10,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Uploads the KilaGraph materials a frame prepared once its geometry is built: a render type is prepared before
- * the geometry callback that fills it, so this is the point where the values set there are final — and it is
- * still before the frame's render passes open.
+ * Takes the values of the KilaGraph render types a frame prepared again once its geometry is built: a render type
+ * is prepared before the geometry callback that fills it, so this is the point where the values set there are
+ * final — and it is still before the frame's render passes open.
  */
 @Mixin(FeatureRenderDispatcher.class)
 public class FeatureRenderDispatcherMixin {

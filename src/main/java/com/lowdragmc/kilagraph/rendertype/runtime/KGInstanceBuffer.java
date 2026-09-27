@@ -93,8 +93,16 @@ public final class KGInstanceBuffer implements AutoCloseable {
         dirty = false;
     }
 
+    /** The uploaded instances as they are now; {@code null} before the first upload. */
+    @Nullable
     GpuBufferSlice slice() {
-        GpuBufferSlice slice = buffer.slice();
+        return buffer.slice();
+    }
+
+    /** The uploaded instances, for a draw prepared now: they stay in it until the frame ends, whatever is set and
+     *  uploaded meanwhile ({@link KGUploadBuffer#capture}). */
+    GpuBufferSlice capture() {
+        GpuBufferSlice slice = buffer.capture();
         if (slice == null) throw new IllegalStateException("instance buffer was never uploaded");
         return slice;
     }

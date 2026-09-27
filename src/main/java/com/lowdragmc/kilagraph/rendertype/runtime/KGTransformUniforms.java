@@ -45,9 +45,9 @@ import java.nio.ByteBuffer;
  * {@code globals.glsl} ({@code CameraBlockPos} + {@code CameraOffset}, a precision-split form that is more
  * accurate far from the origin), so the Transform node's world translation reads that instead. World here
  * means <em>absolute world</em>: {@code world = IViewMat * view + cameraWorldPos}, with {@code ViewMat}
- * carrying only the camera rotation. Rewritten at the start of every KilaGraph draw (before its pass —
- * {@code writeToBuffer} is illegal inside a pass) via {@link #prepareUpload()}; bound inside the pass via
- * {@link #slice()}.</p>
+ * carrying only the camera rotation. Refreshed whenever a KilaGraph render type is prepared
+ * ({@link #prepareUpload()}); each draw binds the block as it was when the draw was prepared ({@code capture}), as
+ * Minecraft's own per-draw transforms are.</p>
  *
  * <p><b>Camera source:</b> the object&harr;view matrix always comes from {@code RenderSystem} (set
  * correctly by whatever is rendering). The camera rotation + projection come from the live game camera in
@@ -67,6 +67,7 @@ public final class KGTransformUniforms {
         @Override public String declareGlsl() { return KGTransformUniforms.declareGlsl(); }
         @Override public void prepareUpload() { KGTransformUniforms.prepareUpload(); }
         @Override public GpuBufferSlice slice() { return KGTransformUniforms.slice(); }
+        @Override public GpuBufferSlice capture() { return BUFFER.capture(); }
     };
 
     /** std140 size: six mat4 + ivec3 + vec3 (the camera-position split pair) + vec2 (the depth remap). */
