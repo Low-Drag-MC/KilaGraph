@@ -198,7 +198,9 @@ public final class McRecipeGameTest {
 
         var blast = cook(level, CookingType.BLASTING, rawIron);
         assertTrue(helper, "and blasts too", blast.eval("found", Boolean.class));
-        assertEq(helper, "in half the time", 100, blast.eval("time", Integer.class).intValue());
+        // 26.3 moved the blast furnace's speed-up onto the fuel (its cooking_fuel speed multiplier): the recipe
+        // itself takes as long as the furnace's.
+        assertEq(helper, "in the same recipe time", 200, blast.eval("time", Integer.class).intValue());
         assertEq(helper, "for the same result", Items.IRON_INGOT, blast.eval("out", ItemStack.class).getItem());
 
         // The smoker is food only, which is what makes the option a real input rather than decoration.

@@ -636,7 +636,8 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "fsh reads the KG_Fog slice-view", fsh.contains("kg_fog."));
         assertFalse(helper, "fsh no longer imports fog", fsh.contains("#include <minecraft:fog.glsl>"));
         assertTrue(helper, "fsh imports dynamictransforms", fsh.contains("#include <minecraft:dynamictransforms.glsl>"));
-        assertTrue(helper, "fsh writes fragColor", fsh.contains("fragColor = vec4("));
+        assertTrue(helper, "fsh writes fragColor", fsh.contains("vec4 kg_color = vec4(kg_baseColor, kg_alpha);")
+                && fsh.contains("fragColor = kg_color;"));
 
         // Pipeline metadata
         assertTrue(helper, "pipeline binds DynamicTransforms",

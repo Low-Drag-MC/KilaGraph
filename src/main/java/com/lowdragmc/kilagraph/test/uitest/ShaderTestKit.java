@@ -21,8 +21,16 @@ import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.systems.ScissorState;
-import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.pipeline.IndexType;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.StagedVertexBuffer;
+import net.minecraft.client.renderer.rendertype.PreparedRenderType;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.ProjectionMatrixBuffer;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.OverlayTexture;
@@ -31,6 +39,9 @@ import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -158,7 +169,7 @@ final class ShaderTestKit {
         }
 
         Canvas(GpuFormat format) {
-            target = new TextureTarget("KilaGraph test canvas", SIZE, SIZE, true, format);
+            target = new TextureTarget("KilaGraph test canvas", SIZE, SIZE, format, GpuFormat.D32_FLOAT);
         }
 
         /** Clear colour to {@code argb} and depth to the far plane (0, reversed-Z). */
@@ -174,14 +185,70 @@ final class ShaderTestKit {
             draw(material, new Matrix4f(), emit);
         }
 
+        /** Draw {@code emit}'s geometry through {@code material}'s render type the way Minecraft's own draws go:
+         *  prepared (so uploaded) first, then drawn in a pass on this canvas. */
         void draw(RenderTypeGraphMaterial material, Matrix4f projection, Consumer<VertexConsumer> emit) {
-            withCamera(projection, () -> RenderUtils.drawImmediate(material.renderType(), emit));
+            withCamera(projection, () -> withPrepared(material.renderType(), emit, (prepared, info) -> {
+                try (RenderPass pass = openPass()) {
+                    prepared.drawFromBuffer(info, pass);
+                }
+            }));
         }
 
-        /** Run {@code body} with its draws landing in this canvas, seen through {@code projection}. */
+        /** Build {@code emit}'s geometry for {@code renderType} and prepare the type — both before any pass opens —
+         *  then hand them to {@code draw}; the geometry lives for the call. */
+        static void withPrepared(RenderType renderType, Consumer<VertexConsumer> emit,
+                                 BiConsumer<PreparedRenderType, StagedVertexBuffer.ExecuteInfo> draw) {
+            try (var bytes = new ByteBufferBuilder(RenderType.TRANSIENT_BUFFER_SIZE)) {
+                var builder = new BufferBuilder(bytes, renderType.primitiveTopology(), renderType.format());
+                emit.accept(builder);
+                MeshData mesh = builder.build();
+                if (mesh == null) return;
+                try (mesh) {
+                    var device = RenderSystem.getDevice();
+                    var state = mesh.drawState();
+                    PreparedRenderType prepared = renderType.prepare();
+                    GpuBuffer vertices = device.createBuffer(() -> "KilaGraph test vertices",
+                            GpuBuffer.USAGE_VERTEX, mesh.vertexBuffer());
+                    GpuBuffer indices = mesh.indexBuffer() == null ? null : device.createBuffer(
+                            () -> "KilaGraph test indices", GpuBuffer.USAGE_INDEX, mesh.indexBuffer());
+                    IndexType type = state.indexType();
+                    if (indices == null) {
+                        var sequential = RenderSystem.getSequentialBuffer(state.primitiveTopology());
+                        sequential.getBuffer(state.indexCount()); // grown before the pass opens
+                        type = sequential.type();
+                    }
+                    try {
+                        draw.accept(prepared, new StagedVertexBuffer.ExecuteInfo(vertices, indices, type, 0, 0,
+                                state.indexCount(), state.primitiveTopology()));
+                    } finally {
+                        vertices.close();
+                        if (indices != null) indices.close();
+                    }
+                }
+            }
+        }
+
+        /** Draw like LDLib2's immediate draws do: the render type is prepared inside the already open pass. */
+        void drawInPass(RenderTypeGraphMaterial material, Consumer<VertexConsumer> emit) {
+            withCamera(new Matrix4f(), () -> {
+                try (RenderPass pass = openPass()) {
+                    RenderUtils.drawImmediate(pass, material.renderType(), emit);
+                }
+            });
+        }
+
+        /** A render pass on this canvas's colour and depth. */
+        RenderPass openPass() {
+            RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+                    () -> "KilaGraph test canvas", target.getColorTextureView(), Optional.empty(),
+                    target.getDepthTextureView(), OptionalDouble.empty());
+            RenderSystem.bindDefaultUniforms(pass);
+            return pass;
+        }
+
+        /** Run {@code body} seen through {@code projection}, with an identity model-view and no scissor. */
         void withCamera(Matrix4f projection, Runnable body) {
-            GpuTextureView prevColor = RenderSystem.outputColorTextureOverride;
-            GpuTextureView prevDepth = RenderSystem.outputDepthTextureOverride;
             ScissorState scissor = new ScissorState(RenderSystem.getScissorStateForRenderTypeDraws());
             var modelView = RenderSystem.getModelViewStack();
             RenderSystem.backupProjectionMatrix();
@@ -190,14 +257,10 @@ final class ShaderTestKit {
                 RenderSystem.setProjectionMatrix(projectionBuffer.getBuffer(projection), ProjectionType.PERSPECTIVE);
                 modelView.identity();
                 RenderSystem.disableScissorForRenderTypeDraws();
-                RenderSystem.outputColorTextureOverride = target.getColorTextureView();
-                RenderSystem.outputDepthTextureOverride = target.getDepthTextureView();
                 SceneCameraContext.set(new Matrix4f(), new Matrix4f(projection));
                 body.run();
             } finally {
                 SceneCameraContext.clear();
-                RenderSystem.outputColorTextureOverride = prevColor;
-                RenderSystem.outputDepthTextureOverride = prevDepth;
                 if (scissor.enabled()) {
                     RenderSystem.enableScissorForRenderTypeDraws(scissor.x(), scissor.y(), scissor.width(), scissor.height());
                 }

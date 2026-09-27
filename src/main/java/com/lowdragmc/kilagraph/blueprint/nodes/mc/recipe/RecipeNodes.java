@@ -155,6 +155,10 @@ public final class RecipeNodes {
      *
      * <p>{@code experience} is per item and is a fraction — iron ore pays 0.7 — which is why the furnace
      * hands out whole levels only after several smelts.</p>
+     *
+     * <p>{@code time} is the recipe's cooking time in ticks. The block divides it by its fuel's speed
+     * multiplier (the {@code cooking_fuel} component), which is where a blast furnace's speed now comes from:
+     * raw iron is a 200-tick recipe in a furnace and a blast furnace alike.</p>
      */
     @NodeAttribute(name = "mc_smelting_result", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class SmeltingResult extends AnnotatedNode {

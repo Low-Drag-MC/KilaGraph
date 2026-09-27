@@ -14,6 +14,7 @@ import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VaryingStageNode;
 import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
 import com.lowdragmc.kilagraph.rendertype.iris.IrisSurfaceRegistry;
+import com.lowdragmc.kilagraph.rendertype.runtime.KGPipelines;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeFactory;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
 import com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.Bare;
@@ -33,6 +34,7 @@ import com.lowdragmc.lowdraglib2.uitest.ScenarioOptions;
 import com.lowdragmc.lowdraglib2.uitest.TestContext;
 import com.lowdragmc.lowdraglib2.uitest.UIScenario;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -91,9 +93,10 @@ public class RenderTypeNodeSweepScenario implements UIScenario {
         Sweep sweep = ctx.get(SWEEP);
         String backend = RenderSystem.getDevice().getDeviceInfo().backendName();
         String summary = String.format(java.util.Locale.ROOT,
-                "%s: %d node classes, %d block classes, %d variants, %d distinct pipelines drawn, %d stage-restricted, %d failures",
+                "%s: %d node classes, %d block classes, %d variants, %d distinct pipelines drawn, %d translucent "
+                        + "variants compiled for OIT, %d stage-restricted, %d failures",
                 backend, sweep.nodeClasses, sweep.blockClasses, sweep.variants, sweep.pipelines.size(),
-                sweep.stageRestricted, sweep.failures.size());
+                sweep.oitVariants, sweep.stageRestricted, sweep.failures.size());
         if (IrisCompat.ENABLED) {
             summary += String.format(java.util.Locale.ROOT, "; Iris: %d injectable pipelines validated, not injectable by design: %s",
                     sweep.irisChecked, sweep.irisPassthrough);
@@ -169,7 +172,7 @@ public class RenderTypeNodeSweepScenario implements UIScenario {
         /** Node classes some variant of which the compiler deemed not injectable under a shaderpack. */
         final Set<String> irisPassthrough = new TreeSet<>();
         int irisChecked;
-        int nodeClasses, blockClasses, variants, stageRestricted;
+        int nodeClasses, blockClasses, variants, stageRestricted, oitVariants;
 
         Sweep() {
             List<Class<? extends Node>> classes = new ArrayList<>(RenderTypeGraph.NODE_REGISTRY.getNodeClasses());
@@ -271,6 +274,40 @@ public class RenderTypeNodeSweepScenario implements UIScenario {
                 covered.add(node);
             } catch (Throwable t) {
                 fail(node, label, "drawing threw " + t, compiled);
+            } finally {
+                material.close();
+            }
+            buildVariants(node, label, b);
+        }
+
+        /**
+         * The graph's other pipelines must compile too: the same GLSL under other shader defines. Blended, it has
+         * the three order-independent transparency phases; with colour targets, the pipeline writing them.
+         */
+        private void buildVariants(String node, String label, Bare b) {
+            b.settings(s -> ShaderTestKit.settings(s, RenderTypeGraph.Settings.BlendMode.TRANSLUCENT, s.depthTest(),
+                    false, false));
+            CompiledShaderGraph compiled;
+            try {
+                compiled = new ShaderGraphCompiler(b.graph()).compile();
+            } catch (Throwable t) {
+                fail(node, label, "the compiler threw for the translucent variant " + t, null);
+                return;
+            }
+            if (compiled.hasStageErrors() || !pipelines.add(compiled.contentHash())) return;
+            RenderTypeGraphMaterial material = RenderTypeFactory.createMaterial(compiled);
+            if (material == null) {
+                fail(node, label, "the backend rejected the translucent variant", compiled);
+                return;
+            }
+            try {
+                var generated = RenderTypeFactory.getOrBuildPipelines(compiled);
+                for (RenderPipeline pipeline : generated.all()) {
+                    if (!KGPipelines.ensureCompiled(pipeline)) {
+                        fail(node, label, "the backend rejected " + pipeline.getLocation(), compiled);
+                    }
+                }
+                oitVariants++;
             } finally {
                 material.close();
             }

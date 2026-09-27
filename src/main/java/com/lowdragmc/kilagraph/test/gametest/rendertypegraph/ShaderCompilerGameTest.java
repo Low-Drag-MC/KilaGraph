@@ -672,7 +672,7 @@ public final class ShaderCompilerGameTest {
         String fsh = rgba8.fragmentSource();
         assertFalse(helper, "no stage error", rgba8.hasStageErrors());
         assertTrue(helper, "one array through target 3", fsh.contains("layout(location = 0) out vec4 kg_outputs[4];"));
-        assertTrue(helper, "main output is element 0", fsh.contains("kg_outputs[0] = vec4(kg_baseColor, kg_alpha);"));
+        assertTrue(helper, "main output is element 0", fsh.contains("#define fragColor kg_outputs[0]"));
         assertTrue(helper, "targets written, the gap left alone", fsh.contains("kg_outputs[1] = ")
                 && fsh.contains("kg_outputs[3] = ") && !fsh.contains("kg_outputs[2]"));
         assertEq(helper, "sorted by location, the first block per location wins", java.util.List.of(1, 3),
@@ -682,7 +682,9 @@ public final class ShaderCompilerGameTest {
         assertEq(helper, "the format is not in the GLSL", fsh, rgba16f.fragmentSource());
         assertFalse(helper, "but is in the pipeline key", rgba8.contentHash().equals(rgba16f.contentHash()));
         assertTrue(helper, "not injectable under Iris", rgba8.injectionSnippet() == null);
-        assertTrue(helper, "no targets: plain fragColor", compile(new RenderTypeGraph()).fragmentSource().contains("\nout vec4 fragColor;"));
+        String plain = compile(new RenderTypeGraph()).fragmentSource();
+        assertTrue(helper, "no targets: plain fragColor", plain.contains("\nlayout(location = 0) out vec4 fragColor;")
+                && !plain.contains(ShaderGraphCompiler.MRT_OUTPUTS));
         helper.succeed();
     }
 
@@ -2987,12 +2989,13 @@ public final class ShaderCompilerGameTest {
         NodeModel sc2 = addNode(g2, SceneColorNode.class);
         wire(g2, addBlock(g2, g2.getFragmentStageModel(), FragmentBaseColorBlock.class).getInputsById().get("color"),
                 sc2.getOutputsById().get("out"));
+        // (gl_FragCoord.z is left to the OIT phases' depth; the screen-space uv is what must not appear.)
         assertFalse(helper, "editor preview does not use gl_FragCoord",
-                new ShaderGraphCompiler(g2).editorPreview().compile().fragmentSource().contains("gl_FragCoord"));
+                new ShaderGraphCompiler(g2).editorPreview().compile().fragmentSource().contains("gl_FragCoord.xy"));
 
         // In-world: the real compile keeps true screen-space.
         assertTrue(helper, "in-world keeps gl_FragCoord screen-space",
-                new ShaderGraphCompiler(g2).compile().fragmentSource().contains("gl_FragCoord"));
+                new ShaderGraphCompiler(g2).compile().fragmentSource().contains("gl_FragCoord.xy"));
         helper.succeed();
     }
 

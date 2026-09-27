@@ -92,14 +92,24 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBuffers;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.SubmitNodeStorage;
+import net.minecraft.client.renderer.oit.OitRenderPassProvider;
+import net.minecraft.client.renderer.oit.OitStage;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.textures.FilterMode;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -146,13 +156,15 @@ public class RenderTypePixelScenario implements UIScenario {
                 .step("an exposed variable is a per-material uniform", RenderTypePixelScenario::materialUniform)
                 .step("two materials of one graph are not batched together", RenderTypePixelScenario::noCrossMaterialBatching)
                 .step("a value set during the submit reaches that draw", RenderTypePixelScenario::uniformSetDuringSubmit)
+                .step("a render type prepared inside an open pass still draws its values", RenderTypePixelScenario::preparedInsidePass)
                 .step("textures sample the right texels, and can be swapped per material", RenderTypePixelScenario::textureSampling)
                 .step("uv runs left-to-right and bottom-to-top", RenderTypePixelScenario::uvDirection)
                 .step("blend modes combine with what is already there", RenderTypePixelScenario::blending)
-                .step("the depth test keeps what is nearer (26.2 is reversed-Z)", RenderTypePixelScenario::depthTest)
+                .step("order-independent transparency composites like blending", RenderTypePixelScenario::orderIndependentTransparency)
+                .step("the depth test keeps what is nearer (reversed-Z)", RenderTypePixelScenario::depthTest)
                 .step("a depth offset pulls a coplanar surface forward", RenderTypePixelScenario::depthOffset)
                 .step("a float colour target keeps values above 1", RenderTypePixelScenario::floatColorTarget)
-                .step("colour targets are written in the same draw (MRT)", RenderTypePixelScenario::colorTargets)
+                .step("colour targets are written in the same draw, in a pass that has them (MRT)", RenderTypePixelScenario::colorTargets)
                 .step("colour targets blend like the main target", RenderTypePixelScenario::colorTargetBlend)
                 .step("alpha discard drops what is below the cutoff", RenderTypePixelScenario::alphaDiscard)
                 .step("camera planes and eye depth are reconstructed from the projection", RenderTypePixelScenario::depthReconstruction)
@@ -296,6 +308,22 @@ public class RenderTypePixelScenario implements UIScenario {
         }
     }
 
+    /** LDLib2's immediate draws prepare the render type inside an open pass, where nothing may be written: the
+     *  values still reach the draw, the first time and after a change. */
+    private static void preparedInsidePass(TestContext ctx) {
+        try (RenderTypeGraphMaterial material = material(ctx, exposedTint())) {
+            Canvas canvas = canvas(ctx);
+            for (float[] tint : new float[][]{{1, 0, 0}, {0, 0, 1}}) {
+                material.setUniform("Tint", new Vector3f(tint[0], tint[1], tint[2]));
+                canvas.clear(CLEAR);
+                canvas.drawInPass(material, vc -> quad(vc, -1, -1, 1, 1, 0.5f, -1));
+                try (NativeImage img = canvas.read()) {
+                    expect(ctx, "the tint set before the draw", rgba(img, C, C), tint[0], tint[1], tint[2]);
+                }
+            }
+        }
+    }
+
     private static void textureSampling(TestContext ctx) {
         // 2x2 texture, image row 0 at the top: red green / blue white.
         Identifier checker = Identifier.fromNamespaceAndPath("kilagraph", "uitest/checker");
@@ -417,12 +445,17 @@ public class RenderTypePixelScenario implements UIScenario {
              Canvas second = new Canvas();
              Canvas hdr = new Canvas(GpuFormat.RGBA16_FLOAT)) {
             ctx.check("the material has both targets", material.colorTargets().size() == 2);
-            expect(ctx, "none bound: the main target still draws", draw(ctx, material, C, C), 1, 0, 0);
+            expect(ctx, "none bound: the main target still draws", drawWithColorTargets(ctx, material, C, C), 1, 0, 0);
             material.setColorTarget(1, second.target.getColorTextureView());
             material.setColorTarget(3, hdr.target.getColorTextureView());
             second.clear(CLEAR);
             hdr.clear(0);
-            expect(ctx, "the main target", draw(ctx, material, C, C), 1, 0, 0);
+            // A render type draws in its caller's pass, which has the main target alone.
+            expect(ctx, "a render type draw writes the main target", draw(ctx, material, C, C), 1, 0, 0);
+            try (NativeImage img = second.read()) {
+                expect(ctx, "a render type draw leaves the colour targets alone", rgba(img, C, C), 0.2f, 0.2f, 0.2f);
+            }
+            expect(ctx, "the main target", drawWithColorTargets(ctx, material, C, C), 1, 0, 0);
             try (NativeImage img = second.read()) {
                 expect(ctx, "target 1", rgba(img, C, C), 0, 1, 0);
             }
@@ -434,11 +467,11 @@ public class RenderTypePixelScenario implements UIScenario {
                 refused = true;
             }
             ctx.check("a texture of another format is refused", refused);
-            var small = new TextureTarget("KilaGraph small target", Canvas.SIZE / 2, Canvas.SIZE / 2, false,
-                    GpuFormat.RGBA8_UNORM);
+            var small = new TextureTarget("KilaGraph small target", Canvas.SIZE / 2, Canvas.SIZE / 2,
+                    GpuFormat.RGBA8_UNORM, null);
             try {
                 material.setColorTarget(1, small.getColorTextureView());
-                expect(ctx, "a target of another size is skipped", draw(ctx, material, C, C), 1, 0, 0);
+                expect(ctx, "a target of another size is skipped", drawWithColorTargets(ctx, material, C, C), 1, 0, 0);
             } finally {
                 small.destroyBuffers();
             }
@@ -454,7 +487,7 @@ public class RenderTypePixelScenario implements UIScenario {
              Canvas second = new Canvas()) {
             material.setColorTarget(1, second.target.getColorTextureView());
             second.clear(CLEAR);
-            expect(ctx, "the main target adds", draw(ctx, material, C, C), 0.7f, 0.2f, 0.2f);
+            expect(ctx, "the main target adds", drawWithColorTargets(ctx, material, C, C), 0.7f, 0.2f, 0.2f);
             try (NativeImage img = second.read()) {
                 expect(ctx, "the colour target adds", rgba(img, C, C), 0.2f, 0.7f, 0.2f);
             }
@@ -498,6 +531,110 @@ public class RenderTypePixelScenario implements UIScenario {
         setInputConstant(half, "x", 0.5f);
         wire(graph.graph(), graph.alphaIn(), half.getOutputsById().get("out"));
         expect(ctx, mode + " over (0.2, 0.2, 0.2)", drawCenter(ctx, graph), r, g, b);
+    }
+
+    /**
+     * With improved transparency a blended material draws through Minecraft's order-independent phases (depth
+     * bounds, transmittance, accumulation) and a composite; replayed on the canvas as
+     * {@code LevelRenderer.executeOit} runs them. Over one layer, each blend OIT can express lands where classic
+     * blending does; one it can't draws in the solid phase instead.
+     */
+    private static void orderIndependentTransparency(TestContext ctx) {
+        float[] d = {0.2f, 0.2f, 0.2f};
+        float[] c = {0.5f, 0.25f, 0f};
+        float a = 0.5f;
+        oit(ctx, BlendMode.TRANSLUCENT, c[0] * a + d[0] * (1 - a), c[1] * a + d[1] * (1 - a), c[2] * a + d[2] * (1 - a));
+        oit(ctx, BlendMode.TRANSLUCENT_PREMULTIPLIED_ALPHA, c[0] + d[0] * (1 - a), c[1] + d[1] * (1 - a), c[2] + d[2] * (1 - a));
+        oit(ctx, BlendMode.LIGHTNING, c[0] * a + d[0], c[1] * a + d[1], c[2] * a + d[2]);
+        oit(ctx, BlendMode.ADDITIVE, c[0] + d[0], c[1] + d[1], c[2] + d[2]);
+        try (RenderTypeGraphMaterial multiply = material(ctx, halfTransparent(BlendMode.MULTIPLY));
+             RenderTypeGraphMaterial translucent = material(ctx, halfTransparent(BlendMode.TRANSLUCENT))) {
+            ctx.check("a multiply draws in the solid phase", multiply.drawsSolidUnderImprovedTransparency());
+            ctx.check("a translucent draws in the OIT phases", !translucent.drawsSolidUnderImprovedTransparency());
+        }
+    }
+
+    /** (0.5, 0.25, 0) at alpha 0.5 with {@code mode}. */
+    private static Bare halfTransparent(BlendMode mode) {
+        Bare graph = bare().settings(s -> settings(s, mode, s.depthTest(), false, false));
+        wire(graph.graph(), graph.color(), vec3(graph, 0.5f, 0.25f, 0f).getOutputsById().get("out"));
+        NodeModel half = addNode(graph.graph(), Vec3Node.class);
+        setInputConstant(half, "x", 0.5f);
+        wire(graph.graph(), graph.alphaIn(), half.getOutputsById().get("out"));
+        return graph;
+    }
+
+    private static void oit(TestContext ctx, BlendMode mode, float r, float g, float b) {
+        try (RenderTypeGraphMaterial material = material(ctx, halfTransparent(mode))) {
+            Canvas canvas = canvas(ctx);
+            canvas.clear(CLEAR);
+            int size = Canvas.SIZE;
+            var targets = new ArrayList<TextureTarget>();
+            try {
+                TextureTarget depthBounds = oitTarget(targets, "depth bounds", GpuFormat.RGBA32_FLOAT,
+                        new Vector4f(-Float.MAX_VALUE, 0, 0, 0));
+                TextureTarget depthBoundsCulled = oitTarget(targets, "depth bounds culled", GpuFormat.RGBA32_FLOAT, null);
+                TextureTarget accumulate = oitTarget(targets, "accumulate", GpuFormat.RGBA16_FLOAT, new Vector4f(0));
+                GpuTextureView[] transmittance = new GpuTextureView[LevelRenderer.OIT_TRANSMITTANCE_TARGET_COUNT];
+                for (int i = 0; i < transmittance.length; i++) {
+                    transmittance[i] = oitTarget(targets, "transmittance", GpuFormat.RGBA16_FLOAT, new Vector4f(0))
+                            .getColorTextureView();
+                }
+                var params = new OitRenderPassProvider.Parameters(depthBounds.getColorTextureView(), transmittance,
+                        accumulate.getColorTextureView(), canvas.target.getDepthTextureView());
+                var encoder = RenderSystem.getDevice().createCommandEncoder();
+                var nearest = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
+                // A real (reversed-Z) perspective: the phases turn depths linear through the projection.
+                boolean zeroToOne = RenderSystem.getDevice().getDeviceInfo().isZZeroToOne();
+                Matrix4f projection = new Matrix4f().setPerspective((float) Math.toRadians(90), 1, 64f, 0.5f, zeroToOne);
+                canvas.withCamera(projection, () -> Canvas.withPrepared(material.renderType(),
+                        vc -> quad(vc, -16, -16, 16, 16, -8, -1), (prepared, info) -> {
+                    for (OitStage stage : OitStage.values()) {
+                        try (RenderPass pass = OitRenderPassProvider.createRenderPass(stage, () -> "KilaGraph OIT", params)) {
+                            prepared.drawFromBufferOit(info, stage, pass);
+                        }
+                        if (stage == OitStage.DEPTH_BOUNDS) {
+                            try (RenderPass pass = encoder.createRenderPass(() -> "KilaGraph OIT cull",
+                                    depthBoundsCulled.getColorTextureView(), Optional.empty(),
+                                    canvas.target.getDepthTextureView(), OptionalDouble.empty())) {
+                                RenderSystem.bindDefaultUniforms(pass);
+                                pass.setPipeline(RenderSystem.getCompiledPipeline(RenderPipelines.BLIT_DEPTH_BOUNDS));
+                                pass.setUniform("InSampler", depthBounds.getColorTextureView(), nearest);
+                                pass.draw(3, 1, 0, 0);
+                                pass.setUniform("DepthBoundsSampler", depthBounds.getColorTextureView(), nearest);
+                                pass.setPipeline(RenderSystem.getCompiledPipeline(RenderPipelines.OIT_DEPTH_BOUNDS_CULL));
+                                pass.draw(3, 1, 0, 0);
+                            }
+                            params.setDepthBoundsTargetView(depthBoundsCulled.getColorTextureView());
+                        }
+                    }
+                    try (RenderPass pass = encoder.createRenderPass(() -> "KilaGraph OIT composite",
+                            canvas.target.getColorTextureView(), Optional.empty(), canvas.target.getDepthTextureView(),
+                            OptionalDouble.empty())) {
+                        RenderSystem.bindDefaultUniforms(pass);
+                        pass.setUniform("Sampler0", accumulate.getColorTextureView(), nearest);
+                        for (int i = 0; i < transmittance.length; i++) pass.setUniform("Coeff" + i, transmittance[i], nearest);
+                        pass.setUniform("DepthBoundsSampler", depthBounds.getColorTextureView(), nearest);
+                        pass.setPipeline(RenderSystem.getCompiledPipeline(RenderPipelines.OIT_COMPOSITE));
+                        pass.draw(3, 1, 0, 0);
+                    }
+                }));
+                try (NativeImage img = canvas.read()) {
+                    expect(ctx, mode + " through OIT over (0.2, 0.2, 0.2)", rgba(img, C, C), r, g, b);
+                }
+            } finally {
+                targets.forEach(TextureTarget::destroyBuffers);
+            }
+        }
+    }
+
+    /** A canvas-sized colour target for the OIT phases, cleared to {@code clear} (or left as is). */
+    private static TextureTarget oitTarget(List<TextureTarget> targets, String label, GpuFormat format,
+                                           @org.jetbrains.annotations.Nullable Vector4f clear) {
+        var target = new TextureTarget("KilaGraph OIT " + label, Canvas.SIZE, Canvas.SIZE, format, null);
+        targets.add(target);
+        if (clear != null) RenderSystem.getDevice().createCommandEncoder().clearColorTexture(target.getColorTexture(), clear);
+        return target;
     }
 
     private static void depthTest(TestContext ctx) {
@@ -669,7 +806,8 @@ public class RenderTypePixelScenario implements UIScenario {
             }
             Canvas canvas = canvas(ctx);
             canvas.clear(CLEAR);
-            canvas.withCamera(new Matrix4f(), () -> material.drawInstanced(mesh, instances, 4, new Matrix4f()));
+            canvas.withCamera(new Matrix4f(), () -> material.drawInstanced(mesh, instances, 4, new Matrix4f(),
+                    canvas.target.getColorTextureView(), canvas.target.getDepthTextureView()));
             try (NativeImage img = canvas.read()) {
                 for (int i = 0; i < 4; i++) {
                     expect(ctx, "instance " + i, pixel(img, QUADRANTS[i][0], QUADRANTS[i][1]),
@@ -704,7 +842,8 @@ public class RenderTypePixelScenario implements UIScenario {
             }
             Canvas canvas = canvas(ctx);
             canvas.clear(CLEAR);
-            canvas.withCamera(new Matrix4f(), () -> material.drawInstanced(mesh, instances, 4, new Matrix4f()));
+            canvas.withCamera(new Matrix4f(), () -> material.drawInstanced(mesh, instances, 4, new Matrix4f(),
+                    canvas.target.getColorTextureView(), canvas.target.getDepthTextureView()));
             try (NativeImage img = canvas.read()) {
                 for (int i = 0; i < 4; i++) {
                     float v = i / 3f;
@@ -823,17 +962,31 @@ public class RenderTypePixelScenario implements UIScenario {
             canvas.withCamera(new Matrix4f(), () -> {
                 var storage = new SubmitNodeStorage();
                 submits.accept(storage);
-                try (var frame = dispatcher.prepareFrame(storage)) {
-                    frame.executeSolid();
-                    frame.executeTranslucent();
-                    frame.executeTranslucentAfterTerrain();
-                    frame.executeAlwaysOnTop();
+                try (var frame = dispatcher.prepareFrame(storage);
+                     var pass = canvas.openPass()) {
+                    frame.executeSolid(pass);
+                    frame.executeTranslucent(pass);
+                    frame.executeTranslucentAfterTerrain(pass);
+                    frame.executeAlwaysOnTop(pass);
                 }
                 // prepareFrame drained the storage; the private staged buffer is reset for the next use.
                 buffers.endFrame();
             });
         }
         return canvas.read();
+    }
+
+    /** A full-canvas quad drawn through the material's colour-target pipeline, in a pass holding the bound targets. */
+    private static float[] drawWithColorTargets(TestContext ctx, RenderTypeGraphMaterial material, int x, int y) {
+        Canvas canvas = canvas(ctx);
+        canvas.clear(CLEAR);
+        try (KGMesh mesh = KGMesh.build(material, vc -> quad(vc, -1, -1, 1, 1, 0.5f, -1))) {
+            canvas.withCamera(new Matrix4f(), () -> material.drawInstanced(mesh, null, 1, new Matrix4f(),
+                    canvas.target.getColorTextureView(), canvas.target.getDepthTextureView()));
+        }
+        try (NativeImage img = canvas.read()) {
+            return rgba(img, x, y);
+        }
     }
 
     private static NativeImage drawImage(TestContext ctx, RenderTypeGraphMaterial material, Matrix4f projection,

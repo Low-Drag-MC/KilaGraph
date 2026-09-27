@@ -19,7 +19,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
-import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
+import net.minecraft.util.context.ContextKeySet;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -86,6 +86,13 @@ public final class LootNodes {
             return false;
         }
 
+        /** What a roll supplies: where, and the entity and tool when given. */
+        private static final ContextKeySet ROLL_PARAMS = new ContextKeySet.Builder()
+                .required(LootContextParams.ORIGIN)
+                .optional(LootContextParams.THIS_ENTITY)
+                .optional(LootContextParams.TOOL)
+                .build();
+
         @InputPort public Level level;
         @InputPort public Identifier table;
         @InputPort public BlockPos pos = BlockPos.ZERO;
@@ -121,9 +128,9 @@ public final class LootNodes {
                     .withOptionalParameter(LootContextParams.THIS_ENTITY, ctx.getInput("entity", Entity.class, null))
                     .withOptionalParameter(LootContextParams.TOOL,
                             heldTool == null || heldTool.isEmpty() ? null : heldTool)
-                    // EMPTY requires nothing, so building the parameters cannot fail here; a table that
-                    // wants more than was supplied fails while rolling instead, below.
-                    .create(LootContextParamSets.EMPTY);
+                    // 26.3 refuses a parameter its set doesn't allow, so the set names exactly what is
+                    // supplied; a table that wants more than that fails while rolling instead, below.
+                    .create(ROLL_PARAMS);
 
             List<ItemStack> items;
             try {
