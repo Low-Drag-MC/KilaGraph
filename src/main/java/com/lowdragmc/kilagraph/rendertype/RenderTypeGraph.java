@@ -587,6 +587,8 @@ public class RenderTypeGraph extends Graph {
             NONE
         }
 
+        /** Ignored since Minecraft 26.3, which draws a render type into the render pass it is drawn in (the phase
+         *  its submit went to); kept so graphs saved before still load. */
         public enum OutputTarget {
             MAIN,
             TRANSLUCENT,

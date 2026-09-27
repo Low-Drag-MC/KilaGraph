@@ -17,7 +17,7 @@ import java.util.Map;
 /**
  * The GPU-side {@code KG_Material} uniform buffer for one material instance. Holds the per-field
  * values on the Java side, packs them std140 in {@link MaterialUniformLayout} order, and uploads to
- * a persistent {@link GpuBuffer} that {@code PreparedRenderTypeMixin} binds during the draw.
+ * a {@link KGUploadBuffer} that {@code PreparedRenderTypeMixin} binds during the draw.
  *
  * <p>Values are set with {@link #set}; {@link #prepareUpload()} re-uploads the GPU buffer after a change.
  * Empty layouts allocate nothing and return a {@code null} slice (the mixin then binds no custom UBO).</p>
@@ -28,7 +28,7 @@ public final class MaterialUniformBuffer implements AutoCloseable {
     private final Map<String, float[]> values = new HashMap<>();
     private final int byteSize;
 
-    @Nullable private GpuBuffer buffer;
+    private final KGUploadBuffer buffer = new KGUploadBuffer(() -> "KG_Material UBO", GpuBuffer.USAGE_UNIFORM);
     private boolean dirty = true;
     private boolean closed = false;
 
@@ -49,20 +49,12 @@ public final class MaterialUniformBuffer implements AutoCloseable {
     }
 
     /**
-     * Create (if needed) and upload the GPU buffer when values changed. Performs a
-     * {@code writeToBuffer}, which is only legal <em>outside</em> an open render pass — call this
-     * before any render pass opens (mirrors how vanilla writes {@code DynamicTransforms}
-     * before {@code createRenderPass}). Must run on the render thread.
+     * Upload the values when they changed since the last upload. Best called before the render pass opens
+     * (where the buffer is written in place); see {@link KGUploadBuffer} for inside one. Render thread.
      */
     public void prepareUpload() {
         if (layout.isEmpty() || closed) return;
         RenderSystem.assertOnRenderThread();
-        if (buffer == null) {
-            buffer = RenderSystem.getDevice().createBuffer(
-                    () -> "KG_Material UBO",
-                    GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_COPY_DST,
-                    byteSize);
-        }
         if (dirty) {
             upload();
             dirty = false;
@@ -76,7 +68,7 @@ public final class MaterialUniformBuffer implements AutoCloseable {
      */
     @Nullable
     public GpuBufferSlice slice() {
-        if (layout.isEmpty() || closed || buffer == null) return null;
+        if (layout.isEmpty() || closed) return null;
         return buffer.slice();
     }
 
@@ -116,7 +108,7 @@ public final class MaterialUniformBuffer implements AutoCloseable {
                 }
             }
             bb.rewind();
-            RenderSystem.getDevice().createCommandEncoder().writeToBuffer(buffer.slice(), bb);
+            buffer.upload(bb);
         } finally {
             MemoryUtil.memFree(bb);
         }
@@ -129,9 +121,6 @@ public final class MaterialUniformBuffer implements AutoCloseable {
     @Override
     public void close() {
         closed = true;
-        if (buffer != null) {
-            buffer.close();
-            buffer = null;
-        }
+        buffer.close();
     }
 }

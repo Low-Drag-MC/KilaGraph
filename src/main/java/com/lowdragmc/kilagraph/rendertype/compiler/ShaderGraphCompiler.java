@@ -1507,6 +1507,8 @@ public class ShaderGraphCompiler {
     public static final String COLOR_TARGETS_DEFINE = "KG_COLOR_TARGETS";
     /** Shader define of a premultiplied-alpha material's OIT pipelines: the accumulation wants straight alpha. */
     public static final String PREMULTIPLIED_ALPHA_DEFINE = "KG_PREMULTIPLIED_ALPHA";
+    /** Shader define of an additive (ONE, ONE) material's OIT pipelines: its colour counts in full, not by alpha. */
+    public static final String ADDITIVE_ONE_DEFINE = "KG_ADDITIVE_ONE";
     /** Sampler name for the captured opaque scene colour (bound at draw from {@code SceneCaptureManager}). */
     public static final String SCENE_COLOR_SAMPLER = "KG_SceneColor";
     /** Sampler name for the captured opaque scene depth (bound at draw from {@code SceneCaptureManager}). */
@@ -2423,6 +2425,10 @@ public class ShaderGraphCompiler {
         // The accumulation premultiplies by alpha itself.
         sb.append("#ifdef ").append(PREMULTIPLIED_ALPHA_DEFINE).append('\n')
                 .append("    kg_color.rgb /= max(kg_color.a, 0.0001);\n")
+                .append("#endif\n");
+        // (ONE, ONE) blending adds the whole colour, whatever its alpha.
+        sb.append("#ifdef ").append(ADDITIVE_ONE_DEFINE).append('\n')
+                .append("    kg_color.a = 1.0;\n")
                 .append("#endif\n");
         sb.append("    kg_color = sampleColorForAccumulation(kg_color);\n");
         sb.append("#endif\n");

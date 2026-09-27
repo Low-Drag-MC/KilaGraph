@@ -73,7 +73,9 @@ public final class KGTransformUniforms {
     private static final int UBO_SIZE = new Std140SizeCalculator()
             .putMat4f().putMat4f().putMat4f().putMat4f().putMat4f().putMat4f().putIVec3().putVec3().putVec2().get();
 
-    @Nullable private static GpuBuffer buffer;
+    private static final KGUploadBuffer BUFFER = new KGUploadBuffer(() -> "KG_Transforms UBO", GpuBuffer.USAGE_UNIFORM);
+    /** The bytes last uploaded: every material a frame prepares refreshes the block, mostly with the same data. */
+    @Nullable private static ByteBuffer lastUpload;
 
     private static final Matrix4f modelView = new Matrix4f();
     private static final Matrix4f iModelView = new Matrix4f();
@@ -114,15 +116,11 @@ public final class KGTransformUniforms {
     }
 
     /**
-     * Create (if needed) and refresh the buffer for the current frame from the live MC matrices + camera.
-     * Performs a {@code writeToBuffer} — call before the draw's render pass opens.
+     * Refresh the buffer from the live MC matrices + camera; best called before the render pass opens (see
+     * {@link KGUploadBuffer}). Skips the upload when nothing changed.
      */
     public static void prepareUpload() {
         RenderSystem.assertOnRenderThread();
-        if (buffer == null) {
-            buffer = RenderSystem.getDevice().createBuffer(
-                    () -> "KG_Transforms UBO", GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_COPY_DST, UBO_SIZE);
-        }
         compute();
         upload();
     }
@@ -130,7 +128,7 @@ public final class KGTransformUniforms {
     /** The slice to bind as {@code KG_Transforms} (pure — safe inside a render pass). */
     @Nullable
     public static GpuBufferSlice slice() {
-        return buffer == null ? null : buffer.slice();
+        return BUFFER.slice();
     }
 
     private static void compute() {
@@ -186,7 +184,12 @@ public final class KGTransformUniforms {
                     .putVec3(camOffX, camOffY, camOffZ)
                     .putVec2(depthZScale, depthZBias);
             bb.rewind();
-            RenderSystem.getDevice().createCommandEncoder().writeToBuffer(buffer.slice(), bb);
+            if (lastUpload != null && BUFFER.slice() != null && lastUpload.equals(bb)) return;
+            if (lastUpload == null) lastUpload = MemoryUtil.memAlloc(UBO_SIZE);
+            lastUpload.clear();
+            lastUpload.put(bb).flip();
+            bb.rewind();
+            BUFFER.upload(bb);
         } finally {
             MemoryUtil.memFree(bb);
         }

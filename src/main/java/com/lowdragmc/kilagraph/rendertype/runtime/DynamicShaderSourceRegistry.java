@@ -13,11 +13,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@link Identifier} (always in the {@link Kilagraph#MODID} namespace, path {@code generated/<hash>})
  * and {@link ShaderType}.
  *
- * <p>This registry is consulted by {@code ShaderManagerMixin}, which patches
- * {@code ShaderManager.getShader(id, type)} — the source used by the device for both lazy
- * {@code setPipeline} compilation and explicit {@code precompilePipeline}. Because the device always
- * resolves shader source through that method, generated pipelines survive resource reloads with no
- * manual re-precompile: the reload rebuilds the device's pipeline cache, and each recompile re-reads
+ * <p>This registry is consulted by {@code ShaderManagerMixin}, which patches the {@code ShaderSource} of the
+ * pipeline cache every shader reload installs ({@code ShaderManager.Configs.getShader(id, type)}) — the source
+ * both {@code KGPipelines}' explicit compiles and the cache's lazy ones read. So generated pipelines survive
+ * resource reloads with no manual recompile: the reload replaces the pipeline cache, and each recompile re-reads
  * source from here.</p>
  */
 public final class DynamicShaderSourceRegistry {

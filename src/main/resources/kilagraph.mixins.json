@@ -6,7 +6,12 @@
   "client": [
     "client.ShaderManagerMixin",
     "client.RenderTypeMixin",
-    "client.PreparedRenderTypeMixin"
+    "client.PreparedRenderTypeMixin",
+    "client.FeatureRenderDispatcherMixin",
+    "client.SubmitNodeCollectionMixin",
+    "client.LevelRendererMixin",
+    "client.PipelineCacheAccessor",
+    "client.RenderSystemAccessor"
   ],
   "mixins": [],
   "injectors": {

@@ -22,7 +22,7 @@ public final class KGInstanceBuffer implements AutoCloseable {
     private final KGInstanceLayout layout;
     private final int capacity;
     private final ByteBuffer data;
-    @Nullable private GpuBuffer buffer;
+    private final KGUploadBuffer buffer = new KGUploadBuffer(() -> "KilaGraph instances", GpuBuffer.USAGE_VERTEX);
     private boolean dirty = true;
     private boolean closed;
 
@@ -84,22 +84,19 @@ public final class KGInstanceBuffer implements AutoCloseable {
         return this;
     }
 
-    /** Upload pending changes; call outside a render pass. */
+    /** Upload pending changes; best called outside a render pass (see {@link KGUploadBuffer}). */
     void upload() {
         RenderSystem.assertOnRenderThread();
         if (closed) throw new IllegalStateException("instance buffer is closed");
-        if (buffer == null) {
-            buffer = RenderSystem.getDevice().createBuffer(() -> "KilaGraph instances",
-                    GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, data.capacity());
-        }
-        if (!dirty) return;
-        RenderSystem.getDevice().createCommandEncoder().writeToBuffer(buffer.slice(), data.clear());
+        if (!dirty && buffer.slice() != null) return;
+        buffer.upload(data.clear());
         dirty = false;
     }
 
     GpuBufferSlice slice() {
-        if (buffer == null) throw new IllegalStateException("instance buffer was never uploaded");
-        return buffer.slice();
+        GpuBufferSlice slice = buffer.slice();
+        if (slice == null) throw new IllegalStateException("instance buffer was never uploaded");
+        return slice;
     }
 
     private InstanceAttribute require(String name, int components) {
@@ -122,7 +119,7 @@ public final class KGInstanceBuffer implements AutoCloseable {
     public void close() {
         if (closed) return;
         closed = true;
-        if (buffer != null) buffer.close();
+        buffer.close();
         MemoryUtil.memFree(data);
     }
 }

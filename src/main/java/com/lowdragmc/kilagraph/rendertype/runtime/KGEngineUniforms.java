@@ -41,7 +41,7 @@ public final class KGEngineUniforms {
     /** std140 size: float (Time) + vec2 (ScreenSize) + float (GameTime). Grows as engine fields are added. */
     private static final int UBO_SIZE = new Std140SizeCalculator().putFloat().putVec2().putFloat().get();
 
-    @Nullable private static GpuBuffer buffer;
+    private static final KGUploadBuffer BUFFER = new KGUploadBuffer(() -> "KG_Globals UBO", GpuBuffer.USAGE_UNIFORM);
     private static float currentTimeSeconds;
     private static float screenWidth, screenHeight;
     private static long lastUpdateKey = Long.MIN_VALUE;
@@ -121,18 +121,14 @@ public final class KGEngineUniforms {
     }
 
     /**
-     * Create (if needed) and refresh the buffer for the current frame. Performs a {@code writeToBuffer}
-     * — call before the draw's render pass opens. Idempotent within a frame (skips the write
-     * when the time hasn't advanced), so many materials per frame upload at most once.
+     * Refresh the buffer for the current frame; best called before the render pass opens (see
+     * {@link KGUploadBuffer}). Idempotent within a frame (skips the write when the time hasn't advanced), so many
+     * materials per frame upload at most once.
      */
     public static void prepareUpload() {
         RenderSystem.assertOnRenderThread();
-        if (buffer == null) {
-            buffer = RenderSystem.getDevice().createBuffer(
-                    () -> "KG_Globals UBO", GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_COPY_DST, UBO_SIZE);
-        }
         long key = computeTimeKey();
-        if (key == lastUpdateKey) return;
+        if (key == lastUpdateKey && BUFFER.slice() != null) return;
         lastUpdateKey = key;
         upload();
     }
@@ -140,7 +136,7 @@ public final class KGEngineUniforms {
     /** The slice to bind as {@code KG_Globals} (pure — safe inside a render pass). */
     @Nullable
     public static GpuBufferSlice slice() {
-        return buffer == null ? null : buffer.slice();
+        return BUFFER.slice();
     }
 
     /** World time in seconds, wrapping every 1200s (one MC day) to keep float precision. */
@@ -170,7 +166,7 @@ public final class KGEngineUniforms {
             Std140Builder.intoBuffer(bb).putFloat(currentTimeSeconds).putVec2(screenWidth, screenHeight)
                     .putFloat(currentTimeSeconds / 1200.0f);
             bb.rewind();
-            RenderSystem.getDevice().createCommandEncoder().writeToBuffer(buffer.slice(), bb);
+            BUFFER.upload(bb);
         } finally {
             MemoryUtil.memFree(bb);
         }

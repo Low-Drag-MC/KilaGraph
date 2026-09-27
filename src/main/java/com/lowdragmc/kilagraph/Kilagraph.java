@@ -5,16 +5,13 @@ import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.kilagraph.graph.ui.KGUITypeHandles;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
-import com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureHandler;
 import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 import com.lowdragmc.lowdraglib2.syncdata.AccessorRegistries;
 import com.lowdragmc.lowdraglib2.syncdata.accessor.direct.CustomDirectAccessor;
 import com.mojang.logging.LogUtils;
-import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.loading.FMLEnvironment;
 import org.slf4j.Logger;
 
 @Mod(Kilagraph.MODID)
@@ -62,10 +59,5 @@ public class Kilagraph {
         LOGGER.info("KilaGraph rendertype nodes loaded: {}", RenderTypeGraph.NODE_REGISTRY.getNodeClasses().size());
         // Register all KG GameTests (each group adds itself in KGGameTests.init).
         KGGameTests.init(modEventBus);
-        // Client-only debug command + in-world draw for validating the RenderType pipeline end-to-end.
-        if (FMLEnvironment.getDist() == Dist.CLIENT) {
-            // Capture the opaque scene colour/depth (for Scene Color/Depth nodes), gated by demand.
-            SceneCaptureHandler.init();
-        }
     }
 }

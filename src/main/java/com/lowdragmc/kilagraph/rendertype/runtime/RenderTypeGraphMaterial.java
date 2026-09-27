@@ -6,6 +6,7 @@ import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.renderpearl.api.commands.RenderPassDescriptor;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.textures.GpuSampler;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
@@ -30,11 +31,12 @@ import java.util.*;
 import java.util.function.Supplier;
 
 /**
- * A compiled, ready-to-render material: a Minecraft {@link RenderType} (sharing a cached pipeline)
+ * A compiled, ready-to-render material: a Minecraft {@link RenderType} (sharing cached pipelines)
  * plus its per-instance {@code KG_Material} uniform buffer and dynamic sampler bindings. Renderers get
- * {@link #renderType()} for {@code submitCustomGeometry}; {@code PreparedRenderTypeMixin} calls
- * {@link #bindCustomUniforms} during draw to bind both the custom UBO and the per-instance textures that
- * vanilla's {@code RenderSetup} path doesn't update.
+ * {@link #renderType()} for {@code submitCustomGeometry}. Values are uploaded when the render type is prepared
+ * and again once the frame's geometry is built ({@link #flushPrepared}), all before the render passes open;
+ * {@code PreparedRenderTypeMixin} calls {@link #bindCustomUniforms} inside the pass to bind both the custom UBO
+ * and the per-instance textures that vanilla's {@code RenderSetup} path doesn't update.
  *
  * <p><b>Setting values.</b> EXPOSED graph variables are addressed by their <em>display name</em> (not
  * the mangled {@code kg_*} GLSL identifier): {@link #setUniform(String, float)} and its typed overloads
@@ -53,6 +55,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
 
     private static final Map<RenderType, RenderTypeGraphMaterial> BY_RENDER_TYPE =
             Collections.synchronizedMap(new IdentityHashMap<>());
+    /** Materials prepared since the last {@link #flushPrepared}. Render thread. */
+    private static final Set<RenderTypeGraphMaterial> PREPARED = Collections.newSetFromMap(new IdentityHashMap<>());
 
     private final RenderType renderType;
     private final MaterialUniformBuffer uniforms;
@@ -88,6 +92,9 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
      *  this material draws (see {@code IrisShaderInjector}). 0 = no Iris injection. Set by the factory when a
      *  shaderpack-compatible variant is active. */
     private int irisSurfaceId = 0;
+    /** Blended, but in a way order-independent transparency can't express (see {@link RenderTypeFactory}). */
+    private final boolean solidUnderImprovedTransparency;
+    private boolean closed;
 
     private record ResolvedSampler(GpuTextureView view, GpuSampler sampler) {}
 
@@ -98,7 +105,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
                                    Map<String, String> variableSamplers,
                                    Map<String, SamplerDefault> textures,
                                    Map<String, SamplerDefault> injectionOnlyTextures,
-                                   boolean usesSceneColor, boolean usesSceneDepth) {
+                                   boolean usesSceneColor, boolean usesSceneDepth,
+                                   boolean solidUnderImprovedTransparency) {
         this.renderType = renderType;
         this.uniforms = new MaterialUniformBuffer(layout);
         this.uniformBlocks = List.copyOf(uniformBlocks);
@@ -110,6 +118,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         this.injectionOnlyTextures = new HashMap<>(injectionOnlyTextures);
         this.usesSceneColor = usesSceneColor;
         this.usesSceneDepth = usesSceneDepth;
+        this.solidUnderImprovedTransparency = solidUnderImprovedTransparency;
         BY_RENDER_TYPE.put(renderType, this);
     }
 
@@ -121,6 +130,31 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
 
     public RenderType renderType() {
         return renderType;
+    }
+
+    /**
+     * Whether, with improved transparency on, the material's custom geometry draws in the solid phase: it blends,
+     * but in a way order-independent transparency can't express (multiply, min, invert… depend on what is behind),
+     * so it blends over the opaque scene instead, unsorted against other translucent geometry.
+     */
+    public boolean drawsSolidUnderImprovedTransparency() {
+        return solidUnderImprovedTransparency;
+    }
+
+    /** Called when one of this material's render types is prepared: uploads now, and again at {@link #flushPrepared}. */
+    public void onPrepared() {
+        prepareUniforms();
+        PREPARED.add(this);
+    }
+
+    /**
+     * Upload every material prepared since the last call. Minecraft prepares a render type before it runs the
+     * geometry callback that fills it, so values set there are uploaded here — when the frame's geometry is built
+     * and before its passes open. Render thread.
+     */
+    public static void flushPrepared() {
+        for (RenderTypeGraphMaterial material : PREPARED) material.prepareUniforms();
+        PREPARED.clear();
     }
 
     // ---- instancing --------------------------------------------------------------------------
@@ -139,20 +173,27 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         return instanceLayout;
     }
 
-    /** A buffer of per-instance values for {@link #drawInstanced}. The caller owns (closes) it. */
+    /** A buffer of per-instance values for {@link #prepareInstanced}. The caller owns (closes) it. */
     public KGInstanceBuffer createInstanceBuffer(int capacity) {
         if (instanceLayout == null) throw new IllegalStateException("the graph reads no instance data");
         return new KGInstanceBuffer(instanceLayout, capacity);
     }
 
     /**
-     * Draw {@code count} instances of {@code mesh} now, transformed by {@code pose} on top of the current
-     * model-view. Call on the render thread, outside a render pass (e.g. from a render-stage event).
-     * {@code instances} is required when the graph reads Instance Data, and must hold {@code count} values.
+     * Prepare a draw of {@code count} instances of {@code mesh}, transformed by {@code pose} on top of the current
+     * model-view, to {@link InstancedDraw#execute} in a render pass later in the frame. Call on the render thread
+     * before that pass opens: the values, instances and transforms are uploaded here, since a pass allows no
+     * uploads. {@code instances} is required when the graph reads Instance Data, and must hold {@code count}
+     * values. Returns {@code null} when there is nothing to draw, or the pipeline doesn't compile (logged).
      */
-    public void drawInstanced(KGMesh mesh, @Nullable KGInstanceBuffer instances, int count, Matrix4fc pose) {
+    @Nullable
+    public InstancedDraw prepareInstanced(KGMesh mesh, @Nullable KGInstanceBuffer instances, int count, Matrix4fc pose) {
         RenderSystem.assertOnRenderThread();
-        if (count <= 0) return;
+        if (KGUploadBuffer.inRenderPass()) {
+            throw new IllegalStateException("prepare an instanced draw before its render pass opens");
+        }
+        if (count <= 0) return null;
+        GpuBufferSlice instanceSlice = null;
         if (instanceLayout != null) {
             if (instances == null || !instances.layout().attributes().equals(instanceLayout.attributes())) {
                 throw new IllegalArgumentException("an instance buffer created for this graph is required");
@@ -161,17 +202,94 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
                 throw new IllegalArgumentException(count + " instances drawn from a buffer of " + instances.capacity());
             }
             instances.upload();
+            instanceSlice = instances.slice();
         }
+        mesh.prepareIndices();
+        PreparedRenderType main;
         var modelView = RenderSystem.getModelViewStack();
         modelView.pushMatrix();
         try {
             modelView.mul(pose);
-            PreparedRenderType prepared = renderType.prepare();
-            ((KGPreparedRenderType) (Object) prepared).kilagraph$setInstances(
-                    instanceLayout == null ? null : instances.slice(), count);
-            mesh.draw(prepared);
+            main = renderType.prepare(); // uploads this material (RenderTypeMixin)
         } finally {
             modelView.popMatrix();
+        }
+        ((KGPreparedRenderType) (Object) main).kilagraph$setInstances(instanceSlice, count);
+        PreparedRenderType withTargets = null;
+        if (colorTargetsPipeline != null) {
+            if (KGPipelines.ensureCompiled(colorTargetsPipeline)) {
+                withTargets = new PreparedRenderType(main.name(), colorTargetsPipeline, null,
+                        main.dynamicTransforms(), main.scissorState(), main.textures());
+                var tagged = (KGPreparedRenderType) (Object) withTargets;
+                tagged.kilagraph$setMaterial(this);
+                tagged.kilagraph$setInstances(instanceSlice, count);
+            } else if (!colorTargetsFailedWarned) {
+                colorTargetsFailedWarned = true;
+                Kilagraph.LOGGER.warn("[KilaGraph] the colour-target pipeline of {} doesn't compile; "
+                        + "its draws write only the main target", contentHash);
+            }
+        }
+        return new InstancedDraw(mesh, main, withTargets);
+    }
+
+    /**
+     * Draw {@code count} instances of {@code mesh} into the main render target now (see {@link #prepareInstanced}),
+     * writing the bound colour targets too when the graph has some. Render thread, outside a render pass.
+     */
+    public void drawInstanced(KGMesh mesh, @Nullable KGInstanceBuffer instances, int count, Matrix4fc pose) {
+        var target = Minecraft.getInstance().gameRenderer.mainRenderTarget();
+        drawInstanced(mesh, instances, count, pose, target.getColorTextureView(), target.getDepthTextureView());
+    }
+
+    /**
+     * Draw {@code count} instances of {@code mesh} into {@code color} (+ {@code depth}) now, in a pass of its own
+     * that also holds the bound colour targets when the graph has some. {@code color} must have the graph's colour
+     * format. Render thread, outside a render pass.
+     */
+    public void drawInstanced(KGMesh mesh, @Nullable KGInstanceBuffer instances, int count, Matrix4fc pose,
+                              GpuTextureView color, @Nullable GpuTextureView depth) {
+        InstancedDraw draw = prepareInstanced(mesh, instances, count, pose);
+        if (draw == null) return;
+        var encoder = RenderSystem.getDevice().createCommandEncoder();
+        if (draw.hasColorTargets()) {
+            try (RenderPass pass = encoder.createRenderPass(colorTargetPass(() -> "KilaGraph instanced " + contentHash,
+                    color, Optional.empty(), depth, OptionalDouble.empty()))) {
+                draw.executeWithColorTargets(pass);
+            }
+        } else {
+            try (RenderPass pass = encoder.createRenderPass(() -> "KilaGraph instanced " + contentHash,
+                    color, Optional.empty(), depth, OptionalDouble.empty())) {
+                draw.execute(pass);
+            }
+        }
+    }
+
+    /** An instanced draw uploaded by {@link #prepareInstanced}, for a render pass later in the same frame. */
+    public static final class InstancedDraw {
+        private final KGMesh mesh;
+        private final PreparedRenderType main;
+        @Nullable private final PreparedRenderType withColorTargets;
+
+        private InstancedDraw(KGMesh mesh, PreparedRenderType main, @Nullable PreparedRenderType withColorTargets) {
+            this.mesh = mesh;
+            this.main = main;
+            this.withColorTargets = withColorTargets;
+        }
+
+        /** Whether {@link #executeWithColorTargets} can draw: the graph writes colour targets and their pipeline compiled. */
+        public boolean hasColorTargets() {
+            return withColorTargets != null;
+        }
+
+        /** Draw into {@code pass}, whose single colour attachment is the main target. */
+        public void execute(RenderPass pass) {
+            main.drawFromBuffer(mesh.executeInfo(), pass);
+        }
+
+        /** Draw into a pass from {@link RenderTypeGraphMaterial#colorTargetPass}, writing the colour targets too. */
+        public void executeWithColorTargets(RenderPass pass) {
+            if (withColorTargets == null) throw new IllegalStateException("the draw has no colour-target pipeline");
+            withColorTargets.drawFromBuffer(mesh.executeInfo(), pass);
         }
     }
 
@@ -184,22 +302,34 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     // ---- extra colour targets (MRT) -----------------------------------------------------------
 
     private List<ColorTarget> colorTargets = List.of();
+    /** The pipeline writing the colour targets too; {@code null} when the graph writes none. */
+    @Nullable private RenderPipeline colorTargetsPipeline;
+    private boolean colorTargetsFailedWarned;
     private final @Nullable GpuTextureView[] colorTargetViews = new GpuTextureView[ColorTarget.MAX_LOCATION + 1];
     private boolean colorTargetSizeWarned;
 
-    void setColorTargets(List<ColorTarget> targets) {
+    void setColorTargets(List<ColorTarget> targets, @Nullable RenderPipeline pipeline) {
         this.colorTargets = List.copyOf(targets);
+        this.colorTargetsPipeline = pipeline;
     }
 
-    /** The graph's extra colour targets (Color Target blocks), sorted by location. */
+    /** The graph's extra colour targets (Color Target blocks), sorted by location. They are written only by a draw
+     *  into a pass that has them ({@link #colorTargetPass}): a Minecraft pass has the main target alone. */
     public List<ColorTarget> colorTargets() {
         return colorTargets;
     }
 
+    /** The pipeline that writes the colour targets as well as the main one, for a pass from {@link #colorTargetPass};
+     *  {@code null} when the graph writes no colour targets. */
+    @Nullable
+    public RenderPipeline colorTargetsPipeline() {
+        return colorTargetsPipeline;
+    }
+
     /**
-     * Bind {@code view} as the colour target at {@code location} (1..7) for every draw of this material; null
-     * discards that output. Its format must match the Color Target block's; its size must match the main target
-     * at draw time, else it is skipped for that draw.
+     * Bind {@code view} as the colour target at {@code location} (1..7) for every draw of this material into a
+     * {@link #colorTargetPass}; null discards that output. Its format must match the Color Target block's; its size
+     * must match the main target at draw time, else it is skipped for that draw.
      */
     public void setColorTarget(int location, @Nullable GpuTextureView view) {
         ColorTarget target = colorTargets.stream().filter(t -> t.location() == location).findFirst()
@@ -215,8 +345,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     public RenderPassDescriptor colorTargetPass(Supplier<String> label, GpuTextureView color, Optional<Vector4fc> clearColor,
                                                 @Nullable GpuTextureView depth, OptionalDouble clearDepth) {
         int width = color.getWidth(0), height = color.getHeight(0);
-        RenderPassDescriptor pass = RenderPassDescriptor.create(label).withColorAttachment(color, clearColor);
-        int count = colorTargets.getLast().location() + 1;
+        RenderPassDescriptor.Builder pass = RenderPassDescriptor.builder(label).withColorAttachment(color, clearColor);
+        int count = colorTargets.isEmpty() ? 1 : colorTargets.getLast().location() + 1;
         for (int location = 1; location < count; location++) {
             GpuTextureView view = colorTargetViews[location];
             if (view != null && (view.isClosed() || view.getWidth(0) != width || view.getHeight(0) != height)) {
@@ -231,7 +361,7 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
             else pass.withUnusedColorAttachment();
         }
         if (depth != null) pass.withDepthAttachment(depth, clearDepth);
-        return pass.withRenderArea(new RenderPass.RenderArea(0, 0, width, height));
+        return pass.withRenderArea(new RenderPass.RenderArea(0, 0, width, height)).build();
     }
 
     public String contentHash() {
@@ -448,12 +578,14 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     // ---- draw-time binding -------------------------------------------------------------------
 
     /**
-     * Called from the draw mixin at {@code drawFromBuffer} HEAD, before the render pass opens:
-     * (re)upload the UBO if values changed and resolve the dynamic textures. Both must happen here, not
-     * inside the pass — {@code writeToBuffer} and a lazy texture load ({@code getTexture} →
-     * {@code registerAndLoad} → {@code writeToTexture}) are illegal once a render pass is active.
+     * (Re)upload the UBOs if values changed and resolve the dynamic textures, before the render pass opens. Both
+     * belong outside the pass: a buffer write and a lazy texture load ({@code getTexture} → {@code registerAndLoad}
+     * → {@code writeToTexture}) are illegal inside one (see {@link KGUploadBuffer} for the buffers' fallback).
+     * Called when the render type is prepared and at {@link #flushPrepared}; a renderer drawing through
+     * {@link #bindCustomUniforms} in its own pass calls it before opening that pass.
      */
     public void prepareUniforms() {
+        if (closed) return;
         uniforms.prepareUpload();
         if (instanceLayout != null) {
             if (defaultInstance == null) defaultInstance = new KGInstanceBuffer(instanceLayout, 1);
@@ -495,24 +627,23 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
             if (s != null) renderPass.setUniform(block.uboName(), s);
         }
         // Dynamic samplers: (re)bind the textures resolved in prepareUniforms, so setTexture takes effect
-        // without rebuilding the RenderType. bindTexture is a pure pass command (no GPU upload), and the
-        // GL backend dedups the actual glBindTexture, so a no-op rebind is cheap.
+        // without rebuilding the RenderType. Binding is a pure pass command (no GPU upload).
         for (Map.Entry<String, ResolvedSampler> e : resolvedTextures.entrySet()) {
             // An external raw view (e.g. SlideShow's live slide texture) wins over the Identifier binding.
             ResolvedSampler r = externalViews.getOrDefault(e.getKey(), e.getValue());
-            renderPass.bindTexture(e.getKey(), r.view(), r.sampler());
+            renderPass.setUniform(e.getKey(), r.view(), r.sampler());
         }
         // Captured scene colour/depth: bound from the live SceneCaptureManager (not TextureManager). Before
         // the first capture the view is null — bind the missing-texture as a placeholder so the encoder's
         // "every declared sampler must be bound" check passes.
         if (usesSceneColor) {
             GpuTextureView view = SceneCaptureManager.INSTANCE.colorView();
-            renderPass.bindTexture(ShaderGraphCompiler.SCENE_COLOR_SAMPLER,
+            renderPass.setUniform(ShaderGraphCompiler.SCENE_COLOR_SAMPLER,
                     view != null ? view : missingView(), SceneCaptureManager.INSTANCE.sampler());
         }
         if (usesSceneDepth) {
             GpuTextureView view = SceneCaptureManager.INSTANCE.depthView();
-            renderPass.bindTexture(ShaderGraphCompiler.SCENE_DEPTH_SAMPLER,
+            renderPass.setUniform(ShaderGraphCompiler.SCENE_DEPTH_SAMPLER,
                     view != null ? view : missingView(), SceneCaptureManager.INSTANCE.sampler());
         }
     }
@@ -527,7 +658,10 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
 
     @Override
     public void close() {
+        if (closed) return;
+        closed = true;
         BY_RENDER_TYPE.remove(renderType);
+        PREPARED.remove(this);
         uniforms.close();
         if (defaultInstance != null) defaultInstance.close();
         if (usesSceneColor || usesSceneDepth) SceneCaptureManager.INSTANCE.release();

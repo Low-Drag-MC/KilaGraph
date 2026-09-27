@@ -20,7 +20,7 @@ import org.lwjgl.opengl.GL30;
  * Owns copies of the opaque scene's colour + depth, for the Scene Color / Scene Depth nodes. You cannot
  * sample the main render target while it is the active attachment (feedback loop), so {@link #capture()}
  * copies the main colour + depth into textures we own — taken at the opaque&rarr;translucent boundary
- * (see {@link SceneCaptureHandler}) so translucent materials sample "the opaque scene behind them", exactly
+ * (see {@code LevelRendererMixin}) so translucent materials sample "the opaque scene behind them", exactly
  * like Unity's opaque texture.
  *
  * <p><b>Gated.</b> Capture only runs while at least one live {@link RenderTypeGraphMaterial} needs it:
@@ -69,7 +69,7 @@ public final class SceneCaptureManager {
 
     /**
      * Copy the main render target's colour + depth into our owned textures. No-op if nobody needs it or the
-     * main target isn't ready. Called by {@link SceneCaptureHandler} after opaque geometry, before translucent.
+     * main target isn't ready. Called by {@code LevelRendererMixin} after opaque geometry, before translucent, with no render pass open.
      */
     public void capture() {
         if (users <= 0) return;

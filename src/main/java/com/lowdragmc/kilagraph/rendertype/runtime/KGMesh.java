@@ -1,20 +1,20 @@
 package com.lowdragmc.kilagraph.rendertype.runtime;
 
-import com.mojang.renderpearl.api.pipeline.IndexType;
-import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
-import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.pipeline.IndexType;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
-import net.minecraft.client.renderer.rendertype.PreparedRenderType;
+import net.minecraft.client.renderer.StagedVertexBuffer;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
 
-/** Static geometry uploaded once, for {@link RenderTypeGraphMaterial#drawInstanced}. */
+/** Static geometry uploaded once, for {@link RenderTypeGraphMaterial#prepareInstanced}. */
 public final class KGMesh implements AutoCloseable {
 
     private final GpuBuffer vertexBuffer;
@@ -59,16 +59,19 @@ public final class KGMesh implements AutoCloseable {
         }
     }
 
-    void draw(PreparedRenderType prepared) {
-        GpuBuffer indices = indexBuffer;
-        IndexType type = indexType;
-        if (indices == null) {
-            // No own indices: the shared sequential buffer, fetched per draw since it can be regrown.
-            var sequential = RenderSystem.getSequentialBuffer(topology);
-            indices = sequential.getBuffer(indexCount);
-            type = sequential.type();
-        }
-        prepared.drawFromBuffer(vertexBuffer, indices, type, 0, 0, indexCount);
+    /** Make sure the indices exist before the pass opens: without its own, the mesh reads the shared sequential
+     *  buffer, which may have to grow — and it can't inside a pass. */
+    void prepareIndices() {
+        if (indexBuffer != null) return;
+        var sequential = RenderSystem.getSequentialBuffer(topology);
+        sequential.requestIndexCount(indexCount);
+        sequential.resizeToRequestedIndexCount();
+    }
+
+    /** The draw, resolved when it executes: the shared sequential buffer (and its index type) is read then. */
+    StagedVertexBuffer.ExecuteInfo executeInfo() {
+        IndexType type = indexBuffer != null ? indexType : RenderSystem.getSequentialBuffer(topology).type();
+        return new StagedVertexBuffer.ExecuteInfo(vertexBuffer, indexBuffer, type, 0, 0, indexCount, topology);
     }
 
     @Override

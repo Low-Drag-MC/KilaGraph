@@ -10,12 +10,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Routes KilaGraph-generated shader ids ({@code kilagraph:generated/...}) to
- * {@link DynamicShaderSourceRegistry}. {@code ShaderManager.getShader} is the source the device
- * uses for both lazy {@code setPipeline} compilation and explicit {@code precompilePipeline}, so this
- * single seam makes generated pipelines compile everywhere and survive resource reloads.
+ * Routes KilaGraph-generated shader ids ({@code kilagraph:generated/...}) to {@link DynamicShaderSourceRegistry}.
+ * {@code ShaderManager.Configs} is the {@code ShaderSource} of the pipeline cache every shader reload installs,
+ * so this single seam serves generated sources to both KilaGraph's own compiles ({@code KGPipelines}) and the
+ * cache's lazy ones — which is how generated pipelines survive a resource reload. Their {@code #include}s resolve
+ * through the same source like any asset shader's.
  */
-@Mixin(ShaderManager.class)
+@Mixin(ShaderManager.Configs.class)
 public class ShaderManagerMixin {
 
     @Inject(method = "getShader", at = @At("HEAD"), cancellable = true)

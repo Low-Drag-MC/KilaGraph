@@ -12,25 +12,26 @@ import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.KGVertexFormat;
 import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
 import com.lowdragmc.kilagraph.rendertype.iris.IrisSurfaceRegistry;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.logging.LogUtils;
 import com.mojang.renderpearl.api.GpuFormat;
-import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.pipeline.BindGroupLayout;
-import com.mojang.renderpearl.api.pipeline.BlendFunction;
-import com.mojang.renderpearl.api.pipeline.ColorTargetState;
-import com.mojang.renderpearl.api.pipeline.DepthStencilState;
-import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.renderpearl.api.pipeline.BlendFactor;
+import com.mojang.renderpearl.api.pipeline.BlendFunction;
 import com.mojang.renderpearl.api.pipeline.BlendOp;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
 import com.mojang.renderpearl.api.pipeline.CompareOp;
-import com.mojang.renderpearl.api.vertex.VertexFormat;
+import com.mojang.renderpearl.api.pipeline.DepthStencilState;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.renderpearl.api.pipeline.UniformType;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.textures.AddressMode;
 import com.mojang.renderpearl.api.textures.FilterMode;
 import com.mojang.renderpearl.api.textures.GpuSampler;
-import com.mojang.logging.LogUtils;
-import net.minecraft.client.renderer.rendertype.OutputTarget;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.oit.OitPipelineSet;
 import net.minecraft.client.renderer.rendertype.RenderSetup;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
@@ -41,29 +42,36 @@ import org.slf4j.Logger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 /**
  * Turns a {@link CompiledShaderGraph} into a usable {@link RenderType}. The expensive products —
- * generated GLSL + {@link RenderPipeline} — are cached by the graph's content hash and shared across
+ * generated GLSL + {@link RenderPipeline}s — are cached by the graph's content hash and shared across
  * material instances; each distinct set of textures/uniform values becomes a lightweight
- * {@link RenderTypeGraphMaterial} wrapping its own {@link RenderType} over the shared pipeline.
+ * {@link RenderTypeGraphMaterial} wrapping its own {@link RenderType} over the shared pipelines.
+ *
+ * <p><b>Pipelines.</b> One GLSL source serves every pipeline of a graph, its shader defines picking the variant
+ * (see {@code ShaderGraphCompiler.assembleFragment}):</p>
+ * <ul>
+ *   <li>the <b>main</b> pipeline, drawn in Minecraft's passes, which have a single colour attachment;</li>
+ *   <li>a <b>colour-targets</b> pipeline when the graph writes extra colour targets, for a pass that has them;</li>
+ *   <li>an {@link OitPipelineSet} for a blended material Minecraft's order-independent transparency can
+ *       express. With improved transparency on, every blended custom geometry draws in the OIT phases; a blend
+ *       those can't express (multiply, min, invert…) draws in the solid phase instead (see
+ *       {@link RenderTypeGraphMaterial#drawsSolidUnderImprovedTransparency}).</li>
+ * </ul>
  *
  * <p><b>Resource management.</b> Generated pipelines/sources are reference-counted by content hash:
  * {@link #createMaterial} acquires a reference, {@link RenderTypeGraphMaterial#close()} releases it,
- * and when the last reference drops we evict the pipeline + GLSL source from our maps (and the
- * material frees its UBO {@link GpuBuffer}). This bounds our heap to live
- * materials — important for the live preview, which churns a new hash on every edit.</p>
- *
- * <p><b>Known limitation:</b> the device's pipeline cache has no per-pipeline release API (only a
- * global {@code clearPipelineCache}), so a generated shader program already compiled on the GPU
- * lingers in the device until a resource reload. We avoid creating <em>duplicate</em> device entries
- * by reusing one {@link RenderPipeline} object per live hash, but cannot free dead ones individually.</p>
+ * and when the last reference drops the pipelines are closed and evicted along with their GLSL source (and the
+ * material frees its UBO {@link GpuBuffer}). This bounds both heap and GPU to live materials — important for the
+ * live preview, which churns a new hash on every edit.</p>
  *
  * <p>All methods must run on the render thread (they touch the GPU device / pipeline cache).</p>
  */
@@ -71,17 +79,38 @@ public final class RenderTypeFactory {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    /** Cache: graph content hash -> shared RenderPipeline. */
-    private static final Map<String, RenderPipeline> PIPELINES = new ConcurrentHashMap<>();
+    /** The pipelines generated for one graph (see the class javadoc). */
+    public record GeneratedPipelines(RenderPipeline main, @Nullable RenderPipeline colorTargets,
+                                     @Nullable OitPipelineSet oit) {
+        public List<RenderPipeline> all() {
+            List<RenderPipeline> all = new ArrayList<>(5);
+            all.add(main);
+            if (colorTargets != null) all.add(colorTargets);
+            if (oit != null) {
+                all.add(oit.depthBoundsPipeline());
+                all.add(oit.transmittancePipeline());
+                all.add(oit.accumulatePipeline());
+            }
+            return all;
+        }
+    }
+
+    /** Cache: graph content hash -> the pipelines shared by every material of that graph. */
+    private static final Map<String, GeneratedPipelines> PIPELINES = new ConcurrentHashMap<>();
     /** Live material references per content hash; entry evicted when it reaches 0. */
     private static final Map<String, Integer> REFCOUNTS = new ConcurrentHashMap<>();
     /** Hashes that failed to compile on the GPU. Content hash is deterministic, so a failed hash
-     *  stays failed — skip re-precompiling it every frame (and dump its GLSL only once). */
+     *  stays failed — skip re-compiling it every frame (and dump its GLSL only once). */
     private static final Set<String> FAILED = ConcurrentHashMap.newKeySet();
     /** Graph hashes already warned about Scene Color/Depth on an opaque material (self-sampling feedback). */
     private static final Set<String> SCENE_ON_OPAQUE_WARNED = ConcurrentHashMap.newKeySet();
+    /** Graph hashes already told about drawing in the solid phase under improved transparency. */
+    private static final Set<String> SOLID_UNDER_OIT_WARNED = ConcurrentHashMap.newKeySet();
     /** Graph hashes already warned about a vertex format the Iris integration can't route (warn once each). */
     private static final Set<String> IRIS_FORMAT_WARNED = ConcurrentHashMap.newKeySet();
+    /** Numbers each material's render type, so two materials of one graph never prepare to equal
+     *  {@code PreparedRenderType} records — equal ones share a draw (and so one material's values). */
+    private static final AtomicInteger MATERIAL_SERIAL = new AtomicInteger();
     private static final String IRIS_ALBEDO_SAMPLER = "Sampler0";
     private static final Identifier NEUTRAL_WHITE = Identifier.fromNamespaceAndPath(Kilagraph.MODID, "textures/misc/white.png");
 
@@ -102,21 +131,21 @@ public final class RenderTypeFactory {
      * material is initialized purely from the graph's compiled defaults — EXPOSED variable defaults into
      * the UBO and {@code samplerDefaults} (else a missing-texture placeholder) into every declared
      * sampler; callers set dynamic values/textures afterward via {@code setUniform}/{@code setTexture}.
-     * Validates the pipeline on the GPU; returns {@code null} (and cleans up the unreferenced entry) if
-     * it is invalid, so callers never draw with a broken pipeline.
+     * Compiles the main pipeline on the GPU; returns {@code null} (and cleans up the unreferenced entry) if
+     * it is invalid, so callers never draw with a broken pipeline — or when no shader reload has completed yet,
+     * so there are no sources to compile against.
      */
     @Nullable
     public static RenderTypeGraphMaterial createMaterial(CompiledShaderGraph compiled) {
         String hash = compiled.contentHash();
-        if (FAILED.contains(hash)) return null; // known-bad: don't re-precompile / re-spam every frame
+        if (FAILED.contains(hash)) return null; // known-bad: don't re-compile / re-spam every frame
         if (compiled.hasStageErrors()) {
             for (var e : compiled.stageErrors()) LOGGER.warn("[KilaGraph] stage error: {}", e.message());
             return null; // generated GLSL references stage-unavailable data; don't build it
         }
-        RenderPipeline pipeline = getOrBuildPipeline(compiled);
-
-        if (!RenderSystem.getDevice().precompilePipeline(pipeline).isValid()) {
-            if (FAILED.add(hash)) {
+        GeneratedPipelines pipelines = getOrBuildPipelines(compiled);
+        if (!KGPipelines.ensureCompiled(pipelines.main())) {
+            if (KGPipelines.hasFailed(pipelines.main()) && FAILED.add(hash)) {
                 LOGGER.warn("[KilaGraph] " +
                                 "generated pipeline invalid for hash {}.\n--- VERTEX ---\n{}\n--- FRAGMENT ---\n{}",
                         hash, compiled.vertexSource(), compiled.fragmentSource());
@@ -124,6 +153,15 @@ public final class RenderTypeFactory {
             if (!REFCOUNTS.containsKey(hash)) evictGenerated(hash); // nobody references it; drop our entry
             return null;
         }
+        // The OIT pipelines are compiled now only when they're about to be drawn — otherwise at their first draw,
+        // which skips a pipeline that doesn't compile (see PreparedRenderTypeMixin) rather than failing the frame.
+        OitPipelineSet oit = pipelines.oit();
+        if (oit != null && Minecraft.getInstance().gameRenderer.useImprovedTransparency() && !compileAll(oit)) {
+            LOGGER.warn("[KilaGraph] graph {}: its order-independent transparency pipelines don't compile, "
+                    + "so with improved transparency it draws in the solid phase", hash);
+            oit = null;
+        }
+        boolean translucent = compiled.settings().blend() != RenderTypeGraph.Settings.BlendMode.OPAQUE;
 
         // A pack's entity program reads Sampler0/1/2 like a vanilla entity type does; unbound, it reads stale textures.
         boolean irisRouted = IrisCompat.ENABLED
@@ -133,7 +171,8 @@ public final class RenderTypeFactory {
                 && IrisCompat.supportsVertexFormat(vertexFormat(compiled.settings().vertexFormatElements()));
         boolean useLightmap = compiled.usesLightmap() || irisRouted;
         boolean useOverlay = compiled.usesOverlay() || irisRouted;
-        RenderSetup.RenderSetupBuilder setup = RenderSetup.builder(pipeline);
+        RenderSetup.RenderSetupBuilder setup = RenderSetup.builder(pipelines.main());
+        if (oit != null) setup.setOitPipelines(oit);
         if (irisRouted) setup.withTexture(IRIS_ALBEDO_SAMPLER, NEUTRAL_WHITE);
         // Baked Sampler2D default textures + sampler params (per-instance dynamic textures are applied
         // later via RenderTypeGraphMaterial.setTexture, re-bound each draw by the mixin).
@@ -142,9 +181,9 @@ public final class RenderTypeFactory {
             SamplerDefault def = e.getValue();
             setup.withTexture(e.getKey(), def.texture(), () -> gpuSampler(def));
         }
-        // Every sampler the pipeline declares MUST be bound at draw or the GPU encoder throws
-        // "Missing sampler". Bind a placeholder for any declared sampler not provided and not covered
-        // by overlay (Sampler1) / lightmap (Sampler2).
+        // Every sampler the pipeline declares MUST be bound at draw (the render pass validates it). Bind a
+        // placeholder for any declared sampler not provided and not covered by overlay (Sampler1) / lightmap
+        // (Sampler2).
         for (String sampler : compiled.layout().samplers()) {
             if (samplerDefaults.containsKey(sampler)) continue;
             if (sampler.equals("Sampler1") && useOverlay) continue;
@@ -156,7 +195,6 @@ public final class RenderTypeFactory {
         if (useLightmap) setup.useLightmap();
         if (useOverlay) setup.useOverlay();
         if (compiled.settings().sortOnUpload()) setup.sortOnUpload();
-        setup.setOutputTarget(outputTarget(compiled.settings().outputTarget()));
 
         REFCOUNTS.merge(hash, 1, Integer::sum);
         // The graph samples the captured opaque scene — start (and refcount) the capture while this material lives.
@@ -166,14 +204,19 @@ public final class RenderTypeFactory {
             // BEFORE that point, so at its own screen position the capture contains... itself (last frame):
             // a self-sampling feedback loop that renders black with view-dependent fringes (identical in
             // vanilla and under shaderpacks; same constraint as Unity's Scene Color). Warn once per graph.
-            if (compiled.settings().blend() == RenderTypeGraph.Settings.BlendMode.OPAQUE
-                    && SCENE_ON_OPAQUE_WARNED.add(hash)) {
+            if (!translucent && SCENE_ON_OPAQUE_WARNED.add(hash)) {
                 Kilagraph.LOGGER.warn("[KilaGraph] graph {} uses Scene Color/Depth on an OPAQUE material: "
                         + "it draws before the scene capture and will sample ITSELF (black feedback). "
                         + "Use a translucent BlendMode and draw it in the translucent phase.", hash);
             }
         }
-        String name = Kilagraph.MODID + ":graph/" + hash;
+        boolean solidUnderOit = translucent && oit == null;
+        if (solidUnderOit && Minecraft.getInstance().gameRenderer.useImprovedTransparency()
+                && SOLID_UNDER_OIT_WARNED.add(hash)) {
+            LOGGER.info("[KilaGraph] graph {}: blend mode {} has no order-independent form, so with improved "
+                    + "transparency it blends over the opaque scene in the solid phase", hash, compiled.settings().blend());
+        }
+        String name = Kilagraph.MODID + ":graph/" + hash + "/" + MATERIAL_SERIAL.incrementAndGet();
         RenderType renderType = RenderType.create(name, setup.createRenderSetup());
         // UBOs only the injection snippet needs (fragment reconstructions — e.g. Fresnel's viewDir pulls
         // KG_Globals.ScreenSize only under injection): uploaded + Iris-bound by the material, but kept out
@@ -198,9 +241,9 @@ public final class RenderTypeFactory {
         RenderTypeGraphMaterial material = new RenderTypeGraphMaterial(
                 renderType, compiled.layout(), compiled.uniformBlocks(), injectionOnly, hash,
                 compiled.uniformFields(), compiled.variableSamplers(), buildMaterialTextures(compiled),
-                injectionOnlyTextures, compiled.usesSceneColor(), compiled.usesSceneDepth());
+                injectionOnlyTextures, compiled.usesSceneColor(), compiled.usesSceneDepth(), solidUnderOit);
         material.setInstanceLayout(KGInstanceLayout.of(compiled.instanceAttributes()));
-        material.setColorTargets(compiled.colorTargets());
+        material.setColorTargets(compiled.colorTargets(), pipelines.colorTargets());
         // Bake EXPOSED-variable defaults into the material UBO; callers may override later via setUniform.
         for (Map.Entry<String, float[]> e : compiled.uniformDefaults().entrySet()) {
             material.setUniformField(e.getKey(), e.getValue());
@@ -216,8 +259,7 @@ public final class RenderTypeFactory {
         if (IrisCompat.ENABLED) {
             if (irisRouted) {
                 material.setIrisSurfaceId(IrisSurfaceRegistry.register(compiled));
-                boolean translucent = compiled.settings().blend() != RenderTypeGraph.Settings.BlendMode.OPAQUE;
-                IrisCompat.assignToEntities(pipeline, translucent, compiled.alphaDiscards());
+                IrisCompat.assignToEntities(pipelines.main(), translucent, compiled.alphaDiscards());
                 // A reload to inject this new surface (if the programs are now stale) is driven from the
                 // client tick (IrisCompat.reloadShadersIfStale via IrisDebugCommand), NOT here — reloading
                 // mid-frame crashes the world pipeline.
@@ -238,7 +280,13 @@ public final class RenderTypeFactory {
         return material;
     }
 
-    /** Release a material's reference to its generated pipeline; evict when the last one drops. */
+    private static boolean compileAll(OitPipelineSet oit) {
+        return KGPipelines.ensureCompiled(oit.depthBoundsPipeline())
+                && KGPipelines.ensureCompiled(oit.transmittancePipeline())
+                && KGPipelines.ensureCompiled(oit.accumulatePipeline());
+    }
+
+    /** Release a material's reference to its generated pipelines; evict when the last one drops. */
     static void release(String contentHash) {
         // Mirror the release into the Iris surface registry (no-op if this graph wasn't injection-registered).
         if (IrisCompat.LOADED) IrisSurfaceRegistry.release(contentHash);
@@ -252,67 +300,109 @@ public final class RenderTypeFactory {
         });
     }
 
-    /** Drop our heap references to a generated pipeline + its GLSL source (GPU program can't be freed individually). */
+    /** Close a graph's pipelines and drop them + their GLSL source. */
     private static void evictGenerated(String contentHash) {
-        PIPELINES.remove(contentHash);
+        GeneratedPipelines pipelines = PIPELINES.remove(contentHash);
+        if (pipelines != null) pipelines.all().forEach(KGPipelines::evict);
         DynamicShaderSourceRegistry.unregister(DynamicShaderSourceRegistry.shaderId(contentHash));
     }
 
-    /** Get the cached pipeline for this compiled graph, building + registering its GLSL on first use. */
-    public static RenderPipeline getOrBuildPipeline(CompiledShaderGraph compiled) {
-        return PIPELINES.computeIfAbsent(compiled.contentHash(), hash -> buildPipeline(compiled));
+    /** The cached pipelines for this compiled graph, building + registering its GLSL on first use. */
+    public static GeneratedPipelines getOrBuildPipelines(CompiledShaderGraph compiled) {
+        return PIPELINES.computeIfAbsent(compiled.contentHash(), hash -> buildPipelines(compiled));
     }
 
-    private static RenderPipeline buildPipeline(CompiledShaderGraph compiled) {
-        Identifier shaderId = DynamicShaderSourceRegistry.shaderId(compiled.contentHash());
-        // Resolve #include the same way ShaderManager does for asset shaders — the GL device
-        // compiles whatever the registry returns, and the driver can't understand #include.
-        String vsh = GlslImportProcessor.process(compiled.vertexSource());
-        String fsh = GlslImportProcessor.process(compiled.fragmentSource());
-        DynamicShaderSourceRegistry.register(shaderId, vsh, fsh);
+    private static GeneratedPipelines buildPipelines(CompiledShaderGraph compiled) {
+        String hash = compiled.contentHash();
+        Identifier shaderId = DynamicShaderSourceRegistry.shaderId(hash);
+        DynamicShaderSourceRegistry.register(shaderId, compiled.vertexSource(), compiled.fragmentSource());
 
         RenderTypeGraph.Settings settings = compiled.settings();
-        RenderPipeline.Builder b = RenderPipeline.builder()
-                .withLocation(Identifier.fromNamespaceAndPath(Kilagraph.MODID, "pipeline/" + compiled.contentHash()))
+        // Everything but the colour targets and the depth state, which the OIT phases set their own way.
+        RenderPipeline.Builder base = RenderPipeline.builder()
                 .withVertexShader(shaderId)
                 .withFragmentShader(shaderId)
                 .withVertexBinding(0, vertexFormat(settings.vertexFormatElements()))
                 .withPrimitiveTopology(primitiveTopology(settings.vertexFormatMode()))
-                .withColorTargetState(colorTarget(blendFunction(settings.blend()), settings.colorFormat()))
-                .withDepthStencilState(depthState(settings))
                 .withCull(settings.cull());
-        for (ColorTarget target : compiled.colorTargets()) {
-            b.withColorTargetState(target.location(), colorTarget(blendFunction(settings.blend()), target.format()));
-        }
-
-        // One bind group for the whole program (Vulkan rejects anything the shader declares but the layout lacks).
-        BindGroupLayout.Builder layout = BindGroupLayout.builder();
-
-        // Builtin UBOs actually referenced by the generated GLSL, plus DynamicTransforms: the vanilla draw
-        // path binds it on EVERY draw, so a pipeline of ours must declare it whether or not a node read it.
-        // That requirement belongs here and not in the compiler — builtinUniforms() means "what the GLSL
-        // references", and a consumer driving its own draw (Photon's fullscreen post-effect passes) binds
-        // nothing of Minecraft's, so a declaration it can't honour is a hard "Missing uniform" at draw.
-        Set<String> builtins = new LinkedHashSet<>(compiled.builtinUniforms());
-        builtins.add("DynamicTransforms");
-        for (String ubo : builtins) {
-            layout.withUniform(ubo, UniformType.UNIFORM_BUFFER);
-        }
-        // Per-material UBO + samplers exposed by the graph.
-        if (!compiled.layout().isEmpty()) {
-            layout.withUniform(MaterialUniformLayout.UBO_NAME, UniformType.UNIFORM_BUFFER);
-        }
-        // KilaGraph-managed UBOs the graph uses (engine globals / transforms / a mod's own), uploaded by us
-        // each frame. Generic — adding a new engine UBO needs no change here.
-        for (ShaderUniformBlock block : compiled.uniformBlocks()) {
-            layout.withUniform(block.uboName(), UniformType.UNIFORM_BUFFER);
-        }
-        for (String sampler : compiled.layout().samplers()) {
-            layout.withSampler(sampler);
-        }
         KGInstanceLayout instances = KGInstanceLayout.of(compiled.instanceAttributes());
-        if (instances != null) b.withVertexBinding(1, instances.format());
-        return b.withBindGroupLayout(layout.build()).build();
+        if (instances != null) base.withVertexBinding(1, instances.format());
+        for (BindGroupLayout layout : bindGroupLayouts(compiled)) base.withBindGroupLayout(layout);
+        RenderPipeline.Snippet snippet = base.buildSnippet();
+
+        Optional<BlendFunction> blend = blendFunction(settings.blend());
+        ColorTargetState mainTarget = colorTarget(blend, settings.colorFormat());
+        RenderPipeline main = RenderPipeline.builder(snippet)
+                .withLocation(Identifier.fromNamespaceAndPath(Kilagraph.MODID, "pipeline/" + hash))
+                .withColorTargetState(mainTarget)
+                .withDepthStencilState(depthState(settings))
+                .build();
+        RenderPipeline colorTargets = null;
+        if (!compiled.colorTargets().isEmpty()) {
+            RenderPipeline.Builder b = RenderPipeline.builder(snippet)
+                    .withLocation(Identifier.fromNamespaceAndPath(Kilagraph.MODID, "pipeline/" + hash + "_color_targets"))
+                    .withShaderDefine(ShaderGraphCompiler.COLOR_TARGETS_DEFINE)
+                    .withColorTargetState(mainTarget)
+                    .withDepthStencilState(depthState(settings));
+            for (ColorTarget target : compiled.colorTargets()) {
+                b.withColorTargetState(target.location(), colorTarget(blend, target.format()));
+            }
+            colorTargets = b.build();
+        }
+        return new GeneratedPipelines(main, colorTargets, oitPipelines(settings, snippet, hash));
+    }
+
+    /** How a blend mode is drawn in the OIT phases; {@code null}: it can't be (it depends on what's behind). */
+    private record OitBlend(boolean additive, @Nullable String define) {}
+
+    @Nullable
+    private static OitBlend oitBlend(RenderTypeGraph.Settings.BlendMode blend) {
+        return switch (blend) {
+            case TRANSLUCENT, ENTITY_OUTLINE_BLIT -> new OitBlend(false, null);
+            case TRANSLUCENT_PREMULTIPLIED_ALPHA -> new OitBlend(false, ShaderGraphCompiler.PREMULTIPLIED_ALPHA_DEFINE);
+            // (SRC_ALPHA, ONE) colour — OVERLAY only differs in the alpha channel, which the main target doesn't show.
+            case LIGHTNING, OVERLAY -> new OitBlend(true, null);
+            case ADDITIVE -> new OitBlend(true, ShaderGraphCompiler.ADDITIVE_ONE_DEFINE);
+            case OPAQUE, GLINT, INVERT, MULTIPLY, SUBTRACT, MIN, MAX -> null;
+        };
+    }
+
+    @Nullable
+    private static OitPipelineSet oitPipelines(RenderTypeGraph.Settings settings, RenderPipeline.Snippet snippet, String hash) {
+        OitBlend oit = oitBlend(settings.blend());
+        if (oit == null) return null;
+        RenderPipeline.Builder builder = RenderPipeline.builder(snippet);
+        if (oit.additive()) builder.withShaderDefine("OIT_ADDITIVE");
+        if (oit.define() != null) builder.withShaderDefine(oit.define());
+        OitPipelineSet.Builder set = OitPipelineSet.builder(Identifier.fromNamespaceAndPath(Kilagraph.MODID, hash), builder);
+        // The phases test depth like the material does, and none of them writes it.
+        if (settings.depthTest() == RenderTypeGraph.Settings.DepthTest.ALWAYS
+                || settings.depthTest() == RenderTypeGraph.Settings.DepthTest.NONE) {
+            set.withoutDepthTest();
+        } else {
+            DepthStencilState depth = depthState(settings, false);
+            Consumer<RenderPipeline.Builder> modifier = b -> b.withDepthStencilState(depth);
+            set.withDepthBoundsModifier(modifier).withTransmittanceModifier(modifier).withAccumulateModifier(modifier);
+        }
+        return set.build();
+    }
+
+    /**
+     * The bind group layouts of a pipeline running {@code compiled}'s GLSL: one per uniform it declares (the
+     * Minecraft blocks its includes declare, {@code KG_Material}, the KilaGraph-managed blocks, the samplers).
+     * One layout each, so one Minecraft also adds (the OIT phases' {@code Globals}/{@code Projection}) is the
+     * same layout rather than a duplicate name. A pipeline must declare nothing more: the render pass requires
+     * every declared uniform to be bound at draw.
+     */
+    public static List<BindGroupLayout> bindGroupLayouts(CompiledShaderGraph compiled) {
+        Map<String, UniformType> uniforms = new LinkedHashMap<>();
+        for (String ubo : compiled.builtinUniforms()) uniforms.put(ubo, UniformType.UNIFORM_BUFFER);
+        if (!compiled.layout().isEmpty()) uniforms.put(MaterialUniformLayout.UBO_NAME, UniformType.UNIFORM_BUFFER);
+        for (ShaderUniformBlock block : compiled.uniformBlocks()) uniforms.put(block.uboName(), UniformType.UNIFORM_BUFFER);
+        for (String sampler : compiled.layout().samplers()) uniforms.put(sampler, UniformType.COMBINED_IMAGE_SAMPLER);
+        List<BindGroupLayout> layouts = new ArrayList<>(uniforms.size());
+        uniforms.forEach((name, type) -> layouts.add(BindGroupLayout.builder().withUniform(name, type).build()));
+        return layouts;
     }
 
     /**
@@ -339,7 +429,7 @@ public final class RenderTypeFactory {
                 || sampler.equals(ShaderGraphCompiler.SCENE_DEPTH_SAMPLER);
     }
 
-    /** Build the GPU sampler for a {@link SamplerDefault}, mapping KilaGraph's enums to blaze3d's. */
+    /** Build the GPU sampler for a {@link SamplerDefault}, mapping KilaGraph's enums to renderpearl's. */
     public static GpuSampler gpuSampler(SamplerDefault def) {
         FilterMode filter = def.filter() == SamplerFilter.LINEAR ? FilterMode.LINEAR : FilterMode.NEAREST;
         AddressMode address = def.address() == SamplerAddress.REPEAT ? AddressMode.REPEAT : AddressMode.CLAMP_TO_EDGE;
@@ -390,9 +480,13 @@ public final class RenderTypeFactory {
         return new BlendFunction(src, dst, op, BlendFactor.ZERO, BlendFactor.ONE, BlendOp.ADD);
     }
 
+    private static DepthStencilState depthState(RenderTypeGraph.Settings settings) {
+        return depthState(settings, settings.depthWrite());
+    }
+
     /** Minecraft renders reversed-Z, so "nearer" ({@code LEQUAL}/{@code LESS}) is a greater-than compare, and a
      *  positive bias pulls toward the camera. */
-    private static DepthStencilState depthState(RenderTypeGraph.Settings settings) {
+    private static DepthStencilState depthState(RenderTypeGraph.Settings settings, boolean depthWrite) {
         CompareOp op = switch (settings.depthTest()) {
             case LEQUAL -> CompareOp.GREATER_THAN_OR_EQUAL;
             case LESS -> CompareOp.GREATER_THAN;
@@ -405,14 +499,6 @@ public final class RenderTypeFactory {
             if (factor == 0) factor = Float.MIN_VALUE;
             else units = Float.MIN_VALUE;
         }
-        return new DepthStencilState(op, settings.depthWrite(), factor, units);
-    }
-
-    private static OutputTarget outputTarget(RenderTypeGraph.Settings.OutputTarget target) {
-        return switch (target) {
-            case WEATHER -> OutputTarget.WEATHER_TARGET;
-            case ITEM_ENTITY -> OutputTarget.ITEM_ENTITY_TARGET;
-            case MAIN, TRANSLUCENT, PARTICLES -> OutputTarget.MAIN_TARGET;
-        };
+        return new DepthStencilState(op, depthWrite, factor, units);
     }
 }

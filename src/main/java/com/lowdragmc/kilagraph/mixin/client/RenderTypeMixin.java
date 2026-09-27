@@ -9,7 +9,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
- /** Stamps a KilaGraph render type's material onto the {@link PreparedRenderType} its {@code prepare()} returns. */
+/** Stamps a KilaGraph render type's material onto the {@link PreparedRenderType} its {@code prepare()} returns,
+ *  and uploads the material: preparing is where 26.3 puts everything a draw needs before its pass opens. */
 @Mixin(RenderType.class)
 public class RenderTypeMixin {
 
@@ -18,5 +19,6 @@ public class RenderTypeMixin {
         var material = RenderTypeGraphMaterial.of((RenderType) (Object) this);
         if (material == null) return;
         ((KGPreparedRenderType) (Object) cir.getReturnValue()).kilagraph$setMaterial(material);
+        material.onPrepared();
     }
 }

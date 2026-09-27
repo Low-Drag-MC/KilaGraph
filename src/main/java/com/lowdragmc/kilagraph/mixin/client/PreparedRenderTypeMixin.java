@@ -1,21 +1,17 @@
 package com.lowdragmc.kilagraph.mixin.client;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.llamalad7.mixinextras.sugar.Local;
+import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
 import com.lowdragmc.kilagraph.rendertype.iris.IrisSurfaceUniform;
+import com.lowdragmc.kilagraph.rendertype.runtime.KGPipelines;
 import com.lowdragmc.kilagraph.rendertype.runtime.KGPreparedRenderType;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
-import com.mojang.renderpearl.api.pipeline.IndexType;
-import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
-import com.mojang.renderpearl.api.commands.CommandEncoder;
 import com.mojang.renderpearl.api.commands.RenderPass;
-import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import net.minecraft.client.renderer.StagedVertexBuffer;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Vector4fc;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -23,16 +19,21 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.function.Supplier;
+import java.util.Collections;
+import java.util.Set;
+import java.util.WeakHashMap;
 
 /**
- * Uploads a KilaGraph material's UBOs/textures at {@code drawFromBuffer} HEAD (still outside the pass; later
- * than {@code prepare()}, so values set in the geometry callback count) and binds them before the draw call.
+ * Binds a KilaGraph material's UBOs, textures and instances in the draw every render type funnels through —
+ * {@code drawFromBuffer} and each OIT phase's {@code drawFromBufferOit} — inside the caller's render pass. The
+ * material was uploaded when the render type was prepared (see {@code RenderTypeMixin}).
  */
 @Mixin(PreparedRenderType.class)
 public abstract class PreparedRenderTypeMixin implements KGPreparedRenderType {
+
+    /** Pipelines already reported as not compiling, so each is logged once. */
+    @Unique
+    private static final Set<RenderPipeline> kilagraph$REPORTED = Collections.newSetFromMap(new WeakHashMap<>());
 
     @Unique
     private @Nullable RenderTypeGraphMaterial kilagraph$material;
@@ -57,30 +58,33 @@ public abstract class PreparedRenderTypeMixin implements KGPreparedRenderType {
         this.kilagraph$instanceCount = count;
     }
 
-    /** Upload before the pass opens; skip the draw in an Iris shadow pass we have no mapping for (it would
-     *  corrupt the shadow map). */
-    @Inject(
-            method = "drawFromBuffer(Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/IndexType;III)V",
-            at = @At("HEAD"),
-            cancellable = true)
-    private void kilagraph$prepareMaterial(GpuBuffer vertexBuffer, GpuBuffer indexBuffer, IndexType indexType,
-                                           int baseVertex, int firstIndex, int indexCount, CallbackInfo ci) {
+    /** Skip a draw whose pipeline doesn't compile — Minecraft would fail the frame. The main pipeline compiled when
+     *  the material was built; an OIT phase's compiles at its first draw, a pipeline after a shader reload at its
+     *  next. Also skips an Iris shadow pass we have no mapping for (it would corrupt the shadow map). */
+    @Inject(method = "draw", at = @At("HEAD"), cancellable = true)
+    private void kilagraph$skipBroken(StagedVertexBuffer.ExecuteInfo info, RenderPass renderPass, RenderPipeline pipeline,
+                                      CallbackInfo ci) {
         var material = kilagraph$material;
         if (material == null) return;
         if (IrisCompat.shouldSkipShadowDraw()) {
             ci.cancel();
             return;
         }
-        material.prepareUniforms();
+        if (!KGPipelines.ensureCompiled(pipeline)) {
+            if (kilagraph$REPORTED.add(pipeline)) {
+                Kilagraph.LOGGER.warn("[KilaGraph] pipeline {} of {} doesn't compile; its draws are skipped",
+                        pipeline.getLocation(), material.contentHash());
+            }
+            ci.cancel();
+        }
     }
 
     /** Bind after vanilla's own texture loop, so per-instance textures win. */
     @Inject(
-            method = "drawFromBuffer(Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/IndexType;III)V",
-            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderPass;drawIndexed(IIIII)V", shift = At.Shift.BEFORE))
-    private void kilagraph$bindMaterialUniforms(GpuBuffer vertexBuffer, GpuBuffer indexBuffer, IndexType indexType,
-                                                int baseVertex, int firstIndex, int indexCount, CallbackInfo ci,
-                                                @Local RenderPass renderPass) {
+            method = "draw",
+            at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/commands/RenderPass;drawIndexed(IIIII)V"))
+    private void kilagraph$bindMaterialUniforms(StagedVertexBuffer.ExecuteInfo info, RenderPass renderPass,
+                                                RenderPipeline pipeline, CallbackInfo ci) {
         var material = kilagraph$material;
         if (material == null) return;
         material.bindCustomUniforms(renderPass);
@@ -96,24 +100,10 @@ public abstract class PreparedRenderTypeMixin implements KGPreparedRenderType {
         }
     }
 
-    /** Open the pass with the material's extra colour targets (unused attachments where none is bound). */
-    @WrapOperation(
-            method = "drawFromBuffer(Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/IndexType;III)V",
-            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/CommandEncoder;createRenderPass(Ljava/util/function/Supplier;Lcom/mojang/blaze3d/textures/GpuTextureView;Ljava/util/Optional;Lcom/mojang/blaze3d/textures/GpuTextureView;Ljava/util/OptionalDouble;)Lcom/mojang/blaze3d/systems/RenderPass;"))
-    private RenderPass kilagraph$colorTargets(CommandEncoder encoder, Supplier<String> label, GpuTextureView color,
-                                              Optional<Vector4fc> clearColor, @Nullable GpuTextureView depth,
-                                              OptionalDouble clearDepth, Operation<RenderPass> original) {
-        var material = kilagraph$material;
-        if (material == null || material.colorTargets().isEmpty()) {
-            return original.call(encoder, label, color, clearColor, depth, clearDepth);
-        }
-        return encoder.createRenderPass(material.colorTargetPass(label, color, clearColor, depth, clearDepth));
-    }
-
-    /** firstInstance stays 0: GL's gl_InstanceID ignores it, Vulkan's gl_InstanceIndex doesn't. */
+    /** firstInstance stays 0, so gl_InstanceIndex is the instance's index on both backends. */
     @ModifyArg(
-            method = "drawFromBuffer(Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/IndexType;III)V",
-            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderPass;drawIndexed(IIIII)V"),
+            method = "draw",
+            at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/commands/RenderPass;drawIndexed(IIIII)V"),
             index = 1)
     private int kilagraph$instanceCount(int instanceCount) {
         return kilagraph$material != null ? kilagraph$instanceCount : instanceCount;
@@ -122,10 +112,10 @@ public abstract class PreparedRenderTypeMixin implements KGPreparedRenderType {
     /** Clear the discriminator after our draw so the next, unrelated draw sharing this program is not
      *  flagged as ours (the program is still bound here, so the reset reaches it). */
     @Inject(
-            method = "drawFromBuffer(Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/IndexType;III)V",
-            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderPass;drawIndexed(IIIII)V", shift = At.Shift.AFTER))
-    private void kilagraph$resetSurfaceId(GpuBuffer vertexBuffer, GpuBuffer indexBuffer, IndexType indexType,
-                                          int baseVertex, int firstIndex, int indexCount, CallbackInfo ci) {
+            method = "draw",
+            at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/api/commands/RenderPass;drawIndexed(IIIII)V", shift = At.Shift.AFTER))
+    private void kilagraph$resetSurfaceId(StagedVertexBuffer.ExecuteInfo info, RenderPass renderPass,
+                                          RenderPipeline pipeline, CallbackInfo ci) {
         var material = kilagraph$material;
         if (material != null && material.irisSurfaceId() != 0 && IrisCompat.isShaderPackInUse()) {
             IrisSurfaceUniform.clearBoundProgram();

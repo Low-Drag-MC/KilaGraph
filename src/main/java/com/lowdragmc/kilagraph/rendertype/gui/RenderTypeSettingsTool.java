@@ -90,6 +90,7 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
         vertexFormatMode = enumSelector(RenderTypeGraph.Settings.VertexFormatMode.class);
         blend = enumSelector(RenderTypeGraph.Settings.BlendMode.class);
         depthTest = enumSelector(RenderTypeGraph.Settings.DepthTest.class);
+        // Not shown: Minecraft 26.3 draws a render type into the pass it is drawn in. Kept so the value round-trips.
         outputTarget = enumSelector(RenderTypeGraph.Settings.OutputTarget.class);
         colorFormat = enumSelector(RenderTypeGraph.Settings.ColorFormat.class);
         var depthOffsetGroup = new ConfiguratorGroup("rendertypegraph.settings.depth_offset", false);
@@ -116,7 +117,6 @@ public class RenderTypeSettingsTool extends UIElement implements IGraphTool {
                 row("rendertypegraph.settings.primitive", vertexFormatMode),
                 row("rendertypegraph.settings.blend", blend),
                 row("rendertypegraph.settings.depth_test", depthTest),
-                row("rendertypegraph.settings.target", outputTarget),
                 row("rendertypegraph.settings.color_format", colorFormat),
                 row("rendertypegraph.settings.depth_write", depthWrite),
                 row("rendertypegraph.settings.cull", cull),
