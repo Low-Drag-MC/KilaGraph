@@ -142,10 +142,46 @@ final class NodeMetadata {
      * declared ones, so an rpc entry's parameters sat on top of its {@code trigger} and the ordering
      * this method's own loop exists to produce was thrown away for any node that has both.
      */
+    /** Where an annotated port with no {@code display} of its own finds its label: {@code kg.pin.<id>}. */
+    static final String PIN_KEY = "kg.pin.";
+
+    /**
+     * A port's label: its {@code display} — a lang key, or the text itself — else {@code kg.pin.<id>}, one key every
+     * node's port of that id shares and namespaced so it catches no other string (the bare id LDLib2 falls back to is
+     * a key any text drawn anywhere can hit), shown as the id in words where no language has it.
+     */
+    static Component label(FieldDef d) {
+        return d.display.isEmpty() ? Component.translatableWithFallback(PIN_KEY + d.id, words(d.id))
+                : Component.translatableWithFallback(d.display, d.display);
+    }
+
+    /** {@code upwardsSpeed} → {@code Upwards Speed}, {@code optionalObject2} → {@code Optional Object 2}. */
+    static String words(String id) {
+        StringBuilder out = new StringBuilder(id.length() + 8);
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            if (c == '_') {
+                out.append(' ');
+                continue;
+            }
+            if (i > 0) {
+                char previous = id.charAt(i - 1);
+                boolean nextLower = i + 1 < id.length() && Character.isLowerCase(id.charAt(i + 1));
+                boolean wordStart = Character.isUpperCase(c) && (Character.isLowerCase(previous)
+                        || (Character.isDigit(previous) || Character.isUpperCase(previous)) && nextLower)
+                        || Character.isDigit(c) && Character.isLetter(previous);
+                if (wordStart) out.append(' ');
+            }
+            boolean startsWord = out.isEmpty() || out.charAt(out.length() - 1) == ' ';
+            out.append(startsWord ? Character.toUpperCase(c) : c);
+        }
+        return out.toString().strip().replaceAll(" +", " ");
+    }
+
     private void applyPort(IPortDefinitionContext ctx, Node node, FieldDef d) {
         if (d.kind == Kind.INPUT_PORT) {
             IInputPortBuilder<?> b = ctx.addInputPort(d.id, d.typeHandle);
-            if (!d.display.isEmpty()) b.withDisplayName(Component.translatableWithFallback(d.display, d.display));
+            b.withDisplayName(label(d));
             if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
             if (hasAccessor(d.field.getGenericType())) {
                 Object def = readFieldValue(d.field, node);
@@ -161,7 +197,7 @@ final class NodeMetadata {
             b.build();
         } else {
             IOutputPortBuilder<?> b = ctx.addOutputPort(d.id, d.typeHandle);
-            if (!d.display.isEmpty()) b.withDisplayName(Component.translatableWithFallback(d.display, d.display));
+            b.withDisplayName(label(d));
             if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
             b.build();
         }

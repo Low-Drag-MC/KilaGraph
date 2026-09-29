@@ -24,8 +24,9 @@ public @interface InputPort {
     String name() default "";
 
     /**
-     * The label: a lang key, or the text itself where no language has one. Empty: the port id, read as a lang key
-     * (LDLib2's default) — a key every node's port of that id shares, so name one here where yours means something else.
+     * The label: a lang key, or the text itself where no language has one. Empty: {@code kg.pin.<id>}, the id in words
+     * where no language has that — a key every node's port of that id shares, so name one here where yours means
+     * something else.
      */
     String display() default "";
 
