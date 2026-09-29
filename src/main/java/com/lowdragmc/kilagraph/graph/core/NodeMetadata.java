@@ -109,7 +109,7 @@ final class NodeMetadata {
         for (FieldDef d : defs) {
             if (d.kind != Kind.OPTION) continue;
             IOptionBuilder<?> b = ctx.addOption(d.id, d.typeHandle);
-            if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
+            if (!d.display.isEmpty()) b.withDisplayName(Component.translatableWithFallback(d.display, d.display));
             if (hasAccessor(d.field.getGenericType())) {
                 Object def = readFieldValue(d.field, node);
                 if (def != null) b.withDefaultValue(def);
@@ -145,7 +145,7 @@ final class NodeMetadata {
     private void applyPort(IPortDefinitionContext ctx, Node node, FieldDef d) {
         if (d.kind == Kind.INPUT_PORT) {
             IInputPortBuilder<?> b = ctx.addInputPort(d.id, d.typeHandle);
-            if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
+            if (!d.display.isEmpty()) b.withDisplayName(Component.translatableWithFallback(d.display, d.display));
             if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
             if (hasAccessor(d.field.getGenericType())) {
                 Object def = readFieldValue(d.field, node);
@@ -161,7 +161,7 @@ final class NodeMetadata {
             b.build();
         } else {
             IOutputPortBuilder<?> b = ctx.addOutputPort(d.id, d.typeHandle);
-            if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
+            if (!d.display.isEmpty()) b.withDisplayName(Component.translatableWithFallback(d.display, d.display));
             if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
             b.build();
         }

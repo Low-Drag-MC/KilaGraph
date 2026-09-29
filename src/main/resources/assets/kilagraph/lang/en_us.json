@@ -5404,5 +5404,8 @@
   "kg.node.rt_vec4.in.z": "The z component.",
   "kg.node.rt_vec4.in.w": "The w component.",
   "kg.node.rt_vec4.out.out": "The assembled vector.",
-  "kg.node.rt_white_balance.out.out": "The color warmed or cooled and tinted along green to magenta."
+  "kg.node.rt_white_balance.out.out": "The color warmed or cooled and tinted along green to magenta.",
+  "level": "Level",
+  "side": "Side",
+  "damaged": "Damaged"
 }

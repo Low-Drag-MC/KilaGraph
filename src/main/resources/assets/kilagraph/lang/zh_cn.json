@@ -5402,5 +5402,8 @@
   "kg.node.rt_vec4.in.z": "z 分量。",
   "kg.node.rt_vec4.in.w": "w 分量。",
   "kg.node.rt_vec4.out.out": "组装好的向量。",
-  "kg.node.rt_white_balance.out.out": "经过冷暖调整、并在绿到品红之间偏移后的颜色。"
+  "kg.node.rt_white_balance.out.out": "经过冷暖调整、并在绿到品红之间偏移后的颜色。",
+  "level": "世界",
+  "side": "面",
+  "damaged": "已损坏"
 }
