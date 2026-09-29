@@ -9,7 +9,10 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.nbt.CompoundTag;
 
-/** {@code tag} without {@code key}: a copy when there was one to remove — the input is never written (see {@code mc_nbt_set}). */
+/**
+ * Remove {@code key} from {@code tag}, returning the tag — in place, as {@code mc_nbt_set} writes, or from a copy
+ * with {@code copy}.
+ */
 @NodeAttribute(name = "mc_nbt_remove", group = "mc/nbt", graphTypes = BlueprintGraph.class)
 public class NbtRemoveNode extends AnnotatedNode {
     @Override
@@ -19,17 +22,17 @@ public class NbtRemoveNode extends AnnotatedNode {
 
     @InputPort public CompoundTag tag;
     @InputPort public String key = "";
+    /** Remove from a copy of {@code tag}, leaving it as it was, rather than from the tag itself. */
+    @InputPort public boolean copy = false;
     @OutputPort public CompoundTag out;
 
     @Override
     public void evaluate(EvalContext ctx) {
         CompoundTag t = ctx.getInput("tag", CompoundTag.class, null);
         if (t == null) { ctx.setOutput("out", new CompoundTag()); return; }
+        if (ctx.getBool("copy", false)) t = t.copy();
         String k = ctx.getInput("key", String.class, "");
-        if (!k.isEmpty() && t.contains(k)) {
-            t = t.copy();
-            t.remove(k);
-        }
+        if (!k.isEmpty()) t.remove(k);
         ctx.setOutput("out", t);
     }
 }

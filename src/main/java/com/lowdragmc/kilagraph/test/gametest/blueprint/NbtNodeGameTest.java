@@ -147,7 +147,7 @@ public final class NbtNodeGameTest {
         wire(g, hasAfter.getInputsById().get("tag"), remove.getOutputsById().get("out"));
 
         var exec = new GraphExecutor(g);
-        // The removal hands back a copy, so the reads before it still see foo whenever they run.
+        // Evaluate the pre-removal reads before the removal mutates the (shared) tag instance.
         assertTrue(helper, "has foo", exec.evaluate(has.getOutputsById().get("out"), Boolean.class));
         assertFalse(helper, "missing bar", exec.evaluate(hasMissing.getOutputsById().get("out"), Boolean.class));
         assertFalse(helper, "foo gone after remove", exec.evaluate(hasAfter.getOutputsById().get("out"), Boolean.class));
@@ -260,7 +260,7 @@ public final class NbtNodeGameTest {
         helper.succeed();
     }
 
-    /** {@code mc_nbt_path_set}, including the creation of missing parents and the copy it documents. */
+    /** {@code mc_nbt_path_set}, including the creation of missing parents and the aliasing it documents. */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void pathWritesAndCreatesParents(GameTestHelper helper) {
@@ -272,7 +272,15 @@ public final class NbtNodeGameTest {
         CompoundTag out = eval(deep, "out", CompoundTag.class);
         assertEq(helper, "and the parents were created", "hi",
                 out.getCompound("a").getCompound("b").getString("c"));
-        assertTrue(helper, "written into a copy: the tag it was given is untouched", out != fresh && fresh.isEmpty());
+        assertTrue(helper, "the tag is mutated in place, not copied", out == fresh);
+
+        // With Copy on, the same write lands in a copy and the tag it was given stays as it was.
+        CompoundTag kept = new CompoundTag();
+        var copied = pathSet(kept, "a.b.c", NbtValueType.STRING, "hi");
+        setInputConstant(copied.node(), "copy", true);
+        CompoundTag copyOut = eval(copied, "out", CompoundTag.class);
+        assertEq(helper, "the copy has the write", "hi", copyOut.getCompound("a").getCompound("b").getString("c"));
+        assertTrue(helper, "and the tag it was given is untouched", copyOut != kept && kept.isEmpty());
 
         // Overwriting an existing value.
         CompoundTag root = sample();

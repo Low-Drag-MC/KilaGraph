@@ -14,13 +14,15 @@ import net.minecraft.nbt.CompoundTag;
 import java.util.List;
 
 /**
- * A copy of {@link CompoundTag} {@code tag} with a value put under {@code key}. A null input tag yields a
+ * Put a value into a {@link CompoundTag} under {@code key}, returning the tag. A null input tag yields a
  * fresh compound. The {@link NbtValueType} option types the {@code value} port.
  *
- * <p>Tags are values here, as stacks and lists are: the input is never written. It may be a variable's,
- * an entity's, or one another branch has read — and a pure node is worked out again for each exec node
- * that reads it, so a write into the input would land once per reader. Setters chain:
- * {@code Set(Set(tag, a), b)} holds both.</p>
+ * <p>In place by default: the tag it is given is the one written, and handed back — so setters chained
+ * onto one tag, or branched off it, all write the one compound. {@code copy} writes into a copy instead and
+ * leaves the input alone (NBT Copy does the same as a node of its own). ⚠️ A pure node is worked out again
+ * for each exec node that reads it, so in place, a write the tag's own contents decide — a count read out of
+ * it plus one — lands once per reader; that, or a tag that is a variable's or an entity's, is what
+ * {@code copy} is for.</p>
  */
 // valueType MUST stay an option — see NbtGetNode: it drives the dynamic port's type, decided at
 // defineNode time, before any wire has a value.
@@ -35,6 +37,8 @@ public class NbtSetNode extends AnnotatedNode {
     @Option public NbtValueType valueType = NbtValueType.STRING;
     @InputPort public CompoundTag tag;
     @InputPort public String key = "";
+    /** Write into a copy of {@code tag}, leaving it as it was, rather than into the tag itself. */
+    @InputPort public boolean copy = false;
     @OutputPort public CompoundTag out;
 
     @Override
@@ -45,7 +49,7 @@ public class NbtSetNode extends AnnotatedNode {
     @Override
     public void evaluate(EvalContext ctx) {
         CompoundTag in = ctx.getInput("tag", CompoundTag.class, null);
-        CompoundTag t = in == null ? new CompoundTag() : in.copy();
+        CompoundTag t = in == null ? new CompoundTag() : ctx.getBool("copy", false) ? in.copy() : in;
         String k = ctx.getInput("key", String.class, "");
         NbtValueType vt = ctx.getOption("valueType", NbtValueType.class, NbtValueType.STRING);
         if (!k.isEmpty()) {
@@ -57,7 +61,7 @@ public class NbtSetNode extends AnnotatedNode {
                 case BOOL -> t.putBoolean(k, ctx.getBool("value", false));
                 case COMPOUND -> {
                     CompoundTag c = ctx.getInput("value", CompoundTag.class, null);
-                    if (c != null) t.put(k, c.copy());
+                    if (c != null) t.put(k, c);
                 }
                 default -> t.putString(k, ctx.getInput("value", String.class, ""));
             }

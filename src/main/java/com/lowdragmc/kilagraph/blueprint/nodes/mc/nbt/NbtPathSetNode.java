@@ -30,8 +30,8 @@ import java.util.List;
  * slot that does not exist: {@code Items[4]} on a three-element list writes nothing and reports
  * {@code count = 0}.
  *
- * <p>Like {@code mc_nbt_set}, this writes into a copy and hands that back: the tag it is given is never
- * written, since a pure node is worked out again for each exec node that reads it.
+ * <p>Like {@code mc_nbt_set}, this writes into the tag it is given and hands the same object back — or, with
+ * {@code copy}, into a copy, leaving the input alone. See {@code mc_nbt_set} for when that matters.
  *
  * <p>{@code count} is how many matches were written, since a wildcard path can hit several at once.
  * {@code ok} is false for an unparseable path and for a path that reached nothing writable, which are the
@@ -49,6 +49,8 @@ public class NbtPathSetNode extends AnnotatedNode {
     @Option public NbtValueType valueType = NbtValueType.STRING;
     @InputPort public CompoundTag tag;
     @InputPort public String path = "";
+    /** Write into a copy of {@code tag}, leaving it as it was, rather than into the tag itself. */
+    @InputPort public boolean copy = false;
     @OutputPort public CompoundTag out;
     @OutputPort public int count;
     @OutputPort public boolean ok;
@@ -61,7 +63,7 @@ public class NbtPathSetNode extends AnnotatedNode {
     @Override
     public void evaluate(EvalContext ctx) {
         CompoundTag in = ctx.getInput("tag", CompoundTag.class, null);
-        CompoundTag t = in == null ? new CompoundTag() : in.copy();
+        CompoundTag t = in == null ? new CompoundTag() : ctx.getBool("copy", false) ? in.copy() : in;
         NbtValueType vt = ctx.getOption("valueType", NbtValueType.class, NbtValueType.STRING);
         NbtPathArgument.NbtPath p = NbtPaths.parse(ctx.getInput("path", String.class, ""));
 

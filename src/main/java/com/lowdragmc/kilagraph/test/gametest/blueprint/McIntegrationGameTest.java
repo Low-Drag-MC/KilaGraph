@@ -474,9 +474,9 @@ public final class McIntegrationGameTest {
     /**
      * A compound tag written and read back through three chained nodes.
      *
-     * <p>The NBT setters hand on a copy with their write in it, which their own docs promise. That promise
-     * only means anything across a wire, and this is where it is checked: Create makes a tag, Path Set
-     * writes into a copy and passes it along, Path Get reads it out of what arrived.
+     * <p>The NBT nodes mutate in place and hand the same object on, which their own docs promise. That
+     * promise only means anything across a wire, and this is where it is checked: Create makes a tag, Path
+     * Set writes into it and passes it along, Path Get reads it out of what arrived.
      *
      * <p>The second reader is the sharper half. It hangs off the <b>same</b> Set output and asks for a
      * parent of the path that was written, so it can only answer if the intermediate compounds really were
