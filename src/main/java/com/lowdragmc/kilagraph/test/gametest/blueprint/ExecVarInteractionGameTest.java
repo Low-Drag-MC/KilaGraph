@@ -72,9 +72,9 @@ public final class ExecVarInteractionGameTest {
      * one run).
      *
      * <p>⚠️ This used to pin the opposite — a read memoised for the whole generation, a later
-     * {@code SetVar} not seen — out of care for loop-carried accumulators. They keep their meaning:
-     * {@code LoopController.beginIteration} still clears the cache for each iteration, and the read an
-     * accumulator's {@code SetVar} makes is worked out inside that {@code SetVar}'s own step.
+     * {@code SetVar} not seen — out of care for loop-carried accumulators. They keep their meaning: the
+     * read an accumulator's {@code SetVar} makes is worked out inside that {@code SetVar}'s own step, each
+     * iteration.
      * {@link #execSetThenDataRead} covers a first read after a write.</p>
      */
     @GameTest(template = "empty")

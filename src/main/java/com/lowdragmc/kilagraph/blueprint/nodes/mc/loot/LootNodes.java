@@ -31,10 +31,10 @@ import java.util.List;
  * Rolling loot tables and asking what a block would drop.
  *
  * <h2>Random, and therefore not cacheable</h2>
- * Everything here rolls dice. That makes these the only data nodes in the mod whose answer changes between
- * two evaluations with identical inputs, which matters because the executor memoises per generation: within
- * one run a graph reading the same roll twice sees one result, and across runs it sees new ones. A graph
- * that wants two independent chest-fulls needs two runs or two nodes, not one node read twice.
+ * Everything here rolls dice. That makes these data nodes whose answer changes between two evaluations with
+ * identical inputs, which matters because of when a pure node is evaluated: once for everything one exec
+ * node reads, and again for the next exec node that reads it (as Unreal does). Two exec nodes reading one
+ * roll see two chest-fulls; a graph that wants one chest-full in two places stores it in a variable first.
  *
  * <h2>Server side only</h2>
  * Loot tables live on the server's reloadable registries, reached through {@code level.getServer()}, so a

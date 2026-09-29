@@ -3,14 +3,20 @@ package com.lowdragmc.kilagraph.test.gametest.blueprint;
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.exec.ForNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.PrintNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.ExecInputPort;
+import com.lowdragmc.kilagraph.graph.core.ExecOutputPort;
 import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.exec.ExecContext;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles.ExecutionFlow;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -49,6 +55,31 @@ public final class ExecOutputRetentionGameTest {
             int runs = merged instanceof Integer i ? i : 0;
             ctx.setOutput("number", (float) runs);
             ctx.setOutput("text", "run" + runs);
+        }
+
+        @Override
+        public void evaluate(EvalContext ctx) {
+            ctx.setOutput("number", -1.0f);
+            ctx.setOutput("text", "fell-through");
+        }
+    }
+
+    /**
+     * As {@link PublisherNode}, but publishing nothing for {@code text}: an event whose {@code sender} is
+     * null. A read of {@code text} falls through to {@code evaluate()}, whose markers must not reach
+     * {@code number}.
+     */
+    public static final class HalfPublisherNode extends AnnotatedNode {
+        @ExecInputPort public ExecutionFlow in;
+        @ExecOutputPort public ExecutionFlow next;
+        @OutputPort public float number;
+        @OutputPort public String text;
+
+        @Override
+        public void execute(ExecContext ctx) {
+            ctx.setOutput("number", 7.0f);
+            ctx.setOutput("text", null);
+            ctx.flow("next");
         }
 
         @Override
@@ -162,6 +193,67 @@ public final class ExecOutputRetentionGameTest {
         if (!expect(helper, "the latest publication is what a later read sees", "2/run2/1", f.read())) return;
         f.exec.clearCache();
         if (!expect(helper, "and it stays the latest", "2/run2/2", f.read())) return;
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * Entry → HalfPublisher → Print(text) → Print(number) → Print(number)
+     * </pre>
+     * Reading the output it published nothing for falls through to its {@code evaluate()} — and what it did
+     * publish stays the run's answer: not overwritten by that evaluation, and not gone stale at the next step.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void readingWhatAnExecNodeDidNotPublishLeavesWhatItDid(GameTestHelper helper) {
+        BlueprintGraph g = newGraph();
+        var entry = addNode(g, EntryNode.class);
+        var publisher = addNode(g, HalfPublisherNode.class);
+        wire(g, publisher.getInputsById().get("in"), entry.getOutputsById().get("next"));
+        var text = addNode(g, PrintNode.class);
+        wire(g, text.getInputsById().get("value"), publisher.getOutputsById().get("text"));
+        wire(g, text.getInputsById().get("trigger"), publisher.getOutputsById().get("next"));
+        var first = addNode(g, PrintNode.class);
+        wire(g, first.getInputsById().get("value"), publisher.getOutputsById().get("number"));
+        wire(g, first.getInputsById().get("trigger"), text.getOutputsById().get("next"));
+        var second = addNode(g, PrintNode.class);
+        wire(g, second.getInputsById().get("value"), publisher.getOutputsById().get("number"));
+        wire(g, second.getInputsById().get("trigger"), first.getOutputsById().get("next"));
+        var exec = new GraphExecutor(g);
+        exec.executeFrom(entry);
+        String read = exec.nodeState(text.getUid()).get("last") + "/" + exec.nodeState(first.getUid()).get("last")
+                + "/" + exec.nodeState(second.getUid()).get("last");
+        if (!expect(helper, "the unpublished one fell through, the published one stayed", "fell-through/7.0/7.0",
+                read)) return;
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * Entry → HalfPublisher → For(3) body → SetVar(acc ← acc + HalfPublisher.number)
+     * </pre>
+     * What an exec node published stays readable in a loop body, retention off: nothing is cleared between
+     * iterations. It used to be — every iteration fell through to {@code evaluate()}'s -1.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void aPublicationStaysReadableThroughALoop(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.variable("acc", float.class, 0f, VariableKind.INPUT);
+        b.add("entry", EntryNode.class);
+        b.add("publisher", HalfPublisherNode.class);
+        b.add("loop", ForNode.class).constant("loop.count", 3);
+        b.add("sum", AddNode.class).wire("sum.in1", "acc").wire("sum.in2", "publisher.number");
+        b.add("setAcc", SetVarNode.class).option("setAcc", "varName", "acc").wire("setAcc.value", "sum");
+        b.wire("publisher.in", "entry");
+        b.wire("loop.in", "publisher.next");
+        b.wire("setAcc.trigger", "loop.body");
+
+        var exec = new GraphExecutor(b.graph());
+        exec.executeFrom(b.node("entry"));
+        Object acc = exec.getEnvironment().variables().get("acc");
+        if (!expect(helper, "three iterations each read the publication", "21",
+                acc instanceof Number n ? Integer.toString(Math.round(n.floatValue())) : String.valueOf(acc))) return;
         helper.succeed();
     }
 

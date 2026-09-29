@@ -165,8 +165,9 @@ public final class ExecutorEdgeCaseGameTest {
      * A node reached through two different inputs must still evaluate once.
      *
      * <p>{@code Random} makes that observable: it draws from the executor's shared RNG, so a second
-     * evaluation would return a different number. Its own javadoc relies on the port cache for
-     * "same evaluator, same roll", which makes it the right probe for the slot table's memoisation.</p>
+     * evaluation would return a different number. Within one read — one exec node's, or one
+     * {@code evaluate} — it is one roll, which makes it the right probe for the slot table's
+     * memoisation.</p>
      */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)

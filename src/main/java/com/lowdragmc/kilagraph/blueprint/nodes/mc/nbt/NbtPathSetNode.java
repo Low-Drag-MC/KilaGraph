@@ -30,9 +30,8 @@ import java.util.List;
  * slot that does not exist: {@code Items[4]} on a three-element list writes nothing and reports
  * {@code count = 0}.
  *
- * <p>Like {@code mc_nbt_set}, this mutates the tag it is given and hands the same object back rather than
- * copying. Tags in this graph are shared references, so a second reader downstream sees the write; that is
- * the existing behaviour of the key-based node and the two must not disagree about it.
+ * <p>Like {@code mc_nbt_set}, this writes into a copy and hands that back: the tag it is given is never
+ * written, since a pure node is worked out again for each exec node that reads it.
  *
  * <p>{@code count} is how many matches were written, since a wildcard path can hit several at once.
  * {@code ok} is false for an unparseable path and for a path that reached nothing writable, which are the
@@ -61,8 +60,8 @@ public class NbtPathSetNode extends AnnotatedNode {
 
     @Override
     public void evaluate(EvalContext ctx) {
-        CompoundTag t = ctx.getInput("tag", CompoundTag.class, null);
-        if (t == null) t = new CompoundTag();
+        CompoundTag in = ctx.getInput("tag", CompoundTag.class, null);
+        CompoundTag t = in == null ? new CompoundTag() : in.copy();
         NbtValueType vt = ctx.getOption("valueType", NbtValueType.class, NbtValueType.STRING);
         NbtPathArgument.NbtPath p = NbtPaths.parse(ctx.getInput("path", String.class, ""));
 

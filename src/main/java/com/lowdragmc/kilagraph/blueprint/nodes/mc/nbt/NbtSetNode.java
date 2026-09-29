@@ -14,8 +14,13 @@ import net.minecraft.nbt.CompoundTag;
 import java.util.List;
 
 /**
- * Put a value into a {@link CompoundTag} under {@code key}, returning the (mutated) tag. A null
- * input tag yields a fresh compound. The {@link NbtValueType} option types the {@code value} port.
+ * A copy of {@link CompoundTag} {@code tag} with a value put under {@code key}. A null input tag yields a
+ * fresh compound. The {@link NbtValueType} option types the {@code value} port.
+ *
+ * <p>Tags are values here, as stacks and lists are: the input is never written. It may be a variable's,
+ * an entity's, or one another branch has read — and a pure node is worked out again for each exec node
+ * that reads it, so a write into the input would land once per reader. Setters chain:
+ * {@code Set(Set(tag, a), b)} holds both.</p>
  */
 // valueType MUST stay an option — see NbtGetNode: it drives the dynamic port's type, decided at
 // defineNode time, before any wire has a value.
@@ -39,8 +44,8 @@ public class NbtSetNode extends AnnotatedNode {
 
     @Override
     public void evaluate(EvalContext ctx) {
-        CompoundTag t = ctx.getInput("tag", CompoundTag.class, null);
-        if (t == null) t = new CompoundTag();
+        CompoundTag in = ctx.getInput("tag", CompoundTag.class, null);
+        CompoundTag t = in == null ? new CompoundTag() : in.copy();
         String k = ctx.getInput("key", String.class, "");
         NbtValueType vt = ctx.getOption("valueType", NbtValueType.class, NbtValueType.STRING);
         if (!k.isEmpty()) {
@@ -52,7 +57,7 @@ public class NbtSetNode extends AnnotatedNode {
                 case BOOL -> t.putBoolean(k, ctx.getBool("value", false));
                 case COMPOUND -> {
                     CompoundTag c = ctx.getInput("value", CompoundTag.class, null);
-                    if (c != null) t.put(k, c);
+                    if (c != null) t.put(k, c.copy());
                 }
                 default -> t.putString(k, ctx.getInput("value", String.class, ""));
             }

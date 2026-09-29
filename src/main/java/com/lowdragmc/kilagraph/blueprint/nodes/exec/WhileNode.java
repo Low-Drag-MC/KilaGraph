@@ -28,7 +28,7 @@ public class WhileNode extends AnnotatedNode {
     @Override
     public void execute(ExecContext ctx) {
         int cap = Math.max(1, ctx.getOption("maxIterations", Integer.class, maxIterations));
-        // The controller re-pulls "cond" (after clearing the cache) before each iteration and caps
+        // The controller re-pulls "cond" (worked out again after the body's last step) before each iteration and caps
         // at maxIterations; the engine steps the body and fires "completed" when cond goes false.
         ctx.pushLoop(new LoopController.WhileController(ctx.preparedNode(), cap), "body", "completed");
     }

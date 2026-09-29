@@ -147,7 +147,7 @@ public final class NbtNodeGameTest {
         wire(g, hasAfter.getInputsById().get("tag"), remove.getOutputsById().get("out"));
 
         var exec = new GraphExecutor(g);
-        // Evaluate the pre-removal reads before the removal mutates the (shared) tag instance.
+        // The removal hands back a copy, so the reads before it still see foo whenever they run.
         assertTrue(helper, "has foo", exec.evaluate(has.getOutputsById().get("out"), Boolean.class));
         assertFalse(helper, "missing bar", exec.evaluate(hasMissing.getOutputsById().get("out"), Boolean.class));
         assertFalse(helper, "foo gone after remove", exec.evaluate(hasAfter.getOutputsById().get("out"), Boolean.class));
@@ -260,7 +260,7 @@ public final class NbtNodeGameTest {
         helper.succeed();
     }
 
-    /** {@code mc_nbt_path_set}, including the creation of missing parents and the aliasing it documents. */
+    /** {@code mc_nbt_path_set}, including the creation of missing parents and the copy it documents. */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void pathWritesAndCreatesParents(GameTestHelper helper) {
@@ -272,7 +272,7 @@ public final class NbtNodeGameTest {
         CompoundTag out = eval(deep, "out", CompoundTag.class);
         assertEq(helper, "and the parents were created", "hi",
                 out.getCompound("a").getCompound("b").getString("c"));
-        assertTrue(helper, "the tag is mutated in place, not copied", out == fresh);
+        assertTrue(helper, "written into a copy: the tag it was given is untouched", out != fresh && fresh.isEmpty());
 
         // Overwriting an existing value.
         CompoundTag root = sample();
