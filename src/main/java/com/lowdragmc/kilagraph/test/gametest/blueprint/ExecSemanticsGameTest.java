@@ -10,13 +10,16 @@ import com.lowdragmc.kilagraph.blueprint.nodes.exec.ForNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SequenceNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
+import com.lowdragmc.kilagraph.graph.exec.EvalTrace;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import net.minecraft.gametest.framework.GameTestHelper;
 import org.joml.Vector2f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
+import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.newGraph;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputConstant;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
@@ -31,6 +34,8 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  *       interleaving.</li>
  *   <li><b>Nested loops: the inner loop body can read the outer loop's index</b> — the inner loop's
  *       cache invalidation must not destroy the outer loop's live index.</li>
+ *   <li><b>A pure node is worked out again for each exec node that reads it</b>, and once for everything
+ *       one exec node reads — Unreal's rule.</li>
  * </ol>
  */
 @GameTestHolder(Kilagraph.MODID)
@@ -39,6 +44,89 @@ public final class ExecSemanticsGameTest {
     private static final String NESTED_FOR_OUTER_INDEX = "exec_nested_for_outer_index";
 
     private ExecSemanticsGameTest() {}
+
+    /**
+     * <pre>
+     * Entry → SetVar(a ← shared) → SetVar(b ← shared)        shared = 2 + 3
+     * </pre>
+     * Two exec nodes read one pure node: it is worked out for each — Unreal inlines a pure node's code in
+     * front of every impure node that needs it ({@code KismetCompiler.cpp:2816-2900}).
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void aPureNodeIsWorkedOutAgainForEachExecNodeThatReadsIt(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.add("entry", EntryNode.class);
+        b.add("shared", AddNode.class).constant("shared.in1", 2f).constant("shared.in2", 3f);
+        b.add("setA", SetVarNode.class).option("setA", "varName", "a").wire("setA.value", "shared");
+        b.add("setB", SetVarNode.class).option("setB", "varName", "b").wire("setB.value", "shared");
+        b.then("entry", "setA", "setB");
+
+        var exec = new GraphExecutor(b.graph());
+        var trace = new EvalTrace();
+        exec.setTrace(trace);
+        exec.executeFrom(b.node("entry"));
+        assertEq(helper, "worked out once for each reader", 2, trace.evalCount(b.node("shared").getUid()));
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * Entry → SetVar(a ← both)        both = shared + shared
+     * </pre>
+     * One exec node reading a pure node twice has it worked out once for both reads — Unreal gathers an
+     * impure node's pure inputs into a set before inlining them.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void aPureNodeReadTwiceByOneExecNodeIsWorkedOutOnce(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.add("entry", EntryNode.class);
+        b.add("shared", AddNode.class).constant("shared.in1", 2f).constant("shared.in2", 3f);
+        b.add("both", AddNode.class).wire("both.in1", "shared").wire("both.in2", "shared");
+        b.add("setA", SetVarNode.class).option("setA", "varName", "a").wire("setA.value", "both");
+        b.then("entry", "setA");
+
+        var exec = new GraphExecutor(b.graph());
+        var trace = new EvalTrace();
+        exec.setTrace(trace);
+        exec.executeFrom(b.node("entry"));
+        assertEq(helper, "worked out once", 1, trace.evalCount(b.node("shared").getUid()));
+        Object a = exec.getEnvironment().variables().get("a");
+        assertEq(helper, "and read twice", 10f, a instanceof Number n ? n.floatValue() : Float.NaN, 1e-5f);
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * Entry → SetVar(x ← 1) → SetVar(seen1 ← x) → SetVar(x ← 2) → SetVar(seen2 ← x)
+     * </pre>
+     * One get-node for {@code x}, read on both sides of a write in one run: the second read sees the write,
+     * because a read is worked out again for the exec node that asks.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void aVariableReadAfterAWriteInTheSameRunSeesIt(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.variable("x", int.class, 0, VariableKind.INPUT);
+        b.add("entry", EntryNode.class);
+        b.add("one", AddNode.class).constant("one.in1", 1f).constant("one.in2", 0f);
+        b.add("two", AddNode.class).constant("two.in1", 2f).constant("two.in2", 0f);
+        b.add("setX1", SetVarNode.class).option("setX1", "varName", "x").wire("setX1.value", "one");
+        b.add("seen1", SetVarNode.class).option("seen1", "varName", "seen1").wire("seen1.value", "x");
+        b.add("setX2", SetVarNode.class).option("setX2", "varName", "x").wire("setX2.value", "two");
+        b.add("seen2", SetVarNode.class).option("seen2", "varName", "seen2").wire("seen2.value", "x");
+        b.then("entry", "setX1", "seen1", "setX2", "seen2");
+
+        var exec = new GraphExecutor(b.graph());
+        exec.executeFrom(b.node("entry"));
+        var vars = exec.getEnvironment().variables();
+        assertEq(helper, "the first read sees the first write", 1f,
+                vars.get("seen1") instanceof Number n ? n.floatValue() : Float.NaN, 1e-5f);
+        assertEq(helper, "the second read, after the second write, sees that", 2f,
+                vars.get("seen2") instanceof Number n ? n.floatValue() : Float.NaN, 1e-5f);
+        helper.succeed();
+    }
 
     /**
      * <pre>

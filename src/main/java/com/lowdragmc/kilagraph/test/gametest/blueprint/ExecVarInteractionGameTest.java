@@ -65,21 +65,21 @@ public final class ExecVarInteractionGameTest {
     }
 
     /**
-     * A variable read is memoised for the whole generation: a {@code SetVar} later in the same run
-     * does <em>not</em> invalidate a read that already happened. {@code clearCache()} is the
-     * invalidation point — which is exactly why {@code LoopController.beginIteration} calls it, so
-     * each iteration re-reads its accumulator.
+     * A variable read goes stale when the flow takes a step — the {@code SetVar} that wrote it, here — and
+     * is otherwise memoised until {@code clearCache()}: a store changed with no step in between is not
+     * seen by a read that already happened. Unreal's rule, a pure read worked out again for each exec
+     * node ({@code ExecSemanticsGameTest.aVariableReadAfterAWriteInTheSameRunSeesIt} is the same inside
+     * one run).
      *
-     * <p>Pinned because it is invisible to any value assertion until a graph reads a variable both
-     * before and after a write in one run, and because it is the semantic most at risk from a change
-     * to how variable reads are addressed: a cell or slot that made the second read see the store
-     * directly would silently change the meaning of every loop-carried accumulator in every existing
-     * graph. {@link #execSetThenDataRead} covers the other half — a first read after a write is
-     * fresh — and the two together fix the behaviour from both sides.</p>
+     * <p>⚠️ This used to pin the opposite — a read memoised for the whole generation, a later
+     * {@code SetVar} not seen — out of care for loop-carried accumulators. They keep their meaning:
+     * {@code LoopController.beginIteration} still clears the cache for each iteration, and the read an
+     * accumulator's {@code SetVar} makes is worked out inside that {@code SetVar}'s own step.
+     * {@link #execSetThenDataRead} covers a first read after a write.</p>
      */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
-    public static void aVariableReadIsMemoisedUntilClearCache(GameTestHelper helper) {
+    public static void aVariableReadGoesStaleWhenTheFlowSteps(GameTestHelper helper) {
         var b = KGGraphBuilder.blueprint();
         b.variable("x", int.class, 0, VariableKind.INPUT);
         b.add("read", AddNode.class).wire("read.in1", "x").constant("read.in2", 0f);
@@ -93,13 +93,13 @@ public final class ExecVarInteractionGameTest {
 
         assertEq(helper, "before the write", 0f, orNaN(exec.evaluate(readOut, Float.class)), 1e-5f);
         exec.executeFrom(b.node("entry"));           // x = 21 in the store
-        assertEq(helper, "same generation still sees the memo", 0f,
+        assertEq(helper, "the flow stepped, so the read is fresh", 21f,
                 orNaN(exec.evaluate(readOut, Float.class)), 1e-5f);
-        assertEq(helper, "the store really was written", 21f,
-                num(exec.getEnvironment().variables().get("x")), 1e-5f);
+        exec.getEnvironment().variables().put("x", 5);
+        assertEq(helper, "a store changed with no step is not seen by the memo", 21f,
+                orNaN(exec.evaluate(readOut, Float.class)), 1e-5f);
         exec.clearCache();
-        assertEq(helper, "after clearCache the read is fresh", 21f,
-                orNaN(exec.evaluate(readOut, Float.class)), 1e-5f);
+        assertEq(helper, "until clearCache", 5f, orNaN(exec.evaluate(readOut, Float.class)), 1e-5f);
         helper.succeed();
     }
 

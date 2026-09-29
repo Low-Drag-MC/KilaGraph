@@ -137,15 +137,13 @@ public final class FunctionCallGameTest {
 
         // for (i = 0; i < n; i++) { acc += i; out = acc; }
         //
-        // Both writes take the accumulator node's value rather than re-reading `acc`, because a
-        // variable read is memoised for the generation: after the last iteration's body there is no
-        // further clearCache(), so a read of `acc` on the `completed` path would still see the value
-        // from before that iteration's write. See
-        // ExecVarInteractionGameTest.aVariableReadIsMemoisedUntilClearCache.
+        // `out` reads `acc`, which the step before it wrote. Wired to `accum` instead it would be
+        // `acc + i` worked out again with the new `acc` — a pure node is worked out for each exec
+        // node that reads it — so the last iteration would give 10 + 4.
         fn.add("loop", ForNode.class).wire("loop.count", "n");
         fn.add("accum", AddNode.class).wire("accum.in1", "acc").wire("accum.in2", "loop.index");
         fn.add("setAcc", SetVarNode.class).option("setAcc", "varName", "acc").wire("setAcc.value", "accum");
-        fn.add("setOut", SetVarNode.class).option("setOut", "varName", "out").wire("setOut.value", "accum");
+        fn.add("setOut", SetVarNode.class).option("setOut", "varName", "out").wire("setOut.value", "acc");
         fn.wire("loop.in", "call");
         fn.wire("setAcc.trigger", "loop.body");
         fn.then("setAcc", "setOut");

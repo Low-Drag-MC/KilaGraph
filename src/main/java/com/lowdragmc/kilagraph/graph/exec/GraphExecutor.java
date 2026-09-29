@@ -37,7 +37,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Pull-based evaluator for a {@link Graph}. Demand-driven: callers request the value of an
  * {@link PortModel} (output port), and the executor recursively resolves upstream nodes,
- * memoising results for the lifetime of this executor instance.
+ * memoising results until {@link #clearCache()} — and, on an exec flow, a pull's results only until the
+ * flow takes its next step (see {@link #pulled}).
  *
  * <p>Three "kick-off" surfaces:</p>
  * <ol>
@@ -132,6 +133,17 @@ public final class GraphExecutor {
     private int execWrittenCount;
     /** @see #retainExecOutputs(boolean) */
     private boolean retainExecOutputs;
+
+    /**
+     * Slots a pull worked out since the flow last took a step. The next step marks them stale, so a
+     * pure node is worked out again for each exec node that reads it, and once for everything one exec
+     * node reads — Unreal's rule: its compiler inlines a pure node's code in front of each impure node
+     * that needs it ({@code KismetCompiler.cpp:2816-2900}). So a variable read after a {@code SetVar}
+     * sees the write. What an exec node published from {@code execute()} is not logged here and stays
+     * valid for the run; a pull with no flow ({@link #evaluate}) takes no step and keeps its whole memo.
+     */
+    private int[] pulled = EMPTY_STAMPS;
+    private int pulledCount;
 
     /**
      * The variable cell each variable-touching node resolved, by node index, plus the name it was
@@ -389,6 +401,7 @@ public final class GraphExecutor {
             writtenCount = 0;
             execWrittenCount = 0;
         }
+        pulledCount = 0;
         generation = next;
     }
 
@@ -523,6 +536,8 @@ public final class GraphExecutor {
                 writtenCount = 0;
                 execWritten = EMPTY_STAMPS;
                 execWrittenCount = 0;
+                pulled = EMPTY_STAMPS;
+                pulledCount = 0;
                 varCells = EMPTY_CELLS;
                 varCellNames = EMPTY_CELL_NAMES;
                 activeLoops = EMPTY_LOOPS;
@@ -618,6 +633,9 @@ public final class GraphExecutor {
             throw new IllegalStateException("exec step for a node from a different prepared graph: "
                     + node.uid);
         }
+        // before anything this node pulls, the intrinsic path's included: the last node's pure reads
+        // are its own, and this one works them out again
+        if (pulledCount > 0) stalePulled();
         if (!opt(Opt.EXEC_PRERESOLVE)) {
             // Measurement path only — see Opt.EXEC_PRERESOLVE. Same node back, same work as before.
             node = resolve(node.model);
@@ -1182,6 +1200,7 @@ public final class GraphExecutor {
         // form already knows which it is — so the bookkeeping only runs where it can actually fire.
         if (!cycleChecks) {
             evaluateNode(owner);
+            notePulled(owner);
             return stamps[slot] == generation;
         }
         enterNode(owner);
@@ -1190,7 +1209,28 @@ public final class GraphExecutor {
         } finally {
             exitNode();
         }
+        notePulled(owner);
         return stamps[slot] == generation;
+    }
+
+    /** Log {@code n}'s outputs as worked out by a pull, to go stale at the next step — see {@link #pulled}. */
+    private void notePulled(PreparedGraph.Node n) {
+        // a constant reads the same whenever it is read
+        if (n.dataKind == PreparedGraph.DataKind.CONSTANT) return;
+        int[] outs = n.outputSlots;
+        if (pulledCount + outs.length > pulled.length) {
+            pulled = Arrays.copyOf(pulled, Math.max(pulledCount + outs.length, Math.max(16, pulled.length * 2)));
+        }
+        for (int slot : outs) pulled[pulledCount++] = slot;
+    }
+
+    /** The flow took a step: what the pulls before it worked out is worked out again when read. */
+    private void stalePulled() {
+        for (int i = 0; i < pulledCount; i++) {
+            int slot = pulled[i];
+            if (stamps[slot] == generation) stamps[slot] = 0;
+        }
+        pulledCount = 0;
     }
 
     /** Memoised evaluation of {@code slot} as an object — boxes if the slot is in the numeric lane. */
