@@ -1,5 +1,6 @@
 package com.lowdragmc.kilagraph.graph.type;
 
+import com.lowdragmc.lowdraglib2.math.HDRColor;
 import com.mojang.serialization.Codec;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
@@ -61,12 +62,17 @@ public final class Vectors {
      * vector wire reach any vector pin.</p>
      *
      * <p>A {@link Number} answers one component so that a scalar reaching a vector pin is arithmetic
-     * rather than zero; anything else answers three zeroes, which is the shape a Vector3 pin would
-     * have had anyway.</p>
+     * rather than zero; an {@link HDRColor} its red, green and blue as they are drawn (Unreal's
+     * {@code Conv_LinearColorToVector}); anything else answers three zeroes, which is the shape a
+     * Vector3 pin would have had anyway.</p>
      */
     public static float[] components(Object raw) {
         if (raw instanceof Vector4f v) {
             return new float[] {v.x, v.y, v.z, v.w};
+        }
+        if (raw instanceof HDRColor color) {
+            var rgb = color.toVector4f();
+            return new float[] {rgb.x, rgb.y, rgb.z};
         }
         if (raw instanceof Vector3f v) {
             return new float[] {v.x, v.y, v.z};

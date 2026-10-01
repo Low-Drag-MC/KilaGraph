@@ -289,6 +289,15 @@ public final class VectorPinTypeGameTest {
         return addNode(newGraph(), cls).getOutputsById().get("out").getDataTypeHandle();
     }
 
+    /** A colour read as a vector is its red, green and blue, the intensity folded in — Unreal's Conv_LinearColorToVector. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void aColourReadAsAVectorIsItsRedGreenBlue(GameTestHelper helper) {
+        assertVec(helper, "an HDR colour", new float[] {1f, 0.5f, 0.25f},
+                new com.lowdragmc.lowdraglib2.math.HDRColor(0.5f, 0.25f, 0.125f, 0.75f, 2f));
+        helper.succeed();
+    }
+
     private static Object constant(NodeModel node, String portId) {
         var c = node.getInputConstantsById().get(portId);
         return c == null ? null : c.getValue();
