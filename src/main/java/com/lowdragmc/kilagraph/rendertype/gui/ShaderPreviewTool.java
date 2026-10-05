@@ -6,8 +6,8 @@ import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContent;
 import com.lowdragmc.kilagraph.rendertype.preview.KGPreviewContents;
 import com.lowdragmc.kilagraph.rendertype.preview.PreviewContentMenu;
+import com.lowdragmc.kilagraph.rendertype.preview.PreviewMaterialSlot;
 import com.lowdragmc.kilagraph.rendertype.preview.PreviewRenderer;
-import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeFactory;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
 import com.lowdragmc.lowdraglib2.client.scene.SceneRenderContext;
 import com.lowdragmc.lowdraglib2.client.scene.WorldSceneRenderer;
@@ -23,7 +23,6 @@ import com.lowdragmc.lowdraglib2.utils.virtuallevel.TrackedDummyWorld;
 import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
 import com.mojang.logging.LogUtils;
-import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.network.chat.Component;
@@ -38,10 +37,11 @@ import org.slf4j.Logger;
  * lighting).
  *
  * <p>The material is rebuilt only when the graph's content hash changes (pipelines are cached by
- * hash), giving real-time updates as the user edits without recompiling every frame. A graph that
- * fails to compile or whose pipeline is rejected by the driver simply skips drawing that frame. The
- * cube geometry is emitted in whatever vertex format/mode the graph's {@code Settings} specify, so
- * the preview matches the real pipeline's expectations.</p>
+ * hash), giving real-time updates as the user edits without recompiling every frame — and in the background
+ * ({@link PreviewMaterialSlot}), the last material drawing until the new one is ready. A graph that fails to
+ * compile or whose pipeline is rejected by the driver keeps the last good material. The cube geometry is emitted
+ * in whatever vertex format/mode the graph's {@code Settings} specify, so the preview matches the real pipeline's
+ * expectations.</p>
  */
 public class ShaderPreviewTool extends UIElement implements IGraphTool {
 
@@ -53,10 +53,11 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
 
     @Nullable
     private final Label errorLabel;
-    /** The material being drawn; {@code null} until the first successful compile (a failed one keeps the last). */
-    @Getter
+    /** The material being drawn: {@code null} until the first successful build (a failed one keeps the last). */
+    private final PreviewMaterialSlot material = new PreviewMaterialSlot();
+    /** The graph last compiled (its stage errors, if any, are what the error label shows). */
     @Nullable
-    private RenderTypeGraphMaterial material;
+    private CompiledShaderGraph lastCompiled;
     private boolean lastCompileFailed = false;
     /** The graph change-version last compiled; skip recompiling while it's unchanged. */
     private long lastChangeVersion = Long.MIN_VALUE;
@@ -109,10 +110,13 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
     @Override
     protected void onRemoved() {
         super.onRemoved();
-        if (material != null) {
-            material.close();
-            material = null;
-        }
+        material.close();
+    }
+
+    /** The material being drawn; {@code null} until the first successful build. */
+    @Nullable
+    public RenderTypeGraphMaterial getMaterial() {
+        return material.material();
     }
 
     /** Runs inside the scene's render (render thread): (re)build the material and submit the cube. */
@@ -164,8 +168,9 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
     // ---- right-click content switch ----------------------------------------------------------
 
     private void onMouseDown(UIEvent event) {
-        if (event.button != 1 || material == null) return; // right-click only
-        var formatKeys = PreviewContentMenu.formatKeys(material.renderType().format());
+        RenderTypeGraphMaterial current = material.material();
+        if (event.button != 1 || current == null) return; // right-click only
+        var formatKeys = PreviewContentMenu.formatKeys(current.renderType().format());
         PreviewContentMenu.open(this, event, formatKeys, c -> {
             content = c;
             // Persist the choice on the graph model so it survives reopen + undo/redo.
@@ -176,53 +181,48 @@ public class ShaderPreviewTool extends UIElement implements IGraphTool {
         });
     }
 
-    /** Recompile + rebuild the material when the graph changed; null if it can't be rendered. */
+    /** Recompile the graph when it changed, and draw the latest material built; null while there is none. */
+    @Nullable
     private RenderTypeGraphMaterial updateMaterial(RenderTypeGraph graph) {
+        boolean wasFailed = material.failed();
         // Skip the per-frame recompile while the graph hasn't changed. onGraphChanged bumps the version
-        // on any structural OR value/option edit, so a stale render is impossible. (We still recompile
-        // when we have no material yet, e.g. after a compile/pipeline failure, to keep retrying.)
+        // on any structural OR value/option edit, so a stale render is impossible.
         long version = graph.getChangeVersion();
-        if (material != null && version == lastChangeVersion) return material;
-
-        CompiledShaderGraph compiled;
-        try {
-            // editorPreview(): screen-space defaults (Scene Color/Depth's unconnected UV) map the whole capture
-            // onto the cube instead of the panel's screen sub-rect — otherwise the preview would only show the
-            // small on-screen rectangle it occupies. In-world materials still use true screen-space.
-            compiled = graph.createCompiler().editorPreview().compile();
-        } catch (RuntimeException e) {
-            if (!lastCompileFailed) {
-                LOGGER.warn("[KilaGraph] preview graph failed to compile: {}", e.getMessage());
-                lastCompileFailed = true;
+        boolean edited = version != lastChangeVersion;
+        if (edited) {
+            lastChangeVersion = version; // a graph that doesn't compile is retried on the next edit
+            try {
+                // editorPreview(): screen-space defaults (Scene Color/Depth's unconnected UV) map the whole capture
+                // onto the cube instead of the panel's screen sub-rect — otherwise the preview would only show the
+                // small on-screen rectangle it occupies. In-world materials still use true screen-space.
+                lastCompiled = graph.createCompiler().editorPreview().compile();
+                lastCompileFailed = false;
+                // Built in the background; the last good material keeps drawing until then — and for good,
+                // should the edit produce an invalid shader.
+                material.request(lastCompiled);
+            } catch (RuntimeException e) {
+                if (!lastCompileFailed) {
+                    LOGGER.warn("[KilaGraph] preview graph failed to compile: {}", e.getMessage());
+                    lastCompileFailed = true;
+                }
+                edited = false;
             }
-            return material; // keep last good material rendering
         }
-        lastChangeVersion = version;
-        lastCompileFailed = false;
-        showStageErrors(compiled);
-
-        if (material != null && material.contentHash().equals(compiled.contentHash())) {
-            // GLSL unchanged (pipeline reused), but a value-only edit (texture / sampler params / uniform
-            // default) may have changed the baked defaults — re-bake them onto the existing material.
-            material.refreshDefaults(compiled);
-            return material;
-        }
-        // Graph changed — createMaterial validates the pipeline on the GPU and returns null if the
-        // edit produced an invalid shader; keep the last good material rather than crashing the draw.
-        RenderTypeGraphMaterial rebuilt = RenderTypeFactory.createMaterial(compiled);
-        if (rebuilt == null) {
-            // GLSL/pipeline compile failures happen at the GPU layer (GlDevice/RenderTypeFactory), not the
-            // graph-validation layer, so they never reach the GraphLogger — surface them here (the detailed
-            // driver error is in the log). Don't clobber a stage-error message already shown above.
-            if (!compiled.hasStageErrors()) showCompileError();
-            return material;
-        }
-        if (material != null) material.close();
-        material = rebuilt;
-        return material;
+        material.update();
+        if (edited || material.failed() != wasFailed) showErrors();
+        return material.material();
     }
 
-    /** Show a generic "shader failed to compile" message (the driver's detailed GLSL error is logged). */
+    /** Show the last compile's stage errors, else whether its build failed on the GPU. */
+    private void showErrors() {
+        if (lastCompiled == null) return;
+        if (lastCompiled.hasStageErrors() || !material.failed()) showStageErrors(lastCompiled);
+        else showCompileError();
+    }
+
+    /** Show a generic "shader failed to compile" message (the driver's detailed GLSL error is logged). GLSL/pipeline
+     *  compile failures happen at the GPU layer, not the graph-validation layer, so they never reach the
+     *  GraphLogger. */
     private void showCompileError() {
         if (errorLabel == null) return;
         errorLabel.setValue(Component.translatable("rendertypegraph.preview.compile_failed")

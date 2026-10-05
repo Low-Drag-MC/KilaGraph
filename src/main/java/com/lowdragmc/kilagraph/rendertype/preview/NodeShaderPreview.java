@@ -2,9 +2,7 @@ package com.lowdragmc.kilagraph.rendertype.preview;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphModel;
-import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
-import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeFactory;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
 import com.lowdragmc.lowdraglib2.client.scene.SceneRenderContext;
 import com.lowdragmc.lowdraglib2.client.scene.WorldSceneRenderer;
@@ -34,7 +32,8 @@ import java.util.function.Supplier;
  * nodes exactly as they'd shade.
  *
  * <p>Rebuilds its material only when the compiled content hash changes, so editing upstream updates
- * the thumbnail in real time. Frees its material (and the Scene its resources) when removed.</p>
+ * the thumbnail in real time — in the background ({@link PreviewMaterialSlot}), the last thumbnail drawing until
+ * the new one is ready. Frees its material (and the Scene its resources) when removed.</p>
  */
 public class NodeShaderPreview extends UIElement {
 
@@ -48,7 +47,7 @@ public class NodeShaderPreview extends UIElement {
     private final Supplier<String> previewPortId;
     private final Scene scene;
 
-    private RenderTypeGraphMaterial material;
+    private final PreviewMaterialSlot material = new PreviewMaterialSlot();
     private boolean lastCompileFailed = false;
     /** The graph change-version last compiled; skip recompiling this thumbnail while it's unchanged. */
     private long lastChangeVersion = Long.MIN_VALUE;
@@ -117,7 +116,8 @@ public class NodeShaderPreview extends UIElement {
     /** The vertex-format keys of the current material (for the geometry picker), or null until it's built. */
     @Nullable
     public Set<String> previewFormatKeys() {
-        return material == null ? null : PreviewContentMenu.formatKeys(material.renderType().format());
+        RenderTypeGraphMaterial current = material.material();
+        return current == null ? null : PreviewContentMenu.formatKeys(current.renderType().format());
     }
 
     /** Switch this preview's geometry — invoked by {@code RenderTypeGraphView.createMenu}'s content items.
@@ -140,50 +140,44 @@ public class NodeShaderPreview extends UIElement {
                         renderType.format(), RenderTypeGraph.Settings.VertexFormatMode.QUADS));
     }
 
+    /** Recompile the thumbnail when the graph changed, and draw the latest material built; null while there is none. */
+    @Nullable
     private RenderTypeGraphMaterial updateMaterial() {
+        requestIfEdited();
+        material.update();
+        return material.material();
+    }
+
+    /** Recompile the subgraph feeding the port when the graph changed; built in the background, the last thumbnail
+     *  drawing until then (and for good, should the build fail). */
+    private void requestIfEdited() {
         // Skip the per-frame recompile while the graph is unchanged (onGraphChanged bumps the version on
         // any edit). Graph-wide, so any edit re-checks every thumbnail — conservative but correct, and
         // still far cheaper than compiling each node preview every frame.
         long version = graph.getChangeVersion();
-        if (material != null && version == lastChangeVersion) return material;
+        if (version == lastChangeVersion) return;
 
         // Re-resolve the live port by the node's current preview id — it's recreated on defineNode (and its
         // id changes when an output is renamed), so a captured instance would be stale.
         String id = previewPortId.get();
         PortModel outputPort = id == null ? null : nodeModel.getOutputsById().get(id);
-        if (outputPort == null) return material;
+        if (outputPort == null) return;
 
-        CompiledShaderGraph compiled;
+        lastChangeVersion = version; // a subgraph that doesn't compile is retried on the next edit
         try {
-            compiled = graph.createCompiler().compilePreview(outputPort);
+            material.request(graph.createCompiler().compilePreview(outputPort));
+            lastCompileFailed = false;
         } catch (RuntimeException e) {
             if (!lastCompileFailed) {
                 LOGGER.warn("[KilaGraph] node preview failed to compile: {}", e.getMessage());
                 lastCompileFailed = true;
             }
-            return material;
         }
-        lastChangeVersion = version;
-        lastCompileFailed = false;
-        if (material != null && material.contentHash().equals(compiled.contentHash())) {
-            // GLSL unchanged (pipeline reused), but a value-only edit may have changed the baked
-            // defaults (texture / sampler params / uniform default) — re-bake them onto the material.
-            material.refreshDefaults(compiled);
-            return material;
-        }
-        RenderTypeGraphMaterial rebuilt = RenderTypeFactory.createMaterial(compiled);
-        if (rebuilt == null) return material;
-        if (material != null) material.close();
-        material = rebuilt;
-        return material;
     }
 
     @Override
     protected void onRemoved() {
         super.onRemoved();
-        if (material != null) {
-            material.close();
-            material = null;
-        }
+        material.close();
     }
 }

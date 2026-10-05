@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -71,7 +72,9 @@ import java.util.function.Consumer;
  * {@link #createMaterial} acquires a reference, {@link RenderTypeGraphMaterial#close()} releases it,
  * and when the last reference drops the pipelines are closed and evicted along with their GLSL source (and the
  * material frees its UBO {@link GpuBuffer}). This bounds both heap and GPU to live materials — important for the
- * live preview, which churns a new hash on every edit.</p>
+ * live preview, which churns a new hash on every edit. A preview's background build ({@link #buildInBackground})
+ * holds no reference until its material is made; one nobody makes a material of is dropped with
+ * {@link #abandonBuild}.</p>
  *
  * <p>All methods must run on the render thread (they touch the GPU device / pipeline cache).</p>
  */
@@ -106,6 +109,8 @@ public final class RenderTypeFactory {
     private static final Set<String> SCENE_BEFORE_CAPTURE_WARNED = ConcurrentHashMap.newKeySet();
     /** Blend modes already told about drawing in the solid phase. */
     private static final Set<RenderTypeGraph.Settings.BlendMode> SOLID_PHASE_LOGGED = ConcurrentHashMap.newKeySet();
+    /** Sources of evicted graphs a background compile still reads, dropped once it is done. Render thread. */
+    private static final Map<String, CompletableFuture<?>> SOURCES_IN_USE = new HashMap<>();
     /** Graph hashes already warned about a vertex format the Iris integration can't route (warn once each). */
     private static final Set<String> IRIS_FORMAT_WARNED = ConcurrentHashMap.newKeySet();
     /** Numbers each material's render type, so two materials of one graph never prepare to equal
@@ -137,6 +142,38 @@ public final class RenderTypeFactory {
      */
     @Nullable
     public static RenderTypeGraphMaterial createMaterial(CompiledShaderGraph compiled) {
+        return createMaterial(compiled, true);
+    }
+
+    /**
+     * {@link #createMaterial(CompiledShaderGraph)} for a preview drawn in a scene of its own, which Minecraft's
+     * order-independent transparency never draws: the material is the same, but its OIT pipelines aren't compiled
+     * up front — only should one ever draw.
+     */
+    @Nullable
+    public static RenderTypeGraphMaterial createPreviewMaterial(CompiledShaderGraph compiled) {
+        return createMaterial(compiled, false);
+    }
+
+    /**
+     * Compile {@code compiled}'s main pipeline off the render thread for a {@link #createPreviewMaterial} later,
+     * which then doesn't wait for it; call again (on later frames) until it isn't {@code COMPILING}. A {@code FAILED}
+     * build is reported by that createPreviewMaterial, which returns {@code null}. Drop a build nobody will make a
+     * material of with {@link #abandonBuild}.
+     */
+    public static KGPipelines.State buildInBackground(CompiledShaderGraph compiled) {
+        if (FAILED.contains(compiled.contentHash()) || compiled.hasStageErrors()) return KGPipelines.State.FAILED;
+        return KGPipelines.compileInBackground(getOrBuildPipelines(compiled).main());
+    }
+
+    /** Drop {@link #buildInBackground}'s pipelines and sources unless a material uses them. */
+    public static void abandonBuild(CompiledShaderGraph compiled) {
+        String hash = compiled.contentHash();
+        if (!REFCOUNTS.containsKey(hash) && PIPELINES.containsKey(hash)) evictGenerated(hash);
+    }
+
+    @Nullable
+    private static RenderTypeGraphMaterial createMaterial(CompiledShaderGraph compiled, boolean compileOit) {
         String hash = compiled.contentHash();
         if (FAILED.contains(hash)) return null; // known-bad: don't re-compile / re-spam every frame
         if (compiled.hasStageErrors()) {
@@ -156,7 +193,8 @@ public final class RenderTypeFactory {
         // The OIT pipelines are compiled now only when they're about to be drawn — otherwise at their first draw,
         // which skips a pipeline that doesn't compile (see PreparedRenderTypeMixin) rather than failing the frame.
         OitPipelineSet oit = pipelines.oit();
-        if (oit != null && Minecraft.getInstance().gameRenderer.useImprovedTransparency() && !compileAll(oit)) {
+        if (oit != null && compileOit && Minecraft.getInstance().gameRenderer.useImprovedTransparency()
+                && !compileAll(oit)) {
             LOGGER.warn("[KilaGraph] graph {}: its order-independent transparency pipelines don't compile, "
                     + "so it draws in the solid phase", hash);
             oit = null;
@@ -308,8 +346,31 @@ public final class RenderTypeFactory {
     /** Close a graph's pipelines and drop them + their GLSL source. */
     private static void evictGenerated(String contentHash) {
         GeneratedPipelines pipelines = PIPELINES.remove(contentHash);
-        if (pipelines != null) pipelines.all().forEach(KGPipelines::evict);
-        DynamicShaderSourceRegistry.unregister(DynamicShaderSourceRegistry.shaderId(contentHash));
+        List<CompletableFuture<?>> compiling = new ArrayList<>();
+        if (pipelines != null) {
+            for (RenderPipeline pipeline : pipelines.all()) {
+                CompletableFuture<?> compile = KGPipelines.evict(pipeline);
+                if (compile != null) compiling.add(compile);
+            }
+        }
+        if (compiling.isEmpty()) {
+            DynamicShaderSourceRegistry.unregister(DynamicShaderSourceRegistry.shaderId(contentHash));
+        } else {
+            // A background compile still reads them: drop them once it is done (dropUnusedSources).
+            SOURCES_IN_USE.put(contentHash, CompletableFuture.allOf(compiling.toArray(CompletableFuture[]::new)));
+        }
+    }
+
+    /** Drop the sources of evicted graphs whose background compiles are done — unless the graph was built again
+     *  meanwhile. Render thread, once a frame. */
+    public static void dropUnusedSources() {
+        SOURCES_IN_USE.entrySet().removeIf(entry -> {
+            if (!entry.getValue().isDone()) return false;
+            if (!PIPELINES.containsKey(entry.getKey())) {
+                DynamicShaderSourceRegistry.unregister(DynamicShaderSourceRegistry.shaderId(entry.getKey()));
+            }
+            return true;
+        });
     }
 
     /** The cached pipelines for this compiled graph, building + registering its GLSL on first use. */

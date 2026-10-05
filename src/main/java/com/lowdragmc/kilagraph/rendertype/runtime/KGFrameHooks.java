@@ -16,5 +16,7 @@ public final class KGFrameHooks {
     public static void onFrameRendered(RenderFrameEvent.Post event) {
         KGUploadBuffer.endFrame();
         RenderTypeGraphMaterial.endFrame();
+        KGPipelines.closeAbandoned();
+        RenderTypeFactory.dropUnusedSources();
     }
 }

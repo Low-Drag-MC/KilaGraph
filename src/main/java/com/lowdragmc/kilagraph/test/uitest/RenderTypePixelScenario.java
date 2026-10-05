@@ -70,6 +70,7 @@ import com.lowdragmc.kilagraph.rendertype.nodes.texture.SamplerTexture2DNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.transform.CameraNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.transform.KGTransformsUboNode;
+import com.lowdragmc.kilagraph.rendertype.preview.PreviewMaterialSlot;
 import com.lowdragmc.kilagraph.rendertype.runtime.DynamicShaderSourceRegistry;
 import com.lowdragmc.kilagraph.rendertype.runtime.KGInstanceBuffer;
 import com.lowdragmc.kilagraph.rendertype.runtime.KGMesh;
@@ -184,6 +185,12 @@ public class RenderTypePixelScenario implements UIScenario {
                 .step("a blend OIT can't express goes to the solid phase from every submit", RenderTypePixelScenario::submitPhases)
                 .step("closing the last material of a graph frees its pipelines", RenderTypePixelScenario::pipelinesFreed)
                 .step("a closed material's render type draws nothing", RenderTypePixelScenario::closedMaterial)
+                .step("a preview builds its material in the background", RenderTypePixelScenario::previewRequested)
+                .waitUntil("the preview's build is done", ctx -> previewShows(ctx, "first"))
+                .step("edits made during a build wait for it; only the latest is built", RenderTypePixelScenario::previewEdited)
+                .waitUntil("the latest edit is built", ctx -> previewShows(ctx, "fourth"))
+                .step("closing a preview mid-build drops the build", RenderTypePixelScenario::previewClosed)
+                .waitUntil("and, once that compile is done, its sources", ctx -> !sourcesKept(ctx.get("fifth")))
                 .step("the depth test keeps what is nearer (reversed-Z)", RenderTypePixelScenario::depthTest)
                 .step("a depth offset pulls a coplanar surface forward", RenderTypePixelScenario::depthOffset)
                 .step("a float colour target keeps values above 1", RenderTypePixelScenario::floatColorTarget)
@@ -719,6 +726,71 @@ public class RenderTypePixelScenario implements UIScenario {
             refused = true;
         }
         ctx.check("an instanced draw of a closed material is refused", refused);
+    }
+
+    private static final String SLOT = "preview slot";
+
+    /** A preview graph of its own colour, so of its own hash. */
+    private static CompiledShaderGraph previewGraph(float red) {
+        Bare b = bare();
+        wire(b.graph(), b.color(), vec3(b, red, 0.5f, 0.25f).getOutputsById().get("out"));
+        return b.graph().createCompiler().editorPreview().compile();
+    }
+
+    private static boolean sourcesKept(CompiledShaderGraph compiled) {
+        return DynamicShaderSourceRegistry.get(DynamicShaderSourceRegistry.shaderId(compiled.contentHash()),
+                ShaderType.VERTEX) != null;
+    }
+
+    private static void previewRequested(TestContext ctx) {
+        var slot = new PreviewMaterialSlot();
+        ctx.put(SLOT, slot);
+        CompiledShaderGraph first = previewGraph(0.11f);
+        ctx.put("first", first);
+        slot.request(first);
+        slot.update();
+        ctx.check("nothing draws until the build is done", slot.material() == null && !slot.failed()
+                && sourcesKept(first));
+    }
+
+    /** Advance the preview a frame; whether it now draws {@code key}'s graph. */
+    private static boolean previewShows(TestContext ctx, String key) {
+        PreviewMaterialSlot slot = ctx.get(SLOT);
+        CompiledShaderGraph compiled = ctx.get(key);
+        slot.update();
+        return slot.material() != null && slot.material().contentHash().equals(compiled.contentHash());
+    }
+
+    private static void previewEdited(TestContext ctx) {
+        PreviewMaterialSlot slot = ctx.get(SLOT);
+        CompiledShaderGraph first = ctx.get("first");
+        CompiledShaderGraph second = previewGraph(0.22f), third = previewGraph(0.33f), fourth = previewGraph(0.44f);
+        ctx.put("second", second);
+        ctx.put("third", third);
+        ctx.put("fourth", fourth);
+        slot.request(second);
+        slot.update();
+        slot.request(third);
+        slot.request(fourth);
+        slot.update();
+        ctx.check("the last material keeps drawing meanwhile", slot.material().contentHash().equals(first.contentHash()));
+        ctx.check("only the edit in flight is building; the later ones wait",
+                sourcesKept(second) && !sourcesKept(third) && !sourcesKept(fourth));
+    }
+
+    private static void previewClosed(TestContext ctx) {
+        PreviewMaterialSlot slot = ctx.get(SLOT);
+        for (String key : new String[]{"first", "second", "third"}) {
+            ctx.check("the " + key + " edit's pipelines are freed", !sourcesKept(ctx.get(key)));
+        }
+        CompiledShaderGraph fourth = ctx.get("fourth"), fifth = previewGraph(0.55f);
+        ctx.put("fifth", fifth);
+        slot.request(fifth);
+        slot.update();
+        ctx.check("a build under way", sourcesKept(fifth) && slot.material().contentHash().equals(fourth.contentHash()));
+        slot.close();
+        // The build's own sources stay while its compile runs in the background: it still reads them.
+        ctx.check("closing the preview drops its material", !sourcesKept(fourth) && slot.material() == null);
     }
 
     /** (0.5, 0.25, 0) at alpha 0.5 with {@code mode}. */
