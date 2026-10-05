@@ -37,21 +37,14 @@ public final class NodeRegistrationGameTest {
     private static final String SAME_KEYS = "node_registration_languages_cover_the_same_keys";
 
     /**
-     * The nodes v26.1.0.15 added. A list rather than a count of the registry, because the interesting
+     * The nodes v26.1.0.16 added. A list rather than a count of the registry, because the interesting
      * failure is "the one just written is missing", and a total would only move when it did.
      */
     private static final String[] RECENT_NODES = {
-            "vector_to_vec2", "vector_to_vec3", "vector_to_vec4",
-
-            "math_wrap", "math_snap", "math_step", "math_smoothstep", "math_inverse_lerp",
-            "math_delta_angle", "math_move_towards", "math_nearly_equals", "math_wave",
-
-            "vector_direction_to", "vector_set_length", "vector_slerp", "vector_perpendicular",
-            "vector_wrap",
-
-            "quat_identity", "quat_from_axis_angle", "quat_from_euler", "quat_to_euler",
-            "quat_from_to", "quat_multiply", "quat_inverse", "quat_normalize", "quat_slerp",
-            "quat_rotate_vector", "quat_angle_between", "quat_to_vec4", "quat_from_vec4",
+            "mc_nearest_entity",
+            "mc_damage_source_info", "mc_damage_source_is", "mc_make_damage_source",
+            "mc_damage_entity_with_source",
+            "mc_nbt_copy",
     };
 
     public static void registerFunctions() {
@@ -90,8 +83,8 @@ public final class NodeRegistrationGameTest {
             return;
         }
 
-        if (RECENT_NODES.length != 30) {
-            helper.fail("expected 30 recent nodes, the list has " + RECENT_NODES.length);
+        if (RECENT_NODES.length != 6) {
+            helper.fail("expected 6 recent nodes, the list has " + RECENT_NODES.length);
             return;
         }
         helper.succeed();
