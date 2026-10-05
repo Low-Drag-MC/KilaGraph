@@ -16,5 +16,6 @@ import java.lang.annotation.Target;
 public @interface ExecInputPort {
     String name() default "";
 
+    /** The label, as {@link InputPort#display()}. */
     String display() default "";
 }

@@ -35,7 +35,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * Multi-node combination / interaction tests. The per-node suites pin individual node behaviour;
  * these pin the <em>compositions</em> that have historically hidden bugs:
  * <ul>
- *   <li>Nested loops with an accumulator that survives both clearCache layers.</li>
+ *   <li>Nested loops with an accumulator that both layers keep adding to.</li>
  *   <li>{@code Break} scope: inner loop only; and {@code Break} unwinding through a {@code Sequence}
  *       to the enclosing loop (abandoning later Sequence outputs).</li>
  *   <li>{@code While} terminating on a condition that the body mutates (not on the iteration cap).</li>
@@ -82,7 +82,7 @@ public final class ExecCombinationsGameTest {
      * Builds {@code name = name + delta} as a get → Add → SetVar chain and returns the SetVar node.
      * Wire the returned node's {@code trigger} into the exec point that should perform the increment.
      * Re-reads the variable each evaluation, so it accumulates correctly across loop iterations
-     * (each iteration's clearCache re-pulls the current value).
+     * (the read goes stale at each step and is pulled again).
      */
     private static NodeModel incrementer(BlueprintGraph g, VariableDeclarationModelBase v, String name, float delta) {
         var add = addNode(g, AddNode.class);

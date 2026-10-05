@@ -58,7 +58,7 @@ public final class UIActions {
      *       nothing.</li>
      *   <li><b>Loops would get the same element.</b> Memoising in node state to fix the first problem
      *       breaks the second: a {@code ForEach} building one row per item would produce one row and
-     *       reuse it, because node state deliberately survives the per-iteration cache clear.</li>
+     *       reuse it, because node state deliberately outlives the pull cache.</li>
      * </ul>
      *
      * <p>Being an exec node resolves both, because it makes "when is a new one made" an explicit part

@@ -113,7 +113,7 @@ public final class KGTypeHandlesGameTest {
         List<TypeHandle> authorable = graph.getLibrarySupportTypes();
 
         for (TypeHandle wireOnly : List.of(KGTypeHandles.LEVEL, KGTypeHandles.ENTITY,
-                KGTypeHandles.PLAYER, KGTypeHandles.BLOCK_ENTITY,
+                KGTypeHandles.PLAYER, KGTypeHandles.BLOCK_ENTITY, KGTypeHandles.DAMAGE_SOURCE,
                 KGTypeHandles.LIST, KGTypeHandles.MAP, KGTypeHandles.NODE_REF)) {
             assertTrue(helper, wireOnly.getIdentification() + " should be pickable as a port type",
                     pickable.contains(wireOnly));

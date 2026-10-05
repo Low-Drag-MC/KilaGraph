@@ -17,6 +17,7 @@ import java.lang.annotation.Target;
 public @interface OutputPort {
     String name() default "";
 
+    /** The label, as {@link InputPort#display()}. */
     String display() default "";
 
     PortCapacity capacity() default PortCapacity.MULTIPLE;

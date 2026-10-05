@@ -66,9 +66,10 @@ public final class EvalTrace {
     /**
      * Record a data-node evaluation.
      *
-     * <p>Called from {@code evaluateNode}, which the memo in {@code ensureComputed} reaches exactly
-     * once per node per generation — so the number of {@code EVAL} events for a node <em>is</em> the
-     * number of times it was really evaluated, which is the quantity under test.</p>
+     * <p>Called from {@code evaluateNode}, which the memo in {@code ensureComputed} reaches once per
+     * node per generation — and, on an exec flow, once per step that reads it — so the number of
+     * {@code EVAL} events for a node <em>is</em> the number of times it was really evaluated, which is
+     * the quantity under test.</p>
      */
     void recordEval(AbstractNodeModel node) {
         events.add(new Event(Kind.EVAL, node.getUid(), labelOf(node)));

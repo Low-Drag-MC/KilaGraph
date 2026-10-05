@@ -1,11 +1,9 @@
-## v26.3.0.15
-* hello 26.3!
-* Added improved transparency (order-independent transparency) support to render type graphs; a blend it can't express (multiply, subtract, min, max, invert, glint) draws in the solid phase with either setting, as vanilla's glint does
-* Added prepareInstanced, preparing an instanced draw before its render pass for executing in one, and a drawInstanced that draws into a given target
-* Improved a draw's values: it binds the values, textures, instances and transforms its render type was prepared with, like Minecraft's own per-draw transforms
-* Improved generated pipelines, now freed once their last material is closed
-* Improved the editor's previews, whose shaders now compile in the background instead of stalling the editor on every edit
-* Fixed a closed material's render type failing the frame when still submitted; its draws are skipped
-* Removed the render type Output Target setting: 26.3 draws a render type in the pass it is drawn in
-* Extra colour targets are written by a draw into a pass that has them (drawInstanced, colorTargetPass); a draw in Minecraft's own passes writes the main target
-* The Iris integration is off until Iris is released for NeoForge 26.3
+## v26.3.0.16
+* Added a nearest-entity node
+* Added the damage source as a graph type, with nodes to read one, test it against a damage type tag, build one and hurt with it
+* Added NBT Copy, and a copy pin on NBT Set, NBT Path Set and NBT Remove (they still write in place by default)
+* Added colour to vector conversion: a colour wired into a vector pin reads as its red, green and blue
+* Changed a pure node to be worked out again for each exec node that reads it, as Unreal does
+* Fixed loops, subgraph returns and reads after a flow not seeing the last write; For and ForEach re-read their count and list before each iteration
+* Fixed an exec node's published outputs being lost when an output it did not publish is read
+* Improved port labels: a port's display is a lang key with its text as fallback, and undisplayed ports use kg.pin.<id> keys with the id in words as fallback

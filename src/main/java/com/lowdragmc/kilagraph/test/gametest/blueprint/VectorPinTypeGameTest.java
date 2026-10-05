@@ -6,18 +6,23 @@ import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.blueprint.nodes.list.ListGetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorConvertNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorGeometryNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorMathNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorStructNodes;
+import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.kilagraph.graph.type.Vectors;
+import com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder;
 import com.lowdragmc.lowdraglib2.Platform;
+import com.lowdragmc.lowdraglib2.math.HDRColor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -57,6 +62,7 @@ public final class VectorPinTypeGameTest {
     private static final String EVERY_WIDTH_ACCEPTED = "vector_pin_every_width_accepted";
     private static final String DEFAULT_WIDTH_THREE = "vector_pin_default_width_three";
     private static final String WIDTH_CONVERSIONS = "vector_pin_width_conversions";
+    private static final String COLOUR_READS_AS_RGB = "vector_pin_colour_reads_as_rgb";
 
     public static void registerFunctions() {
         KGGameTests.registerFunction(PIN_TYPE_NAMES, VectorPinTypeGameTest::polymorphicPinsSayVectorAndThreeDimensionalOnesSayVec3);
@@ -66,6 +72,7 @@ public final class VectorPinTypeGameTest {
         KGGameTests.registerFunction(EVERY_WIDTH_ACCEPTED, VectorPinTypeGameTest::everyWidthReachesAVectorPin);
         KGGameTests.registerFunction(DEFAULT_WIDTH_THREE, VectorPinTypeGameTest::aFreshVectorPinDefaultsToWidthThree);
         KGGameTests.registerFunction(WIDTH_CONVERSIONS, VectorPinTypeGameTest::theWidthConversionsTakeAnyWidthAndNameTheOneTheyProduce);
+        KGGameTests.registerFunction(COLOUR_READS_AS_RGB, VectorPinTypeGameTest::aColourReadAsAVectorIsItsRedGreenBlue);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -77,6 +84,7 @@ public final class VectorPinTypeGameTest {
         KGGameTests.registerFunctionTest(event, EVERY_WIDTH_ACCEPTED, KGGameTests.functionKey(EVERY_WIDTH_ACCEPTED), data);
         KGGameTests.registerFunctionTest(event, DEFAULT_WIDTH_THREE, KGGameTests.functionKey(DEFAULT_WIDTH_THREE), data);
         KGGameTests.registerFunctionTest(event, WIDTH_CONVERSIONS, KGGameTests.functionKey(WIDTH_CONVERSIONS), data);
+        KGGameTests.registerFunctionTest(event, COLOUR_READS_AS_RGB, KGGameTests.functionKey(COLOUR_READS_AS_RGB), data);
     }
 
     private static final float EPS = 1e-4f;
@@ -280,6 +288,28 @@ public final class VectorPinTypeGameTest {
         // width picker reads its length. A null here is the NPE that KGTypeHandles warns about.
         assertTrue(helper, "an unwired VECTOR pin has a value, got " + value, value != null);
         assertEq(helper, "default width", 3, Vectors.components(value).length);
+        helper.succeed();
+    }
+
+    /** A colour read as a vector is its red, green and blue, the intensity folded in — also through an untyped output. */
+    public static void aColourReadAsAVectorIsItsRedGreenBlue(GameTestHelper helper) {
+        HDRColor colour = new HDRColor(0.5f, 0.25f, 0.125f, 0.75f, 2f);
+        assertVec(helper, "an HDR colour", new float[] {1f, 0.5f, 0.25f}, colour);
+
+        var b = KGGraphBuilder.blueprint();
+        b.variable("colours", List.class, null, VariableKind.INPUT);
+        b.add("first", ListGetNode.class).wire("first.list", "colours").constant("first.index", 0);
+        b.add("len", VectorNodes.Length.class).wire("len.in", "first.value");
+        var g = b.graph();
+        PortModel into = b.node("len").getInputsById().get("in");
+        assertTrue(helper, "the editor takes an untyped output into a vector pin",
+                g.graphModel.canAssignTo(into, b.outputOf("first.value")));
+
+        var exec = new GraphExecutor(g);
+        exec.getEnvironment().variables().put("colours", List.of(colour));
+        Float length = exec.evaluate(b.outputOf("len"), Float.class);
+        assertEq(helper, "the length of (1, 0.5, 0.25)", (float) Math.sqrt(1.3125),
+                length == null ? Float.NaN : length, EPS);
         helper.succeed();
     }
 

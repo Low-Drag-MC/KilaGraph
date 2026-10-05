@@ -45,6 +45,7 @@ import com.lowdragmc.kilagraph.test.gametest.blueprint.McActionGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McContainerGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McCoverageGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McDataGameTest;
+import com.lowdragmc.kilagraph.test.gametest.blueprint.McDamageSourceGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McDecomposeGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McGeometryGameTest;
 import com.lowdragmc.kilagraph.test.gametest.blueprint.McIdTagGameTest;
@@ -189,6 +190,7 @@ public final class KGGameTests {
             new Group(McActionGameTest::registerFunctions, McActionGameTest::register),
             new Group(McContainerGameTest::registerFunctions, McContainerGameTest::register),
             new Group(McCoverageGameTest::registerFunctions, McCoverageGameTest::register),
+            new Group(McDamageSourceGameTest::registerFunctions, McDamageSourceGameTest::register),
             new Group(McDecomposeGameTest::registerFunctions, McDecomposeGameTest::register),
             new Group(McGeometryGameTest::registerFunctions, McGeometryGameTest::register),
             new Group(McIdTagGameTest::registerFunctions, McIdTagGameTest::register),

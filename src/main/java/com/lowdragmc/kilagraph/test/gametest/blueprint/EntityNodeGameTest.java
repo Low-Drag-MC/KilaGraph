@@ -2,7 +2,11 @@ package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.SmoothstepNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.EntitiesInRadiusNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.gameplay.DamageSourceNodes;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
@@ -12,6 +16,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityTypes;
@@ -40,18 +45,20 @@ public final class EntityNodeGameTest {
     private static final String IN_RADIUS = "mc_entity_in_radius";
     private static final String IN_AABB = "mc_entity_in_aabb";
     private static final String DISTANCE = "mc_entity_distance_test";
+    private static final String PIN_LABELS = "mc_entity_pin_labels";
 
     private EntityNodeGameTest() {}
 
 
     public static void registerFunctions() {
         KGGameTests.registerFunction(IN_RADIUS, EntityNodeGameTest::inRadius);
+        KGGameTests.registerFunction(PIN_LABELS, EntityNodeGameTest::anUndisplayedPortIsLabelledByItsPinKey);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
-                IN_RADIUS
+                IN_RADIUS, PIN_LABELS
         }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
@@ -101,5 +108,31 @@ public final class EntityNodeGameTest {
                     + " | a=" + diag(level, a) + " | b=" + diag(level, b) + " | found=" + out);
         }
         helper.succeed();
+    }
+
+    /** An annotated port with no {@code display} is labelled by {@code kg.pin.<id>}, the id in words as fallback. */
+    public static void anUndisplayedPortIsLabelledByItsPinKey(GameTestHelper helper) {
+        var g = newGraph();
+        var inRadius = addNode(g, EntitiesInRadiusNode.class);
+        var nearest = addNode(g, NearestEntityNode.class);
+        var info = addNode(g, DamageSourceNodes.Info.class);
+        var smoothstep = addNode(g, SmoothstepNode.class);
+        var setVar = addNode(g, SetVarNode.class);
+
+        if (!pinLabel(helper, inRadius.getInputsById().get("level"), "Level")) return;
+        // words: camel case splits, a digit starts a word, exec pins too
+        if (!pinLabel(helper, nearest.getInputsById().get("livingOnly"), "Living Only")) return;
+        if (!pinLabel(helper, info.getOutputsById().get("directEntity"), "Direct Entity")) return;
+        if (!pinLabel(helper, smoothstep.getInputsById().get("edge0"), "Edge 0")) return;
+        if (!pinLabel(helper, setVar.getInputsById().get("trigger"), "Trigger")) return;
+        helper.succeed();
+    }
+
+    private static boolean pinLabel(GameTestHelper helper, PortModel port, String fallback) {
+        var label = port.getDisplayName();
+        boolean ok = label.getContents() instanceof TranslatableContents contents
+                && ("kg.pin." + port.getPortId()).equals(contents.getKey()) && fallback.equals(contents.getFallback());
+        if (!ok) helper.fail(port.getPortId() + ": expected kg.pin." + port.getPortId() + " / " + fallback + ", got " + label);
+        return ok;
     }
 }

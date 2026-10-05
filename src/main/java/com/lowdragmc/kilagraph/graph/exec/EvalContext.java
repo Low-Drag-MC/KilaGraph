@@ -88,11 +88,18 @@ public final class EvalContext {
      * Publish the staged outputs. Every output port is written, including the ones the node never
      * set — they become {@code null}, which is what made a second pull of the same node a cache hit
      * rather than a re-evaluation.
+     *
+     * <p>Except one that is current already: an exec node pulled for an output it did not publish keeps
+     * what it did publish this run. (A pure node has none, or it would not be evaluated.)</p>
      */
     void flush() {
         PreparedGraph.Node n = prepared;
         for (int k = 0; k < n.outputSlots.length; k++) {
             int slot = n.outputSlots[k];
+            if (executor.isCurrent(slot)) {
+                staged[k] = null;
+                continue;
+            }
             if (stagedStamp[k] != stagedGen) {
                 executor.writeSlot(slot, null);
             } else if (stagedKind[k] == GraphExecutor.KIND_OBJECT) {

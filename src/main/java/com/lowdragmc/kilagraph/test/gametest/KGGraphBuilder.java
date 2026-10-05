@@ -198,10 +198,8 @@ public final class KGGraphBuilder {
     /**
      * A second node reading an already-declared variable, registered under {@code nodeName}.
      *
-     * <p>Two nodes for one variable are two nodes, so they get their own slots and their own memos.
-     * That matters after a loop: the body's read is memoised for the iteration that wrote it, and a
-     * read placed on the {@code completed} path needs to be a different node to see the final value
-     * — see {@code ExecVarInteractionGameTest.aVariableReadIsMemoisedUntilClearCache}.</p>
+     * <p>Two nodes for one variable are two nodes, so they get their own slots and their own memos —
+     * for a graph that reads one variable in two places and wants to say so.</p>
      */
     public KGGraphBuilder readAgain(String nodeName, String varName) {
         if (nodes.containsKey(nodeName)) throw new IllegalArgumentException("Duplicate node name '" + nodeName + "'");

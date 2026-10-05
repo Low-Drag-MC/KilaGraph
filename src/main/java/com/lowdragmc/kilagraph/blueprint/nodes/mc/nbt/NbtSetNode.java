@@ -14,8 +14,12 @@ import net.minecraft.nbt.CompoundTag;
 import java.util.List;
 
 /**
- * Put a value into a {@link CompoundTag} under {@code key}, returning the (mutated) tag. A null
- * input tag yields a fresh compound. The {@link NbtValueType} option types the {@code value} port.
+ * Put a value into a {@link CompoundTag} under {@code key}, returning the tag. A null input tag yields a
+ * fresh compound. The {@link NbtValueType} option types the {@code value} port.
+ *
+ * <p>In place by default: the tag it is given is the one written and handed back. {@code copy} writes into a
+ * copy instead. ⚠️ A pure node is worked out again for each exec node that reads it, so an in-place write
+ * computed from the tag itself (a count read out of it plus one) lands once per reader.</p>
  */
 // valueType MUST stay an option — see NbtGetNode: it drives the dynamic port's type, decided at
 // defineNode time, before any wire has a value.
@@ -30,6 +34,8 @@ public class NbtSetNode extends AnnotatedNode {
     @Option public NbtValueType valueType = NbtValueType.STRING;
     @InputPort public CompoundTag tag;
     @InputPort public String key = "";
+    /** Write into a copy of {@code tag}, leaving it as it was, rather than into the tag itself. */
+    @InputPort public boolean copy = false;
     @OutputPort public CompoundTag out;
 
     @Override
@@ -39,8 +45,8 @@ public class NbtSetNode extends AnnotatedNode {
 
     @Override
     public void evaluate(EvalContext ctx) {
-        CompoundTag t = ctx.getInput("tag", CompoundTag.class, null);
-        if (t == null) t = new CompoundTag();
+        CompoundTag in = ctx.getInput("tag", CompoundTag.class, null);
+        CompoundTag t = in == null ? new CompoundTag() : ctx.getBool("copy", false) ? in.copy() : in;
         String k = ctx.getInput("key", String.class, "");
         NbtValueType vt = ctx.getOption("valueType", NbtValueType.class, NbtValueType.STRING);
         if (!k.isEmpty()) {

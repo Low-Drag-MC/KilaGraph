@@ -63,8 +63,8 @@ import java.util.Objects;
  * as <em>nothing</em> against its own switch (-0.19 ns per node step, sign unstable) while making the
  * whole check about 40% <em>slower</em>: {@code pullLane} grew past what the inliner would take and
  * both sides of its own comparison regressed together. And there is nothing for a memo to save in the
- * first place, because a node is already memoised per generation — the fold runs once per node per
- * run either way. If the cost has to go further, the direction that can reach zero is inferring at
+ * first place, because a node is already memoised — the fold runs once per node per evaluation either
+ * way. If the cost has to go further, the direction that can reach zero is inferring at
  * prepare time which nodes can never see a non-float value, not making the runtime check cleverer.</p>
  *
  * <p>The node-side path ({@link EvalContext#lane}) is still two-pass. It is reached only when
