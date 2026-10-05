@@ -23,6 +23,10 @@ public @interface InputPort {
     /** Port id. Defaults to the annotated field's name. */
     String name() default "";
 
+    /**
+     * The label: a lang key, or the text itself. Empty: {@code kg.pin.<id>}, shared by every port of that id, with the
+     * id in words as fallback.
+     */
     String display() default "";
 
     PortCapacity capacity() default PortCapacity.SINGLE;

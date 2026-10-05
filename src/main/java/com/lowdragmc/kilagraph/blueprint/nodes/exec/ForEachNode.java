@@ -19,6 +19,9 @@ import java.util.List;
 
 /**
  * Iterates a List, exposing {@code item} and {@code index} per iteration.
+ *
+ * <p>{@code list} is read again before each iteration, as Unreal's {@code ForEachLoop} does, so a body
+ * that changes it changes the loop.</p>
  */
 @NodeAttribute(name = "exec_foreach", group = "exec", graphTypes = BlueprintGraph.class)
 public class ForEachNode extends AnnotatedNode {
@@ -36,11 +39,9 @@ public class ForEachNode extends AnnotatedNode {
 
     @Override
     public void execute(ExecContext ctx) {
-        // Pull the list once before iterating — clearing the cache between iterations would lose it.
-        List<?> values = ctx.getInput("list", List.class, List.of());
-        // The controller publishes "index"/"item" into node state per iteration (read by evaluate());
-        // the engine steps the body and fires "completed" when the list is exhausted.
-        ctx.pushLoop(new LoopController.ForEachController(values), "body", "completed");
+        // The controller reads "list" before each iteration and holds "index"/"item" (read by
+        // evaluate()); the engine steps the body and fires "completed" when the list is exhausted.
+        ctx.pushLoop(new LoopController.ForEachController(ctx.preparedNode()), "body", "completed");
     }
 
     @Override

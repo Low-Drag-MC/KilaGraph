@@ -37,7 +37,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Pull-based evaluator for a {@link Graph}. Demand-driven: callers request the value of an
  * {@link PortModel} (output port), and the executor recursively resolves upstream nodes,
- * memoising results for the lifetime of this executor instance.
+ * memoising results until {@link #clearCache()} — and, on an exec flow, a pull's results only until the
+ * flow takes its next step (see {@link #pulled}).
  *
  * <p>Three "kick-off" surfaces:</p>
  * <ol>
@@ -134,6 +135,16 @@ public final class GraphExecutor {
     private boolean retainExecOutputs;
 
     /**
+     * Slots a pull worked out since the flow last took a step. The next step marks them stale, so a
+     * pure node is worked out again for each exec node that reads it, and once for everything one exec
+     * node reads, as Unreal does — a variable read after a {@code SetVar} sees the write. What an exec
+     * node published from {@code execute()} is not logged and stays valid for the run; a pull with no
+     * flow ({@link #evaluate}) keeps its whole memo. See {@link #stalePulled} for what counts as a step.
+     */
+    private int[] pulled = EMPTY_STAMPS;
+    private int pulledCount;
+
+    /**
      * The variable cell each variable-touching node resolved, by node index, plus the name it was
      * resolved for.
      *
@@ -153,10 +164,8 @@ public final class GraphExecutor {
      * The controller of each loop node currently iterating, by node index.
      *
      * <p>A loop's {@code index} and {@code item} outputs are recomputed from here whenever they are
-     * demanded, rather than written into the node's slot when the iteration begins. The engine clears
-     * the value cache between iterations, so a slot written at iteration start would be wiped by a
-     * <em>nested</em> loop's clear and the enclosing loop's index would vanish — which is the bug
-     * {@code ForNode}'s javadoc has always warned about.</p>
+     * demanded, rather than written into the node's slot when the iteration begins: a read of them is
+     * a pull, which goes stale at each step and is worked out again for the iteration now running.</p>
      */
     private LoopController[] activeLoops = EMPTY_LOOPS;
 
@@ -389,6 +398,7 @@ public final class GraphExecutor {
             writtenCount = 0;
             execWrittenCount = 0;
         }
+        pulledCount = 0;
         generation = next;
     }
 
@@ -523,6 +533,8 @@ public final class GraphExecutor {
                 writtenCount = 0;
                 execWritten = EMPTY_STAMPS;
                 execWrittenCount = 0;
+                pulled = EMPTY_STAMPS;
+                pulledCount = 0;
                 varCells = EMPTY_CELLS;
                 varCellNames = EMPTY_CELL_NAMES;
                 activeLoops = EMPTY_LOOPS;
@@ -618,6 +630,8 @@ public final class GraphExecutor {
             throw new IllegalStateException("exec step for a node from a different prepared graph: "
                     + node.uid);
         }
+        // before this node pulls anything (intrinsics included): the last node's pure reads are not its own
+        if (pulledCount > 0) stalePulled();
         if (!opt(Opt.EXEC_PRERESOLVE)) {
             // Measurement path only — see Opt.EXEC_PRERESOLVE. Same node back, same work as before.
             node = resolve(node.model);
@@ -935,22 +949,12 @@ public final class GraphExecutor {
     }
 
     /**
-     * Invalidate a single node: drop its per-node {@link #nodeState} entry and evict all its
-     * output ports from the pull cache. The next pull of any of its outputs recomputes.
+     * Drops a node's cached outputs, keeping its memory: the next pull of any of them recomputes.
      *
-     * <p>Used by {@code CacheClear}: unlike {@link #clearCache} (which invalidates the whole pull
-     * cache but leaves node state — so a {@code Cache} would keep serving its memo) and
-     * {@link #clearNodeState} (which drops every node's state), this targets exactly one node so a
-     * {@code Cache} recomputes while unrelated memoised values stay put.</p>
-     */
-    /**
-     * Drops a node's cached outputs, keeping its memory.
-     *
-     * <p>The distinction matters: {@link #invalidateNode} exists for {@code CacheClear}, whose whole
-     * job is to forget, while a host that writes a variable mid-run only needs the readers
-     * downstream of it to recompute. Erasing {@code nodeState} on that path silently resets every
-     * damped value, previous-frame edge and loop counter downstream of the write — once per frame,
-     * so they never accumulate anything and no error is ever raised.
+     * <p>Unlike {@link #invalidateNode}, which exists for {@code CacheClear} and whose whole job is to
+     * forget, this leaves {@code nodeState} alone — erasing it would reset every damped value,
+     * previous-frame edge and loop counter the node keeps, with no error anywhere. A flow does not need
+     * it to see a write: each step works its pure reads out again.
      */
     public void invalidateNodeOutputs(NodeModel target) {
         if (target == null) return;
@@ -964,6 +968,15 @@ public final class GraphExecutor {
         }
     }
 
+    /**
+     * Invalidate a single node: drop its per-node {@link #nodeState} entry and evict all its
+     * output ports from the pull cache. The next pull of any of its outputs recomputes.
+     *
+     * <p>Used by {@code CacheClear}: unlike {@link #clearCache} (which invalidates the whole pull
+     * cache but leaves node state — so a {@code Cache} would keep serving its memo) and
+     * {@link #clearNodeState} (which drops every node's state), this targets exactly one node so a
+     * {@code Cache} recomputes while unrelated memoised values stay put.</p>
+     */
     public void invalidateNode(NodeModel target) {
         if (target == null) return;
         nodeState.remove(target.getUid());
@@ -1014,13 +1027,13 @@ public final class GraphExecutor {
      * consequence is a retained {@code Entity} or {@code ItemStack} rather than a wrong answer, and
      * an invariant that has to be argued from the whole program is not one worth relying on.
      * Logging every non-null store keeps it local: <b>if a slot holds a reference, it is in the
-     * log.</b> A null store needs no entry because there is nothing to release, and duplicates are
-     * harmless — {@code clearCache} just nulls the slot twice.</p>
+     * log.</b> A null store needs no entry because there is nothing to release, and a slot that already
+     * holds a reference is already logged — so a slot re-evaluated at every step is logged once.</p>
      */
     void writeSlot(int slot, Object value) {
         kinds[slot] = KIND_OBJECT;
         stamps[slot] = generation;
-        if (value != null) {
+        if (value != null && slots[slot] == null) {
             if (writtenCount == written.length) {
                 written = Arrays.copyOf(written, Math.max(16, written.length * 2));
             }
@@ -1178,10 +1191,13 @@ public final class GraphExecutor {
     private boolean ensureComputed(@Nullable PreparedGraph.Node owner, int slot) {
         if (owner == null || slot < 0) return false;
         if (stamps[slot] == generation) return true;
+        // an exec node pulled for an output it did not publish keeps the ones it did (see notePulled)
+        long current = currentOutputs(owner);
         // An acyclic graph cannot revisit a node that is already being evaluated, and the prepared
         // form already knows which it is — so the bookkeeping only runs where it can actually fire.
         if (!cycleChecks) {
             evaluateNode(owner);
+            notePulled(owner, current);
             return stamps[slot] == generation;
         }
         enterNode(owner);
@@ -1190,7 +1206,53 @@ public final class GraphExecutor {
         } finally {
             exitNode();
         }
+        notePulled(owner, current);
         return stamps[slot] == generation;
+    }
+
+    /** Which of {@code n}'s first 64 outputs are current — for a pure node, none, or it would not be evaluated. */
+    private long currentOutputs(PreparedGraph.Node n) {
+        int[] outs = n.outputSlots;
+        long mask = 0L;
+        for (int k = 0, end = Math.min(outs.length, 64); k < end; k++) {
+            if (stamps[outs[k]] == generation) mask |= 1L << k;
+        }
+        return mask;
+    }
+
+    /** Whether {@code slot} holds a value worked out or published this generation. */
+    boolean isCurrent(int slot) {
+        return stamps[slot] == generation;
+    }
+
+    /**
+     * Log what a pull of {@code n} worked out, to go stale at the next step — see {@link #pulled}. Not
+     * the outputs that were {@code current} before it: an exec node's published ones stay for the run,
+     * and {@link EvalContext#flush} does not overwrite them either.
+     */
+    private void notePulled(PreparedGraph.Node n, long current) {
+        // a constant reads the same whenever it is read
+        if (n.dataKind == PreparedGraph.DataKind.CONSTANT) return;
+        int[] outs = n.outputSlots;
+        if (pulledCount + outs.length > pulled.length) {
+            pulled = Arrays.copyOf(pulled, Math.max(pulledCount + outs.length, Math.max(16, pulled.length * 2)));
+        }
+        for (int k = 0; k < outs.length; k++) {
+            if (k < 64 && (current & 1L << k) != 0) continue;
+            pulled[pulledCount++] = outs[k];
+        }
+    }
+
+    /**
+     * Marks what earlier pulls worked out as stale. Run before each exec step, when a flow finishes,
+     * before a loop decides its next iteration and before a subgraph's results are harvested.
+     */
+    void stalePulled() {
+        for (int i = 0; i < pulledCount; i++) {
+            int slot = pulled[i];
+            if (stamps[slot] == generation) stamps[slot] = 0;
+        }
+        pulledCount = 0;
     }
 
     /** Memoised evaluation of {@code slot} as an object — boxes if the slot is in the numeric lane. */
@@ -1902,6 +1964,8 @@ public final class GraphExecutor {
      */
     void finishSubgraph(PreparedGraph.Node node, CustomGraphModelImpl inner,
                         GraphExecutor childExec, ExecFrame parentFrame) {
+        // the harvest reads after the body's last step, and must see its writes
+        childExec.stalePulled();
         if (!opt(Opt.SUBGRAPH_PRERESOLVE)) {
             harvestSubgraphOutputs(node.subgraphNode, inner, childExec);
             for (PortModel pin : reachedExecOutPins(node.subgraphNode, inner, childExec)) {
@@ -2177,5 +2241,10 @@ public final class GraphExecutor {
         stamps = EMPTY_STAMPS;
         written = EMPTY_STAMPS;
         writtenCount = 0;
+        // the slot logs index the arrays just dropped
+        execWritten = EMPTY_STAMPS;
+        execWrittenCount = 0;
+        pulled = EMPTY_STAMPS;
+        pulledCount = 0;
     }
 }

@@ -5,12 +5,14 @@ import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListAppendNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListGetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.list.ListSizeNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtCopyNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtCreateNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtGetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtHasNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtRemoveNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtSetNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.nbt.NbtValueType;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.EvalTrace;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
 import com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder;
@@ -45,6 +47,10 @@ public final class NbtPipelineGameTest {
     private static final String NBT_THROUGH_A_LIST = "nbt_pipeline_nbt_through_a_list";
     private static final String REMOVE_DROPS_ONLY_THE_NAMED_KEY = "nbt_pipeline_remove_drops_only_the_named_key";
     private static final String NBT_ACROSS_A_SUBGRAPH_BOUNDARY = "nbt_pipeline_nbt_across_a_subgraph_boundary";
+    private static final String SIBLING_SETS_THAT_COPY = "nbt_pipeline_sibling_sets_that_copy_leave_the_tag_alone";
+    private static final String A_SET_READ_BY_TWO_EXEC_NODES = "nbt_pipeline_a_set_read_by_two_exec_nodes";
+    private static final String A_COPY_IS_A_TAG_OF_ITS_OWN = "nbt_pipeline_a_copy_is_a_tag_of_its_own";
+    private static final String A_REMOVE_THAT_COPIES = "nbt_pipeline_a_remove_that_copies_leaves_the_tag_alone";
 
     private NbtPipelineGameTest() {}
 
@@ -55,13 +61,18 @@ public final class NbtPipelineGameTest {
         KGGameTests.registerFunction(NBT_THROUGH_A_LIST, NbtPipelineGameTest::nbtThroughAList);
         KGGameTests.registerFunction(REMOVE_DROPS_ONLY_THE_NAMED_KEY, NbtPipelineGameTest::removeDropsOnlyTheNamedKey);
         KGGameTests.registerFunction(NBT_ACROSS_A_SUBGRAPH_BOUNDARY, NbtPipelineGameTest::nbtAcrossASubgraphBoundary);
+        KGGameTests.registerFunction(SIBLING_SETS_THAT_COPY, NbtPipelineGameTest::siblingSetsThatCopyLeaveTheTagTheyWereGivenAlone);
+        KGGameTests.registerFunction(A_SET_READ_BY_TWO_EXEC_NODES, NbtPipelineGameTest::aSetReadByTwoExecNodesLandsOncePerReaderInPlaceAndOnceWithACopy);
+        KGGameTests.registerFunction(A_COPY_IS_A_TAG_OF_ITS_OWN, NbtPipelineGameTest::aCopyIsATagOfItsOwn);
+        KGGameTests.registerFunction(A_REMOVE_THAT_COPIES, NbtPipelineGameTest::aRemoveThatCopiesLeavesTheTagItWasGivenAlone);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 NESTED_COMPOUND_ROUND_TRIP, CHAINED_SETS_SHARE_ONE_TAG, NBT_THROUGH_A_LIST,
-                REMOVE_DROPS_ONLY_THE_NAMED_KEY, NBT_ACROSS_A_SUBGRAPH_BOUNDARY
+                REMOVE_DROPS_ONLY_THE_NAMED_KEY, NBT_ACROSS_A_SUBGRAPH_BOUNDARY, SIBLING_SETS_THAT_COPY,
+                A_SET_READ_BY_TWO_EXEC_NODES, A_COPY_IS_A_TAG_OF_ITS_OWN, A_REMOVE_THAT_COPIES
         }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
@@ -134,6 +145,106 @@ public final class NbtPipelineGameTest {
         CompoundTag shared = exec.evaluate(b.outputOf("setA.out"), CompoundTag.class);
         assertTrue(helper, "one tag holds both keys",
                 shared != null && shared.contains("a") && shared.contains("b"));
+        helper.succeed();
+    }
+
+    /** With {@code copy} on, two setters fed by one {@code NbtCreate} give two tags and leave the shared one empty. */
+    public static void siblingSetsThatCopyLeaveTheTagTheyWereGivenAlone(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.add("tag", NbtCreateNode.class);
+        b.add("setA", NbtSetNode.class).option("setA", "valueType", NbtValueType.INT)
+                .wire("setA.tag", "tag").constant("setA.key", "a").constant("setA.value", 1)
+                .constant("setA.copy", true);
+        b.add("setB", NbtSetNode.class).option("setB", "valueType", NbtValueType.INT)
+                .wire("setB.tag", "tag").constant("setB.key", "b").constant("setB.value", 2)
+                .constant("setB.copy", true);
+
+        var exec = new GraphExecutor(b.graph());
+        CompoundTag a = exec.evaluate(b.outputOf("setA.out"), CompoundTag.class);
+        CompoundTag bTag = exec.evaluate(b.outputOf("setB.out"), CompoundTag.class);
+        CompoundTag shared = exec.evaluate(b.outputOf("tag"), CompoundTag.class);
+        assertTrue(helper, "setA holds 'a' alone", a != null && a.contains("a") && !a.contains("b"));
+        assertTrue(helper, "setB holds 'b' alone", bTag != null && bTag.contains("b") && !bTag.contains("a"));
+        assertTrue(helper, "the tag they were given is untouched", shared != null && shared.isEmpty());
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * t = {n: 0};  inc = Set(t, "n", Get(t, "n") + 1)
+     * Entry → SetVar(a ← inc) → SetVar(b ← inc)
+     * </pre>
+     * A pure setter is worked out once per exec node that reads it: in place, two readers land two increments in
+     * {@code t}; with {@code copy}, each gets {@code {n: 1}} and {@code t} is untouched.
+     */
+    public static void aSetReadByTwoExecNodesLandsOncePerReaderInPlaceAndOnceWithACopy(GameTestHelper helper) {
+        for (boolean copy : new boolean[]{false, true}) {
+            var b = KGGraphBuilder.blueprint();
+            b.variable("t", CompoundTag.class, null, VariableKind.INPUT);
+            b.add("entry", EntryNode.class);
+            b.add("n", NbtGetNode.class).option("n", "valueType", NbtValueType.INT)
+                    .wire("n.tag", "t").constant("n.key", "n");
+            b.add("plus", AddNode.class).wire("plus.in1", "n").constant("plus.in2", 1f);
+            b.add("inc", NbtSetNode.class).option("inc", "valueType", NbtValueType.INT)
+                    .wire("inc.tag", "t").constant("inc.key", "n").wire("inc.value", "plus").constant("inc.copy", copy);
+            b.add("setA", SetVarNode.class).option("setA", "varName", "a").wire("setA.value", "inc");
+            b.add("setB", SetVarNode.class).option("setB", "varName", "b").wire("setB.value", "inc");
+            b.then("entry", "setA", "setB");
+
+            var exec = new GraphExecutor(b.graph());
+            CompoundTag t = new CompoundTag();
+            t.putInt("n", 0);
+            exec.getEnvironment().variables().put("t", t);
+            exec.executeFrom(b.node("entry"));
+
+            var vars = exec.getEnvironment().variables();
+            if (copy) {
+                assertEq(helper, "copying, the variable's tag is untouched", 0, t.getIntOr("n", -1));
+                assertEq(helper, "the first reader got one increment", 1,
+                        vars.get("a") instanceof CompoundTag a ? a.getIntOr("n", -1) : -1);
+                assertEq(helper, "and so did the second", 1,
+                        vars.get("b") instanceof CompoundTag bTag ? bTag.getIntOr("n", -1) : -1);
+            } else {
+                assertEq(helper, "in place, each reader's increment landed in the variable's tag", 2, t.getIntOr("n", -1));
+                assertTrue(helper, "and both readers hold that same tag", vars.get("a") == t && vars.get("b") == t);
+            }
+        }
+        helper.succeed();
+    }
+
+    /** {@code NbtCopy} is a deep copy: a write into it, nested compounds included, leaves the original alone. */
+    public static void aCopyIsATagOfItsOwn(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.variable("t", CompoundTag.class, null, VariableKind.INPUT);
+        b.add("copy", NbtCopyNode.class).wire("copy.tag", "t");
+        var exec = new GraphExecutor(b.graph());
+        CompoundTag inner = new CompoundTag();
+        inner.putInt("hp", 20);
+        CompoundTag original = new CompoundTag();
+        original.put("stats", inner);
+        exec.getEnvironment().variables().put("t", original);
+        CompoundTag copy = exec.evaluate(b.outputOf("copy"), CompoundTag.class);
+        assertTrue(helper, "a copy, not the same tag", copy != null && copy != original && copy.equals(original));
+        copy.getCompoundOrEmpty("stats").putInt("hp", 5);
+        assertEq(helper, "and deep: the original's nested compound is untouched", 20,
+                original.getCompoundOrEmpty("stats").getIntOr("hp", -1));
+        helper.succeed();
+    }
+
+    /** {@code NbtRemove} with {@code copy} on removes from a copy: the tag it was given keeps the key. */
+    public static void aRemoveThatCopiesLeavesTheTagItWasGivenAlone(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.variable("t", CompoundTag.class, null, VariableKind.INPUT);
+        b.add("drop", NbtRemoveNode.class).wire("drop.tag", "t").constant("drop.key", "a").constant("drop.copy", true);
+        var exec = new GraphExecutor(b.graph());
+        CompoundTag original = new CompoundTag();
+        original.putInt("a", 1);
+        original.putInt("b", 2);
+        exec.getEnvironment().variables().put("t", original);
+        CompoundTag out = exec.evaluate(b.outputOf("drop"), CompoundTag.class);
+        assertTrue(helper, "the copy lost 'a' and kept 'b'", out != null && !out.contains("a") && out.contains("b"));
+        assertTrue(helper, "the tag it was given still has both", out != original
+                && original.contains("a") && original.contains("b"));
         helper.succeed();
     }
 

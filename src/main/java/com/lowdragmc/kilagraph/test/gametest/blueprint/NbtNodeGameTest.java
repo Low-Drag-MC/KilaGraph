@@ -284,6 +284,15 @@ public final class NbtNodeGameTest {
                 out.getCompoundOrEmpty("a").getCompoundOrEmpty("b").getStringOr("c", ""));
         assertTrue(helper, "the tag is mutated in place, not copied", out == fresh);
 
+        // With Copy on, the same write lands in a copy and the tag it was given stays as it was.
+        CompoundTag kept = new CompoundTag();
+        var copied = pathSet(kept, "a.b.c", NbtValueType.STRING, "hi");
+        setInputConstant(copied.node(), "copy", true);
+        CompoundTag copyOut = eval(copied, "out", CompoundTag.class);
+        assertEq(helper, "the copy has the write", "hi",
+                copyOut.getCompoundOrEmpty("a").getCompoundOrEmpty("b").getStringOr("c", ""));
+        assertTrue(helper, "and the tag it was given is untouched", copyOut != kept && kept.isEmpty());
+
         // Overwriting an existing value.
         CompoundTag root = sample();
         var over = pathSet(root, "Level", NbtValueType.INT, 7);

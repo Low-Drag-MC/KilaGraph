@@ -45,7 +45,7 @@ public final class CacheGameTest {
 
     /**
      * For(3) body: SetVar("seen", Cache.cached); Cache.value ← For.index. The Cache memoises the
-     * first index (0) and keeps serving it across iterations despite the loop's clearCache().
+     * first index (0) and keeps serving it across iterations, though each one works it out again.
      * A plain index→SetVar wire would leave seen==2; with Cache it stays 0.
      */
     public static void cacheMemoizes(GameTestHelper helper) {

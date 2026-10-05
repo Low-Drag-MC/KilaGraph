@@ -46,6 +46,7 @@ public final class FunctionCallGameTest {
     private static final String SAME_NAMED_VARIABLES_DO_NOT_COLLIDE = "function_call_same_named_variables_do_not_collide";
     private static final String A_CACHE_INSIDE_A_FUNCTION_DOES_NOT_LEAK_BETWEEN_CALLS = "function_call_a_cache_inside_a_function_does_not_leak_between_calls";
     private static final String A_SEEDED_FUNCTION_RESTARTS_ITS_RANDOM_SEQUENCE_PER_CALL = "function_call_a_seeded_function_restarts_its_random_sequence_per_call";
+    private static final String A_RETURN_SEES_THE_LAST_STEPS_WRITE = "function_call_a_return_sees_the_last_steps_write";
 
     private FunctionCallGameTest() {}
 
@@ -59,6 +60,7 @@ public final class FunctionCallGameTest {
         KGGameTests.registerFunction(SAME_NAMED_VARIABLES_DO_NOT_COLLIDE, FunctionCallGameTest::sameNamedVariablesDoNotCollide);
         KGGameTests.registerFunction(A_CACHE_INSIDE_A_FUNCTION_DOES_NOT_LEAK_BETWEEN_CALLS, FunctionCallGameTest::aCacheInsideAFunctionDoesNotLeakBetweenCalls);
         KGGameTests.registerFunction(A_SEEDED_FUNCTION_RESTARTS_ITS_RANDOM_SEQUENCE_PER_CALL, FunctionCallGameTest::aSeededFunctionRestartsItsRandomSequencePerCall);
+        KGGameTests.registerFunction(A_RETURN_SEES_THE_LAST_STEPS_WRITE, FunctionCallGameTest::aReturnSeesTheLastStepsWrite);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
@@ -66,7 +68,8 @@ public final class FunctionCallGameTest {
         for (String p : new String[]{
                 MULTIPLE_PARAMETERS_AND_RETURNS, TWO_CALL_SITES_DO_NOT_SHARE_STATE, THREE_LEVELS_DEEP,
                 FUNCTION_CONTAINING_A_LOOP, LOOP_CONTAINING_A_FUNCTION_CALL, SAME_NAMED_VARIABLES_DO_NOT_COLLIDE,
-                A_CACHE_INSIDE_A_FUNCTION_DOES_NOT_LEAK_BETWEEN_CALLS, A_SEEDED_FUNCTION_RESTARTS_ITS_RANDOM_SEQUENCE_PER_CALL
+                A_CACHE_INSIDE_A_FUNCTION_DOES_NOT_LEAK_BETWEEN_CALLS, A_SEEDED_FUNCTION_RESTARTS_ITS_RANDOM_SEQUENCE_PER_CALL,
+                A_RETURN_SEES_THE_LAST_STEPS_WRITE
         }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
@@ -160,15 +163,13 @@ public final class FunctionCallGameTest {
 
         // for (i = 0; i < n; i++) { acc += i; out = acc; }
         //
-        // Both writes take the accumulator node's value rather than re-reading `acc`, because a
-        // variable read is memoised for the generation: after the last iteration's body there is no
-        // further clearCache(), so a read of `acc` on the `completed` path would still see the value
-        // from before that iteration's write. See
-        // ExecVarInteractionGameTest.aVariableReadIsMemoisedUntilClearCache.
+        // `out` reads `acc`, which the step before it wrote. Wired to `accum` instead it would be
+        // `acc + i` worked out again with the new `acc` — a pure node is worked out for each exec
+        // node that reads it — so the last iteration would give 10 + 4.
         fn.add("loop", ForNode.class).wire("loop.count", "n");
         fn.add("accum", AddNode.class).wire("accum.in1", "acc").wire("accum.in2", "loop.index");
         fn.add("setAcc", SetVarNode.class).option("setAcc", "varName", "acc").wire("setAcc.value", "accum");
-        fn.add("setOut", SetVarNode.class).option("setOut", "varName", "out").wire("setOut.value", "accum");
+        fn.add("setOut", SetVarNode.class).option("setOut", "varName", "out").wire("setOut.value", "acc");
         fn.wire("loop.in", "call");
         fn.wire("setAcc.trigger", "loop.body");
         fn.then("setAcc", "setOut");
@@ -183,6 +184,30 @@ public final class FunctionCallGameTest {
 
         // 0 + 1 + 2 + 3 + 4
         assertEq(helper, "sum of 0..4", 10f, f(exec.evaluate(outer.outputOf("f.out"), Float.class)), 1e-5f);
+        helper.succeed();
+    }
+
+    /** {@code fn(x) { x = x + 1 } -> out = x} with no {@code ret}: the write is the last step, so the harvest must see it. */
+    public static void aReturnSeesTheLastStepsWrite(GameTestHelper helper) {
+        var outer = KGGraphBuilder.blueprint();
+        var fn = outer.subgraph();
+        fn.execVariable("call", VariableKind.INPUT);
+        fn.variable("x", float.class, 0f, VariableKind.INPUT);
+        fn.variable("out", float.class, 0f, VariableKind.OUTPUT);
+        fn.add("inc", AddNode.class).wire("inc.in1", "x").constant("inc.in2", 1f);
+        fn.add("setX", SetVarNode.class).option("setX", "varName", "x").wire("setX.value", "inc");
+        fn.wire("out", "x");
+        fn.then("call", "setX");
+
+        outer.add("entry", EntryNode.class);
+        outer.call("f", fn).constant("f.x", 10f);
+        outer.wire("f.call", "entry");
+
+        var exec = new GraphExecutor(outer.graph());
+        exec.executeFrom(outer.node("entry"));
+
+        assertEq(helper, "x after the write, not before it", 11f,
+                f(exec.evaluate(outer.outputOf("f.out"), Float.class)), 1e-5f);
         helper.succeed();
     }
 

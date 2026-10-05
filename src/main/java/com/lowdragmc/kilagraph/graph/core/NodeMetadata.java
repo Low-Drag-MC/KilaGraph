@@ -109,7 +109,7 @@ final class NodeMetadata {
         for (FieldDef d : defs) {
             if (d.kind != Kind.OPTION) continue;
             IOptionBuilder<?> b = ctx.addOption(d.id, d.typeHandle);
-            if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
+            if (!d.display.isEmpty()) b.withDisplayName(Component.translatableWithFallback(d.display, d.display));
             if (hasAccessor(d.field.getGenericType())) {
                 Object def = readFieldValue(d.field, node);
                 if (def != null) b.withDefaultValue(def);
@@ -134,6 +134,40 @@ final class NodeMetadata {
         }
     }
 
+    private static final String PIN_KEY = "kg.pin.";
+
+    /**
+     * A port's label: its {@code display} (a lang key, or the text itself), else {@code kg.pin.<id>} with the id in
+     * words as fallback. Namespaced because the bare id LDLib2 falls back to can collide with any other lang key.
+     */
+    private static Component label(FieldDef d) {
+        return d.display.isEmpty() ? Component.translatableWithFallback(PIN_KEY + d.id, words(d.id))
+                : Component.translatableWithFallback(d.display, d.display);
+    }
+
+    /** {@code upwardsSpeed} → {@code Upwards Speed}, {@code optionalObject2} → {@code Optional Object 2}. */
+    private static String words(String id) {
+        StringBuilder out = new StringBuilder(id.length() + 8);
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            if (c == '_') {
+                out.append(' ');
+                continue;
+            }
+            if (i > 0) {
+                char previous = id.charAt(i - 1);
+                boolean nextLower = i + 1 < id.length() && Character.isLowerCase(id.charAt(i + 1));
+                boolean wordStart = Character.isUpperCase(c) && (Character.isLowerCase(previous)
+                        || (Character.isDigit(previous) || Character.isUpperCase(previous)) && nextLower)
+                        || Character.isDigit(c) && Character.isLetter(previous);
+                if (wordStart) out.append(' ');
+            }
+            boolean startsWord = out.isEmpty() || out.charAt(out.length() - 1) == ' ';
+            out.append(startsWord ? Character.toUpperCase(c) : c);
+        }
+        return out.toString().strip().replaceAll(" +", " ");
+    }
+
     /**
      * ⚠️ <b>Every builder is {@code build()}ed here, before this returns.</b> A port takes its place
      * in the node's display order at the moment it is built — {@code PortBuilder.build()} is what
@@ -152,7 +186,7 @@ final class NodeMetadata {
     private void applyPort(IPortDefinitionContext ctx, Node node, FieldDef d) {
         if (d.kind == Kind.INPUT_PORT) {
             IInputPortBuilder<?> b = ctx.addInputPort(d.id, d.typeHandle);
-            if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
+            b.withDisplayName(label(d));
             if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
             if (hasAccessor(d.field.getGenericType())) {
                 Object def = readFieldValue(d.field, node);
@@ -168,7 +202,7 @@ final class NodeMetadata {
             b.build();
         } else {
             IOutputPortBuilder<?> b = ctx.addOutputPort(d.id, d.typeHandle);
-            if (!d.display.isEmpty()) b.withDisplayName(Component.literal(d.display));
+            b.withDisplayName(label(d));
             if (d.execFlow) b.withConnectorUI(PortConnectorUI.FLOW);
             b.build();
         }

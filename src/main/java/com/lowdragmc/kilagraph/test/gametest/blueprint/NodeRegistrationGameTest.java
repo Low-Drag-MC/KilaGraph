@@ -4,12 +4,16 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers;
 import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 import java.io.InputStream;
@@ -19,6 +23,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * The step between writing a node and being able to use one: that it is in the registry under the id
@@ -35,23 +41,17 @@ public final class NodeRegistrationGameTest {
     private static final String ID_OWNERSHIP = "node_registration_every_node_owns_its_id";
     private static final String NAMED_IN_BOTH = "node_registration_named_in_both_languages";
     private static final String SAME_KEYS = "node_registration_languages_cover_the_same_keys";
+    private static final String PIN_KEYS = "node_registration_pin_keys_keep_their_translations";
 
     /**
-     * The nodes v26.1.0.15 added. A list rather than a count of the registry, because the interesting
+     * The nodes v26.2.0.16 added. A list rather than a count of the registry, because the interesting
      * failure is "the one just written is missing", and a total would only move when it did.
      */
     private static final String[] RECENT_NODES = {
-            "vector_to_vec2", "vector_to_vec3", "vector_to_vec4",
-
-            "math_wrap", "math_snap", "math_step", "math_smoothstep", "math_inverse_lerp",
-            "math_delta_angle", "math_move_towards", "math_nearly_equals", "math_wave",
-
-            "vector_direction_to", "vector_set_length", "vector_slerp", "vector_perpendicular",
-            "vector_wrap",
-
-            "quat_identity", "quat_from_axis_angle", "quat_from_euler", "quat_to_euler",
-            "quat_from_to", "quat_multiply", "quat_inverse", "quat_normalize", "quat_slerp",
-            "quat_rotate_vector", "quat_angle_between", "quat_to_vec4", "quat_from_vec4",
+            "mc_nearest_entity",
+            "mc_damage_source_info", "mc_damage_source_is", "mc_make_damage_source",
+            "mc_damage_entity_with_source",
+            "mc_nbt_copy",
     };
 
     public static void registerFunctions() {
@@ -59,14 +59,17 @@ public final class NodeRegistrationGameTest {
         KGGameTests.registerFunction(ID_OWNERSHIP, NodeRegistrationGameTest::everyRegisteredNodeOwnsItsId);
         KGGameTests.registerFunction(NAMED_IN_BOTH, NodeRegistrationGameTest::everyRegisteredNodeIsNamedInBothLanguages);
         KGGameTests.registerFunction(SAME_KEYS, NodeRegistrationGameTest::theTwoLanguagesCoverTheSameKeys);
+        KGGameTests.registerFunction(PIN_KEYS, NodeRegistrationGameTest::everyPinKeyThatShadowedALangKeyIsTranslated);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         var data = KGGameTests.defaultTestData(environment);
-        for (String p : new String[]{RECENT_IN_LIBRARY, ID_OWNERSHIP, NAMED_IN_BOTH, SAME_KEYS}) {
+        for (String p : new String[]{RECENT_IN_LIBRARY, ID_OWNERSHIP, NAMED_IN_BOTH, SAME_KEYS, PIN_KEYS}) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), data);
         }
     }
+
+    private static final String PIN_KEY = "kg.pin.";
 
     private NodeRegistrationGameTest() {
     }
@@ -90,8 +93,8 @@ public final class NodeRegistrationGameTest {
             return;
         }
 
-        if (RECENT_NODES.length != 30) {
-            helper.fail("expected 30 recent nodes, the list has " + RECENT_NODES.length);
+        if (RECENT_NODES.length != 6) {
+            helper.fail("expected 6 recent nodes, the list has " + RECENT_NODES.length);
             return;
         }
         helper.succeed();
@@ -172,6 +175,62 @@ public final class NodeRegistrationGameTest {
                     + onlyEn.subList(0, Math.min(8, onlyEn.size()))
                     + ", " + onlyZh.size() + " only in zh_cn "
                     + onlyZh.subList(0, Math.min(8, onlyZh.size())));
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A pin id that is also a bare lang key was labelled by it before {@code kg.pin.<id>}, so it needs a pin key in
+     * both languages to keep that translation; and no pin key is dead.
+     */
+    public static void everyPinKeyThatShadowedALangKeyIsTranslated(GameTestHelper helper) {
+        JsonObject en = lang(helper, "en_us");
+        JsonObject zh = lang(helper, "zh_cn");
+        if (en == null || zh == null) return;
+
+        Set<String> pinIds = new TreeSet<>();
+        int checked = 0;
+        int unspawnable = 0;
+        for (Class<? extends Node> cls : BlueprintGraph.NODE_REGISTRY.getNodeClasses()) {
+            NodeModel model;
+            try {
+                model = KGGameTestHelpers.addRegisteredNode(KGGameTestHelpers.newGraph(), cls);
+            } catch (Throwable t) {
+                unspawnable++;
+                continue;
+            }
+            if (model == null) continue;
+            checked++;
+            List<PortModel> ports = new ArrayList<>(model.getInputsById().values());
+            ports.addAll(model.getOutputsByDisplayOrder());
+            for (PortModel port : ports) {
+                if (port.getDisplayName().getContents() instanceof TranslatableContents contents
+                        && contents.getKey().startsWith(PIN_KEY)) {
+                    pinIds.add(contents.getKey().substring(PIN_KEY.length()));
+                }
+            }
+        }
+        if (unspawnable > checked || pinIds.isEmpty()) {
+            helper.fail("swept " + checked + " node classes (" + unspawnable + " unspawnable) and found "
+                    + pinIds.size() + " pin ids — fix spawning before trusting a pass");
+            return;
+        }
+
+        List<String> failures = new ArrayList<>();
+        for (String id : pinIds) {
+            if (!en.has(id) && !zh.has(id)) continue;
+            check(failures, en, "en_us", PIN_KEY + id, "shadows the bare key");
+            check(failures, zh, "zh_cn", PIN_KEY + id, "shadows the bare key");
+        }
+        for (String key : en.keySet()) {
+            if (key.startsWith(PIN_KEY) && !pinIds.contains(key.substring(PIN_KEY.length()))) {
+                failures.add(key + " labels no port");
+            }
+        }
+        if (!failures.isEmpty()) {
+            helper.fail(failures.size() + " pin key problem(s): "
+                    + String.join(" | ", failures.subList(0, Math.min(12, failures.size()))));
             return;
         }
         helper.succeed();

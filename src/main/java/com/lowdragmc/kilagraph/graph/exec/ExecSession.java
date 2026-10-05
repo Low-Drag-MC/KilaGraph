@@ -291,6 +291,8 @@ public final class ExecSession {
         while (true) {
             if (stack.isEmpty()) {
                 state = State.FINISHED;
+                // a read after the flow sees what its last step wrote
+                rootScope.stalePulled();
                 return null;
             }
             ExecFrame top = stack.peek();
