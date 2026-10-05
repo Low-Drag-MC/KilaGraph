@@ -7,6 +7,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.mc.action.WorldEffectNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.component.DataComponentNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.container.ContainerNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.EntityCastNodes;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.world.WorldQueryNodes;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
@@ -32,6 +33,7 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.joml.Vector2f;
+import org.joml.Vector3f;
 import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.TestData;
@@ -61,6 +63,7 @@ public final class McCoverageGameTest {
     private static final String ENTITY_CASTS = "mc_coverage_entity_casts";
     private static final String ENTITY_CONTAINER = "mc_coverage_entity_container";
     private static final String NEAREST_PLAYER = "mc_coverage_nearest_player";
+    private static final String NEAREST_ENTITY = "mc_coverage_nearest_entity";
     private static final String FLUID_COMPONENTS = "mc_coverage_fluid_components";
     private static final String GIVE_ITEM_AND_SEND_MESSAGE = "mc_coverage_give_item_and_send_message";
 
@@ -68,6 +71,7 @@ public final class McCoverageGameTest {
         KGGameTests.registerFunction(ENTITY_CASTS, McCoverageGameTest::entityCasts);
         KGGameTests.registerFunction(ENTITY_CONTAINER, McCoverageGameTest::entityContainer);
         KGGameTests.registerFunction(NEAREST_PLAYER, McCoverageGameTest::nearestPlayer);
+        KGGameTests.registerFunction(NEAREST_ENTITY, McCoverageGameTest::nearestEntity);
         KGGameTests.registerFunction(FLUID_COMPONENTS, McCoverageGameTest::fluidComponents);
         KGGameTests.registerFunction(GIVE_ITEM_AND_SEND_MESSAGE, McCoverageGameTest::giveItemAndSendMessage);
     }
@@ -75,7 +79,7 @@ public final class McCoverageGameTest {
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
-                ENTITY_CASTS, ENTITY_CONTAINER, NEAREST_PLAYER,
+                ENTITY_CASTS, ENTITY_CONTAINER, NEAREST_PLAYER, NEAREST_ENTITY,
                 FLUID_COMPONENTS, GIVE_ITEM_AND_SEND_MESSAGE
         }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
@@ -175,6 +179,64 @@ public final class McCoverageGameTest {
         assertFalse(helper, "a zero radius finds nothing",
                 probe(level, WorldQueryNodes.NearestPlayer.class, "pos", where, "radius", 0.0)
                         .eval("found", Boolean.class));
+        helper.succeed();
+    }
+
+    /**
+     * The nearest entity to a point: the closest one wins, the excluded one and the non-living are
+     * skipped when asked, the radius is a sphere, and an empty radius is an honest miss.
+     */
+    public static void nearestEntity(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        // the asker at (1, 2, 1); a boat one block off, a pig two blocks off, another pig five off
+        Entity asker = helper.spawn(EntityType.ARMOR_STAND, new BlockPos(1, 2, 1));
+        Entity boat = helper.spawn(EntityType.OAK_BOAT, new BlockPos(2, 2, 1));
+        Entity near = helper.spawn(EntityType.PIG, new BlockPos(3, 2, 1));
+        Entity far = helper.spawn(EntityType.PIG, new BlockPos(6, 2, 1));
+        // ⚠️ GameTests run millions of blocks out, where a float is a whole block wide: the centre is
+        // the asker's position rounded, so distances are measured from it rather than assumed
+        var at = new Vector3f((float) asker.getX(), (float) asker.getY(), (float) asker.getZ());
+
+        var living = probe(level, NearestEntityNode.class,
+                "center", at, "radius", 8.0, "exclude", asker, "livingOnly", true);
+        assertTrue(helper, "something living is within eight blocks", living.eval("found", Boolean.class));
+        assertEq(helper, "the near pig, not the asker and not the boat", near, living.eval("out", Object.class));
+        assertEq(helper, "about two blocks away", (float) Math.sqrt(near.distanceToSqr(at.x, at.y, at.z)),
+                living.eval("distance", Double.class).floatValue(), 0.01f);
+
+        var anything = probe(level, NearestEntityNode.class,
+                "center", at, "radius", 8.0, "exclude", asker, "livingOnly", false);
+        assertEq(helper, "with the living-only switch off the boat is closer", boat, anything.eval("out", Object.class));
+
+        var unexcluded = probe(level, NearestEntityNode.class,
+                "center", at, "radius", 8.0, "livingOnly", true);
+        assertEq(helper, "with nothing excluded the asker finds itself", asker, unexcluded.eval("out", Object.class));
+
+        // a sphere: from three blocks up, the far pig (about five along) sits inside the search box but
+        // outside the sphere once the near one is gone — the radius is picked halfway between the two
+        near.discard();
+        var above = new Vector3f(at.x, at.y + 3f, at.z);
+        double reach = Math.sqrt(far.distanceToSqr(above.x, above.y, above.z));
+        double boxReach = Math.max(Math.abs(far.getX() - above.x),
+                Math.max(Math.abs(far.getY() - above.y), Math.abs(far.getZ() - above.z)));
+        double radius = (reach + boxReach) / 2;
+        var sphere = probe(level, NearestEntityNode.class,
+                "center", above, "radius", radius, "exclude", asker, "livingOnly", true);
+        assertFalse(helper, "five along and three up is about 5.83 away: outside the sphere though inside its box",
+                sphere.eval("found", Boolean.class));
+        assertEq(helper, "and the distance reads the radius", (float) radius,
+                sphere.eval("distance", Double.class).floatValue(), 0.01f);
+        assertEq(helper, "the far pig is still there for a wider search", far,
+                probe(level, NearestEntityNode.class,
+                        "center", at, "radius", 8.0, "exclude", asker, "livingOnly", true).eval("out", Object.class));
+
+        assertFalse(helper, "a zero radius finds nothing",
+                probe(level, NearestEntityNode.class,
+                        "center", at, "radius", 0.0).eval("found", Boolean.class));
+        // null rather than unwired: an unwired VEC3 pin reads as the origin
+        assertFalse(helper, "and no centre finds nothing",
+                probe(level, NearestEntityNode.class,
+                        "center", null, "radius", 8.0).eval("found", Boolean.class));
         helper.succeed();
     }
 
