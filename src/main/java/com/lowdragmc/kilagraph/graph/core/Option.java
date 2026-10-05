@@ -26,5 +26,6 @@ public @interface Option {
     /** Option id. Defaults to the annotated field's name. */
     String name() default "";
 
+    /** The label, as {@link InputPort#display()}. */
     String display() default "";
 }
