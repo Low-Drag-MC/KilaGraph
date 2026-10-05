@@ -115,7 +115,9 @@ public final class MixedWorkloadGameTest {
                 trace.countByLabel("GreaterThanNode") >= 4);
         assertTrue(helper, "the loop ran four iterations",
                 trace.countByLabel("MaxNode") == 4);
-        assertTrue(helper, "the vector stage ran", trace.countByLabel("Length") == 1);
+        // twice: `len` is read by two exec nodes — setTag through the NBT stage, setLabel through the
+        // string stage — and a pure node is worked out for each exec node that reads it
+        assertTrue(helper, "the vector stage ran", trace.countByLabel("Length") == 2);
         assertTrue(helper, "the NBT stage ran", trace.countByLabel("NbtSetNode") == 3);
         assertTrue(helper, "the string stage ran", trace.countByLabel("FormatNode") == 1);
         helper.succeed();

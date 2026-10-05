@@ -31,7 +31,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * executor observes that mutation. Verifies exec-flow and the variable store share one environment.
  */
 public final class ExecVarInteractionGameTest {
-    private static final String A_VARIABLE_READ_IS_MEMOISED_UNTIL_CLEAR_CACHE = "exec_var_interaction_a_variable_read_is_memoised_until_clear_cache";
+    private static final String A_VARIABLE_READ_GOES_STALE_WHEN_THE_FLOW_STEPS = "exec_var_interaction_a_variable_read_goes_stale_when_the_flow_steps";
     private static final String REMOVING_A_VARIABLE_RESTORES_ITS_DEFAULT = "exec_var_interaction_removing_a_variable_restores_its_default";
     private static final String EXEC_SET_THEN_DATA_READ = "exec_set_then_data_read";
     private static final String EXEC_SET_THEN_RUN_OUTPUTS = "exec_set_then_run_outputs";
@@ -41,7 +41,7 @@ public final class ExecVarInteractionGameTest {
 
     public static void registerFunctions() {
         KGGameTests.registerFunction(EXEC_SET_THEN_DATA_READ, ExecVarInteractionGameTest::execSetThenDataRead);
-        KGGameTests.registerFunction(A_VARIABLE_READ_IS_MEMOISED_UNTIL_CLEAR_CACHE, ExecVarInteractionGameTest::aVariableReadIsMemoisedUntilClearCache);
+        KGGameTests.registerFunction(A_VARIABLE_READ_GOES_STALE_WHEN_THE_FLOW_STEPS, ExecVarInteractionGameTest::aVariableReadGoesStaleWhenTheFlowSteps);
         KGGameTests.registerFunction(REMOVING_A_VARIABLE_RESTORES_ITS_DEFAULT, ExecVarInteractionGameTest::removingAVariableRestoresItsDefault);
         KGGameTests.registerFunction(EXEC_SET_THEN_RUN_OUTPUTS, ExecVarInteractionGameTest::execSetThenRunOutputs);
     }
@@ -49,7 +49,7 @@ public final class ExecVarInteractionGameTest {
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
-                EXEC_SET_THEN_DATA_READ, A_VARIABLE_READ_IS_MEMOISED_UNTIL_CLEAR_CACHE, REMOVING_A_VARIABLE_RESTORES_ITS_DEFAULT,
+                EXEC_SET_THEN_DATA_READ, A_VARIABLE_READ_GOES_STALE_WHEN_THE_FLOW_STEPS, REMOVING_A_VARIABLE_RESTORES_ITS_DEFAULT,
                 EXEC_SET_THEN_RUN_OUTPUTS
         }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
@@ -83,19 +83,11 @@ public final class ExecVarInteractionGameTest {
     }
 
     /**
-     * A variable read is memoised for the whole generation: a {@code SetVar} later in the same run
-     * does <em>not</em> invalidate a read that already happened. {@code clearCache()} is the
-     * invalidation point — which is exactly why {@code LoopController.beginIteration} calls it, so
-     * each iteration re-reads its accumulator.
-     *
-     * <p>Pinned because it is invisible to any value assertion until a graph reads a variable both
-     * before and after a write in one run, and because it is the semantic most at risk from a change
-     * to how variable reads are addressed: a cell or slot that made the second read see the store
-     * directly would silently change the meaning of every loop-carried accumulator in every existing
-     * graph. {@link #execSetThenDataRead} covers the other half — a first read after a write is
-     * fresh — and the two together fix the behaviour from both sides.</p>
+     * A variable read goes stale when the flow takes a step and is otherwise memoised until
+     * {@code clearCache()}: a store changed with no step in between is not seen by a read that already
+     * happened. {@link #execSetThenDataRead} covers a first read after a write.
      */
-    public static void aVariableReadIsMemoisedUntilClearCache(GameTestHelper helper) {
+    public static void aVariableReadGoesStaleWhenTheFlowSteps(GameTestHelper helper) {
         var b = KGGraphBuilder.blueprint();
         b.variable("x", int.class, 0, VariableKind.INPUT);
         b.add("read", AddNode.class).wire("read.in1", "x").constant("read.in2", 0f);
@@ -109,13 +101,13 @@ public final class ExecVarInteractionGameTest {
 
         assertEq(helper, "before the write", 0f, orNaN(exec.evaluate(readOut, Float.class)), 1e-5f);
         exec.executeFrom(b.node("entry"));           // x = 21 in the store
-        assertEq(helper, "same generation still sees the memo", 0f,
+        assertEq(helper, "the flow stepped, so the read is fresh", 21f,
                 orNaN(exec.evaluate(readOut, Float.class)), 1e-5f);
-        assertEq(helper, "the store really was written", 21f,
-                num(exec.getEnvironment().variables().get("x")), 1e-5f);
+        exec.getEnvironment().variables().put("x", 5);
+        assertEq(helper, "a store changed with no step is not seen by the memo", 21f,
+                orNaN(exec.evaluate(readOut, Float.class)), 1e-5f);
         exec.clearCache();
-        assertEq(helper, "after clearCache the read is fresh", 21f,
-                orNaN(exec.evaluate(readOut, Float.class)), 1e-5f);
+        assertEq(helper, "until clearCache", 5f, orNaN(exec.evaluate(readOut, Float.class)), 1e-5f);
         helper.succeed();
     }
 
@@ -160,10 +152,6 @@ public final class ExecVarInteractionGameTest {
 
     private static float orNaN(Float v) {
         return v == null ? Float.NaN : v;
-    }
-
-    private static float num(Object o) {
-        return o instanceof Number n ? n.floatValue() : Float.NaN;
     }
 
     /** Entry → SetVar("y", 9); runOutputs() harvests OUTPUT var "y" from the env fallback. */

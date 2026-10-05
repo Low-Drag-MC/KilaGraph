@@ -164,8 +164,8 @@ public final class KGGraphFixtures {
      * {@code for i in 0..count-1: acc += i}, leaving the sum in the {@code acc} graph variable.
      *
      * <p>The body reads {@code acc} through its own node and writes it back, so each iteration
-     * depends on the previous one — which is what makes the per-iteration {@code clearCache()} part
-     * of the result rather than an implementation detail.</p>
+     * depends on the previous one — which is what makes the read going stale at each step part of
+     * the result rather than an implementation detail.</p>
      */
     public static KGGraphBuilder accumulatingLoop(int count) {
         var b = KGGraphBuilder.blueprint();
@@ -280,8 +280,9 @@ public final class KGGraphFixtures {
      * {@code writes} sequential {@code read → +1 → write} steps cycling over four graph variables —
      * the variable store under load, which nothing else measures.
      *
-     * <p>Each step reads through its own node, so a later step sees the value the earlier one wrote:
-     * a read is memoised per node per generation, not per variable.</p>
+     * <p>Each step reads through its own node. One read node would see the writes too — a read goes
+     * stale when the flow steps — but a node per step is the shape that measures the store, not the
+     * memo.</p>
      */
     public static KGGraphBuilder variablePingPong(int writes) {
         int vars = 4;
@@ -387,8 +388,7 @@ public final class KGGraphFixtures {
      *
      * <p>Every stage feeds the next, so a stage that silently stopped running changes a value the
      * test asserts rather than going unnoticed. The post-loop stage reads {@code total} through its
-     * <em>own</em> node ({@code totalAfter}) because the loop body's read is memoised for the last
-     * iteration — see {@link KGGraphBuilder#readAgain}.</p>
+     * own node ({@code totalAfter}) — see {@link KGGraphBuilder#readAgain}.</p>
      *
      * <p>Driven with {@code executeFrom(node("entry"))}. Shared with the benchmark suite so the
      * shape that is measured is the shape that is checked.</p>

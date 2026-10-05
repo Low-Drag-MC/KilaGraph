@@ -2,12 +2,19 @@ package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 
+import com.lowdragmc.kilagraph.blueprint.nodes.compare.LessThanNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.exec.ForEachNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.ForNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SequenceNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.exec.WhileNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.list.ListRemoveAtNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.math.SubtractNode;
+import com.lowdragmc.kilagraph.graph.exec.EvalTrace;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import net.minecraft.core.Holder;
@@ -17,7 +24,11 @@ import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import org.joml.Vector2f;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
+import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.newGraph;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputConstant;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
@@ -25,30 +36,267 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
 /**
  * Regression tests for exec-flow *semantics* (ordering + nesting), as opposed to per-node behaviour.
- * These pin down two correctness properties that the per-node tests don't exercise:
+ * These pin down correctness properties that the per-node tests don't exercise:
  *
  * <ol>
  *   <li><b>Sequence runs each output's chain to completion before the next</b> — not breadth-first
  *       interleaving.</li>
- *   <li><b>Nested loops: the inner loop body can read the outer loop's index</b> — the inner loop's
- *       cache invalidation must not destroy the outer loop's live index.</li>
+ *   <li><b>Nested loops: the inner loop body can read the outer loop's index</b> — the inner loop
+ *       must not destroy the outer loop's live index.</li>
+ *   <li><b>A pure node is worked out again for each exec node that reads it</b>, and once for everything
+ *       one exec node reads — Unreal's rule — in a loop body too, and for what a loop reads before its
+ *       next iteration and a host reads after the flow.</li>
  * </ol>
  */
 public final class ExecSemanticsGameTest {
     private static final String SEQUENCE_TO_COMPLETION = "exec_sequence_runs_to_completion";
     private static final String NESTED_FOR_OUTER_INDEX = "exec_nested_for_outer_index";
+    private static final String PURE_NODE_PER_EXEC_READER = "exec_pure_node_per_exec_reader";
+    private static final String PURE_NODE_ONCE_PER_READER = "exec_pure_node_once_per_reader";
+    private static final String VAR_READ_AFTER_WRITE = "exec_var_read_after_write_same_run";
+    private static final String PURE_READ_IN_LOOP_BODY = "exec_pure_read_in_loop_body";
+    private static final String FOR_REREADS_COUNT = "exec_for_rereads_count";
+    private static final String FOREACH_REREADS_LIST = "exec_foreach_rereads_list";
+    private static final String WHILE_SEES_BODY_WRITE = "exec_while_cond_sees_body_write";
+    private static final String READ_AFTER_FLOW = "exec_read_after_flow_sees_last_write";
 
     private ExecSemanticsGameTest() {}
 
     public static void registerFunctions() {
         KGGameTests.registerFunction(SEQUENCE_TO_COMPLETION, ExecSemanticsGameTest::sequenceToCompletion);
         KGGameTests.registerFunction(NESTED_FOR_OUTER_INDEX, ExecSemanticsGameTest::nestedForOuterIndex);
+        KGGameTests.registerFunction(PURE_NODE_PER_EXEC_READER, ExecSemanticsGameTest::aPureNodeIsWorkedOutAgainForEachExecNodeThatReadsIt);
+        KGGameTests.registerFunction(PURE_NODE_ONCE_PER_READER, ExecSemanticsGameTest::aPureNodeReadTwiceByOneExecNodeIsWorkedOutOnce);
+        KGGameTests.registerFunction(VAR_READ_AFTER_WRITE, ExecSemanticsGameTest::aVariableReadAfterAWriteInTheSameRunSeesIt);
+        KGGameTests.registerFunction(PURE_READ_IN_LOOP_BODY, ExecSemanticsGameTest::aPureReadInALoopBodyIsWorkedOutForEachExecNode);
+        KGGameTests.registerFunction(FOR_REREADS_COUNT, ExecSemanticsGameTest::aForReadsItsCountAgainBeforeEachIteration);
+        KGGameTests.registerFunction(FOREACH_REREADS_LIST, ExecSemanticsGameTest::aForEachReadsItsListAgainBeforeEachIteration);
+        KGGameTests.registerFunction(WHILE_SEES_BODY_WRITE, ExecSemanticsGameTest::aWhileConditionSeesItsBodysWrite);
+        KGGameTests.registerFunction(READ_AFTER_FLOW, ExecSemanticsGameTest::aReadAfterTheFlowSeesItsLastWrite);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         var d = KGGameTests.defaultTestData(environment);
         KGGameTests.registerFunctionTest(event, SEQUENCE_TO_COMPLETION, KGGameTests.functionKey(SEQUENCE_TO_COMPLETION), d);
         KGGameTests.registerFunctionTest(event, NESTED_FOR_OUTER_INDEX, KGGameTests.functionKey(NESTED_FOR_OUTER_INDEX), d);
+        KGGameTests.registerFunctionTest(event, PURE_NODE_PER_EXEC_READER, KGGameTests.functionKey(PURE_NODE_PER_EXEC_READER), d);
+        KGGameTests.registerFunctionTest(event, PURE_NODE_ONCE_PER_READER, KGGameTests.functionKey(PURE_NODE_ONCE_PER_READER), d);
+        KGGameTests.registerFunctionTest(event, VAR_READ_AFTER_WRITE, KGGameTests.functionKey(VAR_READ_AFTER_WRITE), d);
+        KGGameTests.registerFunctionTest(event, PURE_READ_IN_LOOP_BODY, KGGameTests.functionKey(PURE_READ_IN_LOOP_BODY), d);
+        KGGameTests.registerFunctionTest(event, FOR_REREADS_COUNT, KGGameTests.functionKey(FOR_REREADS_COUNT), d);
+        KGGameTests.registerFunctionTest(event, FOREACH_REREADS_LIST, KGGameTests.functionKey(FOREACH_REREADS_LIST), d);
+        KGGameTests.registerFunctionTest(event, WHILE_SEES_BODY_WRITE, KGGameTests.functionKey(WHILE_SEES_BODY_WRITE), d);
+        KGGameTests.registerFunctionTest(event, READ_AFTER_FLOW, KGGameTests.functionKey(READ_AFTER_FLOW), d);
+    }
+
+    /**
+     * <pre>
+     * Entry → SetVar(a ← shared) → SetVar(b ← shared)        shared = 2 + 3
+     * </pre>
+     * Two exec nodes read one pure node: it is worked out for each, as Unreal does.
+     */
+    public static void aPureNodeIsWorkedOutAgainForEachExecNodeThatReadsIt(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.add("entry", EntryNode.class);
+        b.add("shared", AddNode.class).constant("shared.in1", 2f).constant("shared.in2", 3f);
+        b.add("setA", SetVarNode.class).option("setA", "varName", "a").wire("setA.value", "shared");
+        b.add("setB", SetVarNode.class).option("setB", "varName", "b").wire("setB.value", "shared");
+        b.then("entry", "setA", "setB");
+
+        var exec = new GraphExecutor(b.graph());
+        var trace = new EvalTrace();
+        exec.setTrace(trace);
+        exec.executeFrom(b.node("entry"));
+        assertEq(helper, "worked out once for each reader", 2, trace.evalCount(b.node("shared").getUid()));
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * Entry → SetVar(a ← both)        both = shared + shared
+     * </pre>
+     * One exec node reading a pure node twice has it worked out once for both reads.
+     */
+    public static void aPureNodeReadTwiceByOneExecNodeIsWorkedOutOnce(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.add("entry", EntryNode.class);
+        b.add("shared", AddNode.class).constant("shared.in1", 2f).constant("shared.in2", 3f);
+        b.add("both", AddNode.class).wire("both.in1", "shared").wire("both.in2", "shared");
+        b.add("setA", SetVarNode.class).option("setA", "varName", "a").wire("setA.value", "both");
+        b.then("entry", "setA");
+
+        var exec = new GraphExecutor(b.graph());
+        var trace = new EvalTrace();
+        exec.setTrace(trace);
+        exec.executeFrom(b.node("entry"));
+        assertEq(helper, "worked out once", 1, trace.evalCount(b.node("shared").getUid()));
+        Object a = exec.getEnvironment().variables().get("a");
+        assertEq(helper, "and read twice", 10f, a instanceof Number n ? n.floatValue() : Float.NaN, 1e-5f);
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * Entry → SetVar(x ← 1) → SetVar(seen1 ← x) → SetVar(x ← 2) → SetVar(seen2 ← x)
+     * </pre>
+     * One get-node for {@code x}, read on both sides of a write in one run: the second read sees the write,
+     * because a read is worked out again for the exec node that asks.
+     */
+    public static void aVariableReadAfterAWriteInTheSameRunSeesIt(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.variable("x", int.class, 0, VariableKind.INPUT);
+        b.add("entry", EntryNode.class);
+        b.add("one", AddNode.class).constant("one.in1", 1f).constant("one.in2", 0f);
+        b.add("two", AddNode.class).constant("two.in1", 2f).constant("two.in2", 0f);
+        b.add("setX1", SetVarNode.class).option("setX1", "varName", "x").wire("setX1.value", "one");
+        b.add("seen1", SetVarNode.class).option("seen1", "varName", "seen1").wire("seen1.value", "x");
+        b.add("setX2", SetVarNode.class).option("setX2", "varName", "x").wire("setX2.value", "two");
+        b.add("seen2", SetVarNode.class).option("seen2", "varName", "seen2").wire("seen2.value", "x");
+        b.then("entry", "setX1", "seen1", "setX2", "seen2");
+
+        var exec = new GraphExecutor(b.graph());
+        exec.executeFrom(b.node("entry"));
+        var vars = exec.getEnvironment().variables();
+        assertEq(helper, "the first read sees the first write", 1f,
+                vars.get("seen1") instanceof Number n ? n.floatValue() : Float.NaN, 1e-5f);
+        assertEq(helper, "the second read, after the second write, sees that", 2f,
+                vars.get("seen2") instanceof Number n ? n.floatValue() : Float.NaN, 1e-5f);
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * Entry → For(3) body → SetVar(acc ← inc) → SetVar(out ← inc)        inc = acc + 1
+     * </pre>
+     * The rule holds inside a loop body, which nothing clears between iterations any more: each exec node
+     * works {@code inc} out for itself, so {@code out} is read after the write — 4, not 3.
+     */
+    public static void aPureReadInALoopBodyIsWorkedOutForEachExecNode(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.variable("acc", float.class, 0f, VariableKind.INPUT);
+        b.add("entry", EntryNode.class);
+        b.add("loop", ForNode.class).constant("loop.count", 3);
+        b.add("inc", AddNode.class).wire("inc.in1", "acc").constant("inc.in2", 1f);
+        b.add("setAcc", SetVarNode.class).option("setAcc", "varName", "acc").wire("setAcc.value", "inc");
+        b.add("setOut", SetVarNode.class).option("setOut", "varName", "out").wire("setOut.value", "inc");
+        b.wire("loop.in", "entry");
+        b.wire("setAcc.trigger", "loop.body");
+        b.then("setAcc", "setOut");
+
+        var exec = new GraphExecutor(b.graph());
+        exec.executeFrom(b.node("entry"));
+        var vars = exec.getEnvironment().variables();
+        assertEq(helper, "three iterations", 3f, number(vars.get("acc")), 1e-5f);
+        assertEq(helper, "the second reader saw the first one's write", 4f, number(vars.get("out")), 1e-5f);
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * Entry → For(count ← n) body → SetVar(n ← n - 1) → SetVar(runs ← runs + 1)        n = 4
+     * </pre>
+     * The count is read again before each iteration, as Unreal's {@code ForLoop} compares against
+     * {@code LastIndex} on every pass: 0 &lt; 4, 1 &lt; 3, 2 &lt; 2 stops — two runs, not four.
+     */
+    public static void aForReadsItsCountAgainBeforeEachIteration(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.variable("n", float.class, 4f, VariableKind.INPUT);
+        b.variable("runs", float.class, 0f, VariableKind.INPUT);
+        b.add("entry", EntryNode.class);
+        b.add("loop", ForNode.class).wire("loop.count", "n");
+        b.add("less", SubtractNode.class).wire("less.a", "n").constant("less.b", 1f);
+        b.add("setN", SetVarNode.class).option("setN", "varName", "n").wire("setN.value", "less");
+        b.add("more", AddNode.class).wire("more.in1", "runs").constant("more.in2", 1f);
+        b.add("setRuns", SetVarNode.class).option("setRuns", "varName", "runs").wire("setRuns.value", "more");
+        b.wire("loop.in", "entry");
+        b.wire("setN.trigger", "loop.body");
+        b.then("setN", "setRuns");
+
+        var exec = new GraphExecutor(b.graph());
+        exec.executeFrom(b.node("entry"));
+        assertEq(helper, "the loop saw its count shrink", 2f,
+                number(exec.getEnvironment().variables().get("runs")), 1e-5f);
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * Entry → ForEach(list ← L) body → SetVar(L ← RemoveAt(L, 0)) → SetVar(runs ← runs + 1)        L = [1, 2, 3]
+     * </pre>
+     * The list is read again before each iteration, as Unreal's {@code ForEachLoop} takes the array's length
+     * on every pass: index 0 of three, index 1 of two, index 2 of one stops — two runs.
+     */
+    public static void aForEachReadsItsListAgainBeforeEachIteration(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.variable("L", List.class, null, VariableKind.INPUT);
+        b.variable("runs", float.class, 0f, VariableKind.INPUT);
+        b.add("entry", EntryNode.class);
+        b.add("loop", ForEachNode.class).wire("loop.list", "L");
+        b.add("rest", ListRemoveAtNode.class).wire("rest.list", "L").constant("rest.index", 0);
+        b.add("setL", SetVarNode.class).option("setL", "varName", "L").wire("setL.value", "rest");
+        b.add("more", AddNode.class).wire("more.in1", "runs").constant("more.in2", 1f);
+        b.add("setRuns", SetVarNode.class).option("setRuns", "varName", "runs").wire("setRuns.value", "more");
+        b.wire("loop.in", "entry");
+        b.wire("setL.trigger", "loop.body");
+        b.then("setL", "setRuns");
+
+        var exec = new GraphExecutor(b.graph());
+        exec.getEnvironment().variables().put("L", new ArrayList<>(List.of(1, 2, 3)));
+        exec.executeFrom(b.node("entry"));
+        assertEq(helper, "the loop saw its list shrink", 2f,
+                number(exec.getEnvironment().variables().get("runs")), 1e-5f);
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * Entry → While(cond ← n &lt; 3) body → SetVar(n ← n + 1)
+     * </pre>
+     * One get-node for {@code n} feeds both the condition and the body. The condition is read after the
+     * body's last step, so it sees the write: three passes, then out.
+     */
+    public static void aWhileConditionSeesItsBodysWrite(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.variable("n", float.class, 0f, VariableKind.INPUT);
+        b.add("entry", EntryNode.class);
+        b.add("below", LessThanNode.class).wire("below.a", "n").constant("below.b", 3f);
+        b.add("loop", WhileNode.class).option("loop", "maxIterations", 100).wire("loop.cond", "below");
+        b.add("inc", AddNode.class).wire("inc.in1", "n").constant("inc.in2", 1f);
+        b.add("setN", SetVarNode.class).option("setN", "varName", "n").wire("setN.value", "inc");
+        b.wire("loop.in", "entry");
+        b.wire("setN.trigger", "loop.body");
+
+        var exec = new GraphExecutor(b.graph());
+        exec.executeFrom(b.node("entry"));
+        assertEq(helper, "stopped when the condition read the third write", 3f,
+                number(exec.getEnvironment().variables().get("n")), 1e-5f);
+        helper.succeed();
+    }
+
+    /**
+     * <pre>
+     * Entry → SetVar(x ← inc)        inc = x + 1, then read x and inc from outside
+     * </pre>
+     * A read after the flow is a new one: it sees what the last step wrote rather than what that step
+     * pulled on its way in.
+     */
+    public static void aReadAfterTheFlowSeesItsLastWrite(GameTestHelper helper) {
+        var b = KGGraphBuilder.blueprint();
+        b.variable("x", float.class, 0f, VariableKind.INPUT);
+        b.add("entry", EntryNode.class);
+        b.add("inc", AddNode.class).wire("inc.in1", "x").constant("inc.in2", 1f);
+        b.add("setX", SetVarNode.class).option("setX", "varName", "x").wire("setX.value", "inc");
+        b.then("entry", "setX");
+
+        var exec = new GraphExecutor(b.graph());
+        exec.executeFrom(b.node("entry"));
+        assertEq(helper, "x after the write", 1f, number(exec.evaluate(b.outputOf("x"), Object.class)), 1e-5f);
+        assertEq(helper, "inc worked out from it", 2f, number(exec.evaluate(b.outputOf("inc"), Object.class)), 1e-5f);
+        helper.succeed();
+    }
+
+    private static float number(Object value) {
+        return value instanceof Number n ? n.floatValue() : Float.NaN;
     }
 
     /**
@@ -114,7 +362,7 @@ public final class ExecSemanticsGameTest {
      *                    body → SetVar(seen = outerIndex)
      * </pre>
      * Each outer iteration runs the inner loop once, whose body reads the OUTER index. The last write
-     * must be outerIndex == 2. If the inner loop's clearCache destroys the outer index, seen reads
+     * must be outerIndex == 2. If the inner loop destroys the outer index, seen reads
      * null/0 → test fails.
      */
     public static void nestedForOuterIndex(GameTestHelper helper) {

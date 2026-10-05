@@ -40,6 +40,8 @@ public final class LoopFrame extends ExecFrame {
     }
 
     @Override boolean resume(ExecSession session) {
+        // what the controller reads (cond, count, list) must see the body's writes
+        scope.stalePulled();
         if (!breaking && controller.hasNext(scope)) {
             controller.beginIteration(scope);
             enqueueFlow(node, bodyOut);   // body runs in THIS frame

@@ -35,8 +35,8 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
  * written into the loop node's output slot when an iteration starts. Two properties follow, and both
  * are pinned here and in ExecSemanticsGameTest.nestedForOuterIndex:
  *
- *   - an enclosing loop's index survives a nested loop's clearCache(), because it is recomputed
- *     rather than stored;
+ *   - an enclosing loop's index survives a nested loop, because it is recomputed rather than
+ *     stored;
  *   - a loop's final index stays readable after it completes, which is what per-node state used to
  *     give and what a graph reading `index` on the `completed` path depends on.
  */
