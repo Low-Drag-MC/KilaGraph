@@ -20,15 +20,11 @@ import java.util.List;
  * in the numeric lane on the way out.</p>
  *
  * <p>What it must <b>not</b> do is write the index straight into the loop node's output slot: that
- * would make it a published value, which stays for the run, and the body reads it as a pull that goes
- * stale at each step and is worked out again from the controller.</p>
+ * would make it a published value, which stays for the run, rather than a pull re-read at each step.</p>
  *
- * <h2>What an iteration re-reads</h2>
- * Nothing is cleared between iterations — a pure read goes stale at every step anyway, and what an
- * exec node published (an event's parameters, say) has to stay readable in the body. What the loop
- * itself reads is read again before each iteration, as Unreal's loop macros do: {@code ForLoop}
- * compares against {@code LastIndex} and {@code ForEachLoop} takes the array's length and element on
- * every pass, so a body that changes what they were computed from changes the loop.
+ * <p>Nothing is cleared between iterations — a pure read goes stale at every step anyway, and what an
+ * exec node published has to stay readable in the body. What the loop itself reads is read again
+ * before each iteration, as Unreal's {@code ForLoop}/{@code ForEachLoop} do.</p>
  */
 public interface LoopController {
 

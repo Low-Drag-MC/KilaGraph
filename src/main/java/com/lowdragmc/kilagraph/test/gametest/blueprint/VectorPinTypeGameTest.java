@@ -11,6 +11,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.vector.VectorStructNodes;
 import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
 import com.lowdragmc.kilagraph.graph.type.Vectors;
 import com.lowdragmc.lowdraglib2.Platform;
+import com.lowdragmc.lowdraglib2.math.HDRColor;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
@@ -289,12 +290,12 @@ public final class VectorPinTypeGameTest {
         return addNode(newGraph(), cls).getOutputsById().get("out").getDataTypeHandle();
     }
 
-    /** A colour read as a vector is its red, green and blue, the intensity folded in — Unreal's Conv_LinearColorToVector. */
+    /** A colour read as a vector is its red, green and blue, the intensity folded in. */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void aColourReadAsAVectorIsItsRedGreenBlue(GameTestHelper helper) {
         assertVec(helper, "an HDR colour", new float[] {1f, 0.5f, 0.25f},
-                new com.lowdragmc.lowdraglib2.math.HDRColor(0.5f, 0.25f, 0.125f, 0.75f, 2f));
+                new HDRColor(0.5f, 0.25f, 0.125f, 0.75f, 2f));
         helper.succeed();
     }
 

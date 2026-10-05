@@ -137,12 +137,9 @@ public final class GraphExecutor {
     /**
      * Slots a pull worked out since the flow last took a step. The next step marks them stale, so a
      * pure node is worked out again for each exec node that reads it, and once for everything one exec
-     * node reads — Unreal's rule: its compiler inlines a pure node's code in front of each impure node
-     * that needs it ({@code KismetCompiler.cpp:2816-2900}). So a variable read after a {@code SetVar}
-     * sees the write. What an exec node published from {@code execute()} is not logged here and stays
-     * valid for the run; a pull with no flow ({@link #evaluate}) takes no step and keeps its whole memo.
-     * The end of a flow counts as a step, as do a loop deciding its next iteration and a subgraph's
-     * results being harvested: {@link #stalePulled}.
+     * node reads, as Unreal does — a variable read after a {@code SetVar} sees the write. What an exec
+     * node published from {@code execute()} is not logged and stays valid for the run; a pull with no
+     * flow ({@link #evaluate}) keeps its whole memo. See {@link #stalePulled} for what counts as a step.
      */
     private int[] pulled = EMPTY_STAMPS;
     private int pulledCount;
@@ -633,8 +630,7 @@ public final class GraphExecutor {
             throw new IllegalStateException("exec step for a node from a different prepared graph: "
                     + node.uid);
         }
-        // before anything this node pulls, the intrinsic path's included: the last node's pure reads
-        // are its own, and this one works them out again
+        // before this node pulls anything (intrinsics included): the last node's pure reads are not its own
         if (pulledCount > 0) stalePulled();
         if (!opt(Opt.EXEC_PRERESOLVE)) {
             // Measurement path only — see Opt.EXEC_PRERESOLVE. Same node back, same work as before.
@@ -1031,9 +1027,8 @@ public final class GraphExecutor {
      * consequence is a retained {@code Entity} or {@code ItemStack} rather than a wrong answer, and
      * an invariant that has to be argued from the whole program is not one worth relying on.
      * Logging every non-null store keeps it local: <b>if a slot holds a reference, it is in the
-     * log.</b> A null store needs no entry because there is nothing to release, and a slot that holds
-     * a reference already is in it — so a slot worked out again at every step of a long flow is logged
-     * once, not once per step.</p>
+     * log.</b> A null store needs no entry because there is nothing to release, and a slot that already
+     * holds a reference is already logged — so a slot re-evaluated at every step is logged once.</p>
      */
     void writeSlot(int slot, Object value) {
         kinds[slot] = KIND_OBJECT;
@@ -1196,8 +1191,7 @@ public final class GraphExecutor {
     private boolean ensureComputed(@Nullable PreparedGraph.Node owner, int slot) {
         if (owner == null || slot < 0) return false;
         if (stamps[slot] == generation) return true;
-        // An exec node pulled for an output it did not publish keeps the ones it did: they are neither
-        // overwritten (EvalContext#flush) nor logged to go stale with the pull.
+        // an exec node pulled for an output it did not publish keeps the ones it did (see notePulled)
         long current = currentOutputs(owner);
         // An acyclic graph cannot revisit a node that is already being evaluated, and the prepared
         // form already knows which it is — so the bookkeeping only runs where it can actually fire.
@@ -1233,7 +1227,8 @@ public final class GraphExecutor {
 
     /**
      * Log what a pull of {@code n} worked out, to go stale at the next step — see {@link #pulled}. Not
-     * the outputs that were {@code current} before it: an exec node's published ones stay for the run.
+     * the outputs that were {@code current} before it: an exec node's published ones stay for the run,
+     * and {@link EvalContext#flush} does not overwrite them either.
      */
     private void notePulled(PreparedGraph.Node n, long current) {
         // a constant reads the same whenever it is read
@@ -1249,9 +1244,8 @@ public final class GraphExecutor {
     }
 
     /**
-     * The flow took a step, or finished: what the pulls before worked out is worked out again when
-     * read. Also run before a loop decides its next iteration and before a subgraph's results are
-     * harvested — both read after the last step, and a read there is a new one.
+     * Marks what earlier pulls worked out as stale. Run before each exec step, when a flow finishes,
+     * before a loop decides its next iteration and before a subgraph's results are harvested.
      */
     void stalePulled() {
         for (int i = 0; i < pulledCount; i++) {
@@ -1970,7 +1964,7 @@ public final class GraphExecutor {
      */
     void finishSubgraph(PreparedGraph.Node node, CustomGraphModelImpl inner,
                         GraphExecutor childExec, ExecFrame parentFrame) {
-        // the harvest reads after the body's last step — a write there included
+        // the harvest reads after the body's last step, and must see its writes
         childExec.stalePulled();
         if (!opt(Opt.SUBGRAPH_PRERESOLVE)) {
             harvestSubgraphOutputs(node.subgraphNode, inner, childExec);
@@ -2247,8 +2241,7 @@ public final class GraphExecutor {
         stamps = EMPTY_STAMPS;
         written = EMPTY_STAMPS;
         writtenCount = 0;
-        // slot logs index the arrays just dropped: a flow finishing or a loop deciding before the
-        // next run would stale slots that are not there
+        // the slot logs index the arrays just dropped
         execWritten = EMPTY_STAMPS;
         execWrittenCount = 0;
         pulled = EMPTY_STAMPS;

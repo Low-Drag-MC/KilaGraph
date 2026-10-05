@@ -62,9 +62,8 @@ public final class Vectors {
      * vector wire reach any vector pin.</p>
      *
      * <p>A {@link Number} answers one component so that a scalar reaching a vector pin is arithmetic
-     * rather than zero; an {@link HDRColor} its red, green and blue as they are drawn (Unreal's
-     * {@code Conv_LinearColorToVector}); anything else answers three zeroes, which is the shape a
-     * Vector3 pin would have had anyway.</p>
+     * rather than zero; an {@link HDRColor} its red, green and blue, intensity included; anything else
+     * answers three zeroes, which is the shape a Vector3 pin would have had anyway.</p>
      */
     public static float[] components(Object raw) {
         if (raw instanceof Vector4f v) {

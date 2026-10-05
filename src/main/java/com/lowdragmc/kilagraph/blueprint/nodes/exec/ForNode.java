@@ -17,11 +17,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
  * Counted loop. Runs {@code body} while {@code index} is below {@code count}; on each iteration
  * {@code index} (data output) is the current index 0, 1, …. After the loop, fires {@code completed}.
  *
- * <p>{@code count} is read again before each iteration, as Unreal's {@code ForLoop} compares against
- * {@code LastIndex} on every pass: a body that changes what it is computed from changes the loop.</p>
- *
- * <p>The current index lives on the loop's controller rather than in the pull cache, and
- * {@link #evaluate} re-publishes it on demand — a read of it goes stale at each step like any pull.</p>
+ * <p>{@code count} is read again before each iteration, as Unreal's {@code ForLoop} does. The current
+ * index lives on the loop's controller and {@link #evaluate} re-publishes it on demand.</p>
  */
 @NodeAttribute(name = "exec_for", group = "exec", graphTypes = BlueprintGraph.class)
 public class ForNode extends AnnotatedNode {

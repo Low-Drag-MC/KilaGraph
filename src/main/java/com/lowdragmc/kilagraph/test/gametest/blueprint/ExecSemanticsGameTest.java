@@ -58,8 +58,7 @@ public final class ExecSemanticsGameTest {
      * <pre>
      * Entry → SetVar(a ← shared) → SetVar(b ← shared)        shared = 2 + 3
      * </pre>
-     * Two exec nodes read one pure node: it is worked out for each — Unreal inlines a pure node's code in
-     * front of every impure node that needs it ({@code KismetCompiler.cpp:2816-2900}).
+     * Two exec nodes read one pure node: it is worked out for each, as Unreal does.
      */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
@@ -83,8 +82,7 @@ public final class ExecSemanticsGameTest {
      * <pre>
      * Entry → SetVar(a ← both)        both = shared + shared
      * </pre>
-     * One exec node reading a pure node twice has it worked out once for both reads — Unreal gathers an
-     * impure node's pure inputs into a set before inlining them.
+     * One exec node reading a pure node twice has it worked out once for both reads.
      */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)

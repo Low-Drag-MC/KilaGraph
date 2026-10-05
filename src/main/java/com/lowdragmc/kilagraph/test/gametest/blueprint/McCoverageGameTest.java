@@ -8,6 +8,7 @@ import com.lowdragmc.kilagraph.blueprint.nodes.mc.action.WorldEffectNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.component.DataComponentNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.container.ContainerNodes;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.EntityCastNodes;
+import com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.mc.world.WorldQueryNodes;
 import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
@@ -36,6 +37,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.joml.Vector2f;
+import org.joml.Vector3f;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -176,46 +178,46 @@ public final class McCoverageGameTest {
         Entity far = helper.spawn(EntityType.PIG, new BlockPos(6, 2, 1));
         // ⚠️ GameTests run millions of blocks out, where a float is a whole block wide: the centre is
         // the asker's position rounded, so distances are measured from it rather than assumed
-        var at = new org.joml.Vector3f((float) asker.getX(), (float) asker.getY(), (float) asker.getZ());
+        var at = new Vector3f((float) asker.getX(), (float) asker.getY(), (float) asker.getZ());
 
-        var living = probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+        var living = probe(level, NearestEntityNode.class,
                 "center", at, "radius", 8.0, "exclude", asker, "livingOnly", true);
         assertTrue(helper, "something living is within eight blocks", living.eval("found", Boolean.class));
         assertEq(helper, "the near pig, not the asker and not the boat", near, living.eval("out", Object.class));
         assertEq(helper, "about two blocks away", (float) Math.sqrt(near.distanceToSqr(at.x, at.y, at.z)),
                 living.eval("distance", Double.class).floatValue(), 0.01f);
 
-        var anything = probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+        var anything = probe(level, NearestEntityNode.class,
                 "center", at, "radius", 8.0, "exclude", asker, "livingOnly", false);
         assertEq(helper, "with the living-only switch off the boat is closer", boat, anything.eval("out", Object.class));
 
-        var unexcluded = probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+        var unexcluded = probe(level, NearestEntityNode.class,
                 "center", at, "radius", 8.0, "livingOnly", true);
         assertEq(helper, "with nothing excluded the asker finds itself", asker, unexcluded.eval("out", Object.class));
 
         // a sphere: from three blocks up, the far pig (about five along) sits inside the search box but
         // outside the sphere once the near one is gone — the radius is picked halfway between the two
         near.discard();
-        var above = new org.joml.Vector3f(at.x, at.y + 3f, at.z);
+        var above = new Vector3f(at.x, at.y + 3f, at.z);
         double reach = Math.sqrt(far.distanceToSqr(above.x, above.y, above.z));
         double boxReach = Math.max(Math.abs(far.getX() - above.x),
                 Math.max(Math.abs(far.getY() - above.y), Math.abs(far.getZ() - above.z)));
         double radius = (reach + boxReach) / 2;
-        var sphere = probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+        var sphere = probe(level, NearestEntityNode.class,
                 "center", above, "radius", radius, "exclude", asker, "livingOnly", true);
         assertFalse(helper, "five along and three up is about 5.83 away: outside the sphere though inside its box",
                 sphere.eval("found", Boolean.class));
         assertEq(helper, "and the distance reads the radius", (float) radius,
                 sphere.eval("distance", Double.class).floatValue(), 0.01f);
         assertEq(helper, "the far pig is still there for a wider search", far,
-                probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+                probe(level, NearestEntityNode.class,
                         "center", at, "radius", 8.0, "exclude", asker, "livingOnly", true).eval("out", Object.class));
 
         assertFalse(helper, "a zero radius finds nothing",
-                probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+                probe(level, NearestEntityNode.class,
                         "center", at, "radius", 0.0).eval("found", Boolean.class));
         assertFalse(helper, "and no centre finds nothing",
-                probe(level, com.lowdragmc.kilagraph.blueprint.nodes.mc.entity.NearestEntityNode.class,
+                probe(level, NearestEntityNode.class,
                         "radius", 8.0).eval("found", Boolean.class));
         helper.succeed();
     }

@@ -122,14 +122,7 @@ public final class KGTypeHandles {
      * NeoForge's, which is also why every tank in the game that a graph might care about speaks it.
      */
     public static final TypeHandle FLUID_CONTAINER;
-    /**
-     * How something was hurt, as Minecraft's {@code DamageSource}: the damage type, who is responsible,
-     * what physically did it and where from.
-     *
-     * <p>Wire-only, like the other live-object handles — a source is built by
-     * {@code mc_make_damage_source} or handed in by whatever reported the damage, never authored as a
-     * literal. Its type lives in a datapack registry, so there is no value to default one to.</p>
-     */
+    /** Minecraft's {@code DamageSource}. Wire-only: its type lives in a datapack registry, so there is no default. */
     public static final TypeHandle DAMAGE_SOURCE;
     /**
      * NBT compound tag. LDLib2 has a {@code Tag} accessor and a {@code TagAccessor} widget, so unlike

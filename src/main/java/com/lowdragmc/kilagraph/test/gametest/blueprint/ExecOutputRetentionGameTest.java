@@ -233,7 +233,7 @@ public final class ExecOutputRetentionGameTest {
      * Entry → HalfPublisher → For(3) body → SetVar(acc ← acc + HalfPublisher.number)
      * </pre>
      * What an exec node published stays readable in a loop body, retention off: nothing is cleared between
-     * iterations. It used to be — every iteration fell through to {@code evaluate()}'s -1.
+     * iterations.
      */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)

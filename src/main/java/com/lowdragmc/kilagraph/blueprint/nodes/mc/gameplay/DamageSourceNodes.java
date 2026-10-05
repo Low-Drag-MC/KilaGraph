@@ -21,18 +21,9 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
 /**
- * Reading and building a {@code DamageSource} — how something was hurt.
- *
- * <h2>A source is a type and up to three things</h2>
- * Who is responsible ({@code entity}: the player who drew the bow), what physically did it
- * ({@code directEntity}: the arrow), where it came from, and a damage type that decides what armour,
- * enchantments and death messages make of it — through its tags ({@code minecraft:is_projectile},
- * {@code minecraft:bypasses_armor}). Hurting something with the right source is what gets the death
- * message, the aggro and the kill credit right; {@code mc_damage_entity} hurts with a generic source
- * from nobody.
- *
- * <p>Damage types are a datapack registry, like enchantments (see {@link EnchantmentNodes}), so
- * building a source resolves its type through a world.
+ * Reading and building a {@code DamageSource}: who is responsible ({@code entity}), what struck
+ * ({@code directEntity}), where from, and a damage type. Damage types are a datapack registry, like
+ * enchantments, so building a source resolves its type through a world.
  */
 public final class DamageSourceNodes {
 
@@ -41,13 +32,7 @@ public final class DamageSourceNodes {
     private DamageSourceNodes() {
     }
 
-    /**
-     * What a source says.
-     *
-     * <p>{@code position} is where the damage came from: the source's own position when it was made
-     * with one (an explosion with no entity behind it), otherwise where the direct entity is.
-     * {@code hasPosition} tells that apart from a source with neither.</p>
-     */
+    /** What a source says; {@code position} is its own position, else the direct entity's. */
     @NodeAttribute(name = "mc_damage_source_info", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Info extends AnnotatedNode {
         @Override
@@ -76,10 +61,7 @@ public final class DamageSourceNodes {
         }
     }
 
-    /**
-     * Whether a source's damage type is in a damage type tag — the game's own way of asking "is this
-     * fire", "is this a projectile", "does armour stop this". A tag id that does not exist is false.
-     */
+    /** Whether a source's damage type is in a damage type tag. A tag id that does not exist is false. */
     @NodeAttribute(name = "mc_damage_source_is", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Is extends AnnotatedNode {
         @Override
@@ -100,15 +82,9 @@ public final class DamageSourceNodes {
     }
 
     /**
-     * A source of a given damage type, from an entity.
-     *
-     * <p>{@code directEntity} left unwired is {@code entity} itself — a melee hit, where the one
-     * responsible is also the one that struck, which is what the game's own one-entity sources are.
-     * {@code position} is only used with {@code usePosition} on, because an unwired vector reads as the
-     * world's origin rather than as "none".
-     *
-     * <p>The world is only needed to resolve the type: the {@code level} input, else the world of
-     * whichever entity is given. {@code ok} is false for a type no loaded datapack defines.</p>
+     * A source of a given damage type, from an entity. {@code directEntity} defaults to {@code entity};
+     * {@code position} is only used with {@code usePosition} on, since an unwired vector reads as the origin.
+     * The type resolves through {@code level}, else the entity's world.
      */
     @NodeAttribute(name = "mc_make_damage_source", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class Make extends AnnotatedNode {

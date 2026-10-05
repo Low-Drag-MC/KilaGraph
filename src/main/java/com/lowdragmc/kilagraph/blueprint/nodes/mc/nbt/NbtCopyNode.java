@@ -9,10 +9,7 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 import net.minecraft.nbt.CompoundTag;
 
-/**
- * A deep copy of {@link CompoundTag} {@code tag} — for writing without touching the original, since the setters
- * write in place. A null input yields a fresh compound.
- */
+/** A deep copy of {@code tag}, since the setters write in place. A null input yields a fresh compound. */
 @NodeAttribute(name = "mc_nbt_copy", group = "mc/nbt", graphTypes = BlueprintGraph.class)
 public class NbtCopyNode extends AnnotatedNode {
     @Override

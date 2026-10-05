@@ -24,9 +24,8 @@ public @interface InputPort {
     String name() default "";
 
     /**
-     * The label: a lang key, or the text itself where no language has one. Empty: {@code kg.pin.<id>}, the id in words
-     * where no language has that — a key every node's port of that id shares, so name one here where yours means
-     * something else.
+     * The label: a lang key, or the text itself. Empty: {@code kg.pin.<id>}, shared by every port of that id, with the
+     * id in words as fallback.
      */
     String display() default "";
 

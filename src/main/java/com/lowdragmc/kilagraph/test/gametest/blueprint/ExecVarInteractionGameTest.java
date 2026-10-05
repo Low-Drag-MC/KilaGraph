@@ -65,17 +65,9 @@ public final class ExecVarInteractionGameTest {
     }
 
     /**
-     * A variable read goes stale when the flow takes a step — the {@code SetVar} that wrote it, here — and
-     * is otherwise memoised until {@code clearCache()}: a store changed with no step in between is not
-     * seen by a read that already happened. Unreal's rule, a pure read worked out again for each exec
-     * node ({@code ExecSemanticsGameTest.aVariableReadAfterAWriteInTheSameRunSeesIt} is the same inside
-     * one run).
-     *
-     * <p>⚠️ This used to pin the opposite — a read memoised for the whole generation, a later
-     * {@code SetVar} not seen — out of care for loop-carried accumulators. They keep their meaning: the
-     * read an accumulator's {@code SetVar} makes is worked out inside that {@code SetVar}'s own step, each
-     * iteration.
-     * {@link #execSetThenDataRead} covers a first read after a write.</p>
+     * A variable read goes stale when the flow takes a step and is otherwise memoised until
+     * {@code clearCache()}: a store changed with no step in between is not seen by a read that already
+     * happened. {@link #execSetThenDataRead} covers a first read after a write.
      */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)

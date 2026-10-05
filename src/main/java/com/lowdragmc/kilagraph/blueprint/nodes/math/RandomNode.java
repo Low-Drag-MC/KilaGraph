@@ -8,9 +8,8 @@ import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
 
 /**
- * Uniform float in {@code [min, max)} using the executor's shared RNG. One roll per evaluation: one
- * exec node reading it twice gets the same roll, and two exec nodes reading it get two — as Unreal's
- * pure {@code Random Float} does. A roll wanted twice goes through a variable.
+ * Uniform float in {@code [min, max)} using the executor's shared RNG. One exec node reading it twice gets
+ * one roll, two exec nodes get two, as Unreal's {@code Random Float} does.
  */
 @NodeAttribute(name = "math_random", group = "math", graphTypes = BlueprintGraph.class)
 public class RandomNode extends AnnotatedNode {

@@ -1766,7 +1766,7 @@
   "kg.node.rt_transform.example.1": "Tangent 到 World、类型选 Normal，就是「应用法线贴图」的标准做法：Sample Texture 2D 接 Normal Unpack 再接本节点，出来就是可以直接参与光照的世界空间法线。",
   "kg.node.rt_transform.note.1": "切线空间在两个方向上都不带平移 —— 它是绕表面点的旋转，所以 type 选项只决定链条的其余部分是否平移。",
   "kg.node.rt_transform.note.2": "这里的 Object 与 Position / Normal 节点上的含义一致：由渲染管线定义，因此 GPU 实例化管线会逐实例解析而不是取自绘制姿态矩阵 —— 此时法线改用逆转置变换。",
-  "kg.node.rt_transform.note.2": "Minecraft 没有切线顶点属性，Tangent 空间用的是推导出来的基。具体含义见 Tangent 节点。",
+  "kg.node.rt_transform.note.3": "Minecraft 没有切线顶点属性，Tangent 空间用的是推导出来的基。具体含义见 Tangent 节点。",
 
   "kg.node.rt_mat4_construct.tooltip": "由四个 vec4 列构造 mat4。",
   "kg.node.rt_mat4_construct.desc.1": "逐列拼装矩阵，与 GLSL 的列主序布局一致。",

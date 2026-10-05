@@ -16,6 +16,7 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -71,19 +72,16 @@ public final class EntityNodeGameTest {
         helper.succeed();
     }
 
-    /**
-     * An annotated port with no {@code display} is labelled by {@code kg.pin.<id>}, the id in words where no language
-     * has it — its own namespace, not the bare id LDLib2 falls back to, which any text drawn anywhere can hit (a
-     * montage section called "level" was a pin label).
-     */
+    /** An annotated port with no {@code display} is labelled by {@code kg.pin.<id>}, the id in words as fallback. */
     @GameTest(template = "empty")
     @PrefixGameTestTemplate(false)
     public static void anUndisplayedPortIsLabelledByItsPinKey(GameTestHelper helper) {
         var node = addNode(newGraph(), EntitiesInRadiusNode.class);
         var label = node.getInputsById().get("level").getDisplayName();
-        assertTrue(helper, "a translatable label, got " + label,
-                label.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents);
-        var contents = (net.minecraft.network.chat.contents.TranslatableContents) label.getContents();
+        if (!(label.getContents() instanceof TranslatableContents contents)) {
+            helper.fail("a translatable label, got " + label);
+            return;
+        }
         assertTrue(helper, "under kg.pin.<id>, got " + contents.getKey(), "kg.pin.level".equals(contents.getKey()));
         assertTrue(helper, "the id in words without a translation, got " + contents.getFallback(),
                 "Level".equals(contents.getFallback()));

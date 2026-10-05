@@ -20,9 +20,8 @@ import java.util.List;
 /**
  * Iterates a List, exposing {@code item} and {@code index} per iteration.
  *
- * <p>{@code list} is read again before each iteration, as Unreal's {@code ForEachLoop} takes the array's
- * length and element on every pass: a body that adds to or removes from it changes the loop, and a
- * list worked out by pure nodes is worked out again each time.</p>
+ * <p>{@code list} is read again before each iteration, as Unreal's {@code ForEachLoop} does, so a body
+ * that changes it changes the loop.</p>
  */
 @NodeAttribute(name = "exec_foreach", group = "exec", graphTypes = BlueprintGraph.class)
 public class ForEachNode extends AnnotatedNode {

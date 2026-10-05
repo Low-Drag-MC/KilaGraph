@@ -215,14 +215,7 @@ public final class EntityActionNodes {
         }
     }
 
-    /**
-     * Damages an entity with a given source.
-     *
-     * <p>What {@code mc_damage_entity} cannot say: who did it and how. The source's entity gets the death
-     * message, the kill credit and the victim's aggro, and its damage type decides what armour and
-     * enchantments make of the hit. Build one with {@code mc_make_damage_source}. {@code ok} is false
-     * under the same conditions as {@code mc_damage_entity}, and when there is no source.</p>
-     */
+    /** Damages an entity with a given source; {@code ok} is false as for {@code mc_damage_entity}, or with no source. */
     @NodeAttribute(name = "mc_damage_entity_with_source", group = GROUP, graphTypes = BlueprintGraph.class)
     public static class DamageEntityWithSource extends ActionNode {
         @Override

@@ -40,8 +40,7 @@ public final class LoopFrame extends ExecFrame {
     }
 
     @Override boolean resume(ExecSession session) {
-        // what the controller reads — While's cond, the count, the list — is read after the body's last
-        // step, and sees what it wrote
+        // what the controller reads (cond, count, list) must see the body's writes
         scope.stalePulled();
         if (!breaking && controller.hasNext(scope)) {
             controller.beginIteration(scope);

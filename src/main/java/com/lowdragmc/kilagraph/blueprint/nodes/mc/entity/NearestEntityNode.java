@@ -15,22 +15,8 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
 /**
- * The closest entity within {@code radius} blocks of {@code center}, if any.
- *
- * <p>The sibling of {@code mc_nearest_player} for everything else in the world: what a script asks
- * when it wants <i>the</i> thing to face, lunge at or follow rather than a list to walk. The centre is
- * the graph's vector, not a block position, because the caller is almost always an entity standing at
- * a fractional position and a block's centre would be off by up to half a block in every direction.
- *
- * <ul>
- *   <li>{@code exclude} is left out of the answer — wire the asking entity here, or the search finds
- *       the asker at distance zero;</li>
- *   <li>{@code livingOnly} keeps the answer to living entities (mobs, players, armour stands) and
- *       drops items, projectiles and vehicles;</li>
- *   <li>the dead and the removed are never returned;</li>
- *   <li>the radius is a sphere, not the box the level is asked for;</li>
- *   <li>{@code distance} is the distance to the entity found, or the radius when nothing was.</li>
- * </ul>
+ * The closest living (or, with {@code livingOnly} off, any) entity within a sphere of {@code radius} around
+ * {@code center}, skipping {@code exclude}. {@code distance} is the radius when nothing was found.
  */
 @NodeAttribute(name = "mc_nearest_entity", group = "mc/entity", graphTypes = BlueprintGraph.class)
 public class NearestEntityNode extends AnnotatedNode {

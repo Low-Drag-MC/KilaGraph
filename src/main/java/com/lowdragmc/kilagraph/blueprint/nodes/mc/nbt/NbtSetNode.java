@@ -17,12 +17,9 @@ import java.util.List;
  * Put a value into a {@link CompoundTag} under {@code key}, returning the tag. A null input tag yields a
  * fresh compound. The {@link NbtValueType} option types the {@code value} port.
  *
- * <p>In place by default: the tag it is given is the one written, and handed back — so setters chained
- * onto one tag, or branched off it, all write the one compound. {@code copy} writes into a copy instead and
- * leaves the input alone (NBT Copy does the same as a node of its own). ⚠️ A pure node is worked out again
- * for each exec node that reads it, so in place, a write the tag's own contents decide — a count read out of
- * it plus one — lands once per reader; that, or a tag that is a variable's or an entity's, is what
- * {@code copy} is for.</p>
+ * <p>In place by default: the tag it is given is the one written and handed back. {@code copy} writes into a
+ * copy instead. ⚠️ A pure node is worked out again for each exec node that reads it, so an in-place write
+ * computed from the tag itself (a count read out of it plus one) lands once per reader.</p>
  */
 // valueType MUST stay an option — see NbtGetNode: it drives the dynamic port's type, decided at
 // defineNode time, before any wire has a value.

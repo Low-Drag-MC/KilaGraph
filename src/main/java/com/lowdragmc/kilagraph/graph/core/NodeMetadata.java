@@ -134,29 +134,19 @@ final class NodeMetadata {
         }
     }
 
-    /**
-     * ⚠️ <b>Every builder is {@code build()}ed here, before this returns.</b> A port takes its place
-     * in the node's display order at the moment it is built, and a builder left unbuilt is finished
-     * off by {@code PortDefinitionContext.finish()} — which runs <b>after</b>
-     * {@code onDefineDynamicPorts}. Leaving them to it put every dynamic port <i>above</i> the
-     * declared ones, so an rpc entry's parameters sat on top of its {@code trigger} and the ordering
-     * this method's own loop exists to produce was thrown away for any node that has both.
-     */
-    /** Where an annotated port with no {@code display} of its own finds its label: {@code kg.pin.<id>}. */
-    static final String PIN_KEY = "kg.pin.";
+    private static final String PIN_KEY = "kg.pin.";
 
     /**
-     * A port's label: its {@code display} — a lang key, or the text itself — else {@code kg.pin.<id>}, one key every
-     * node's port of that id shares and namespaced so it catches no other string (the bare id LDLib2 falls back to is
-     * a key any text drawn anywhere can hit), shown as the id in words where no language has it.
+     * A port's label: its {@code display} (a lang key, or the text itself), else {@code kg.pin.<id>} with the id in
+     * words as fallback. Namespaced because the bare id LDLib2 falls back to can collide with any other lang key.
      */
-    static Component label(FieldDef d) {
+    private static Component label(FieldDef d) {
         return d.display.isEmpty() ? Component.translatableWithFallback(PIN_KEY + d.id, words(d.id))
                 : Component.translatableWithFallback(d.display, d.display);
     }
 
     /** {@code upwardsSpeed} → {@code Upwards Speed}, {@code optionalObject2} → {@code Optional Object 2}. */
-    static String words(String id) {
+    private static String words(String id) {
         StringBuilder out = new StringBuilder(id.length() + 8);
         for (int i = 0; i < id.length(); i++) {
             char c = id.charAt(i);
@@ -178,6 +168,14 @@ final class NodeMetadata {
         return out.toString().strip().replaceAll(" +", " ");
     }
 
+    /**
+     * ⚠️ <b>Every builder is {@code build()}ed here, before this returns.</b> A port takes its place
+     * in the node's display order at the moment it is built, and a builder left unbuilt is finished
+     * off by {@code PortDefinitionContext.finish()} — which runs <b>after</b>
+     * {@code onDefineDynamicPorts}. Leaving them to it put every dynamic port <i>above</i> the
+     * declared ones, so an rpc entry's parameters sat on top of its {@code trigger} and the ordering
+     * this method's own loop exists to produce was thrown away for any node that has both.
+     */
     private void applyPort(IPortDefinitionContext ctx, Node node, FieldDef d) {
         if (d.kind == Kind.INPUT_PORT) {
             IInputPortBuilder<?> b = ctx.addInputPort(d.id, d.typeHandle);
