@@ -48,6 +48,7 @@ public final class SceneCaptureManager {
     @Nullable private GpuSampler sampler;
     /** Lazily created FBO pair for the colour blit from Iris's colortex0 (freed in {@link #destroy()}). */
     private int blitReadFbo, blitDrawFbo;
+    private long irisColorCaptures;
 
     private SceneCaptureManager() {}
 
@@ -65,6 +66,11 @@ public final class SceneCaptureManager {
     /** Whether any live material needs the capture (so the mixin should run it). */
     public boolean isNeeded() {
         return users > 0;
+    }
+
+    /** How many captures took their colour from Iris's colortex0 rather than Minecraft's main target (diagnostics). */
+    public long irisColorCaptures() {
+        return irisColorCaptures;
     }
 
     /**
@@ -89,6 +95,7 @@ public final class SceneCaptureManager {
         // Any Iris-path failure falls back to the vanilla copy (worst case: stale colour, never a crash).
         int[] iris = IrisCompat.isShaderPackInUse() ? IrisCompat.irisColorTargetInfo() : null;
         boolean irisColorDone = iris != null && blitIrisColor(iris[0], iris[1], iris[2]);
+        if (irisColorDone) irisColorCaptures++;
         var encoder = RenderSystem.getDevice().createCommandEncoder();
         if (!irisColorDone) {
             ensureColor(w, h, mainColor.getFormat());
