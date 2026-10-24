@@ -8,10 +8,10 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 /**
- * Rewrites every shaderpack program's final GLSL before Iris compiles it. {@code createShader(name, type,
+ * Rewrites a shaderpack program's final GLSL before Iris compiles it. {@code createShader(name, type,
  * source)} is the single chokepoint all of Iris's programs (shaderpack / fallback / shadow) pass through,
  * so modifying its {@code source} argument here lets KilaGraph inject its surface logic (fragment) and
- * vertex displacement (vertex) into the shaderpack's own gbuffers programs (see {@link IrisShaderInjector}).
+ * vertex displacement (vertex) into the programs its geometry is drawn with (see {@link IrisShaderInjector}).
  *
  * <p>Applied only when Iris is present (gated by {@code IrisMixinPlugin}), so referencing Iris's
  * {@code ShaderType} enum here is safe — this class is only ever loaded to be applied to an Iris class.
@@ -25,9 +25,7 @@ public class MixinShaderCreator {
     private static String kilagraph$injectSource(String source,
                                                  @Local(argsOnly = true, ordinal = 0) String name,
                                                  @Local(argsOnly = true) ShaderType type) {
-        // The stage drives the dispatch: FRAGMENT -> surface-shading injection, VERTEX -> displacement
-        // read-hijack, anything else untouched. The name (e.g. gbuffers_entities) is only used for the
-        // one-shot diagnostic logs confirming the injection landed.
+        // The name (e.g. entities_solid) picks the programs to inject into; the stage what to inject.
         return IrisShaderInjector.inject(name, type == null ? "" : type.name(), source);
     }
 }

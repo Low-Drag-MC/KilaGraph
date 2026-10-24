@@ -86,6 +86,12 @@ public final class IrisCompat {
         return ENABLED && "OpenGL".equals(RenderSystem.getDevice().getDeviceInfo().backendName());
     }
 
+    /** Whether our geometry is drawn with the Iris program {@code programName}, the only programs our surfaces are
+     *  injected into. */
+    public static boolean drawsWith(String programName) {
+        return ENABLED && Api.PROGRAMS.contains(programName);
+    }
+
     /** Number of KilaGraph pipelines registered with Iris so far (diagnostics). */
     public static int assignedCount() {
         return ASSIGNED.size();
@@ -251,11 +257,12 @@ public final class IrisCompat {
         if (System.nanoTime() - IrisSurfaceRegistry.lastChangeNanos() < RELOAD_DEBOUNCE_NANOS) return;
         if (System.nanoTime() < retryBackoffUntilNanos) return; // cooling down after a failed attempt
         try {
+            long start = System.nanoTime();
             Api.reload();
             if (IrisShaderInjector.lastInjectedGeneration() >= generation) {
                 failedReloadAttempts = 0;
-                LOGGER.info("[KilaGraph][Iris] reloaded shaderpack to inject new surface(s) ({} live)",
-                        IrisSurfaceRegistry.snapshot().size());
+                LOGGER.info("[KilaGraph][Iris] reloaded shaderpack to inject new surface(s) ({} live) in {} ms",
+                        IrisSurfaceRegistry.snapshot().size(), (System.nanoTime() - start) / 1_000_000);
             } else if (Api.shaderPackInUse()) {
                 seamDead = true;
                 LOGGER.error("[KilaGraph][Iris] shaderpack reloaded but the injection seam never ran "
@@ -332,6 +339,9 @@ public final class IrisCompat {
                 net.irisshaders.iris.pipeline.programs.ShaderKey.ENTITIES_TRANSLUCENT;
         private static final net.irisshaders.iris.pipeline.programs.ShaderKey SHADOW =
                 net.irisshaders.iris.pipeline.programs.ShaderKey.SHADOW_ENTITIES_CUTOUT;
+        /** The names Iris compiles their programs under. */
+        static final Set<String> PROGRAMS = Set.of(SOLID.getName(), CUTOUT.getName(), TRANSLUCENT.getName(),
+                SHADOW.getName());
 
         static boolean shaderPackInUse() {
             return net.irisshaders.iris.api.v0.IrisApi.getInstance().isShaderPackInUse();

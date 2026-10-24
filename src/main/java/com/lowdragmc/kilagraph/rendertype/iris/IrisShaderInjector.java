@@ -17,8 +17,10 @@ import java.util.regex.Pattern;
  * <em>inside the shaderpack's own gbuffers program</em> — the only way to keep custom shading while a
  * shaderpack owns the gbuffer/lighting passes (see the project plan).
  *
- * <p>Iris compiles <b>one shared program per {@code ShaderKey}</b> (all terrain share one program, all
- * entities another, ...), so the injected code must be <b>conditional</b>: it is gated on a
+ * <p>Only the programs our geometry is drawn with are rewritten — those of the {@code ShaderKey}s
+ * {@code IrisCompat} assigns our pipelines to ({@link IrisCompat#drawsWith}); the pack's other programs (terrain,
+ * sky, text, ...) compile untouched. Iris compiles <b>one shared program per {@code ShaderKey}</b> (all
+ * entities of a key share one), so the injected code must be <b>conditional</b>: it is gated on a
  * {@code uniform int kg_surface_id} that the runtime sets (per draw, via GL) to a non-zero id only while
  * drawing our geometry, and resets to 0 afterwards. When {@code kg_surface_id == 0} the original
  * shaderpack behaviour is preserved bit-for-bit, so vanilla blocks/entities are never affected.</p>
@@ -119,8 +121,14 @@ public final class IrisShaderInjector {
      *  live registry advances past this (a new world graph appeared), the programs are stale and a shaderpack
      *  reload is needed to re-inject — see {@code IrisCompat.reloadShadersIfStale}. */
     private static volatile int lastInjectedGeneration = -1;
+    private static final Set<String> INJECTED_PROGRAMS = ConcurrentHashMap.newKeySet();
 
     private IrisShaderInjector() {}
+
+    /** The programs our surfaces have been injected into since the game started (diagnostics). */
+    public static Set<String> injectedPrograms() {
+        return Set.copyOf(INJECTED_PROGRAMS);
+    }
 
     /** The registry generation captured into the current shaderpack programs (see {@link #lastInjectedGeneration}). */
     public static int lastInjectedGeneration() {
@@ -130,7 +138,7 @@ public final class IrisShaderInjector {
     /**
      * Mixin entry point: inject into {@code source} and log (once per program {@code name}) whether the
      * injection landed — ground truth that our {@code ShaderCreator} mixin is actually rewriting the
-     * shaderpack's programs. {@code name} is the Iris program name (e.g. {@code gbuffers_entities});
+     * shaderpack's programs. {@code name} is the Iris program name (e.g. {@code entities_solid});
      * {@code typeName} is the Iris {@code ShaderType} enum name ({@code VERTEX}/{@code FRAGMENT}/...) — a
      * String so this class stays free of Iris types (unit-testable, soft-dep). Fragment sources get the
      * surface-shading injection, vertex sources the displacement read-hijack (see {@link #injectVertex});
@@ -146,6 +154,7 @@ public final class IrisShaderInjector {
         } catch (Throwable ignored) {
             // cache invalidation must never break the pack compile
         }
+        if (!IrisCompat.drawsWith(name)) return source; // none of our geometry is drawn with this program
         return switch (typeName) {
             case "FRAGMENT" -> injectGuarded(name, source, IrisSurfaceRegistry.snapshot());
             case "VERTEX" -> injectVertexGuarded(name, source, IrisSurfaceRegistry.snapshot());
@@ -186,6 +195,7 @@ public final class IrisShaderInjector {
             // Key by name + source length + surface count: a DIFFERENT pack's same-named program re-logs,
             // and so does a reload that bakes a different surface set (the original source length alone is
             // identical across reloads and would silently swallow the "injected N surface(s)" evidence).
+            if (out != source) INJECTED_PROGRAMS.add(name);
             if (out != source && LOGGED.add(name + "#" + (source == null ? 0 : source.length()) + "#" + surfaces.size())) {
                 // Report which sampler families the injected fragment reads — the ground truth for "does this pack
                 // program do albedo/normal/specular PBR for our geometry". Key by name + source length so a
