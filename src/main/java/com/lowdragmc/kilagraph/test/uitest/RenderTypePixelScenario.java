@@ -5,6 +5,9 @@ import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph.Settings.BlendMode;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph.Settings.DepthTest;
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraphTypes;
 import com.lowdragmc.kilagraph.rendertype.compiler.GeometrySpaces;
+import com.lowdragmc.kilagraph.rendertype.compiler.GlslType;
+import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
+import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.format.VertexFormatPresets;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.CombineNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.channel.SplitNode;
@@ -73,6 +76,7 @@ import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeFactory;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
 import com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureManager;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
@@ -100,6 +104,7 @@ import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -109,6 +114,7 @@ import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputCo
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 import static com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.bare;
+import static com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.exposed;
 import static com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.exposedTint;
 import static com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.fmt;
 import static com.lowdragmc.kilagraph.test.uitest.ShaderTestKit.quad;
@@ -146,6 +152,7 @@ public class RenderTypePixelScenario implements UIScenario {
                 .step("an exposed variable is a per-material uniform", RenderTypePixelScenario::materialUniform)
                 .step("two materials of one graph are not batched together", RenderTypePixelScenario::noCrossMaterialBatching)
                 .step("a value set during the submit reaches that draw", RenderTypePixelScenario::uniformSetDuringSubmit)
+                .step("uniforms after a vec3 read their own std140 slot, and ints their int bits", RenderTypePixelScenario::uniformPacking)
                 .step("textures sample the right texels, and can be swapped per material", RenderTypePixelScenario::textureSampling)
                 .step("uv runs left-to-right and bottom-to-top", RenderTypePixelScenario::uvDirection)
                 .step("blend modes combine with what is already there", RenderTypePixelScenario::blending)
@@ -293,6 +300,29 @@ public class RenderTypePixelScenario implements UIScenario {
                     }))) {
                 expect(ctx, "the value set in the geometry callback is the one drawn", rgba(img, C, C), 0, 1, 0);
             }
+        }
+    }
+
+    /** {@code Tint * (Low, High, Steps / 4)}: a float packs into the vec3's fourth slot, and the int is read as one. */
+    private static void uniformPacking(TestContext ctx) {
+        Bare b = bare();
+        NodeModel tinted = addNode(b.graph(), MultiplyNode.class);
+        wire(b.graph(), tinted.getInputsById().get("a"), exposed(b, "Tint", RenderTypeGraphTypes.VEC3, new Vector3f(1, 1, 1)));
+        NodeModel combine = addNode(b.graph(), CombineNode.class);
+        wire(b.graph(), combine.getInputsById().get("r"), exposed(b, "Low", TypeHandles.FLOAT, 0.25f));
+        wire(b.graph(), combine.getInputsById().get("g"), exposed(b, "High", TypeHandles.FLOAT, 0.5f));
+        wire(b.graph(), combine.getInputsById().get("b"), divided(b, exposed(b, "Steps", TypeHandles.INT, 3), 4));
+        wire(b.graph(), tinted.getInputsById().get("b"), combine.getOutputsById().get("rgb"));
+        wire(b.graph(), b.color(), tinted.getOutputsById().get("out"));
+        var types = new ShaderGraphCompiler(b.graph()).compile().layout().fields().stream()
+                .map(MaterialUniformLayout.Field::type).toList();
+        ctx.require("the block is vec3, float, float, int",
+                types.equals(List.of(GlslType.VEC3, GlslType.FLOAT, GlslType.FLOAT, GlslType.INT)));
+        try (RenderTypeGraphMaterial material = material(ctx, b)) {
+            expect(ctx, "the defaults (0.25, 0.5, 3 / 4)", draw(ctx, material, C, C), 0.25f, 0.5f, 0.75f);
+            material.setUniform("Low", 0.75f);
+            material.setUniform("Steps", 1f);
+            expect(ctx, "set values (0.75, 0.5, 1 / 4)", draw(ctx, material, C, C), 0.75f, 0.5f, 0.25f);
         }
     }
 
