@@ -1,4 +1,7 @@
 # ChangeLogs
+## v26.3.0.16.a
+* Fixed int and bool material uniforms being written as float bits
+
 ## v26.3.0.16
 * Added a nearest-entity node
 * Added the damage source as a graph type, with nodes to read one, test it against a damage type tag, build one and hurt with it

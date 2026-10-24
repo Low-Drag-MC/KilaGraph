@@ -5,7 +5,6 @@ import com.lowdragmc.kilagraph.rendertype.compiler.GradientGlsl;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.systems.RenderSystem;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
@@ -16,7 +15,7 @@ import java.util.Map;
 
 /**
  * The GPU-side {@code KG_Material} uniform buffer for one material instance. Holds the per-field
- * values on the Java side, packs them std140 in {@link MaterialUniformLayout} order, and uploads to
+ * values on the Java side, packs them at {@link MaterialUniformLayout#std140Offsets()}, and uploads to
  * a {@link KGUploadBuffer} that {@code PreparedRenderTypeMixin} binds during the draw.
  *
  * <p>Values are set with {@link #set}; {@link #prepareUpload()} re-uploads the GPU buffer after a change.
@@ -81,45 +80,41 @@ public final class MaterialUniformBuffer implements AutoCloseable {
     }
 
     private void upload() {
-        ByteBuffer bb = MemoryUtil.memAlloc(byteSize);
+        // zeroed, so padding and unset members read 0
+        ByteBuffer bb = MemoryUtil.memCalloc(byteSize);
         try {
-            Std140Builder b = Std140Builder.intoBuffer(bb);
-            for (MaterialUniformLayout.Field f : layout.fields()) {
+            var fields = layout.fields();
+            int[] offsets = layout.std140Offsets();
+            for (int i = 0; i < fields.size(); i++) {
+                var f = fields.get(i);
+                int at = offsets[i];
+                if (at < 0) continue; // a sampler: not a member of the block
                 float[] v = values.getOrDefault(f.name(), new float[0]);
                 switch (f.type()) {
-                    case FLOAT, INT, BOOL -> b.putFloat(at(v, 0));
-                    case VEC2 -> b.putVec2(at(v, 0), at(v, 1));
-                    case VEC3 -> b.putVec3(at(v, 0), at(v, 1), at(v, 2));
-                    case VEC4 -> b.putVec4(at(v, 0), at(v, 1), at(v, 2), at(v, 3));
-                    case MAT4 -> {
-                        float[] m = new float[16];
-                        for (int i = 0; i < 16; i++) m[i] = at(v, i);
-                        b.putMat4f(new org.joml.Matrix4f().set(m));
-                    }
-                    case SAMPLER2D -> { /* samplers are not UBO members */ }
-                    case GRADIENT -> {
-                        // KG_Gradient: vec4 header + 8 colour vec4 + 8 alpha vec4 (std140 16-aligned each).
-                        // v is GradientGlsl.pack(): [header(4), colors(32), alphas(32)] = 68 contiguous floats.
-                        for (int i = 0; i < 1 + GradientGlsl.MAX_KEYS * 2; i++) {
-                            int base = i * 4;
-                            b.putVec4(at(v, base), at(v, base + 1), at(v, base + 2), at(v, base + 3));
-                        }
-                    }
-                    case CURVE -> {
-                        // KG_Curve: vec4 header + 16 segment vec4 (std140 16-aligned each).
-                        // v is CurveGlsl.pack(): [header(4), segments(64)] = 68 contiguous floats.
-                        for (int i = 0; i < 1 + CurveGlsl.MAX_SEGMENTS * 2; i++) {
-                            int base = i * 4;
-                            b.putVec4(at(v, base), at(v, base + 1), at(v, base + 2), at(v, base + 3));
-                        }
-                    }
+                    // int / bool members take integer bits
+                    case INT, BOOL -> bb.putInt(at, (int) at(v, 0));
+                    case FLOAT -> bb.putFloat(at, at(v, 0));
+                    case VEC2 -> putFloats(bb, at, v, 2);
+                    case VEC3 -> putFloats(bb, at, v, 3);
+                    case VEC4 -> putFloats(bb, at, v, 4);
+                    // column-major
+                    case MAT4 -> putFloats(bb, at, v, 16);
+                    // KG_Gradient: GradientGlsl.pack() = [header(4), colors(32), alphas(32)], 17 contiguous vec4
+                    case GRADIENT -> putFloats(bb, at, v, (1 + GradientGlsl.MAX_KEYS * 2) * 4);
+                    // KG_Curve: CurveGlsl.pack() = [header(4), segments(64)], 17 contiguous vec4
+                    case CURVE -> putFloats(bb, at, v, (1 + CurveGlsl.MAX_SEGMENTS * 2) * 4);
+                    default -> { }
                 }
             }
-            bb.rewind();
+            // absolute puts: bb still holds all byteSize bytes
             buffer.upload(bb);
         } finally {
             MemoryUtil.memFree(bb);
         }
+    }
+
+    private static void putFloats(ByteBuffer bb, int offset, float[] v, int count) {
+        for (int i = 0; i < count; i++) bb.putFloat(offset + i * 4, at(v, i));
     }
 
     private static float at(float[] v, int i) {

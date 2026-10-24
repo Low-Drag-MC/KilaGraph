@@ -9,6 +9,7 @@ import com.lowdragmc.kilagraph.rendertype.nodes.vertex.VertexModelPositionBlock;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
 import com.lowdragmc.lowdraglib2.client.scene.SceneCameraContext;
 import com.lowdragmc.lowdraglib2.client.utils.RenderUtils;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
@@ -97,12 +98,16 @@ final class ShaderTestKit {
     /** A bare graph whose base colour is an EXPOSED vec3 variable "Tint", default red. */
     static Bare exposedTint() {
         Bare b = bare();
-        var tint = (VariableDeclarationModelBase) b.graph().graphModel.createVariable(
-                "Tint", RenderTypeGraphTypes.VEC3, new Vector3f(1, 0, 0), VariableKind.INPUT);
-        tint.setScope(VariableScope.EXPOSED);
-        var node = b.graph().graphModel.createVariableNode(tint, new Vector2f(), null, null);
-        wire(b.graph(), b.color(), node.getOutputPort());
+        wire(b.graph(), b.color(), exposed(b, "Tint", RenderTypeGraphTypes.VEC3, new Vector3f(1, 0, 0)));
         return b;
+    }
+
+    /** An EXPOSED variable (a {@code KG_Material} field) in {@code b}'s graph; returns its node's output. */
+    static PortModel exposed(Bare b, String name, TypeHandle type, Object defaultValue) {
+        var variable = (VariableDeclarationModelBase) b.graph().graphModel.createVariable(
+                name, type, defaultValue, VariableKind.INPUT);
+        variable.setScope(VariableScope.EXPOSED);
+        return b.graph().graphModel.createVariableNode(variable, new Vector2f(), null, null).getOutputPort();
     }
 
     /** A constant {@code vec3} node in {@code b}'s graph. */
