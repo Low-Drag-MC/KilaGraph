@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -156,10 +157,92 @@ public final class IrisShaderInjector {
         }
         if (!IrisCompat.drawsWith(name)) return source; // none of our geometry is drawn with this program
         return switch (typeName) {
-            case "FRAGMENT" -> injectGuarded(name, source, IrisSurfaceRegistry.snapshot());
-            case "VERTEX" -> injectVertexGuarded(name, source, IrisSurfaceRegistry.snapshot());
+            case "FRAGMENT" -> injectGuarded(name, source, fitting(name, typeName, source,
+                    IrisSurfaceRegistry.snapshot(), true));
+            case "VERTEX" -> injectVertexGuarded(name, source, fitting(name, typeName, source,
+                    IrisSurfaceRegistry.snapshot().stream().filter(IrisSurfaceRegistry.Surface::hasVertex).toList(),
+                    false));
             default -> source;
         };
+    }
+
+    /** {@link #fit} within this GL's limits for the stage, saying so when a surface in use doesn't fit. */
+    private static List<IrisSurfaceRegistry.Surface> fitting(String name, String typeName, String source,
+                                                             List<IrisSurfaceRegistry.Surface> surfaces, boolean fragment) {
+        List<IrisSurfaceRegistry.Surface> fitting = fit(source, surfaces, IrisGlslValidator.limits(fragment), fragment);
+        if (fitting.size() < surfaces.size()) {
+            Set<Integer> live = IrisSurfaceRegistry.liveIds();
+            long leftOut = surfaces.stream().filter(s -> !fitting.contains(s) && live.contains(s.id())).count();
+            if (leftOut > 0 && GUARD_LOGGED.add(name + "#" + typeName + "#full#" + leftOut)) {
+                LOGGER.warn("[KilaGraph][Iris] no room in '{}' ({}) for {} graph(s) in use: with the pack's own, their "
+                        + "uniform blocks and samplers exceed what the stage allows, so they're left out of it.",
+                        name, typeName, leftOut);
+            }
+        }
+        return fitting;
+    }
+
+    /** A shader stage's room: its uniform blocks and samplers. */
+    record Limits(int uniformBlocks, int samplers) {
+        static final Limits NONE = new Limits(Integer.MAX_VALUE, Integer.MAX_VALUE);
+    }
+
+    private static final Pattern BLOCK_DECL = Pattern.compile("\\buniform\\s+\\w+\\s*\\{");
+    private static final Pattern SAMPLER_DECL = Pattern.compile(
+            "\\buniform\\s+(?:(?:lowp|mediump|highp)\\s+)?[iu]?sampler\\w*\\s+(\\w+)\\s*(?:\\[\\s*(\\d+)\\s*])?");
+
+    /**
+     * The surfaces a program of {@code source} has room for within {@code limits}, in order: each takes the uniform
+     * blocks and samplers its declarations add (a shared one once) on top of the pack's — all its blocks, and the
+     * samplers it reads. One that doesn't fit is left out, rather than the program failing to link (and with it the
+     * pack); its geometry then draws the dispatch's fallback. Package-private for unit tests.
+     */
+    static List<IrisSurfaceRegistry.Surface> fit(String source, List<IrisSurfaceRegistry.Surface> surfaces,
+                                                 Limits limits, boolean fragment) {
+        int blocks = count(BLOCK_DECL, source);
+        int samplers = readSamplers(source);
+        boolean depthDeclared = !fragment || DEPTHTEX1_DECL.matcher(source).find();
+        Set<String> units = new HashSet<>();
+        List<IrisSurfaceRegistry.Surface> fitting = new ArrayList<>();
+        for (IrisSurfaceRegistry.Surface s : surfaces) {
+            int addBlocks = 0, addSamplers = 0;
+            for (String unit : s.declarationUnits()) {
+                if (units.contains(unit)) continue;
+                addBlocks += count(BLOCK_DECL, unit);
+                addSamplers += samplers(unit);
+            }
+            boolean addsDepth = s.usesSceneDepth() && !depthDeclared;
+            if (addsDepth) addSamplers++;
+            if (blocks + addBlocks > limits.uniformBlocks() || samplers + addSamplers > limits.samplers()) continue;
+            blocks += addBlocks;
+            samplers += addSamplers;
+            units.addAll(s.declarationUnits());
+            depthDeclared |= addsDepth;
+            fitting.add(s);
+        }
+        return fitting;
+    }
+
+    private static int count(Pattern pattern, String glsl) {
+        int count = 0;
+        for (Matcher m = pattern.matcher(glsl); m.find(); ) count++;
+        return count;
+    }
+
+    private static int samplers(String glsl) {
+        int units = 0;
+        for (Matcher m = SAMPLER_DECL.matcher(glsl); m.find(); ) units += m.group(2) == null ? 1 : Integer.parseInt(m.group(2));
+        return units;
+    }
+
+    /** The texture units the samplers {@code source} declares and reads take (an unread one is optimised away). */
+    private static int readSamplers(String source) {
+        int units = 0;
+        for (Matcher m = SAMPLER_DECL.matcher(source); m.find(); ) {
+            if (count(Pattern.compile("\\b" + m.group(1) + "\\b"), source) < 2) continue;
+            units += m.group(2) == null ? 1 : Integer.parseInt(m.group(2));
+        }
+        return units;
     }
 
     /**

@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL31;
 
 /**
  * Compiles a GLSL string against the live GL context purely to <em>validate</em> it — the safety net that
@@ -23,7 +24,24 @@ final class IrisGlslValidator {
     /** Info-log cap handed to {@code glGetShaderInfoLog} — same value vanilla uses for its program logs. */
     private static final int INFO_LOG_MAX = 32768;
 
+    @Nullable private static IrisShaderInjector.Limits fragmentLimits, vertexLimits;
+
     private IrisGlslValidator() {}
+
+    /** This GL's room for uniform blocks and samplers in a fragment (or vertex) shader; unlimited without GL. */
+    static IrisShaderInjector.Limits limits(boolean fragment) {
+        if (fragmentLimits == null) {
+            try {
+                fragmentLimits = new IrisShaderInjector.Limits(GlStateManager._getInteger(GL31.GL_MAX_FRAGMENT_UNIFORM_BLOCKS),
+                        GlStateManager._getInteger(GL20.GL_MAX_TEXTURE_IMAGE_UNITS));
+                vertexLimits = new IrisShaderInjector.Limits(GlStateManager._getInteger(GL31.GL_MAX_VERTEX_UNIFORM_BLOCKS),
+                        GlStateManager._getInteger(GL20.GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS));
+            } catch (Throwable noContext) {
+                return IrisShaderInjector.Limits.NONE;
+            }
+        }
+        return fragment ? fragmentLimits : vertexLimits;
+    }
 
     /**
      * @return {@code null} when {@code source} compiles as a fragment shader — or when no GL context is
