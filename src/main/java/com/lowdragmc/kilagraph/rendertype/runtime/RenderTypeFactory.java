@@ -325,8 +325,6 @@ public final class RenderTypeFactory {
 
     /** Release a material's reference to its generated pipelines; evict when the last one drops. */
     static void release(String contentHash) {
-        // Mirror the release into the Iris surface registry (no-op if this graph wasn't injection-registered).
-        if (IrisCompat.LOADED) IrisSurfaceRegistry.release(contentHash);
         REFCOUNTS.compute(contentHash, (h, count) -> {
             if (count == null) return null;
             if (count <= 1) {

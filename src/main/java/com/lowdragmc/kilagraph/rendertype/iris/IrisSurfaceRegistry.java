@@ -7,6 +7,9 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -21,9 +24,12 @@ import java.util.Set;
  * runtime sets per draw (see {@link IrisShaderInjector} / {@link IrisSurfaceUniform}).
  *
  * <p>Entries are keyed by graph <b>content hash</b> (so the many materials sharing one graph share one id +
- * snippet) and reference-counted in lockstep with {@code RenderTypeFactory}'s pipeline cache. Registering a
- * graph the program doesn't yet contain bumps {@link #generation()} — the cue for {@code IrisCompat} to
- * schedule a shaderpack recompile so {@code createShader} re-runs and picks up the new function.</p>
+ * snippet) and count the materials using them ({@link #register} / {@link #release}). Registering a graph the
+ * program doesn't yet contain bumps {@link #generation()} — the cue for {@code IrisCompat} to schedule a shaderpack
+ * recompile so {@code createShader} re-runs and picks up the new function. A surface no material uses any more
+ * stays, so a graph shown again needs no recompile — but only the {@value #MAX_UNUSED_SURFACES} most recently
+ * released ones do: past that the oldest is dropped, and the next compile leaves it out (a live editing session
+ * would otherwise grow the injected programs by a surface per edit).</p>
  *
  * <p>Per-id <b>namespacing</b> is applied here, not in the compiler: each snippet is emitted with the raw
  * names {@code KG_Material}/{@code kg_material} and {@code kg_grad_*}, which would collide between snippets
@@ -75,9 +81,17 @@ public final class IrisSurfaceRegistry {
     /** Content hashes whose surface failed standalone GL validation — permanently passthrough (id 0) this
      *  session, never re-validated (the graph source is content-hashed, so the failure is deterministic). */
     private static final Set<String> FAILED_HASHES = new LinkedHashSet<>();
-    /** content hash -> injected surface (insertion order = id order). Cached for the whole session — see
+    /** How many surfaces no material uses are kept for a graph shown again (see {@link #release}). */
+    static final int MAX_UNUSED_SURFACES = 32;
+
+    /** content hash -> injected surface (insertion order = id order); kept after its materials close — see
      *  {@link #release} — so a material recreated with the same graph reuses its id without a reload. */
     private static final Map<String, Surface> BY_HASH = new LinkedHashMap<>();
+    /** content hash -> how many live materials use the surface. */
+    private static final Map<String, Integer> USERS = new HashMap<>();
+    /** Hashes of the surfaces no material uses, the longest unused first. */
+    private static final Set<String> UNUSED = new LinkedHashSet<>();
+    /** Never reused: a program compiled before a surface was dropped still holds its function under its id. */
     private static int nextId = 1;
     /** Bumped whenever a NEW surface is added — lets the reload trigger detect a program that predates it. */
     private static int generation = 0;
@@ -92,14 +106,17 @@ public final class IrisSurfaceRegistry {
      * surface id, or {@code 0} when the graph is not injection-compatible ({@code injectionSnippet()} is
      * {@code null}) — that material then falls back to the M0 passthrough under Iris.
      *
-     * <p>Surfaces are cached for the <b>session</b>, deliberately decoupled from material lifetime (see
-     * {@link #release}): re-registering the same graph hash returns the existing id with no generation bump,
-     * so churn from materials being closed+recreated (switching holograms, exiting the editor) does <b>not</b>
-     * force a shaderpack recompile — only a genuinely new graph does.</p>
+     * <p>Each call is for one material, which {@link #release}s it when it closes (a call returning 0 needs none).
+     * Re-registering a graph hash whose surface is kept returns the existing id with no generation bump, so churn
+     * from materials being closed+recreated (switching holograms, exiting the editor) does <b>not</b> force a
+     * shaderpack recompile — only a new graph, or one whose surface was dropped, does.</p>
      */
     public static int register(CompiledShaderGraph compiled) {
-        String hash = compiled.contentHash();
-        InjectionSnippet snippet = compiled.injectionSnippet();
+        return register(compiled.contentHash(), compiled.injectionSnippet());
+    }
+
+    /** {@link #register(CompiledShaderGraph)} by its parts. Package-private for unit tests. */
+    static int register(String hash, @Nullable InjectionSnippet snippet) {
         if (snippet == null) {
             synchronized (LOCK) {
                 if (LOGGED_INCOMPATIBLE.add(hash)) {
@@ -120,8 +137,8 @@ public final class IrisSurfaceRegistry {
                 }
                 Surface candidate = build(nextId, snippet);
                 // Standalone GL validation BEFORE the surface enters the registry: a surface that can't
-                // compile would otherwise poison every program (the whole-source fallback in injectGuarded
-                // would then degrade ALL surfaces to passthrough). Rejecting here degrades only this graph.
+                // compile would otherwise poison the programs it's injected into (the whole-source fallback in
+                // injectGuarded would then degrade ALL surfaces to passthrough). Rejecting here degrades only this graph.
                 String err = validateStandalone(candidate);
                 if (err != null) {
                     FAILED_HASHES.add(hash);
@@ -148,6 +165,8 @@ public final class IrisSurfaceRegistry {
                         surface.id(), hash, surface.declarationUnits().size(), surface.functions().size(),
                         surface.hasVertex(), BY_HASH.size());
             }
+            USERS.merge(hash, 1, Integer::sum);
+            UNUSED.remove(hash);
             return surface.id();
         }
     }
@@ -225,23 +244,52 @@ public final class IrisSurfaceRegistry {
     public static String debugSummary() {
         synchronized (LOCK) {
             StringBuilder sb = new StringBuilder("surfaces=").append(BY_HASH.size())
+                    .append(" (unused ").append(UNUSED.size()).append(")")
                     .append(", generation=").append(generation);
             for (Map.Entry<String, Surface> e : BY_HASH.entrySet()) {
-                sb.append("\n  id=").append(e.getValue().id()).append(" hash=").append(e.getKey());
+                sb.append("\n  id=").append(e.getValue().id()).append(" hash=").append(e.getKey())
+                        .append(" users=").append(USERS.getOrDefault(e.getKey(), 0));
             }
             return sb.toString();
         }
     }
 
     /**
-     * No-op: a surface is <b>kept</b> after its material closes (cached for the session), so a material
-     * recreated with the same graph hash reuses the already-injected surface instead of re-registering and
-     * forcing another shaderpack reload. Materials still close their own GPU resources via
-     * {@code RenderTypeFactory.release}; only the injected GLSL surface persists here. (Kept as a method so the
-     * factory's release path stays symmetric and a future LRU cap can hook in.)
+     * A material that {@link #register}ed {@code contentHash} (and got a surface) closed. The surface stays once no
+     * material uses it, so a material recreated with the same graph reuses the injected surface instead of forcing
+     * another shaderpack reload — up to {@value #MAX_UNUSED_SURFACES} unused ones, the longest unused dropped first.
+     * A dropped surface needs no reload: no material draws with its id, and the next compile leaves it out.
      */
     public static void release(String contentHash) {
-        // intentionally empty — see the contract above
+        synchronized (LOCK) {
+            Integer users = USERS.get(contentHash);
+            if (users == null) return; // not registered (or already dropped)
+            if (users > 1) {
+                USERS.put(contentHash, users - 1);
+                return;
+            }
+            USERS.remove(contentHash);
+            UNUSED.add(contentHash);
+            for (Iterator<String> it = UNUSED.iterator(); UNUSED.size() > MAX_UNUSED_SURFACES; ) {
+                String dropped = it.next();
+                it.remove();
+                Surface surface = BY_HASH.remove(dropped);
+                LOGGER.debug("[KilaGraph][Iris] dropped unused surface id={} for graph {} ({} live)",
+                        surface == null ? 0 : surface.id(), dropped, BY_HASH.size());
+            }
+        }
+    }
+
+    /** Forget every surface. Package-private for unit tests. */
+    static void reset() {
+        synchronized (LOCK) {
+            BY_HASH.clear();
+            USERS.clear();
+            UNUSED.clear();
+            FAILED_HASHES.clear();
+            nextId = 1;
+            generation = 0;
+        }
     }
 
     /** Nanotime of the last new-surface registration (for the reload debounce). */
@@ -251,10 +299,25 @@ public final class IrisSurfaceRegistry {
         }
     }
 
-    /** An ordered snapshot of the live surfaces for the injector (defensive copy). */
+    /** The surfaces for the injector: those materials use, then the unused ones, the most recently released first —
+     *  the order a program with too little room takes them in ({@code IrisShaderInjector.fit}). */
     public static List<Surface> snapshot() {
         synchronized (LOCK) {
-            return new ArrayList<>(BY_HASH.values());
+            List<Surface> surfaces = new ArrayList<>(BY_HASH.size());
+            for (Map.Entry<String, Surface> e : BY_HASH.entrySet()) {
+                if (USERS.containsKey(e.getKey())) surfaces.add(e.getValue());
+            }
+            List<String> unused = new ArrayList<>(UNUSED);
+            for (int i = unused.size() - 1; i >= 0; i--) surfaces.add(BY_HASH.get(unused.get(i)));
+            return surfaces;
+        }
+    }
+
+    public static Set<Integer> liveIds() {
+        synchronized (LOCK) {
+            Set<Integer> ids = new HashSet<>();
+            for (String hash : USERS.keySet()) ids.add(BY_HASH.get(hash).id());
+            return ids;
         }
     }
 

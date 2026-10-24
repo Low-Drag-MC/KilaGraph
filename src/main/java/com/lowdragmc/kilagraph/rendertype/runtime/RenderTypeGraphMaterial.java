@@ -16,6 +16,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
+import com.lowdragmc.kilagraph.rendertype.iris.IrisSurfaceRegistry;
 import com.lowdragmc.lowdraglib2.math.HDRColor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
@@ -780,6 +781,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         uniforms.close();
         if (defaultInstance != null) defaultInstance.close();
         if (usesSceneColor || usesSceneDepth) SceneCaptureManager.INSTANCE.release();
+        // By material, not hash: another material of the hash may have no surface (a preview).
+        if (irisSurfaceId != 0) IrisSurfaceRegistry.release(contentHash);
         RenderTypeFactory.release(contentHash);
     }
 }
