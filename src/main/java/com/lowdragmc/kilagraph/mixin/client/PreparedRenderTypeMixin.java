@@ -128,12 +128,10 @@ public abstract class PreparedRenderTypeMixin implements KGPreparedRenderType {
         var bindings = kilagraph$bindings;
         if (material == null || bindings == null) return;
         material.bindCustomUniforms(renderPass, bindings, kilagraph$instances);
-        // Iris: record the active material so the program-bind hook can flag this draw (kg_surface_id) AND bind
-        // the material's KG_Material/managed UBOs onto the shaderpack's shared gbuffers program once it is
-        // actually bound (the program isn't bound at this hook). Reset after. id 0 = passthrough (graph not
-        // injection-compatible) — left unflagged so it shows the pack's own albedo.
+        // Iris: the pack's program is bound later, in setupDraw, where IrisSurfaceUniform writes our surface id and
+        // binds what this draw was prepared with. id 0 = passthrough: left unflagged, it shows the pack's own albedo.
         if (material.irisSurfaceId() != 0 && IrisCompat.isShaderPackInUse()) {
-            IrisSurfaceUniform.setCurrent(material);
+            IrisSurfaceUniform.setCurrent(material, bindings);
         }
     }
 

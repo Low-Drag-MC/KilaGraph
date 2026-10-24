@@ -5,6 +5,7 @@
   "plugin": "com.lowdragmc.kilagraph.mixin.iris.IrisMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "MixinFrontendRenderPassValidation",
     "MixinGlCommandEncoderSurface",
     "MixinShaderCreator"
   ],

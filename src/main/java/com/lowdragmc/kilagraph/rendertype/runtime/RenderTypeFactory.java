@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -112,7 +113,9 @@ public final class RenderTypeFactory {
     /** Sources of evicted graphs a background compile still reads, dropped once it is done. Render thread. */
     private static final Map<String, CompletableFuture<?>> SOURCES_IN_USE = new HashMap<>();
     /** Graph hashes already warned about a vertex format the Iris integration can't route (warn once each). */
-    private static final Set<String> IRIS_FORMAT_WARNED = ConcurrentHashMap.newKeySet();
+    private static final Set<String> IRIS_UNROUTED_WARNED = ConcurrentHashMap.newKeySet();
+    /** Graphs whose shaderpack variant doesn't compile where their own shader does: not routed through packs. */
+    private static final Set<String> SHADERPACK_VARIANT_FAILED = ConcurrentHashMap.newKeySet();
     /** Numbers each material's render type, so two materials of one graph never prepare to equal
      *  {@code PreparedRenderType} records — equal ones share a draw (and so one material's values). */
     private static final AtomicInteger MATERIAL_SERIAL = new AtomicInteger();
@@ -181,6 +184,15 @@ public final class RenderTypeFactory {
             return null; // generated GLSL references stage-unavailable data; don't build it
         }
         GeneratedPipelines pipelines = getOrBuildPipelines(compiled);
+        if (!KGPipelines.ensureCompiled(pipelines.main()) && KGPipelines.hasFailed(pipelines.main())
+                && irisRouted(compiled) && !REFCOUNTS.containsKey(hash)) {
+            // The main pipeline is the shaderpack variant: build the graph's own shader instead, and don't route it.
+            SHADERPACK_VARIANT_FAILED.add(hash);
+            LOGGER.warn("[KilaGraph][Iris] graph {}: its shaderpack variant doesn't compile, so shaderpacks don't draw "
+                    + "it.\n--- FRAGMENT ---\n{}", hash, compiled.shaderpackFragmentSource());
+            evictGenerated(hash);
+            pipelines = getOrBuildPipelines(compiled);
+        }
         if (!KGPipelines.ensureCompiled(pipelines.main())) {
             if (KGPipelines.hasFailed(pipelines.main()) && FAILED.add(hash)) {
                 LOGGER.warn("[KilaGraph] " +
@@ -206,11 +218,7 @@ public final class RenderTypeFactory {
         boolean solidPhase = translucent && oit == null;
 
         // A pack's entity program reads Sampler0/1/2 like a vanilla entity type does; unbound, it reads stale textures.
-        boolean irisRouted = IrisCompat.ENABLED
-                && compiled.settings().colorFormat() == RenderTypeGraph.Settings.ColorFormat.RGBA8
-                && compiled.instanceAttributes().isEmpty()
-                && compiled.colorTargets().isEmpty()
-                && IrisCompat.supportsVertexFormat(vertexFormat(compiled.settings().vertexFormatElements()));
+        boolean irisRouted = irisRouted(compiled);
         boolean useLightmap = compiled.usesLightmap() || irisRouted;
         boolean useOverlay = compiled.usesOverlay() || irisRouted;
         RenderSetup.RenderSetupBuilder setup = RenderSetup.builder(pipelines.main());
@@ -291,34 +299,20 @@ public final class RenderTypeFactory {
         for (Map.Entry<String, float[]> e : compiled.uniformDefaults().entrySet()) {
             material.setUniformField(e.getKey(), e.getValue());
         }
-        // Iris compatibility: register the graph's compiled surface so a shaderpack routes our geometry
-        // through its entities gbuffers program and runs our real shading there. register() returns a
-        // non-zero kg_surface_id when the graph is injection-compatible (the injected kg_surface(id,...)
-        // dispatch then shades our geometry), or 0 when it isn't — id 0 still assigns to entities so the
-        // geometry renders, falling back to the shaderpack's own albedo (passthrough). No-op without Iris.
-        // Gated on the vertex format: the entity ShaderKeys we assign to carry the ENTITY layout, and Iris
-        // re-checks nothing (see IrisCompat.supportsVertexFormat) — routing another layout there draws
-        // silently-wrong geometry, so such a graph is left out of the integration entirely.
-        if (IrisCompat.ENABLED) {
-            if (irisRouted) {
-                material.setIrisSurfaceId(IrisSurfaceRegistry.register(compiled));
-                IrisCompat.assignToEntities(pipelines.main(), translucent, compiled.alphaDiscards());
-                // A reload to inject this new surface (if the programs are now stale) is driven from the
-                // client tick (IrisCompat.reloadShadersIfStale via IrisDebugCommand), NOT here — reloading
-                // mid-frame crashes the world pipeline.
-            } else if (IRIS_FORMAT_WARNED.add(hash)) {
-                // Skipping is not just correctness: registering would GL-validate the surface, bump the
-                // registry generation (forcing a full shaderpack recompile on the next tick) and inject this
-                // surface into every pack program for the rest of the session — all for geometry the pack
-                // program could never shade correctly. Unassigned, Iris finds no override for the pipeline
-                // (it logs one "doesn't have a shader override" error of its own) and leaves our own program
-                // in place, so the material still draws with KilaGraph's shading, just without pack lighting.
-                LOGGER.warn("[KilaGraph][Iris] graph {} uses vertex format {} — shaderpack integration needs "
-                                + "the ENTITY format (Position, Color, UV0, UV1, UV2, Normal), so this graph is "
-                                + "not routed through the pack: it keeps rendering with its own shader, "
-                                + "unlit by the shaderpack.",
-                        hash, compiled.settings().vertexFormatElements());
-            }
+        // A shaderpack draws a routed graph with its entity program, running our shading there; a graph whose surface
+        // isn't injectable (id 0) still is, with the pack's own albedo.
+        if (irisRouted) {
+            material.setIrisSurfaceId(IrisSurfaceRegistry.register(compiled));
+            IrisCompat.assignToEntities(pipelines.main(), translucent, compiled.alphaDiscards());
+            // The reload injecting a new surface runs from the client tick (IrisCompat.reloadShadersIfStale):
+            // reloading mid-frame crashes the world pipeline.
+        } else if (IrisCompat.canRoute() && compiled.shaderpackFragmentSource() != null
+                && IRIS_UNROUTED_WARNED.add(hash)) {
+            // Unassigned, Iris keeps our own program for it (logging a missing override once).
+            LOGGER.warn("[KilaGraph][Iris] graph {} is not drawn by shaderpacks: their entity program needs the ENTITY "
+                            + "vertex format (Position, Color, UV0, UV1, UV2, Normal) into one RGBA8 target without "
+                            + "instance data (this graph: {}). It keeps its own shader, unlit by the pack.",
+                    hash, compiled.settings().vertexFormatElements());
         }
         return material;
     }
@@ -354,7 +348,7 @@ public final class RenderTypeFactory {
             }
         }
         if (compiling.isEmpty()) {
-            DynamicShaderSourceRegistry.unregister(DynamicShaderSourceRegistry.shaderId(contentHash));
+            unregisterSources(contentHash);
         } else {
             // A background compile still reads them: drop them once it is done (dropUnusedSources).
             SOURCES_IN_USE.put(contentHash, CompletableFuture.allOf(compiling.toArray(CompletableFuture[]::new)));
@@ -366,11 +360,14 @@ public final class RenderTypeFactory {
     public static void dropUnusedSources() {
         SOURCES_IN_USE.entrySet().removeIf(entry -> {
             if (!entry.getValue().isDone()) return false;
-            if (!PIPELINES.containsKey(entry.getKey())) {
-                DynamicShaderSourceRegistry.unregister(DynamicShaderSourceRegistry.shaderId(entry.getKey()));
-            }
+            if (!PIPELINES.containsKey(entry.getKey())) unregisterSources(entry.getKey());
             return true;
         });
+    }
+
+    private static void unregisterSources(String contentHash) {
+        DynamicShaderSourceRegistry.unregister(DynamicShaderSourceRegistry.shaderId(contentHash));
+        DynamicShaderSourceRegistry.unregister(DynamicShaderSourceRegistry.shaderpackShaderId(contentHash));
     }
 
     /** The cached pipelines for this compiled graph, building + registering its GLSL on first use. */
@@ -398,11 +395,12 @@ public final class RenderTypeFactory {
 
         Optional<BlendFunction> blend = blendFunction(settings.blend());
         ColorTargetState mainTarget = colorTarget(blend, settings.colorFormat());
-        RenderPipeline main = RenderPipeline.builder(snippet)
+        RenderPipeline.Builder mainBuilder = RenderPipeline.builder(snippet)
                 .withLocation(Identifier.fromNamespaceAndPath(Kilagraph.MODID, "pipeline/" + hash))
                 .withColorTargetState(mainTarget)
-                .withDepthStencilState(depthState(settings))
-                .build();
+                .withDepthStencilState(depthState(settings));
+        if (irisRouted(compiled)) withShaderpackBindings(mainBuilder, compiled);
+        RenderPipeline main = mainBuilder.build();
         RenderPipeline colorTargets = null;
         if (!compiled.colorTargets().isEmpty()) {
             RenderPipeline.Builder b = RenderPipeline.builder(snippet)
@@ -416,6 +414,44 @@ public final class RenderTypeFactory {
             colorTargets = b.build();
         }
         return new GeneratedPipelines(main, colorTargets, oitPipelines(settings, snippet, hash));
+    }
+
+    /** Whether a shaderpack draws {@code compiled}'s geometry with its own entity program
+     *  ({@link IrisCompat#assignToEntities}). */
+    private static boolean irisRouted(CompiledShaderGraph compiled) {
+        return IrisCompat.canRoute() && drawableByShaderpack(compiled)
+                && !SHADERPACK_VARIANT_FAILED.contains(compiled.contentHash());
+    }
+
+    /** Whether the graph draws what a shaderpack's entity program does: the entity vertex format into one RGBA8
+     *  target, with no per-instance data. */
+    private static boolean drawableByShaderpack(CompiledShaderGraph compiled) {
+        return compiled.shaderpackFragmentSource() != null
+                && compiled.settings().colorFormat() == RenderTypeGraph.Settings.ColorFormat.RGBA8
+                && compiled.instanceAttributes().isEmpty()
+                && compiled.colorTargets().isEmpty()
+                && IrisCompat.supportsVertexFormat(vertexFormat(compiled.settings().vertexFormatElements()));
+    }
+
+    /**
+     * The main pipeline of an {@link #irisRouted} graph also binds what vanilla's entity pipeline binds: a shaderpack's
+     * entity program drawn in its place reads those, and a render pass binds only what the pipeline's shader reads —
+     * so it runs the graph's shaderpack variant, which reads them too ({@code shaderpackFragmentSource}).
+     */
+    private static void withShaderpackBindings(RenderPipeline.Builder builder, CompiledShaderGraph compiled) {
+        Identifier shaderId = DynamicShaderSourceRegistry.shaderpackShaderId(compiled.contentHash());
+        DynamicShaderSourceRegistry.register(shaderId, compiled.vertexSource(),
+                Objects.requireNonNull(compiled.shaderpackFragmentSource()));
+        builder.withVertexShader(shaderId).withFragmentShader(shaderId);
+        for (String block : ShaderGraphCompiler.shaderpackBlocks()) {
+            if (compiled.builtinUniforms().contains(block)) continue;
+            builder.withBindGroupLayout(BindGroupLayout.builder().withUniform(block, UniformType.UNIFORM_BUFFER).build());
+        }
+        for (String sampler : ShaderGraphCompiler.SHADERPACK_SAMPLERS) {
+            if (compiled.layout().samplers().contains(sampler)) continue;
+            builder.withBindGroupLayout(BindGroupLayout.builder()
+                    .withUniform(sampler, UniformType.COMBINED_IMAGE_SAMPLER).build());
+        }
     }
 
     /** How a blend mode is drawn in the OIT phases; {@code null}: it can't be (it depends on what's behind). */

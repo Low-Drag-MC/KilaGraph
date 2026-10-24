@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.test.uitest;
 
 import com.lowdragmc.kilagraph.rendertype.RenderTypeGraph.Settings.BlendMode;
+import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
 import com.lowdragmc.kilagraph.rendertype.nodes.scene.SceneColorNode;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeFactory;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
@@ -106,6 +107,11 @@ public class RenderTypeWorldScenario implements UIScenario {
                 .step("screenshot", ctx -> ctx.screenshot("classic"))
                 .step("hide the quads, improved transparency", ctx -> {
                     scene(ctx).visible = false;
+                    // Iris turns improved transparency off whenever its shaders are on, with a pack or without one.
+                    if (IrisCompat.LOADED) {
+                        irisShadersBefore = IrisShaders.enabled();
+                        IrisShaders.set(false);
+                    }
                     Minecraft.getInstance().options.improvedTransparency().set(true);
                 })
                 .waitUntil("the renderer uses it", ctx -> Minecraft.getInstance().gameRenderer.useImprovedTransparency())
@@ -124,8 +130,30 @@ public class RenderTypeWorldScenario implements UIScenario {
                     Scene scene = shown;
                     shown = null;
                     Minecraft.getInstance().options.improvedTransparency().set(improvedTransparencyBefore);
+                    if (irisShadersBefore != null) IrisShaders.set(irisShadersBefore);
+                    irisShadersBefore = null;
                     if (scene != null) scene.materials.forEach(RenderTypeGraphMaterial::close);
                 });
+    }
+
+    /** Whether Iris's shaders were on before the improved half turned them off; {@code null}: untouched. */
+    @Nullable private static Boolean irisShadersBefore;
+
+    /** Iris's shader switch — only loaded when Iris is. */
+    private static final class IrisShaders {
+        static boolean enabled() {
+            return net.irisshaders.iris.Iris.getIrisConfig().areShadersEnabled();
+        }
+
+        static void set(boolean enabled) {
+            var config = net.irisshaders.iris.Iris.getIrisConfig();
+            config.setShadersEnabled(enabled);
+            try {
+                config.save();
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        }
     }
 
     private static void build(TestContext ctx) {

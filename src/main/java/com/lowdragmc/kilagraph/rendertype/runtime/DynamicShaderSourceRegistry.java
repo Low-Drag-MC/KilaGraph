@@ -32,6 +32,12 @@ public final class DynamicShaderSourceRegistry {
         return Identifier.fromNamespaceAndPath(Kilagraph.MODID, "generated/" + contentHash);
     }
 
+    /** The shader identifier of a compiled graph's shaderpack variant (see
+     *  {@code CompiledShaderGraph.shaderpackFragmentSource}). */
+    public static Identifier shaderpackShaderId(String contentHash) {
+        return Identifier.fromNamespaceAndPath(Kilagraph.MODID, "generated/" + contentHash + "_shaderpack");
+    }
+
     /** Register the vertex + fragment GLSL for a generated shader id (idempotent). */
     public static void register(Identifier id, String vertexSource, String fragmentSource) {
         SOURCES.put(new Key(id, ShaderType.VERTEX), vertexSource);

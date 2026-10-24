@@ -27,6 +27,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -282,7 +283,8 @@ public class ShaderGraphCompiler {
         line("gl_Position = " + position.code() + ";");
 
         String vsh = assembleVertex();
-        String fsh = assembleFragment(out);
+        String fsh = assembleFragment(out, false);
+        String shaderpackFsh = assembleFragment(out, true);
         // Also compile an Iris-injection snippet (a fresh compiler, fragment-only, injection mode) so a
         // material drawn under a shaderpack can run its real surface shading inside the pack's gbuffers
         // program. Skipped for the editor whole-graph preview (rendered in GUI/PIP, which Iris never
@@ -309,7 +311,8 @@ public class ShaderGraphCompiler {
                 usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth,
                 out.alphaDiscardCutoff != null, new ArrayList<>(missingAttributes),
                 tangentBasisDegraded, injectionSnippet, new ArrayList<>(instanceAttributes.values()),
-                out.colorTargets.values().stream().map(FragmentOutputs.ColorTargetWrite::target).toList());
+                out.colorTargets.values().stream().map(FragmentOutputs.ColorTargetWrite::target).toList(),
+                shaderpackFsh);
     }
 
     /**
@@ -354,7 +357,7 @@ public class ShaderGraphCompiler {
                 new LinkedHashMap<>(variableUniformFields), new LinkedHashMap<>(variableSamplerNames),
                 usesOverlay, usesLightmap, usesSceneColor, usesSceneDepth,
                 false, new ArrayList<>(missingAttributes),
-                tangentBasisDegraded, null, List.of(), List.of());
+                tangentBasisDegraded, null, List.of(), List.of(), null);
     }
 
     /**
@@ -1509,6 +1512,28 @@ public class ShaderGraphCompiler {
     public static final String PREMULTIPLIED_ALPHA_DEFINE = "KG_PREMULTIPLIED_ALPHA";
     /** Shader define of an additive (ONE, ONE) material's OIT pipelines: its colour counts in full, not by alpha. */
     public static final String ADDITIVE_ONE_DEFINE = "KG_ADDITIVE_ONE";
+    /**
+     * The includes declaring the blocks a shaderpack's entity program reads (those vanilla's entity pipeline binds),
+     * with a member of each to read — see {@link CompiledShaderGraph#shaderpackFragmentSource()}.
+     */
+    private static final Map<String, String> SHADERPACK_INCLUDES = new LinkedHashMap<>();
+    /** The samplers a shaderpack's entity program reads: albedo, overlay, lightmap. */
+    public static final List<String> SHADERPACK_SAMPLERS = List.of("Sampler0", "Sampler1", "Sampler2");
+
+    static {
+        // In a fixed order: the generated source must not depend on the run.
+        SHADERPACK_INCLUDES.put("minecraft:dynamictransforms.glsl", "ModelViewMat[0]");
+        SHADERPACK_INCLUDES.put("minecraft:projection.glsl", "ProjMat[0]");
+        SHADERPACK_INCLUDES.put("minecraft:fog.glsl", "FogColor");
+        SHADERPACK_INCLUDES.put("minecraft:globals.glsl", "vec4(GameTime)");
+        SHADERPACK_INCLUDES.put("minecraft:light.glsl", "vec4(Light0_Direction, 0.0)");
+    }
+
+    /** The blocks a shaderpack's entity program reads (see {@link #SHADERPACK_INCLUDES}). */
+    public static List<String> shaderpackBlocks() {
+        return SHADERPACK_INCLUDES.keySet().stream().map(INCLUDE_UBOS::get).toList();
+    }
+
     /** Sampler name for the captured opaque scene colour (bound at draw from {@code SceneCaptureManager}). */
     public static final String SCENE_COLOR_SAMPLER = "KG_SceneColor";
     /** Sampler name for the captured opaque scene depth (bound at draw from {@code SceneCaptureManager}). */
@@ -2129,12 +2154,34 @@ public class ShaderGraphCompiler {
 
     /** Emit a stage's helper function definitions (if any), each on its own line, after a blank line. */
     private static void appendFunctions(StringBuilder sb, StageScope scope) {
+        appendFunctions(sb, scope, Set.of());
+    }
+
+    /** {@link #appendFunctions(StringBuilder, StageScope)} for a stage that also has {@code extraIncludes}. */
+    private static void appendFunctions(StringBuilder sb, StageScope scope, Set<String> extraIncludes) {
         if (scope.functions.isEmpty()) return;
         sb.append('\n');
         for (var fn : scope.functions.entrySet()) {
-            if (providedByInclude(scope, fn.getKey())) continue;
+            if (providedByInclude(scope.includes, fn.getKey()) || providedByInclude(extraIncludes, fn.getKey())) continue;
             sb.append(fn.getValue()).append('\n');
         }
+    }
+
+    /** The shaderpack variant's declarations: the {@link #SHADERPACK_INCLUDES} and samplers the fragment lacks. */
+    private void appendShaderpackDeclarations(StringBuilder sb) {
+        for (String include : SHADERPACK_INCLUDES.keySet()) {
+            if (!fragment.includes.contains(include)) sb.append("#include <").append(include).append(">\n");
+        }
+        for (String sampler : SHADERPACK_SAMPLERS) {
+            if (!layout.samplers().contains(sampler)) sb.append("uniform sampler2D ").append(sampler).append(";\n");
+        }
+    }
+
+    /** The shaderpack variant reads them, in a branch never taken (depth isn't negative). */
+    private static void appendShaderpackReads(StringBuilder sb) {
+        sb.append("    if (gl_FragCoord.z < 0.0) kg_color += ").append(String.join(" + ", SHADERPACK_INCLUDES.values()));
+        for (String sampler : SHADERPACK_SAMPLERS) sb.append(" + texture(").append(sampler).append(", vec2(0.0))");
+        sb.append(";\n");
     }
 
     /** Functions each Minecraft include defines — an inline copy (FogGlsl/LightGlsl) is dropped when the
@@ -2148,8 +2195,8 @@ public class ShaderGraphCompiler {
             "minecraft:sample_lightmap.glsl", Set.of("sample_lightmap"),
             "minecraft:matrix.glsl", Set.of("mat2_rotate_z"));
 
-    private static boolean providedByInclude(StageScope scope, String function) {
-        for (String include : scope.includes) {
+    private static boolean providedByInclude(Collection<String> includes, String function) {
+        for (String include : includes) {
             Set<String> provided = INCLUDE_FUNCTIONS.get(include);
             if (provided != null && provided.contains(function)) return true;
         }
@@ -2380,11 +2427,12 @@ public class ShaderGraphCompiler {
      *       since a Minecraft pass has a single colour attachment.</li>
      * </ul>
      */
-    private String assembleFragment(FragmentOutputs out) {
+    private String assembleFragment(FragmentOutputs out, boolean shaderpack) {
         StringBuilder sb = new StringBuilder();
         sb.append(GLSL_PRELUDE).append('\n');
         appendIncludes(sb, fragment);
         sb.append("#ifdef OIT\n#include <minecraft:oit.glsl>\n#endif\n");
+        if (shaderpack) appendShaderpackDeclarations(sb);
         appendStructDecls(sb, fragment);
         String uniforms = layout.declareGlsl();
         if (!uniforms.isEmpty()) sb.append(uniforms);
@@ -2403,7 +2451,7 @@ public class ShaderGraphCompiler {
                     .append("#endif\n");
         }
         sb.append("#endif\n");
-        appendFunctions(sb, fragment);
+        appendFunctions(sb, fragment, shaderpack ? SHADERPACK_INCLUDES.keySet() : Set.of());
         sb.append("\nvoid main() {\n").append(fragment.body);
         String baseColor = out.baseColor != null ? out.baseColor.code() : "vec3(1.0)";
         String alpha = out.alpha != null ? out.alpha.code() : "1.0";
@@ -2416,6 +2464,7 @@ public class ShaderGraphCompiler {
             sb.append("    if (kg_alpha < ").append(out.alphaDiscardCutoff.code()).append(") discard;\n");
         }
         sb.append("    vec4 kg_color = vec4(kg_baseColor, kg_alpha);\n");
+        if (shaderpack) appendShaderpackReads(sb);
         // An additive surface never counts as opaque in the depth bounds, as in vanilla's additive OIT shaders.
         sb.append("#ifdef OIT_ADDITIVE\n    kg_color.a = min(0.99, kg_color.a);\n#endif\n");
         sb.append("#ifdef OIT_ALPHA_ONLY\n");

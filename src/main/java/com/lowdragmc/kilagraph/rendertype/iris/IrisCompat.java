@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.rendertype.iris;
 
 import com.lowdragmc.kilagraph.mixin.iris.IrisMixinPlugin;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
@@ -25,15 +26,13 @@ public final class IrisCompat {
     /** Whether Iris is on the classpath. Checked without initializing the class (no side effects). */
     public static final boolean LOADED = detect();
 
-    /** Master kill-switch: Iris present, the integration ported to this Minecraft version
-     *  ({@link IrisMixinPlugin#INTEGRATION_PORTED}) <em>and</em> not disabled via
+    /** Master kill-switch: Iris present <em>and</em> the integration not disabled via
      *  {@code -Dkilagraph.iris.disabled=true}. Read once at class init (toggling requires a restart);
-     *  {@code IrisMixinPlugin} reads the same gates independently at mixin-bootstrap, so with the switch
+     *  {@code IrisMixinPlugin} reads the same property independently at mixin-bootstrap, so with the switch
      *  off neither the mixins nor any runtime path runs — KilaGraph behaves as if Iris were absent. */
-    public static final boolean ENABLED = LOADED && IrisMixinPlugin.INTEGRATION_PORTED
-            && !Boolean.getBoolean("kilagraph.iris.disabled");
+    public static final boolean ENABLED = LOADED && !Boolean.getBoolean("kilagraph.iris.disabled");
 
-    /** Pipelines already handed to {@code IrisApi.assignPipeline}. Iris throws if a pipeline is assigned
+    /** Pipelines already handed to {@code IrisPipelines.assignPipeline}. Iris throws if a pipeline is assigned
      *  twice, and one cached pipeline (per content hash) is shared by many materials (preview + in-world),
      *  so we must assign each pipeline at most once. Weakly held: Iris's own pipeline map keeps a strong
      *  reference for as long as the assignment exists, so the weak set only removes OUR contribution to the
@@ -66,13 +65,6 @@ public final class IrisCompat {
     /** The Iris pipeline instance we last saw (weak — never pin a destroyed pipeline), to detect swaps. */
     private static WeakReference<Object> lastPipeline = new WeakReference<>(null);
 
-    static {
-        if (LOADED && !IrisMixinPlugin.INTEGRATION_PORTED) {
-            LOGGER.warn("[KilaGraph][Iris] Iris is installed, but the KilaGraph integration is not ported to this "
-                    + "Minecraft version yet: graph materials render with their own shader, unlit by the shaderpack.");
-        }
-    }
-
     private IrisCompat() {}
 
     private static boolean detect() {
@@ -87,6 +79,11 @@ public final class IrisCompat {
     /** True only when the integration is enabled <em>and</em> a shaderpack is currently active. */
     public static boolean isShaderPackInUse() {
         return ENABLED && Api.shaderPackInUse();
+    }
+
+    /** Whether a shaderpack can draw our geometry: Iris runs on the OpenGL backend only. */
+    public static boolean canRoute() {
+        return ENABLED && "OpenGL".equals(RenderSystem.getDevice().getDeviceInfo().backendName());
     }
 
     /** Number of KilaGraph pipelines registered with Iris so far (diagnostics). */
@@ -178,7 +175,11 @@ public final class IrisCompat {
      * Cheap: only consults Iris when the (rare) broken-latch is set.
      */
     public static boolean shouldSkipShadowDraw() {
-        if (!ENABLED || !shadowAssignBroken) return false;
+        return shadowAssignBroken && isRenderingShadowPass();
+    }
+
+    private static boolean isRenderingShadowPass() {
+        if (!ENABLED) return false;
         try {
             return Api.renderingShadowPass();
         } catch (Throwable t) {
@@ -298,8 +299,9 @@ public final class IrisCompat {
     /**
      * One-time handshake once a pack compile has demonstrably reached the injector (which proves the mixin
      * target classes are loaded): if the <em>binding</em> seam ({@code MixinGlCommandEncoderSurface}) never
-     * applied, per-draw {@code kg_surface_id}/UBO binding can't happen — everything ours would render
-     * passthrough and reloads would be pointless stutter, so latch {@link #mixinsMissing} and say so loudly.
+     * applied — or applied without its injection point, so its hook never ran though frames have been drawn — per-draw
+     * {@code kg_surface_id}/UBO binding can't happen: everything ours would render passthrough and reloads would be
+     * pointless stutter, so latch {@link #mixinsMissing} and say so loudly.
      * (A dead {@code MixinShaderCreator} is caught behaviourally in {@link #reloadShadersIfStale} instead —
      * with it dead, {@code lastInjectedGeneration} stays -1 and this check never arms.)
      */
@@ -308,10 +310,10 @@ public final class IrisCompat {
         if (IrisShaderInjector.lastInjectedGeneration() < 0) return; // no pack compile seen yet
         seamCheckDone = true;
         try {
-            if (!IrisMixinPlugin.wasApplied("MixinGlCommandEncoderSurface")) {
+            if (!IrisMixinPlugin.wasApplied("MixinGlCommandEncoderSurface") || !IrisSurfaceUniform.drawHookRan()) {
                 mixinsMissing = true;
-                LOGGER.error("[KilaGraph][Iris] MixinGlCommandEncoderSurface did not apply (MC/Iris internals "
-                        + "changed?) — integration degraded: KilaGraph materials render as shaderpack "
+                LOGGER.error("[KilaGraph][Iris] MixinGlCommandEncoderSurface did not apply or never ran (MC/Iris "
+                        + "internals changed?) — integration degraded: KilaGraph materials render as shaderpack "
                         + "passthrough; everything else is unaffected.");
             }
         } catch (Throwable ignored) {
@@ -321,6 +323,16 @@ public final class IrisCompat {
 
     /** Holder for the actual Iris calls — loaded lazily, only when {@link #LOADED} is true. */
     private static final class Api {
+        /** The keys our pipelines are assigned to (see {@link #assignEntities} / {@link #assignShadow}). */
+        private static final net.irisshaders.iris.pipeline.programs.ShaderKey SOLID =
+                net.irisshaders.iris.pipeline.programs.ShaderKey.ENTITIES_SOLID;
+        private static final net.irisshaders.iris.pipeline.programs.ShaderKey CUTOUT =
+                net.irisshaders.iris.pipeline.programs.ShaderKey.ENTITIES_CUTOUT;
+        private static final net.irisshaders.iris.pipeline.programs.ShaderKey TRANSLUCENT =
+                net.irisshaders.iris.pipeline.programs.ShaderKey.ENTITIES_TRANSLUCENT;
+        private static final net.irisshaders.iris.pipeline.programs.ShaderKey SHADOW =
+                net.irisshaders.iris.pipeline.programs.ShaderKey.SHADOW_ENTITIES_CUTOUT;
+
         static boolean shaderPackInUse() {
             return net.irisshaders.iris.api.v0.IrisApi.getInstance().isShaderPackInUse();
         }
@@ -330,12 +342,8 @@ public final class IrisCompat {
         }
 
         static void assignEntities(RenderPipeline pipeline, boolean translucent, boolean cutout) {
-            net.irisshaders.iris.pipeline.programs.ShaderKey key = translucent
-                    ? net.irisshaders.iris.pipeline.programs.ShaderKey.ENTITIES_TRANSLUCENT
-                    : cutout
-                    ? net.irisshaders.iris.pipeline.programs.ShaderKey.ENTITIES_CUTOUT
-                    : net.irisshaders.iris.pipeline.programs.ShaderKey.ENTITIES_SOLID;
-            net.irisshaders.iris.pipeline.IrisPipelines.assignPipeline(pipeline, key);
+            net.irisshaders.iris.pipeline.IrisPipelines.assignPipeline(pipeline,
+                    translucent ? TRANSLUCENT : cutout ? CUTOUT : SOLID);
         }
 
         static Object pipelineNullable() {
@@ -355,8 +363,7 @@ public final class IrisCompat {
          */
         static void assignShadow(RenderPipeline pipeline) {
             try {
-                net.irisshaders.iris.pipeline.IrisPipelines.assignPipelineShadow(pipeline,
-                        net.irisshaders.iris.pipeline.programs.ShaderKey.SHADOW_ENTITIES_CUTOUT);
+                net.irisshaders.iris.pipeline.IrisPipelines.assignPipelineShadow(pipeline, SHADOW);
             } catch (IllegalStateException alreadyAssigned) {
                 // A mapping is already registered for this pipeline — which is the state we wanted.
             }

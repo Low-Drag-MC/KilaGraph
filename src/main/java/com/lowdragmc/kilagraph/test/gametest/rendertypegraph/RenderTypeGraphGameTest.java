@@ -17,6 +17,7 @@ import com.lowdragmc.kilagraph.rendertype.gui.RenderTypeGraphView;
 import com.lowdragmc.kilagraph.rendertype.nodes.input.vertex.VertexAttributeInputNode;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.graph.GraphLogger;
 import com.lowdragmc.kilagraph.rendertype.nodes.fog.ApplyFogNode;
+import com.lowdragmc.kilagraph.rendertype.nodes.lighting.MixLightNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.LightMapTextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.OverlayTextureNode;
 import com.lowdragmc.kilagraph.rendertype.nodes.texture.TextureNode;
@@ -81,6 +82,7 @@ public final class RenderTypeGraphGameTest {
     private static final String DEFAULT_ENTITY_SHADER_GRAPH = "rendertype_default_entity_shader_graph";
     private static final String SHADER_VALUE_ASSIGNABILITY = "rendertype_shader_value_assignability";
     private static final String COMPILE_DEFAULT_ENTITY = "rendertype_compile_default_entity";
+    private static final String COMPILE_SHADERPACK_VARIANT = "rendertype_compile_shaderpack_variant";
     private static final String COMPILE_COMPOSED_FORMAT = "rendertype_compile_composed_format";
     private static final String VERTEX_FORMAT_VALIDATION = "rendertype_vertex_format_validation";
     private static final String VERTEX_ELEMENT_FALLBACK = "rendertype_vertex_element_fallback";
@@ -112,6 +114,8 @@ public final class RenderTypeGraphGameTest {
                 RenderTypeGraphGameTest::shaderVectorValuesAreWireCompatible);
         KGGameTests.registerFunction(COMPILE_DEFAULT_ENTITY,
                 RenderTypeGraphGameTest::compileDefaultEntityShader);
+        KGGameTests.registerFunction(COMPILE_SHADERPACK_VARIANT,
+                RenderTypeGraphGameTest::compileShaderpackVariant);
         KGGameTests.registerFunction(COMPILE_COMPOSED_FORMAT,
                 RenderTypeGraphGameTest::compileRespectsComposedVertexFormat);
         KGGameTests.registerFunction(VERTEX_FORMAT_VALIDATION,
@@ -154,6 +158,8 @@ public final class RenderTypeGraphGameTest {
                 KGGameTests.functionKey(SHADER_VALUE_ASSIGNABILITY), d);
         KGGameTests.registerFunctionTest(event, COMPILE_DEFAULT_ENTITY,
                 KGGameTests.functionKey(COMPILE_DEFAULT_ENTITY), d);
+        KGGameTests.registerFunctionTest(event, COMPILE_SHADERPACK_VARIANT,
+                KGGameTests.functionKey(COMPILE_SHADERPACK_VARIANT), d);
         KGGameTests.registerFunctionTest(event, COMPILE_COMPOSED_FORMAT,
                 KGGameTests.functionKey(COMPILE_COMPOSED_FORMAT), d);
         KGGameTests.registerFunctionTest(event, VERTEX_FORMAT_VALIDATION,
@@ -646,6 +652,67 @@ public final class RenderTypeGraphGameTest {
         assertTrue(helper, "layout registers the texture-constant sampler",
                 compiled.layout().samplers().stream().anyMatch(s -> s.startsWith("kg_tex")));
         helper.succeed();
+    }
+
+    /** The fragment a shaderpack's entity program is drawn in place of reads what that program reads — the blocks and
+     *  samplers vanilla's entity pipeline binds — once each, and the graph's own fragment is left as it is. */
+    public static void compileShaderpackVariant(GameTestHelper helper) {
+        CompiledShaderGraph compiled = new ShaderGraphCompiler(new RenderTypeGraph()).compile();
+        String fsh = compiled.fragmentSource();
+        String variant = compiled.shaderpackFragmentSource();
+        assertTrue(helper, "a graph has a shaderpack variant", variant != null);
+        assertFalse(helper, "the graph's own fragment doesn't read the overlay", fsh.contains("Sampler1"));
+        for (String include : List.of("dynamictransforms", "projection", "fog", "globals", "light")) {
+            assertEq(helper, "the variant includes " + include + " once", 1,
+                    count(variant, "#include <minecraft:" + include + ".glsl>"));
+        }
+        for (String sampler : List.of("Sampler0", "Sampler1", "Sampler2")) {
+            assertEq(helper, "the variant declares " + sampler + " once", 1,
+                    count(variant, "uniform sampler2D " + sampler + ";"));
+            assertTrue(helper, "the variant reads " + sampler, variant.contains("texture(" + sampler + ", vec2(0.0))"));
+        }
+        // The default graph inlines the fog functions (FogGlsl); with fog.glsl included they'd be defined twice.
+        assertEq(helper, "the variant leaves the inline fog functions to the include", 0, count(variant, "vec4 apply_fog("));
+        assertTrue(helper, "the variant still applies fog", variant.contains("apply_fog("));
+        assertTrue(helper, "the variant reads the blocks in a branch never taken",
+                variant.contains("if (gl_FragCoord.z < 0.0) kg_color += ModelViewMat[0] + ProjMat[0] + FogColor"));
+
+        // A graph that declares the overlay and lightmap itself, and inlines light.glsl's functions in the fragment.
+        RenderTypeGraph graph = new RenderTypeGraph();
+        NodeModel fragment = graph.getFragmentStageModel();
+        NodeModel baseColor = addBlock(graph, fragment, FragmentBaseColorBlock.class);
+        NodeModel emission = addBlock(graph, fragment, FragmentEmissionBlock.class);
+        NodeModel overlay = addNode(graph, OverlayTextureNode.class);
+        NodeModel lightmap = addNode(graph, LightMapTextureNode.class);
+        NodeModel texO = addNode(graph, SamplerTexture2DNode.class);
+        NodeModel texL = addNode(graph, SamplerTexture2DNode.class);
+        NodeModel lit = addNode(graph, MixLightNode.class);
+        NodeModel up = addNode(graph, Vec3Node.class);
+        wire(graph, texO.getInputsById().get("sampler"), overlay.getOutputsById().get("sampler"));
+        wire(graph, texL.getInputsById().get("sampler"), lightmap.getOutputsById().get("sampler"));
+        wire(graph, lit.getInputsById().get("color"), texO.getOutputsById().get("color"));
+        wire(graph, lit.getInputsById().get("normal"), up.getOutputsById().get("out"));
+        wire(graph, baseColor.getInputsById().get("color"), lit.getOutputsById().get("litColor"));
+        wire(graph, emission.getInputsById().get("color"), texL.getOutputsById().get("color"));
+        CompiledShaderGraph own = new ShaderGraphCompiler(graph).compile();
+        String ownVariant = own.shaderpackFragmentSource();
+        assertTrue(helper, "the graph's fragment inlines minecraft_mix_light",
+                own.fragmentSource().contains("vec4 minecraft_mix_light("));
+        assertTrue(helper, "a graph with its own overlay and lightmap has a variant", ownVariant != null);
+        for (String sampler : List.of("Sampler0", "Sampler1", "Sampler2")) {
+            assertEq(helper, "its variant declares " + sampler + " once", 1,
+                    count(ownVariant, "uniform sampler2D " + sampler + ";"));
+        }
+        assertEq(helper, "its variant leaves minecraft_mix_light to the include", 0,
+                count(ownVariant, "vec4 minecraft_mix_light("));
+        assertTrue(helper, "its variant still lights", ownVariant.contains("minecraft_mix_light("));
+        helper.succeed();
+    }
+
+    private static int count(String haystack, String needle) {
+        int count = 0;
+        for (int at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + needle.length())) count++;
+        return count;
     }
 
     /** The composed vertex format drives the generated {@code in} attribute declarations: a Block-preset

@@ -15,6 +15,7 @@ import com.lowdragmc.kilagraph.rendertype.compiler.CompiledShaderGraph;
 import com.lowdragmc.kilagraph.rendertype.compiler.MaterialUniformLayout;
 import com.lowdragmc.kilagraph.rendertype.compiler.SamplerDefault;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
+import com.lowdragmc.kilagraph.rendertype.iris.IrisCompat;
 import com.lowdragmc.lowdraglib2.math.HDRColor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.rendertype.PreparedRenderType;
@@ -79,8 +80,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     /** Sampler uniform name -> resolved view+sampler (external views applied), replaced — never changed — by
      *  {@link #prepareUniforms} (pre-pass), so a draw's {@link Bindings} can hold on to it. */
     private Map<String, ResolvedSampler> resolvedTextures = Map.of();
-    /** Resolved injection-only samplers (see {@link #injectionOnlyTextures}). */
-    private final Map<String, ResolvedSampler> resolvedInjectionTextures = new HashMap<>();
+    /** Resolved injection-only samplers (see {@link #injectionOnlyTextures}), replaced like {@link #resolvedTextures}. */
+    private Map<String, ResolvedSampler> resolvedInjectionTextures = Map.of();
     /** Sampler uniform name -> externally-supplied raw view+sampler (e.g. another mod's live {@code GpuTexture}),
      *  bound in preference to the Identifier/TextureManager binding. Lets a host feed a texture that has no
      *  registered {@link Identifier} (like SlideShow's decoded slide) straight into a graph sampler. */
@@ -89,8 +90,8 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
     private final boolean usesSceneColor;
     private final boolean usesSceneDepth;
     /** Non-zero discriminator written to the shaderpack program's injected {@code kg_surface_id} uniform while
-     *  this material draws (see {@code IrisShaderInjector}). 0 = no Iris injection. Set by the factory when a
-     *  shaderpack-compatible variant is active. */
+     *  this material draws (see {@code IrisShaderInjector}). 0 = no Iris injection. Set by the factory when the graph
+     *  is routed through shaderpacks and its surface registered. */
     private int irisSurfaceId = 0;
     /** Blended, but in a way order-independent transparency can't express (see {@link #drawsInSolidPhase}). */
     private final boolean drawsInSolidPhase;
@@ -190,29 +191,51 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         @Nullable private final GpuBufferSlice material;
         /** Per {@link #uniformBlocks} entry; {@code null}: the block's current slice, bound at the draw. */
         private final GpuBufferSlice[] blocks;
+        /** The same per {@link #injectionOnlyBlocks} entry, for a shaderpack program (see {@link #bindIrisBlocks}). */
+        private final GpuBufferSlice[] injectionBlocks;
         private final Map<String, ResolvedSampler> textures;
+        private final Map<String, ResolvedSampler> injectionTextures;
         @Nullable private final GpuBufferSlice defaultInstance;
 
-        private Bindings(@Nullable GpuBufferSlice material, GpuBufferSlice[] blocks,
-                         Map<String, ResolvedSampler> textures, @Nullable GpuBufferSlice defaultInstance) {
+        private Bindings(@Nullable GpuBufferSlice material, GpuBufferSlice[] blocks, GpuBufferSlice[] injectionBlocks,
+                         Map<String, ResolvedSampler> textures, Map<String, ResolvedSampler> injectionTextures,
+                         @Nullable GpuBufferSlice defaultInstance) {
             this.material = material;
             this.blocks = blocks;
+            this.injectionBlocks = injectionBlocks;
             this.textures = textures;
+            this.injectionTextures = injectionTextures;
             this.defaultInstance = defaultInstance;
+        }
+
+        /** The {@code KG_Material} values the draw was prepared with; null when the material has no uniform fields. */
+        @Nullable
+        public GpuBufferSlice material() {
+            return material;
         }
     }
 
     /** The bindings of a draw prepared now; given {@code prepared}'s, keeping its blocks (the prepare's transforms). */
     private Bindings capture(@Nullable Bindings prepared) {
         GpuBufferSlice[] blocks;
+        GpuBufferSlice[] injectionBlocks;
         if (prepared != null) {
             blocks = prepared.blocks;
+            injectionBlocks = prepared.injectionBlocks;
         } else {
-            blocks = new GpuBufferSlice[uniformBlocks.size()];
-            for (int i = 0; i < blocks.length; i++) blocks[i] = uniformBlocks.get(i).capture();
+            blocks = captureAll(uniformBlocks);
+            // Only a shaderpack program reads them: a capture makes the next upload of a per-draw block replace it.
+            injectionBlocks = drawnByShaderpack() ? captureAll(injectionOnlyBlocks)
+                    : new GpuBufferSlice[injectionOnlyBlocks.size()];
         }
-        return new Bindings(uniforms.capture(), blocks, resolvedTextures,
+        return new Bindings(uniforms.capture(), blocks, injectionBlocks, resolvedTextures, resolvedInjectionTextures,
                 defaultInstance == null ? null : defaultInstance.capture());
+    }
+
+    private static GpuBufferSlice[] captureAll(List<ShaderUniformBlock> blocks) {
+        GpuBufferSlice[] slices = new GpuBufferSlice[blocks.size()];
+        for (int i = 0; i < slices.length; i++) slices[i] = blocks.get(i).capture();
+        return slices;
     }
 
     // ---- instancing --------------------------------------------------------------------------
@@ -448,21 +471,30 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         return usesSceneColor;
     }
 
-    /** The uploaded {@code KG_Material} buffer slice, for binding onto an Iris shaderpack program at draw
-     *  (see {@code IrisSurfaceUniform}); null when this material has no uniform fields or before upload. */
-    @Nullable
-    public GpuBufferSlice irisMaterialSlice() {
-        return uniforms.slice();
+    /** Whether a shaderpack program draws this material now, the only reader of its injection-only parts. */
+    private boolean drawnByShaderpack() {
+        return irisSurfaceId != 0 && IrisCompat.isShaderPackInUse();
     }
 
-    /** The KilaGraph-managed UBOs ({@code KG_Globals}/{@code KG_Transforms}/...) to bind onto an Iris
-     *  shaderpack program at draw — the vanilla list plus the injection-only reconstruction blocks. */
-    public List<ShaderUniformBlock> irisUniformBlocks() {
-        if (injectionOnlyBlocks.isEmpty()) return uniformBlocks;
-        var all = new ArrayList<ShaderUniformBlock>(uniformBlocks.size() + injectionOnlyBlocks.size());
-        all.addAll(uniformBlocks);
-        all.addAll(injectionOnlyBlocks);
-        return all;
+    /** Receives each KilaGraph-managed UBO ({@code KG_Globals}/{@code KG_Transforms}/...) a draw binds onto an Iris
+     *  shaderpack program. */
+    public interface IrisBlockBinder {
+        void bind(String blockName, GpuBufferSlice slice);
+    }
+
+    /** Feed each KilaGraph-managed UBO a draw with {@code bindings} binds to {@code binder} — the vanilla list plus
+     *  the injection-only reconstruction blocks, each with the slice the draw was prepared with (or, for a block that
+     *  isn't captured per draw, its current one). */
+    public void bindIrisBlocks(Bindings bindings, IrisBlockBinder binder) {
+        bindIrisBlocks(uniformBlocks, bindings.blocks, binder);
+        bindIrisBlocks(injectionOnlyBlocks, bindings.injectionBlocks, binder);
+    }
+
+    private static void bindIrisBlocks(List<ShaderUniformBlock> blocks, GpuBufferSlice[] captured, IrisBlockBinder binder) {
+        for (int i = 0; i < blocks.size(); i++) {
+            GpuBufferSlice slice = captured[i] != null ? captured[i] : blocks.get(i).slice();
+            if (slice != null) binder.bind(blocks.get(i).uboName(), slice);
+        }
     }
 
     /** Receives each of this material's dynamic samplers (uniform name + resolved view/params) for binding
@@ -471,15 +503,15 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         void bind(String samplerName, GpuTextureView view, GpuSampler sampler);
     }
 
-    /** Feed each resolved dynamic sampler (with any external-view override applied) to {@code binder}, so
-     *  {@code IrisSurfaceUniform} can bind them onto the shaderpack program. Call after {@link #prepareUniforms}
-     *  (which fills {@link #resolvedTextures}). Excludes overlay/lightmap/scene (not in the dynamic map);
-     *  includes the injection-only samplers (e.g. {@code kg_NeutralWhite}). */
-    public void bindIrisSamplers(IrisSamplerBinder binder) {
-        for (Map.Entry<String, ResolvedSampler> e : resolvedTextures.entrySet()) {
+    /** Feed each dynamic sampler a draw with {@code bindings} binds (with any external-view override applied) to
+     *  {@code binder}, so {@code IrisSurfaceUniform} can bind them onto the shaderpack program. Excludes
+     *  overlay/lightmap/scene (not in the dynamic map); includes the injection-only samplers (e.g.
+     *  {@code kg_NeutralWhite}). */
+    public void bindIrisSamplers(Bindings bindings, IrisSamplerBinder binder) {
+        for (Map.Entry<String, ResolvedSampler> e : bindings.textures.entrySet()) {
             binder.bind(e.getKey(), e.getValue().view(), e.getValue().sampler());
         }
-        for (Map.Entry<String, ResolvedSampler> e : resolvedInjectionTextures.entrySet()) {
+        for (Map.Entry<String, ResolvedSampler> e : bindings.injectionTextures.entrySet()) {
             binder.bind(e.getKey(), e.getValue().view(), e.getValue().sampler());
         }
     }
@@ -652,8 +684,9 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
         if (closed) return;
         prepareValues();
         for (ShaderUniformBlock block : uniformBlocks) block.prepareUpload();
-        // Injection-only blocks must upload too, or the injected program reads a stale/empty buffer.
-        for (ShaderUniformBlock block : injectionOnlyBlocks) block.prepareUpload();
+        if (drawnByShaderpack()) {
+            for (ShaderUniformBlock block : injectionOnlyBlocks) block.prepareUpload();
+        }
     }
 
     /** The material's own part of {@link #prepareUniforms}: its values, default instance and textures. */
@@ -681,14 +714,15 @@ public final class RenderTypeGraphMaterial implements AutoCloseable {
             }
             resolvedTextures = resolved;
         }
-        if (!injectionOnlyTextures.isEmpty()) {
+        if (drawnByShaderpack() && !injectionOnlyTextures.isEmpty()) {
             var textureManager = Minecraft.getInstance().getTextureManager();
-            resolvedInjectionTextures.clear();
+            Map<String, ResolvedSampler> resolved = new HashMap<>(injectionOnlyTextures.size());
             for (Map.Entry<String, SamplerDefault> e : injectionOnlyTextures.entrySet()) {
                 SamplerDefault def = e.getValue();
                 AbstractTexture tex = textureManager.getTexture(def.texture());
-                resolvedInjectionTextures.put(e.getKey(), new ResolvedSampler(tex.getTextureView(), RenderTypeFactory.gpuSampler(def)));
+                resolved.put(e.getKey(), new ResolvedSampler(tex.getTextureView(), RenderTypeFactory.gpuSampler(def)));
             }
+            resolvedInjectionTextures = resolved;
         }
     }
 

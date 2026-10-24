@@ -75,7 +75,11 @@ public record CompiledShaderGraph(
         // Per-instance attributes (vertex binding 1), sorted by name. Declared in the GLSL, so hashed via it.
         List<InstanceAttribute> instanceAttributes,
         // Extra colour targets (MRT), sorted by location. Format and blend aren't in the GLSL, so hashed explicitly.
-        List<ColorTarget> colorTargets
+        List<ColorTarget> colorTargets,
+        // The fragment shader for a pipeline a shaderpack's entity program is drawn in place of (Iris): it also reads
+        // the blocks and samplers that program reads, which a render pass binds only when the pipeline's own shader
+        // does. Built from the same compile as fragmentSource, so NOT part of contentHash(); null for node previews.
+        @Nullable String shaderpackFragmentSource
 ) {
 
     /** Whether stage-affinity violations were found (the generated GLSL is then not safe to compile). */

@@ -3,7 +3,6 @@ package com.lowdragmc.kilagraph.rendertype.iris;
 import com.lowdragmc.kilagraph.rendertype.compiler.ShaderGraphCompiler;
 import com.lowdragmc.kilagraph.rendertype.runtime.RenderTypeGraphMaterial;
 import com.lowdragmc.kilagraph.rendertype.runtime.SceneCaptureManager;
-import com.lowdragmc.kilagraph.rendertype.runtime.ShaderUniformBlock;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.renderpearl.backend.opengl.GlBuffer;
@@ -27,14 +26,13 @@ import java.util.Map;
  * while a shaderpack owns the (shared) gbuffers program: the {@code kg_surface_id} discriminator <em>and</em>
  * the active material's {@code KG_Material}/managed UBOs, bound onto that program directly by program id.
  *
- * <p><b>Timing.</b> Iris pairs our {@code RenderPipeline} with the shaderpack's {@code GlProgram} and binds
- * that program lazily inside {@code GlCommandEncoder.trySetup} — <em>after</em> our
- * {@code PreparedRenderType.drawFromBuffer} "before drawIndexed" hook (where {@code GL_CURRENT_PROGRAM} is
- * still 0). So {@code PreparedRenderTypeMixin} only records the {@link #currentMaterial} around the draw;
- * {@link #applyToBoundProgram()} (a {@code trySetup} {@code @RETURN} hook) writes the id and binds the UBOs
- * onto the actually-bound program, and {@link #clearBoundProgram()} resets the id afterwards so an unrelated
- * draw on the same program isn't flagged as ours.</p>
-
+ * <p><b>Timing.</b> Iris pairs our {@code RenderPipeline} with the shaderpack's {@code GlProgram} (a substitute
+ * pipeline it hands out for ours) and the GL backend binds that program inside {@code GlCommandEncoder.setupDraw} —
+ * <em>after</em> our {@code PreparedRenderType.draw} "before drawIndexed" hook. So {@code PreparedRenderTypeMixin}
+ * only records the {@link #currentMaterial} and the draw's {@link RenderTypeGraphMaterial.Bindings} around the draw;
+ * {@link #applyToBoundProgram()} (a {@code setupDraw} {@code @RETURN} hook) writes the id and binds what the draw was
+ * prepared with onto the actually-bound program, and {@link #clearBoundProgram()} resets the id afterwards so an
+ * unrelated draw on the same program isn't flagged as ours.</p>
  *
  * <p>The material's {@code KG_Material} UBO is bound to the injected per-id block {@code KG_Material_<id>}
  * ({@link IrisSurfaceRegistry#materialBlockName}); managed UBOs ({@code KG_Globals}/{@code KG_Transforms})
@@ -56,9 +54,15 @@ public final class IrisSurfaceUniform {
     /** Uniform-block index per "program:blockName" (avoids a glGetUniformBlockIndex every draw). */
     private static final Map<String, Integer> BLOCK_INDEX = new HashMap<>();
 
-    /** The material currently being drawn (null = not ours). Render-thread only. */
+    /** The material currently being drawn (null = not ours), and what that draw binds. Render-thread only. */
     @Nullable private static RenderTypeGraphMaterial currentMaterial;
+    @Nullable private static RenderTypeGraphMaterial.Bindings currentBindings;
     private static int currentSurfaceId = 0;
+    /** The program {@link #applyToBoundProgram} flagged as drawing our geometry; 0 = none. */
+    private static int flaggedProgram;
+    /** Whether the {@code setupDraw} hook has run — it runs for every GL draw (see
+     *  {@code IrisCompat.warnOnceIfSeamsMissing}). */
+    private static boolean drawHookRan;
 
     /** Sampler uniform location per "program:samplerName" (avoids a glGetUniformLocation every draw). */
     private static final Map<String, Integer> SAMPLER_LOCATION = new HashMap<>();
@@ -93,16 +97,22 @@ public final class IrisSurfaceUniform {
         return injectedDraws;
     }
 
-    /** Record the material of the draw we're about to issue (set before {@code drawIndexed}). */
-    public static void setCurrent(@Nullable RenderTypeGraphMaterial material) {
-        currentMaterial = material;
-        currentSurfaceId = material != null ? material.irisSurfaceId() : 0;
+    public static boolean drawHookRan() {
+        return drawHookRan;
     }
 
-    /** Write {@link #currentSurfaceId} + bind the material's UBOs onto the currently-bound program. Called at
-     *  {@code trySetup} return, where the shaderpack program is bound. No-op when nothing is ours (the common
+    /** Record the material of the draw we're about to issue and what it binds (set before {@code drawIndexed}). */
+    public static void setCurrent(RenderTypeGraphMaterial material, RenderTypeGraphMaterial.Bindings bindings) {
+        currentMaterial = material;
+        currentBindings = bindings;
+        currentSurfaceId = material.irisSurfaceId();
+    }
+
+    /** Write {@link #currentSurfaceId} + bind the draw's UBOs and samplers onto the currently-bound program. Called at
+     *  {@code setupDraw} return, where the shaderpack program is bound. No-op when nothing is ours (the common
      *  case) so non-KilaGraph draws cost only an int check. */
     public static void applyToBoundProgram() {
+        drawHookRan = true;
         if (currentSurfaceId == 0) return; // nothing of ours drawing — leave the program untouched
         int program = GlStateManager._getInteger(GL20.GL_CURRENT_PROGRAM);
         if (program == 0) return;
@@ -114,6 +124,7 @@ public final class IrisSurfaceUniform {
         if (location(program) < 0) return;
         injectedDraws++;
         writeSurfaceId(program, currentSurfaceId);
+        flaggedProgram = program;
         bindMaterialBlocks(program);
         bindMaterialSamplers(program);
     }
@@ -121,12 +132,11 @@ public final class IrisSurfaceUniform {
     /** Reset the discriminator on the bound program to 0 after our draw, so geometry sharing this program
      *  is not mistaken for ours. Called from the draw's "after drawIndexed" hook (program still bound). */
     public static void clearBoundProgram() {
-        if (currentSurfaceId != 0) {
-            int program = GlStateManager._getInteger(GL20.GL_CURRENT_PROGRAM);
-            if (program != 0) writeSurfaceId(program, 0);
-        }
+        if (flaggedProgram != 0) writeSurfaceId(flaggedProgram, 0);
+        flaggedProgram = 0;
         currentSurfaceId = 0;
         currentMaterial = null;
+        currentBindings = null;
     }
 
     private static void writeSurfaceId(int program, int value) {
@@ -135,20 +145,18 @@ public final class IrisSurfaceUniform {
         GL41.glProgramUniform1i(program, location, value);
     }
 
-    /** Bind the active material's {@code KG_Material_<id>} + managed UBOs onto {@code program}. */
+    /** Bind the draw's {@code KG_Material_<id>} + managed UBOs onto {@code program}. */
     private static void bindMaterialBlocks(int program) {
         RenderTypeGraphMaterial m = currentMaterial;
-        if (m == null) return;
+        RenderTypeGraphMaterial.Bindings bindings = currentBindings;
+        if (m == null || bindings == null) return;
         int base = managedBindingBase();
-        GpuBufferSlice material = m.irisMaterialSlice();
+        GpuBufferSlice material = bindings.material();
         if (material != null) {
             bindBlock(program, IrisSurfaceRegistry.materialBlockName(currentSurfaceId), material, base);
         }
-        int bp = base + 1;
-        for (ShaderUniformBlock block : m.irisUniformBlocks()) {
-            GpuBufferSlice slice = block.slice();
-            if (slice != null) bindBlock(program, block.uboName(), slice, bp++);
-        }
+        int[] bp = {base + 1};
+        m.bindIrisBlocks(bindings, (name, slice) -> bindBlock(program, name, slice, bp[0]++));
     }
 
     /** Point block {@code blockName} of {@code program} at binding point {@code bp} and bind {@code slice}
@@ -173,11 +181,12 @@ public final class IrisSurfaceUniform {
      *  we never told it we moved) is exactly the case here, and would leave real GL on our high unit. */
     private static void bindMaterialSamplers(int program) {
         RenderTypeGraphMaterial m = currentMaterial;
-        if (m == null) return;
+        RenderTypeGraphMaterial.Bindings bindings = currentBindings;
+        if (m == null || bindings == null) return;
         int base = textureUnitBase();
         int prevActiveUnit = GlStateManager._getInteger(GL13.GL_ACTIVE_TEXTURE);
         int[] next = {0};
-        m.bindIrisSamplers((name, view, sampler) -> {
+        m.bindIrisSamplers(bindings, (name, view, sampler) -> {
             int location = samplerLocation(program, name);
             if (location < 0) return; // program doesn't sample it (e.g. stale program awaiting reload)
             int unit = base + next[0]++;
