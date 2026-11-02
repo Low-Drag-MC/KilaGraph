@@ -1,4 +1,7 @@
 # ChangeLogs
+## v26.3.1.0.1
+* Fixed improved transparency (order-independent transparency) losing the light a premultiplied surface carries at zero alpha, and faint or zero-alpha additive and premultiplied surfaces writing the far plane into the depth where they are the only translucent surface
+
 ## v26.3.1.0
 * Added Iris 1.11.7 support for NeoForge 26.3: a shaderpack draws render type graphs with its own entity programs, running their shading, textures, per-material values and vertex displacement there, and casting their shadows
 * Improved shaderpack reloads, now about 4 times faster: graph surfaces are injected only into the entity programs they draw with
