@@ -2990,13 +2990,14 @@ public final class ShaderCompilerGameTest {
         NodeModel sc2 = addNode(g2, SceneColorNode.class);
         wire(g2, addBlock(g2, g2.getFragmentStageModel(), FragmentBaseColorBlock.class).getInputsById().get("color"),
                 sc2.getOutputsById().get("out"));
-        // (gl_FragCoord.z is left to the OIT phases' depth; the screen-space uv is what must not appear.)
-        assertFalse(helper, "editor preview does not use gl_FragCoord",
-                new ShaderGraphCompiler(g2).editorPreview().compile().fragmentSource().contains("gl_FragCoord.xy"));
+        // (The OIT phases read gl_FragCoord for their own depth and pixel; the screen-space uv is what must not appear.)
+        String screenUv = "gl_FragCoord.xy / ";
+        assertFalse(helper, "editor preview does not use the screen-space uv",
+                new ShaderGraphCompiler(g2).editorPreview().compile().fragmentSource().contains(screenUv));
 
         // In-world: the real compile keeps true screen-space.
-        assertTrue(helper, "in-world keeps gl_FragCoord screen-space",
-                new ShaderGraphCompiler(g2).compile().fragmentSource().contains("gl_FragCoord.xy"));
+        assertTrue(helper, "in-world keeps the screen-space uv",
+                new ShaderGraphCompiler(g2).compile().fragmentSource().contains(screenUv));
         helper.succeed();
     }
 
