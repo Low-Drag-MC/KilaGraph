@@ -634,6 +634,15 @@ public class RenderTypePixelScenario implements UIScenario {
         oit(ctx, BlendMode.TRANSLUCENT_PREMULTIPLIED_ALPHA, c[0] + d[0] * (1 - a), c[1] + d[1] * (1 - a), c[2] + d[2] * (1 - a));
         oit(ctx, BlendMode.LIGHTNING, c[0] * a + d[0], c[1] * a + d[1], c[2] * a + d[2]);
         oit(ctx, BlendMode.ADDITIVE, c[0] + d[0], c[1] + d[1], c[2] + d[2]);
+        // what the accumulation adds bounds the depth the composite writes: a quad drawn after it, behind the wall
+        // behind the layer, stays hidden
+        float faint = 0.005f;
+        oit(ctx, "a translucent layer fainter than vanilla's depth-bounds cutoff", transparent(BlendMode.TRANSLUCENT, faint),
+                true, c[0] * faint + d[0] * (1 - faint), c[1] * faint + d[1] * (1 - faint), c[2] * faint + d[2] * (1 - faint));
+        oit(ctx, "an additive layer at zero alpha", transparent(BlendMode.ADDITIVE, 0f), true,
+                c[0] + d[0], c[1] + d[1], c[2] + d[2]);
+        oit(ctx, "a premultiplied layer's light at zero alpha", transparent(BlendMode.TRANSLUCENT_PREMULTIPLIED_ALPHA, 0f),
+                true, c[0] + d[0], c[1] + d[1], c[2] + d[2]);
         try (RenderTypeGraphMaterial multiply = material(ctx, halfTransparent(BlendMode.MULTIPLY));
              RenderTypeGraphMaterial translucent = material(ctx, halfTransparent(BlendMode.TRANSLUCENT))) {
             ctx.check("a multiply draws in the solid phase", multiply.drawsInSolidPhase());
@@ -823,16 +832,31 @@ public class RenderTypePixelScenario implements UIScenario {
 
     /** (0.5, 0.25, 0) at alpha 0.5 with {@code mode}. */
     private static Bare halfTransparent(BlendMode mode) {
+        return transparent(mode, 0.5f);
+    }
+
+    /** (0.5, 0.25, 0) at {@code alpha} with {@code mode}. */
+    private static Bare transparent(BlendMode mode, float alpha) {
         Bare graph = bare().settings(s -> settings(s, mode, s.depthTest(), false, false));
         wire(graph.graph(), graph.color(), vec3(graph, 0.5f, 0.25f, 0f).getOutputsById().get("out"));
-        NodeModel half = addNode(graph.graph(), Vec3Node.class);
-        setInputConstant(half, "x", 0.5f);
-        wire(graph.graph(), graph.alphaIn(), half.getOutputsById().get("out"));
+        NodeModel value = addNode(graph.graph(), Vec3Node.class);
+        setInputConstant(value, "x", alpha);
+        wire(graph.graph(), graph.alphaIn(), value.getOutputsById().get("out"));
         return graph;
     }
 
     private static void oit(TestContext ctx, BlendMode mode, float r, float g, float b) {
-        try (RenderTypeGraphMaterial material = material(ctx, halfTransparent(mode))) {
+        oit(ctx, mode + " through OIT over (0.2, 0.2, 0.2)", halfTransparent(mode), false, r, g, b);
+    }
+
+    /**
+     * {@code graph} through the OIT phases and the composite. With {@code wall}, over an opaque quad of the clear colour
+     * behind it, and a red quad drawn behind that wall after the composite must stay hidden.
+     */
+    private static void oit(TestContext ctx, String what, Bare graph, boolean wall, float r, float g, float b) {
+        try (RenderTypeGraphMaterial material = material(ctx, graph);
+             RenderTypeGraphMaterial backdrop = wall ? material(ctx, solid(0.2f, 0.2f, 0.2f, DepthTest.LEQUAL, true)) : null;
+             RenderTypeGraphMaterial behind = wall ? material(ctx, solid(1, 0, 0, DepthTest.LEQUAL, true)) : null) {
             Canvas canvas = canvas(ctx);
             canvas.clear(CLEAR);
             int size = Canvas.SIZE;
@@ -854,6 +878,7 @@ public class RenderTypePixelScenario implements UIScenario {
                 // A real (reversed-Z) perspective: the phases turn depths linear through the projection.
                 boolean zeroToOne = RenderSystem.getDevice().getDeviceInfo().isZZeroToOne();
                 Matrix4f projection = new Matrix4f().setPerspective((float) Math.toRadians(90), 1, 64f, 0.5f, zeroToOne);
+                if (backdrop != null) canvas.draw(backdrop, projection, vc -> quad(vc, -64, -64, 64, 64, -32, -1));
                 canvas.withCamera(projection, () -> Canvas.withPrepared(material.renderType(),
                         vc -> quad(vc, -16, -16, 16, 16, -8, -1), (prepared, info) -> {
                     for (OitStage stage : OitStage.values()) {
@@ -886,8 +911,9 @@ public class RenderTypePixelScenario implements UIScenario {
                         pass.draw(3, 1, 0, 0);
                     }
                 }));
+                if (behind != null) canvas.draw(behind, projection, vc -> quad(vc, -64, -64, 64, 64, -48, -1));
                 try (NativeImage img = canvas.read()) {
-                    expect(ctx, mode + " through OIT over (0.2, 0.2, 0.2)", rgba(img, C, C), r, g, b);
+                    expect(ctx, what, rgba(img, C, C), r, g, b);
                 }
             } finally {
                 targets.forEach(TextureTarget::destroyBuffers);

@@ -1508,7 +1508,7 @@ public class ShaderGraphCompiler {
     public static final String MRT_OUTPUTS = "kg_outputs";
     /** Shader define of the pipeline variant that writes the extra colour targets (see {@link #MRT_OUTPUTS}). */
     public static final String COLOR_TARGETS_DEFINE = "KG_COLOR_TARGETS";
-    /** Shader define of a premultiplied-alpha material's OIT pipelines: the accumulation wants straight alpha. */
+    /** Shader define of a premultiplied-alpha material's OIT pipelines: its colour is already weighted by alpha. */
     public static final String PREMULTIPLIED_ALPHA_DEFINE = "KG_PREMULTIPLIED_ALPHA";
     /** Shader define of an additive (ONE, ONE) material's OIT pipelines: its colour counts in full, not by alpha. */
     public static final String ADDITIVE_ONE_DEFINE = "KG_ADDITIVE_ONE";
@@ -2465,21 +2465,40 @@ public class ShaderGraphCompiler {
         }
         sb.append("    vec4 kg_color = vec4(kg_baseColor, kg_alpha);\n");
         if (shaderpack) appendShaderpackReads(sb);
-        // An additive surface never counts as opaque in the depth bounds, as in vanilla's additive OIT shaders.
-        sb.append("#ifdef OIT_ADDITIVE\n    kg_color.a = min(0.99, kg_color.a);\n#endif\n");
         sb.append("#ifdef OIT_ALPHA_ONLY\n");
-        sb.append("    executeAlphaOnlyPhase(gl_FragCoord.z, kg_color.a);\n");
+        sb.append("    float kg_coverage = clamp(kg_color.a, 0.0, 1.0);\n");
+        // Whatever the accumulation adds must bound the depth the composite writes, or the composite writes the far
+        // plane where it is the only surface: vanilla's phase drops alpha under 0.01, and a premultiplied or (ONE, ONE)
+        // colour adds light even at zero alpha.
+        sb.append("#ifdef OIT_DEPTH_BOUNDS\n")
+                .append("#if defined(").append(PREMULTIPLIED_ALPHA_DEFINE).append(") || defined(")
+                .append(ADDITIVE_ONE_DEFINE).append(")\n")
+                .append("    if (kg_coverage <= 0.0 && all(lessThanEqual(kg_color.rgb, vec3(0.0)))) discard;\n")
+                .append("#else\n")
+                .append("    if (kg_coverage <= 0.0) discard;\n")
+                .append("#endif\n")
+                .append("    kg_coverage = max(kg_coverage, 0.01);\n")
+                .append("#endif\n");
+        // An additive surface never counts as opaque in the depth bounds, as in vanilla's additive OIT shaders.
+        sb.append("#ifdef OIT_ADDITIVE\n    kg_coverage = min(kg_coverage, 0.99);\n#endif\n");
+        sb.append("    executeAlphaOnlyPhase(gl_FragCoord.z, kg_coverage);\n");
         sb.append("#else\n");
         sb.append("#ifdef OIT_ACCUMULATE\n");
-        // The accumulation premultiplies by alpha itself.
+        // Weighted by the transmittance in front of it without the accumulation's own premultiply: dividing alpha back
+        // out would lose the light a premultiplied colour carries at zero alpha.
         sb.append("#ifdef ").append(PREMULTIPLIED_ALPHA_DEFINE).append('\n')
-                .append("    kg_color.rgb /= max(kg_color.a, 0.0001);\n")
-                .append("#endif\n");
+                .append("    float kg_coverage = clamp(kg_color.a, 0.0, 1.0);\n")
+                .append("#ifdef RENDERPEARL_EXPLICIT_DEPTH_INVARIANCE\n    gl_FragDepth = gl_FragCoord.z;\n#endif\n")
+                .append("    kg_color = vec4(kg_color.rgb, kg_coverage) * sampleTransmittance(ivec2(gl_FragCoord.xy),\n")
+                .append("            normalizeDepth(gl_FragCoord.z), 1.0 - kg_coverage);\n")
+                .append("#else\n");
         // (ONE, ONE) blending adds the whole colour, whatever its alpha.
         sb.append("#ifdef ").append(ADDITIVE_ONE_DEFINE).append('\n')
                 .append("    kg_color.a = 1.0;\n")
                 .append("#endif\n");
+        sb.append("    kg_color.a = clamp(kg_color.a, 0.0, 1.0);\n");
         sb.append("    kg_color = sampleColorForAccumulation(kg_color);\n");
+        sb.append("#endif\n");
         sb.append("#endif\n");
         sb.append("    fragColor = kg_color;\n");
         if (!out.colorTargets.isEmpty()) {
