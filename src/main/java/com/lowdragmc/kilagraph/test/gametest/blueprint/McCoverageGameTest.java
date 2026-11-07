@@ -23,6 +23,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -271,11 +272,20 @@ public final class McCoverageGameTest {
                         "player", player, "stack", ItemStack.EMPTY).eval("ok", Boolean.class));
 
         // A real ServerPlayer, not the mock above: 26.1 delivers a system message through the player's
-        // connection, so a player without one genuinely cannot be sent to and the node says so.
-        assertTrue(helper, "sending a message reported success",
-                action(level, WorldEffectNodes.SendMessage.class,
-                        "player", helper.makeMockServerPlayerInLevel(),
-                        "message", Component.literal("hello")).eval("ok", Boolean.class));
+        // connection, so a player without one genuinely cannot be sent to and the node says so. It joins the
+        // player list every gametest shares, with a connection that negotiated no mod's channels, so it has to
+        // leave again: left behind, it fails any later test that sends a mod payload to all players.
+        ServerPlayer messaged = helper.makeMockServerPlayerInLevel();
+        try {
+            assertTrue(helper, "sending a message reported success",
+                    action(level, WorldEffectNodes.SendMessage.class,
+                            "player", messaged,
+                            "message", Component.literal("hello")).eval("ok", Boolean.class));
+        } finally {
+            level.getServer().getPlayerList().remove(messaged);
+        }
+        assertFalse(helper, "the mock server player left the server",
+                level.getServer().getPlayerList().getPlayers().contains(messaged));
         assertFalse(helper, "with no player it is refused",
                 action(level, WorldEffectNodes.SendMessage.class,
                         "message", Component.literal("hello")).eval("ok", Boolean.class));
