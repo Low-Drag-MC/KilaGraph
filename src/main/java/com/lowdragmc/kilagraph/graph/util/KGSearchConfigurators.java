@@ -38,15 +38,74 @@ public final class KGSearchConfigurators {
      */
     public static ITypeConfigurable typeHandlePickerOption(
             Supplier<Collection<TypeHandle>> candidatesSupplier) {
-        SearchComponentConfigurator.ISearchConfigurator<TypeHandle> search = typeHandleSearch(candidatesSupplier);
-        return (vc, th) -> IConfigurable.create(group ->
-                group.addConfigurator(new SearchComponentConfigurator<>(
-                        "",
-                        () -> readIdAsHandle(vc),
-                        h -> vc.setValue(h == null ? TypeHandles.UNKNOWN.getIdentification() : h.getIdentification()),
-                        search,
-                        vc.forceUpdate()
-                )));
+        return typeHandlePicker(typeHandleSearch(candidatesSupplier), Float.NaN);
+    }
+
+    /**
+     * {@link #typeHandlePickerOption}, at least {@code minWidth} wide: for a node whose title alone would leave the
+     * picker too narrow to show a type's name.
+     */
+    public static ITypeConfigurable typeHandlePickerOption(
+            Supplier<Collection<TypeHandle>> candidatesSupplier, float minWidth) {
+        return typeHandlePicker(typeHandleSearch(candidatesSupplier), minWidth);
+    }
+
+    /**
+     * {@link #typeHandlePickerOption} with "any type" ({@link TypeHandles#UNKNOWN}) offered first, for an option where
+     * leaving the type unset is a choice of its own — one the author has to be able to go back to.
+     */
+    public static ITypeConfigurable typeHandlePickerOptionOrAny(
+            Supplier<Collection<TypeHandle>> candidatesSupplier) {
+        return typeHandlePicker(orAnyType(typeHandleSearch(candidatesSupplier)), Float.NaN);
+    }
+
+    private static final String ANY_TYPE = "kg.type.any";
+
+    private static SearchComponentConfigurator.ISearchConfigurator<TypeHandle> orAnyType(
+            SearchComponentConfigurator.ISearchConfigurator<TypeHandle> types) {
+        return new SearchComponentConfigurator.ISearchConfigurator<>() {
+            @Override
+            public TypeHandle defaultValue() {
+                return TypeHandles.UNKNOWN;
+            }
+
+            @Override
+            public String resultText(@NotNull TypeHandle value) {
+                return TypeHandles.UNKNOWN.equals(value) ? LocalizationUtils.format(ANY_TYPE) : types.resultText(value);
+            }
+
+            @Override
+            public void search(String word, IResultHandler<TypeHandle> handler) {
+                String lower = word == null ? "" : word.toLowerCase();
+                if (lower.isEmpty() || LocalizationUtils.format(ANY_TYPE).toLowerCase().contains(lower)) {
+                    handler.accept(TypeHandles.UNKNOWN);
+                }
+                types.search(word, th -> {
+                    if (!TypeHandles.UNKNOWN.equals(th)) handler.accept(th);
+                });
+            }
+
+            @Override
+            public Component mapping(@NotNull TypeHandle value) {
+                return TypeHandles.UNKNOWN.equals(value) ? Component.translatable(ANY_TYPE) : types.mapping(value);
+            }
+        };
+    }
+
+    /** {@code minWidth} NaN: as wide as the row makes it. */
+    private static ITypeConfigurable typeHandlePicker(SearchComponentConfigurator.ISearchConfigurator<TypeHandle> search,
+                                                      float minWidth) {
+        return (vc, th) -> IConfigurable.create(group -> {
+            var picker = new SearchComponentConfigurator<>(
+                    "",
+                    () -> readIdAsHandle(vc),
+                    h -> vc.setValue(h == null ? TypeHandles.UNKNOWN.getIdentification() : h.getIdentification()),
+                    search,
+                    vc.forceUpdate()
+            );
+            if (!Float.isNaN(minWidth)) picker.searchComponent.layout(l -> l.minWidth(minWidth));
+            group.addConfigurator(picker);
+        });
     }
 
     private static TypeHandle readIdAsHandle(IFieldValueConfigurable vc) {

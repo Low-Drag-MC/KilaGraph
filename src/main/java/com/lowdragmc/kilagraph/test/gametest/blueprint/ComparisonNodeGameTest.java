@@ -9,17 +9,33 @@ import com.lowdragmc.kilagraph.blueprint.nodes.compare.GreaterEqualNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.compare.GreaterThanNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.compare.LessEqualNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.compare.LessThanNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.compare.ComparedType;
 import com.lowdragmc.kilagraph.blueprint.nodes.compare.NotEqualsNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.logic.EnumNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.logic.EqualsNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.graph.type.EnumTypes;
+import com.lowdragmc.kilagraph.graph.type.KGTypeHandles;
+import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeModel;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.InteractionHand;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
+import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addRegisteredNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
+import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertTrue;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.newGraph;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setInputConstant;
+import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.setOption;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.valueSource;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.wire;
 
@@ -188,5 +204,212 @@ public final class ComparisonNodeGameTest {
         assertEq(helper, "5 != \"5\"", Boolean.TRUE,
                 new GraphExecutor(g4).evaluate(n4.getOutputsById().get("out"), Boolean.class));
         helper.succeed();
+    }
+
+    /**
+     * With no type picked, Equals and Not Equals declare their inputs exactly as they did before the type option
+     * existed, and still take any two values.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void comparisonsWithNoTypeKeepTheirPorts(GameTestHelper helper) {
+        var g = newGraph();
+        var eq = addNode(g, EqualsNode.class);
+        var neq = addNode(g, NotEqualsNode.class);
+        assertEq(helper, "Equals in1", TypeHandles.OBJECT, eq.getInputsById().get("in1").getDataTypeHandle());
+        assertEq(helper, "Equals in2", TypeHandles.OBJECT, eq.getInputsById().get("in2").getDataTypeHandle());
+        assertEq(helper, "Not Equals a", TypeHandles.UNKNOWN, neq.getInputsById().get("a").getDataTypeHandle());
+        assertEq(helper, "Not Equals b", TypeHandles.UNKNOWN, neq.getInputsById().get("b").getDataTypeHandle());
+
+        wire(g, eq.getInputsById().get("in1"), valueSource(g.graphModel, "s", String.class, "x"));
+        wire(g, eq.getInputsById().get("in2"), valueSource(g.graphModel, "n", int.class, 5));
+        assertEq(helper, "\"x\" == 5", Boolean.FALSE,
+                new GraphExecutor(g).evaluate(eq.getOutputsById().get("out"), Boolean.class));
+        helper.succeed();
+    }
+
+    /**
+     * A type picked makes every input that type, and an unwired one holds a value of it: an enum nobody gave a
+     * default starts at its first value, as its dropdown shows, rather than handing on null.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void comparisonsWithATypeCompareAgainstAValueOfIt(GameTestHelper helper) {
+        String hand = InteractionHand.class.getName();
+        var g = newGraph();
+        var eq = addNode(g, EqualsNode.class);
+        setOption(eq, ComparedType.OPTION, hand);
+        assertEq(helper, "Equals in1 typed", hand,
+                eq.getInputsById().get("in1").getDataTypeHandle().getIdentification());
+        assertEq(helper, "Equals in2 typed", hand,
+                eq.getInputsById().get("in2").getDataTypeHandle().getIdentification());
+        wire(g, eq.getInputsById().get("in1"),
+                valueSource(g.graphModel, "h", InteractionHand.class, InteractionHand.MAIN_HAND));
+        assertEq(helper, "main hand == the unwired default", Boolean.TRUE,
+                new GraphExecutor(g).evaluate(eq.getOutputsById().get("out"), Boolean.class));
+        setInputConstant(eq, "in2", InteractionHand.OFF_HAND);
+        assertEq(helper, "main hand == off hand", Boolean.FALSE,
+                new GraphExecutor(g).evaluate(eq.getOutputsById().get("out"), Boolean.class));
+
+        // the executor's own path for Not Equals reads the same two inputs
+        var g2 = newGraph();
+        var neq = addNode(g2, NotEqualsNode.class);
+        setOption(neq, ComparedType.OPTION, hand);
+        assertEq(helper, "Not Equals b typed", hand,
+                neq.getInputsById().get("b").getDataTypeHandle().getIdentification());
+        wire(g2, neq.getInputsById().get("a"),
+                valueSource(g2.graphModel, "h", InteractionHand.class, InteractionHand.OFF_HAND));
+        assertEq(helper, "off hand != the unwired default", Boolean.TRUE,
+                new GraphExecutor(g2).evaluate(neq.getOutputsById().get("out"), Boolean.class));
+        setInputConstant(neq, "b", InteractionHand.OFF_HAND);
+        assertEq(helper, "off hand != off hand", Boolean.FALSE,
+                new GraphExecutor(g2).evaluate(neq.getOutputsById().get("out"), Boolean.class));
+
+        // and back to any type: the ports as they were
+        setOption(eq, ComparedType.OPTION, TypeHandles.UNKNOWN.getIdentification());
+        assertEq(helper, "Equals in2 back to any", TypeHandles.OBJECT,
+                eq.getInputsById().get("in2").getDataTypeHandle());
+
+        // the first value was these ports' own: the type still has no default, so no other node's unwired port of it
+        // changes from null
+        assertEq(helper, "the type left without a default", null,
+                KGTypeHandles.handleFor(InteractionHand.class).getDefaultValue());
+        helper.succeed();
+    }
+
+    /**
+     * The Enum node: an enum picked, then one of its values, which comes out typed as the enum — its first until another
+     * is picked, and a new enum's first, not the old one's value, when the enum is changed.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void theEnumNodeGivesTheValuePicked(GameTestHelper helper) {
+        var g = newGraph();
+        var node = addNode(g, EnumNode.class);
+        assertTrue(helper, "no value to pick before an enum is",
+                node.getNodeOptions().stream().noneMatch(o -> o.id.equals(EnumNode.VALUE)));
+
+        setOption(node, EnumNode.TYPE, InteractionHand.class.getName());
+        assertEq(helper, "out typed as the enum", InteractionHand.class.getName(),
+                node.getOutputsById().get("out").getDataTypeHandle().getIdentification());
+        assertEq(helper, "its first value to begin with", InteractionHand.MAIN_HAND,
+                new GraphExecutor(g).evaluate(node.getOutputsById().get("out"), Object.class));
+        setOption(node, EnumNode.VALUE, InteractionHand.OFF_HAND);
+        assertEq(helper, "the value picked", InteractionHand.OFF_HAND,
+                new GraphExecutor(g).evaluate(node.getOutputsById().get("out"), Object.class));
+
+        setOption(node, EnumNode.TYPE, Difficulty.class.getName());
+        assertEq(helper, "another enum: its first value", Difficulty.values()[0],
+                new GraphExecutor(g).evaluate(node.getOutputsById().get("out"), Object.class));
+        assertEq(helper, "and no default given to the type", null,
+                KGTypeHandles.handleFor(Difficulty.class).getDefaultValue());
+        helper.succeed();
+    }
+
+    /** The Enum node keeps its enum and value through a save, and offers the graph's enum types to pick from. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void theEnumNodeKeepsItsPickThroughASave(GameTestHelper helper) {
+        var g = newGraph();
+        var node = addRegisteredNode(g, EnumNode.class);
+        assertTrue(helper, "the graph's enums are offered: Direction",
+                EnumTypes.of(((ICustomNodeModel) node).getNode()).contains(TypeHandles.DIRECTION));
+        setOption(node, EnumNode.TYPE, InteractionHand.class.getName());
+        setOption(node, EnumNode.VALUE, InteractionHand.OFF_HAND);
+        var uid = node.getUid();
+
+        var provider = Platform.getFrozenRegistry();
+        g.graphModel.deserializeNBT(provider, g.graphModel.serializeNBT(provider));
+
+        var back = (NodeModel) g.graphModel.getModel(uid);
+        assertEq(helper, "still the enum", InteractionHand.class.getName(),
+                back.getOutputsById().get("out").getDataTypeHandle().getIdentification());
+        assertEq(helper, "still off hand", InteractionHand.OFF_HAND,
+                new GraphExecutor(g).evaluate(back.getOutputsById().get("out"), Object.class));
+        helper.succeed();
+    }
+
+    /**
+     * A graph saved before the type option existed has no value for it: it loads as any type, its ports and wires as
+     * they were, and compares the same.
+     *
+     * <p>Every input is wired: an untyped pin has no editor to type a value into, and a constant put on one by code is
+     * not kept by a save, before the option as after.</p>
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void aComparisonSavedBeforeTheTypeOptionLoadsAsAny(GameTestHelper helper) {
+        var g = newGraph();
+        // registered, not orphaned: an orphan is not saved
+        var eq = addRegisteredNode(g, EqualsNode.class);
+        var neq = addRegisteredNode(g, NotEqualsNode.class);
+        wire(g, eq.getInputsById().get("in1"), valueSource(g.graphModel, "a", String.class, "x"));
+        wire(g, eq.getInputsById().get("in2"), valueSource(g.graphModel, "b", String.class, "x"));
+        wire(g, neq.getInputsById().get("a"), valueSource(g.graphModel, "c", int.class, 5));
+        wire(g, neq.getInputsById().get("b"), valueSource(g.graphModel, "d", int.class, 6));
+        var eqUid = eq.getUid();
+        var neqUid = neq.getUid();
+
+        var provider = Platform.getFrozenRegistry();
+        CompoundTag saved = g.graphModel.serializeNBT(provider);
+        int stripped = stripOption(saved, "option_" + ComparedType.OPTION);
+        assertEq(helper, "the type option found in both saved nodes", 2, stripped);
+        g.graphModel.deserializeNBT(provider, saved);
+
+        var eq2 = (NodeModel) g.graphModel.getModel(eqUid);
+        var neq2 = (NodeModel) g.graphModel.getModel(neqUid);
+        assertEq(helper, "Equals in2 after loading", TypeHandles.OBJECT,
+                eq2.getInputsById().get("in2").getDataTypeHandle());
+        assertEq(helper, "Not Equals b after loading", TypeHandles.UNKNOWN,
+                neq2.getInputsById().get("b").getDataTypeHandle());
+        assertEq(helper, "\"x\" == \"x\" after loading", Boolean.TRUE,
+                new GraphExecutor(g).evaluate(eq2.getOutputsById().get("out"), Boolean.class));
+        assertEq(helper, "5 != 6 after loading", Boolean.TRUE,
+                new GraphExecutor(g).evaluate(neq2.getOutputsById().get("out"), Boolean.class));
+        helper.succeed();
+    }
+
+    /** A type picked and a value chosen for the unwired input are both kept by a save. */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void aTypedComparisonKeepsItsTypeAndValueThroughASave(GameTestHelper helper) {
+        String hand = InteractionHand.class.getName();
+        var g = newGraph();
+        var eq = addRegisteredNode(g, EqualsNode.class);
+        setOption(eq, ComparedType.OPTION, hand);
+        wire(g, eq.getInputsById().get("in1"),
+                valueSource(g.graphModel, "h", InteractionHand.class, InteractionHand.OFF_HAND));
+        setInputConstant(eq, "in2", InteractionHand.OFF_HAND);
+        var uid = eq.getUid();
+
+        var provider = Platform.getFrozenRegistry();
+        g.graphModel.deserializeNBT(provider, g.graphModel.serializeNBT(provider));
+
+        var back = (NodeModel) g.graphModel.getModel(uid);
+        assertEq(helper, "in2 still typed", hand, back.getInputsById().get("in2").getDataTypeHandle().getIdentification());
+        assertEq(helper, "in2 still off hand", InteractionHand.OFF_HAND,
+                back.getInputConstantsById().get("in2").getValue());
+        assertEq(helper, "off hand == off hand after loading", Boolean.TRUE,
+                new GraphExecutor(g).evaluate(back.getOutputsById().get("out"), Boolean.class));
+        helper.succeed();
+    }
+
+    /** Removes {@code key} from every node's saved input constants under {@code tag}; how many it removed. */
+    private static int stripOption(Tag tag, String key) {
+        int removed = 0;
+        if (tag instanceof CompoundTag compound) {
+            if (compound.get("inputConstants") instanceof CompoundTag constants && constants.contains(key)) {
+                constants.remove(key);
+                removed++;
+            }
+            for (String child : compound.getAllKeys()) {
+                removed += stripOption(compound.get(child), key);
+            }
+        } else if (tag instanceof ListTag list) {
+            for (Tag child : list) {
+                removed += stripOption(child, key);
+            }
+        }
+        return removed;
     }
 }

@@ -6,11 +6,14 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.exec.NumericLane;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandles;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
 /**
- * {@code a != b}, the inverse of {@code Equals}. Both inputs are typed UNKNOWN.
+ * {@code a != b}, the inverse of {@code Equals}. Both inputs are typed UNKNOWN unless a type is picked
+ * ({@link ComparedType}).
  *
  * <p>Numbers compare by value, everything else by {@code Objects.equals} — see
  * {@link NumericLane#valuesEqual} for why that distinction has to exist.</p>
@@ -20,9 +23,20 @@ public class NotEqualsNode extends AnnotatedNode {
     @OutputPort public boolean out;
 
     @Override
+    protected void onDefineExtraOptions(IOptionDefinitionContext ctx) {
+        ComparedType.define(ctx, this);
+    }
+
+    @Override
     protected void onDefineDynamicPorts(IPortDefinitionContext ctx) {
-        ctx.addInputPort("a", TypeHandles.UNKNOWN);
-        ctx.addInputPort("b", TypeHandles.UNKNOWN);
+        TypeHandle type = ComparedType.of(optionValue(ComparedType.OPTION, String.class, ""));
+        if (type == null) {
+            ctx.addInputPort("a", TypeHandles.UNKNOWN);
+            ctx.addInputPort("b", TypeHandles.UNKNOWN);
+        } else {
+            ComparedType.addInput(ctx, this, "a", type);
+            ComparedType.addInput(ctx, this, "b", type);
+        }
     }
 
     @Override

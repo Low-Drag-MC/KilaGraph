@@ -2371,12 +2371,22 @@
   "kg.node.logic_equals.tooltip": "所有输入相等时为真。",
   "kg.node.logic_equals.desc.1": "逐一比较所有输入是否相等。它适用于任意类型而不仅是数字，因此字符串、物品、方块坐标同样可比。",
   "kg.node.logic_equals.option.inputs.tooltip": "参与比较的值的数量。",
+  "kg.node.logic_equals.option.type.tooltip": "任意类型时可比较任何值。选定类型后所有输入都变成该类型，未连线的输入可以直接填该类型的值，比如从枚举的值里选一个。",
   "kg.node.logic_equals.out.out": "所有输入相等时为真。",
   "kg.node.logic_equals.note.1": "浮点数的精确相等判断并不可靠，建议改为判断两者之差是否足够小。",
 
+  "logic_enum": "枚举",
+  "kg.node.logic_enum.tooltip": "从列表里选出的一个枚举值。",
+  "kg.node.logic_enum.desc.1": "先选哪个枚举，再选它的哪个值。可以连到任何接收这个枚举的地方：连进「等于」做比较、连进「选择」，或者连给函数。",
+  "kg.node.logic_enum.option.type.tooltip": "哪个枚举，按名字搜索。",
+  "kg.node.logic_enum.option.value.tooltip": "输出这个枚举的哪个值。",
+  "kg.node.logic_enum.out.out": "选中的值。",
+
   "kg.node.cmp_neq.tooltip": "两个值不同时为真。",
   "kg.node.cmp_neq.desc.1": "Equals 的取反，适用于任意类型。",
+  "kg.node.cmp_neq.option.type.tooltip": "任意类型时可比较任何两个值。选定类型后两个输入都变成该类型，未连线的输入可以直接填该类型的值，比如从枚举的值里选一个。",
   "kg.node.cmp_neq.out.out": "两个值不同时为真。",
+  "kg.type.any": "任意类型",
 
   "kg.node.cmp_lt.tooltip": "a 小于 b 时为真。",
   "kg.node.cmp_lt.desc.1": "数值比较。",
