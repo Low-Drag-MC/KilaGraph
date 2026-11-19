@@ -6,16 +6,22 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.minecraft.gametest.framework.GameTest;
 import com.lowdragmc.kilagraph.Kilagraph;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.exec.ForNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
+import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.graph.exec.VariableStore;
 import com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import net.minecraft.gametest.framework.GameTestHelper;
 import org.joml.Vector2f;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.addNode;
 import static com.lowdragmc.kilagraph.test.gametest.KGGameTestHelpers.assertEq;
@@ -165,6 +171,55 @@ public final class ExecVarInteractionGameTest {
         Map<String, Object> results = exec.runOutputs();
         if (!(results.get("y") instanceof Number n)) { helper.fail("y not a number: " + results.get("y")); return; }
         assertEq(helper, "runOutputs sees exec-written y", 9f, n.floatValue(), 1e-5f);
+        helper.succeed();
+    }
+
+    /** Records each {@code SetVar} it is told of, with what the store holds for it by then. */
+    private static final class Recording extends EvaluationEnvironment {
+        final List<String> told = new ArrayList<>();
+
+        Recording() {
+            super(new VariableStore(), OptionalLong.empty());
+        }
+
+        @Override
+        public void onVariableSet(String name) {
+            told.add(name + "=" + variables().get(name));
+        }
+    }
+
+    /** Entry → For(3): body SetVar(count = index); completed: a SetVar naming nothing. */
+    private static List<String> setsTold(boolean intrinsics) {
+        var g = newGraph();
+        var entry = addNode(g, EntryNode.class);
+        var loop = addNode(g, ForNode.class);
+        setInputConstant(loop, "count", 3);
+        var set = addNode(g, SetVarNode.class);
+        setOption(set, "varName", "count");
+        var unnamed = addNode(g, SetVarNode.class);
+        wire(g, loop.getInputsById().get("in"), entry.getOutputsById().get("next"));
+        wire(g, set.getInputsById().get("trigger"), loop.getOutputsById().get("body"));
+        wire(g, set.getInputsById().get("value"), loop.getOutputsById().get("index"));
+        wire(g, unnamed.getInputsById().get("trigger"), loop.getOutputsById().get("completed"));
+
+        var env = new Recording();
+        var exec = new GraphExecutor(g, env);
+        exec.setOptimisationEnabled(GraphExecutor.Opt.EXEC_INTRINSICS, intrinsics);
+        exec.executeFrom(entry);
+        return env.told;
+    }
+
+    /**
+     * {@code EvaluationEnvironment.onVariableSet}: once per {@code SetVar} that ran, after its write, on the
+     * intrinsic path and through the node's own {@code execute} alike. A Set naming nothing writes nothing and
+     * tells nothing.
+     */
+    @GameTest(template = "empty")
+    @PrefixGameTestTemplate(false)
+    public static void everySetVarTellsTheEnvironmentAfterItsWrite(GameTestHelper helper) {
+        List<String> expected = List.of("count=0", "count=1", "count=2");
+        assertEq(helper, "the intrinsic path", expected, setsTold(true));
+        assertEq(helper, "the node's execute", expected, setsTold(false));
         helper.succeed();
     }
 }
