@@ -704,7 +704,10 @@ public final class GraphExecutor {
             // SetVar: ctx.setVariable(ctx.getOption("varName", String, ""), "value"); ctx.flow("next")
             case Intrinsics.XOP_SETVAR -> {
                 Object raw = optionValue(n, n.execAux);
-                if (raw instanceof String name) assignVariable(n, n.execIn, name);
+                if (raw instanceof String name && !name.isEmpty()) {
+                    assignVariable(n, n.execIn, name);
+                    env.onVariableSet(name);
+                }
                 frame.enqueueAll(n.flowTargets[n.execFlowA], n.flowTargetPins[n.execFlowA]);
             }
 
