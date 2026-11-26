@@ -2383,12 +2383,22 @@
   "kg.node.logic_equals.tooltip": "True when all inputs are equal.",
   "kg.node.logic_equals.desc.1": "Compares every input against the others for equality. It works on any type, not just numbers, so it also compares strings, items and block positions.",
   "kg.node.logic_equals.option.inputs.tooltip": "How many values to compare.",
+  "kg.node.logic_equals.option.type.tooltip": "Any type compares any values. Pick a type and every input becomes that type, so an unwired input can be set to a value of it, such as one of an enum's values.",
   "kg.node.logic_equals.out.out": "True when all inputs are equal.",
   "kg.node.logic_equals.note.1": "Comparing floats for exact equality is unreliable. Test whether their difference is small instead.",
 
+  "logic_enum": "Enum",
+  "kg.node.logic_enum.tooltip": "One value of an enum, picked from a list.",
+  "kg.node.logic_enum.desc.1": "Pick which enum first, then which of its values. Wire it anywhere that enum is taken: into Equals to compare against, into Select, or into a function.",
+  "kg.node.logic_enum.option.type.tooltip": "Which enum. Search it by name.",
+  "kg.node.logic_enum.option.value.tooltip": "Which of the enum's values comes out.",
+  "kg.node.logic_enum.out.out": "The value picked.",
+
   "kg.node.cmp_neq.tooltip": "True when the two values differ.",
   "kg.node.cmp_neq.desc.1": "The inverse of Equals, over any type.",
+  "kg.node.cmp_neq.option.type.tooltip": "Any type compares any two values. Pick a type and both inputs become that type, so an unwired input can be set to a value of it, such as one of an enum's values.",
   "kg.node.cmp_neq.out.out": "True when the two values differ.",
+  "kg.type.any": "Any type",
 
   "kg.node.cmp_lt.tooltip": "True when a is less than b.",
   "kg.node.cmp_lt.desc.1": "Numeric comparison.",

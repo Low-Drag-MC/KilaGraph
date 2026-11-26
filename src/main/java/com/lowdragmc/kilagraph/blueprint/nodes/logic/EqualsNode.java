@@ -1,6 +1,7 @@
 package com.lowdragmc.kilagraph.blueprint.nodes.logic;
 
 import com.lowdragmc.kilagraph.blueprint.BlueprintGraph;
+import com.lowdragmc.kilagraph.blueprint.nodes.compare.ComparedType;
 import com.lowdragmc.kilagraph.graph.core.PortIds;
 import com.lowdragmc.kilagraph.graph.core.AnnotatedNode;
 import com.lowdragmc.kilagraph.graph.core.Option;
@@ -8,6 +9,8 @@ import com.lowdragmc.kilagraph.graph.core.OutputPort;
 import com.lowdragmc.kilagraph.graph.exec.EvalContext;
 import com.lowdragmc.kilagraph.graph.exec.NumericLane;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.NodeAttribute;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.type.TypeHandle;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IOptionDefinitionContext;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefinitionContext;
 
 /**
@@ -18,6 +21,8 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.definition.IPortDefi
  * so a 5 that arrived as an {@code Integer} and a 5 that arrived as a {@code Float} came out unequal.
  * Which of the two a wire carries depends on whichever node produced it, and no player has any way to
  * know that. Everything that is not a number still compares with {@code Objects.equals}.</p>
+ *
+ * <p>The inputs take any values unless a type is picked ({@link ComparedType}).</p>
  */
 @NodeAttribute(name = "logic_equals", group = "logic", graphTypes = BlueprintGraph.class)
 public class EqualsNode extends AnnotatedNode {
@@ -27,10 +32,20 @@ public class EqualsNode extends AnnotatedNode {
     @OutputPort public boolean out;
 
     @Override
+    protected void onDefineExtraOptions(IOptionDefinitionContext context) {
+        ComparedType.define(context, this);
+    }
+
+    @Override
     protected void onDefineDynamicPorts(IPortDefinitionContext context) {
         int n = Math.max(2, optionValue("inputs", Integer.class, inputs));
+        TypeHandle type = ComparedType.of(optionValue(ComparedType.OPTION, String.class, ""));
         for (int i = 1; i <= n; i++) {
-            context.addInputPort(PortIds.in(i), Object.class);
+            if (type == null) {
+                context.addInputPort(PortIds.in(i), Object.class);
+            } else {
+                ComparedType.addInput(context, this, PortIds.in(i), type);
+            }
         }
     }
 
