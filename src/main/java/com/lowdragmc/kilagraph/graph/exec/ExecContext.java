@@ -419,7 +419,8 @@ public final class ExecContext {
      * <p>Equivalent to {@code getExecutor().getEnvironment().variables().put(name, getInputRaw(inputId))},
      * except that a number never becomes an object on the way: the value is copied from the
      * producing port's lane straight into the variable's. A no-op for an empty name, matching what
-     * {@code SetVar} did with one.</p>
+     * {@code SetVar} did with one. The environment is told after the write
+     * ({@link EvaluationEnvironment#onVariableSet}).</p>
      */
     public void setVariable(String name, String inputId) {
         if (name == null || name.isEmpty()) return;
@@ -427,9 +428,10 @@ public final class ExecContext {
         if (idx < 0) {
             // Not in the snapshot — fall back to the live model, as every other read here does.
             executor.getEnvironment().variables().put(name, getInputRaw(inputId));
-            return;
+        } else {
+            executor.assignVariable(prepared, idx, name);
         }
-        executor.assignVariable(prepared, idx, name);
+        executor.getEnvironment().onVariableSet(name);
     }
 
     /** Raise a {@code Break}: the nearest enclosing loop frame ends after this node. */

@@ -54,6 +54,16 @@ public class EvaluationEnvironment {
     }
 
     /**
+     * Told after a node wrote the graph variable {@code name} through {@link ExecContext#setVariable}
+     * — {@code SetVar}, intrinsic or not — whether or not the value changed. Nothing by default.
+     *
+     * <p>For a host that has to act where the write happens, inside the run: Unreal's Blueprint
+     * compiler follows every Set of a RepNotify variable with a call to its notify function. Writes a
+     * host makes to {@link #variables()} itself are not reported; it knows it made them.
+     */
+    public void onVariableSet(String name) {}
+
+    /**
      * The environment a subgraph runs in.
      *
      * <p>A subgraph gets its own variable store — that is what makes its locals local — but

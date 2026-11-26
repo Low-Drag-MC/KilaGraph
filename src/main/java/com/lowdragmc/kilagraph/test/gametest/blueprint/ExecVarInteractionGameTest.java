@@ -2,16 +2,22 @@ package com.lowdragmc.kilagraph.test.gametest.blueprint;
 
 
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.EntryNode;
+import com.lowdragmc.kilagraph.blueprint.nodes.exec.ForNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.exec.SetVarNode;
 import com.lowdragmc.kilagraph.blueprint.nodes.math.AddNode;
+import com.lowdragmc.kilagraph.graph.exec.EvaluationEnvironment;
 import com.lowdragmc.kilagraph.graph.exec.GraphExecutor;
+import com.lowdragmc.kilagraph.graph.exec.VariableStore;
 import com.lowdragmc.kilagraph.test.gametest.KGGraphBuilder;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.variable.VariableDeclarationModelBase;
 import net.minecraft.gametest.framework.GameTestHelper;
 import org.joml.Vector2f;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import com.lowdragmc.kilagraph.test.gametest.KGGameTests;
 import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.TestData;
@@ -35,6 +41,7 @@ public final class ExecVarInteractionGameTest {
     private static final String REMOVING_A_VARIABLE_RESTORES_ITS_DEFAULT = "exec_var_interaction_removing_a_variable_restores_its_default";
     private static final String EXEC_SET_THEN_DATA_READ = "exec_set_then_data_read";
     private static final String EXEC_SET_THEN_RUN_OUTPUTS = "exec_set_then_run_outputs";
+    private static final String EVERY_SET_VAR_TELLS_THE_ENVIRONMENT = "exec_var_interaction_every_set_var_tells_the_environment";
 
     private ExecVarInteractionGameTest() {}
 
@@ -44,13 +51,14 @@ public final class ExecVarInteractionGameTest {
         KGGameTests.registerFunction(A_VARIABLE_READ_GOES_STALE_WHEN_THE_FLOW_STEPS, ExecVarInteractionGameTest::aVariableReadGoesStaleWhenTheFlowSteps);
         KGGameTests.registerFunction(REMOVING_A_VARIABLE_RESTORES_ITS_DEFAULT, ExecVarInteractionGameTest::removingAVariableRestoresItsDefault);
         KGGameTests.registerFunction(EXEC_SET_THEN_RUN_OUTPUTS, ExecVarInteractionGameTest::execSetThenRunOutputs);
+        KGGameTests.registerFunction(EVERY_SET_VAR_TELLS_THE_ENVIRONMENT, ExecVarInteractionGameTest::everySetVarTellsTheEnvironmentAfterItsWrite);
     }
 
     public static void register(RegisterGameTestsEvent event, Holder<TestEnvironmentDefinition<?>> environment) {
         TestData<Holder<TestEnvironmentDefinition<?>>> d = KGGameTests.defaultTestData(environment);
         for (String p : new String[]{
                 EXEC_SET_THEN_DATA_READ, A_VARIABLE_READ_GOES_STALE_WHEN_THE_FLOW_STEPS, REMOVING_A_VARIABLE_RESTORES_ITS_DEFAULT,
-                EXEC_SET_THEN_RUN_OUTPUTS
+                EXEC_SET_THEN_RUN_OUTPUTS, EVERY_SET_VAR_TELLS_THE_ENVIRONMENT
         }) {
             KGGameTests.registerFunctionTest(event, p, KGGameTests.functionKey(p), d);
         }
@@ -173,6 +181,53 @@ public final class ExecVarInteractionGameTest {
         Map<String, Object> results = exec.runOutputs();
         if (!(results.get("y") instanceof Number n)) { helper.fail("y not a number: " + results.get("y")); return; }
         assertEq(helper, "runOutputs sees exec-written y", 9f, n.floatValue(), 1e-5f);
+        helper.succeed();
+    }
+
+    /** Records each {@code SetVar} it is told of, with what the store holds for it by then. */
+    private static final class Recording extends EvaluationEnvironment {
+        final List<String> told = new ArrayList<>();
+
+        Recording() {
+            super(new VariableStore(), OptionalLong.empty());
+        }
+
+        @Override
+        public void onVariableSet(String name) {
+            told.add(name + "=" + variables().get(name));
+        }
+    }
+
+    /** Entry â†’ For(3): body SetVar(count = index); completed: a SetVar naming nothing. */
+    private static List<String> setsTold(boolean intrinsics) {
+        var g = newGraph();
+        var entry = addNode(g, EntryNode.class);
+        var loop = addNode(g, ForNode.class);
+        setInputConstant(loop, "count", 3);
+        var set = addNode(g, SetVarNode.class);
+        setOption(set, "varName", "count");
+        var unnamed = addNode(g, SetVarNode.class);
+        wire(g, loop.getInputsById().get("in"), entry.getOutputsById().get("next"));
+        wire(g, set.getInputsById().get("trigger"), loop.getOutputsById().get("body"));
+        wire(g, set.getInputsById().get("value"), loop.getOutputsById().get("index"));
+        wire(g, unnamed.getInputsById().get("trigger"), loop.getOutputsById().get("completed"));
+
+        var env = new Recording();
+        var exec = new GraphExecutor(g, env);
+        exec.setOptimisationEnabled(GraphExecutor.Opt.EXEC_INTRINSICS, intrinsics);
+        exec.executeFrom(entry);
+        return env.told;
+    }
+
+    /**
+     * {@code EvaluationEnvironment.onVariableSet}: once per {@code SetVar} that ran, after its write, on the
+     * intrinsic path and through the node's own {@code execute} alike. A Set naming nothing writes nothing and
+     * tells nothing.
+     */
+    public static void everySetVarTellsTheEnvironmentAfterItsWrite(GameTestHelper helper) {
+        List<String> expected = List.of("count=0", "count=1", "count=2");
+        assertEq(helper, "the intrinsic path", expected, setsTold(true));
+        assertEq(helper, "the node's execute", expected, setsTold(false));
         helper.succeed();
     }
 }
